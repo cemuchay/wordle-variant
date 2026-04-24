@@ -117,46 +117,40 @@ export default function App() {
   }, [onEnter, onDelete, onChar]);
 
   return (
-    <main className="h-svh flex flex-col bg-dark text-white overflow-hidden">
+  <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
+    
+    {/* Minimal Top Bar - Replaces the big header */}
+    <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
+       <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
+       <div className="flex items-center gap-3">
+         <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
+         <DatePicker currentDate={date} onDateChange={handleDateChange} />
+       </div>
+    </div>
 
-      {/* Scrollable Area */}
-      <div className="flex-1 overflow-y-auto flex flex-col items-center py-6 px-4">
-        <header className="mb-6 text-center">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">
-            Wordle Variant
-          </h1>
-          <p className="text-gray-400 text-xs md:text-sm mt-2 font-mono">
-            {config.length} LETTERS • {date}
-          </p>
-        </header>
-
-        <div className="w-full max-w-md">
-          <DatePicker currentDate={date} onDateChange={handleDateChange} />
-        </div>
-
-        {/* Grid Container - centered and padded */}
-        <div className="flex-1 flex items-center justify-center w-full my-4">
-          <Grid
-          
-            wordLength={config.length}
-            maxAttempts={config.maxAttempts}
-            guesses={guesses}
-            currentGuess={currentGuess}
-          />
-        </div>
+    {/* Grid Area - This will now shrink or grow to fit available space */}
+<div className="flex-1 flex items-center justify-center min-h-0 w-full px-4">
+      <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
+        <Grid
+          wordLength={config.length}
+          maxAttempts={config.maxAttempts}
+          guesses={guesses}
+          currentGuess={currentGuess}
+        />
       </div>
+    </div>
 
-      {/* Keyboard Section - Forced Centering */}
-      <div className="w-full pb-8">
-        <div className="max-w-[600px] mx-auto px-2">
-          <Keyboard
-            onChar={onChar}
-            onDelete={onDelete}
-            onEnter={onEnter}
-            letterStatuses={letterStatuses}
-          />
-        </div>
-      </div>
-    </main>
-  );
+    {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
+    <div className="w-full max-w-[500px] mx-auto pt-2 pb-4 shrink-0">
+      <Keyboard
+        onChar={onChar}
+        onDelete={onDelete}
+        onEnter={onEnter}
+        letterStatuses={letterStatuses}
+      />
+    </div>
+
+    {/* Game Over Modal logic remains same... */}
+  </main>
+);
 }

@@ -18,42 +18,42 @@ interface Props {
 export const Keyboard: React.FC<Props> = ({ onChar, onDelete, onEnter, letterStatuses }) => {
   const getKeyStyle = (key: string) => {
     const status = letterStatuses[key];
-    // In Tailwind 4, ensure these variables are defined in index.css @theme
     switch (status) {
       case 'correct': return 'bg-correct border-correct text-white';
       case 'present': return 'bg-present border-present text-white';
       case 'absent': return 'bg-absent border-absent text-white';
-      default: return 'bg-gray-700 border-gray-600 text-white'; // High contrast dark gray
+      default: return 'bg-gray-700 border-gray-600 text-white';
     }
   };
 
   return (
-    <div className="w-full max-w-[500px] mt-auto pb-8 px-2 select-none">
+    /* mt-auto removed, controlled by App container. pb-2 for tighter fit */
+    <div className="w-full max-w-[500px] mx-auto px-1 select-none shrink-0 pb-2">
       {ROWS.map((row, i) => (
-        <div key={i} className="flex justify-center mb-2 gap-1.5">
+        <div key={i} className="flex justify-center mb-1.5 gap-1 sm:gap-1.5">
           {row.map((key) => {
             const isWide = key === 'ENTER' || key === 'DELETE';
             return (
               <button
                 key={key}
-
+                type="button"
                 className={`
-    ${isWide ? 'px-4 text-[11px] min-w-[65px]' : 'flex-1 min-w-[32px]'}
-    h-14 rounded-md font-bold transition-all border-b-2
-    flex items-center justify-center uppercase
-    cursor-pointer hover:brightness-110 active:translate-y-0.5 active:border-b-0
-    ${getKeyStyle(key)}
-  `}
+                  ${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'}
+                  /* Reduced height from h-14 to h-12/h-13 for vertical space */
+                  h-12 sm:h-13 rounded-md font-bold transition-all border-b-2
+                  flex items-center justify-center uppercase
+                  cursor-pointer hover:brightness-110 active:translate-y-0.5 active:border-b-0
+                  ${getKeyStyle(key)}
+                `}
                 onClick={(e) => {
-                  e.preventDefault(); // Prevent focus issues on mobile
+                  e.preventDefault();
                   if (key === 'ENTER') onEnter();
                   else if (key === 'DELETE') onDelete();
                   else onChar(key);
                 }}
-
               >
-                {key === 'DELETE' ? <Delete size={18} /> :
-                  key === 'ENTER' ? <CornerDownLeft size={18} /> : key}
+                {key === 'DELETE' ? <Delete size={18} /> : 
+                 key === 'ENTER' ? <CornerDownLeft size={18} /> : key}
               </button>
             );
           })}
