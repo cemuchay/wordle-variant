@@ -13,6 +13,27 @@ const getSavedState = (date: string) => {
 };
 
 export default function App() {
+  /**
+ * One-time cleanup for Beta testers
+ * Ensures old, buggy localStorage data is wiped for the new 5-letter version.
+ */
+  const MIGRATION_KEY = 'wordle_v1_cleared';
+
+  if (!localStorage.getItem(MIGRATION_KEY)) {
+    // 1. Find all keys that start with our game prefix
+    const keysToRemove = Object.keys(localStorage).filter(key =>
+      key.startsWith('wordle-')
+    );
+
+    // 2. Remove them
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // 3. Mark as cleared so this block is skipped on next reload
+    localStorage.setItem(MIGRATION_KEY, 'true');
+
+    console.log(`🧹 Beta Cleanup: Removed ${keysToRemove.length} old save files.`);
+  }
+
   const [date, setDate] = useState(() =>
     new URLSearchParams(window.location.search).get('date') ||
     new Date().toISOString().split('T')[0]
