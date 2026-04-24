@@ -22,21 +22,49 @@ import type { GameConfig, GuessResult } from '../types/game';
 
 import { WORDS_5 } from '../data/words';
 
+// lib/gameLogic.ts
+
+/**
+ * Mulberry32 PRNG
+ * Ensures that even small date changes produce a massive "jump" in the word index.
+ */
+const mulberry32 = (seed: number) => {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+};
+
 export function getDailyConfig(dateOverride?: string): GameConfig {
   const date = dateOverride || new Date().toISOString().split('T')[0];
-  const seed = date.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   
-  // For now, we are optimized for 5 letters
+  // 1. Create a high-entropy numeric seed
+  // We use the date + a salt to ensure the sequence is unique to your game
+  const salt = "GFARMS_V1"; 
+  const numericSeed = (date + salt).split('').reduce((acc, char, i) => {
+    return acc + (char.charCodeAt(0) * (i + 1));
+  }, 0);
+
+  // 2. Initialize generator
+  const random = mulberry32(numericSeed);
+
+  // 3. Constant 5-letter length
   const length = 5;
+  
+  // 4. Select from your Official WORDS_5 list
+  // Note: Ensure WORDS_5 is imported from your data/words.ts
   const list = WORDS_5;
   
-  // Deterministic selection from the OFFICIAL list
-  const word = list[seed % list.length];
+  // Using random() ensures today's word has no relation to tomorrow's alphabetically
+  const wordIndex = Math.floor(random() * list.length);
+  const word = list[wordIndex].toUpperCase();
 
   return {
     word,
     length,
-    maxAttempts: 6,
+    maxAttempts: 6, // Standard Wordle
   };
 }
 

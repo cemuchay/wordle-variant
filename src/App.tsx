@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getDailyConfig, checkGuess } from './lib/gameLogic';
 import { VALID_GUESSES_5 } from './data/words';
-import type{ GuessResult, LetterStatus } from './types/game';
+import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
 import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
@@ -13,8 +13,8 @@ const getSavedState = (date: string) => {
 };
 
 export default function App() {
-  const [date, setDate] = useState(() => 
-    new URLSearchParams(window.location.search).get('date') || 
+  const [date, setDate] = useState(() =>
+    new URLSearchParams(window.location.search).get('date') ||
     new Date().toISOString().split('T')[0]
   );
 
@@ -33,7 +33,7 @@ export default function App() {
     const url = new URL(window.location.href);
     url.searchParams.set('date', newDate);
     window.history.pushState({}, '', url);
-    
+
     // Reset all states for the new date
     const saved = getSavedState(newDate);
     setDate(newDate);
@@ -69,7 +69,7 @@ export default function App() {
 
     const result = checkGuess(upperGuess, config.word);
     const newGuesses = [...guesses, result];
-    
+
     // Calculate new letter statuses
     const newStatuses = { ...letterStatuses };
     result.forEach((res) => {
@@ -105,7 +105,7 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) return;
-      
+
       const key = e.key.toUpperCase();
       if (key === 'ENTER') onEnter();
       else if (key === 'BACKSPACE') onDelete();
@@ -117,40 +117,40 @@ export default function App() {
   }, [onEnter, onDelete, onChar]);
 
   return (
-  <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
-    
-    {/* Minimal Top Bar - Replaces the big header */}
-    <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
-       <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
-       <div className="flex items-center gap-3">
-         <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
-         <DatePicker currentDate={date} onDateChange={handleDateChange} />
-       </div>
-    </div>
+    <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
 
-    {/* Grid Area - This will now shrink or grow to fit available space */}
-<div className="flex-1 flex items-center justify-center min-h-0 w-full px-4">
-      <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
-        <Grid
-          wordLength={config.length}
-          maxAttempts={config.maxAttempts}
-          guesses={guesses}
-          currentGuess={currentGuess}
+      {/* Minimal Top Bar - Replaces the big header */}
+      <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
+        <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
+          <DatePicker currentDate={date} onDateChange={handleDateChange} />
+        </div>
+      </div>
+
+      {/* Grid Area - This will now shrink or grow to fit available space */}
+      <div className="flex-1 flex items-center justify-center min-h-0 w-full px-2">
+        <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
+          <Grid
+            wordLength={config.length}
+            maxAttempts={config.maxAttempts}
+            guesses={guesses}
+            currentGuess={currentGuess}
+          />
+        </div>
+      </div>
+
+      {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
+      <div className="w-full max-w-[500px] mx-auto pt-2 pb-2 shrink-0">
+        <Keyboard
+          onChar={onChar}
+          onDelete={onDelete}
+          onEnter={onEnter}
+          letterStatuses={letterStatuses}
         />
       </div>
-    </div>
 
-    {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
-    <div className="w-full max-w-[500px] mx-auto pt-2 pb-4 shrink-0">
-      <Keyboard
-        onChar={onChar}
-        onDelete={onDelete}
-        onEnter={onEnter}
-        letterStatuses={letterStatuses}
-      />
-    </div>
-
-    {/* Game Over Modal logic remains same... */}
-  </main>
-);
+      {/* Game Over Modal logic remains same... */}
+    </main>
+  );
 }
