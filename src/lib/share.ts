@@ -3,7 +3,6 @@ import type { GuessResult } from '../types/game';
 export const generateShareText = (
   date: string,
   guesses: GuessResult[][],
-  wordLength: number,
   maxAttempts: number,
   won: boolean
 ) => {
