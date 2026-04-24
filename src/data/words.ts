@@ -1,240 +1,44 @@
-export const WORDS_4 = [
-   "ABLE",
-   "BACK",
-   "BELL",
-   "BIRD",
-   "BLUE",
-   "BOAT",
-   "BOLD",
-   "BONE",
-   "COLD",
-   "DEAR",
-   "DOOR",
-   "DUST",
-   "ECHO",
-   "FACE",
-   "FAIR",
-   "FALL",
-   "FIRE",
-   "FISH",
-   "FLAT",
-   "FREE",
-   "GIFT",
-   "GLAD",
-   "GOLD",
-   "GOOD",
-   "GREY",
-   "HAND",
-   "HARD",
-   "HILL",
-   "HOPE",
-   "IRON",
-   "JUMP",
-   "JUST",
-   "KIND",
-   "KING",
-   "LAKE",
-   "LAMP",
-   "LEAF",
-   "LION",
-   "LOUD",
-   "LUCK",
-   "MIND",
-   "MOON",
-   "NEAR",
-   "NEXT",
-   "OPEN",
-   "PACK",
-   "PARK",
-   "PATH",
-   "PURE",
-   "RAIN",
-   "RICH",
-   "ROAD",
-   "ROCK",
-   "SAFE",
-   "SAND",
-   "SHIP",
-   "SHOW",
-   "SILK",
-   "SNOW",
-   "SOFT",
-   "STAR",
-   "STAY",
-   "TALL",
-   "TEAM",
-   "TENT",
-   "TIME",
-   "TRUE",
-   "VANE",
-   "VEST",
-   "VIEW",
-   "WAKE",
-   "WAVE",
-   "WIND",
-   "WOLF",
-   "YARD",
-   "ZEAL",
-];
+// src/data/words.ts
+import raw4Official from "./words_4_allowed.txt?raw";
+import raw4Allowed from "./words_4_allowed.txt?raw";
+import raw5Official from "./words_5_official.txt?raw";
+import raw5Allowed from "./words_5_allowed.txt?raw";
 
-export const WORDS_55= [
-   "ABIDE",
-   "ADULT",
-   "ALIVE",
-   "ALTER",
-   "AMUSE",
-   "APPLE",
-   "BASIC",
-   "BEACH",
-   "BIRTH",
-   "BLACK",
-   "BLAND",
-   "BLAST",
-   "BLEED",
-   "BLEND",
-   "BLOCK",
-   "BLOOM",
-   "BOARD",
-   "BRAIN",
-   "BREAD",
-   "BREAK",
-   "BRICK",
-   "BRIGHT",
-   "BROAD",
-   "BUILD",
-   "CANDY",
-   "CHAIR",
-   "CHART",
-   "CHASE",
-   "CLEAN",
-   "CLEAR",
-   "CLIMB",
-   "CLOCK",
-   "CLOUD",
-   "COAST",
-   "COUNT",
-   "COURT",
-   "COVER",
-   "CRANE",
-   "CREAM",
-   "DAILY",
-   "DANCE",
-   "DREAM",
-   "DRINK",
-   "DRIVE",
-   "EARTH",
-   "EMPTY",
-   "FIELD",
-   "FLAME",
-   "FLASH",
-   "FLOAT",
-   "FLOOR",
-   "FLOUR",
-   "FOCUS",
-   "FORCE",
-   "FRAME",
-   "FRESH",
-   "FRONT",
-   "FRUIT",
-   "GLASS",
-   "GLOVE",
-   "GRACE",
-   "GRAND",
-   "GRASS",
-   "GREAT",
-   "GREEN",
-   "GROUP",
-   "GUARD",
-   "GUEST",
-   "GUIDE",
-   "HABIT",
-   "HEART",
-   "HEAVY",
-];
-
-export const WORDS_6 = [
-   "ABROAD",
-   "ABSENT",
-   "ABSORB",
-   "ACCENT",
-   "ACCEPT",
-   "ACCESS",
-   "ACCUSE",
-   "ACROSS",
-   "ACTIVE",
-   "ACTUAL",
-   "ADVICE",
-   "ADVISE",
-   "AFFECT",
-   "AFFORD",
-   "AFRAID",
-   "AGENCY",
-   "AGENDA",
-   "ALMOST",
-   "ALWAYS",
-   "AMOUNT",
-   "ANIMAL",
-   "ANNUAL",
-   "ANSWER",
-   "ANYONE",
-   "APPEAL",
-   "APPEAR",
-   "AROUND",
-   "ARRIVE",
-   "ARTIST",
-   "ASPECT",
-   "ASSIST",
-   "ATTACK",
-   "ATTEND",
-   "AUGUST",
-   "AUTHOR",
-   "AVENUE",
-   "BARELY",
-   "BASKET",
-   "BEAUTY",
-   "BECOME",
-   "BEFORE",
-   "BEHIND",
-   "BELIEVE",
-   "BELONG",
-   "BEYOND",
-   "BISHOP",
-   "BORDER",
-   "BOTTLE",
-   "BOTTOM",
-   "BOUGHT",
-   "BRANCH",
-   "BREATH",
-   "BRIDGE",
-   "BRIGHT",
-   "BROKEN",
-   "BUDGET",
-   "BURDEN",
-   "BUTTON",
-   "CAMERA",
-   "CANCER",
-   "CANNOT",
-   "CARBON",
-   "CAREER",
-   "CASTLE",
-   "CHANGE"
-];
-
-import raw5Official from './words_5_official.txt?raw';
-import raw5Allowed from './words_5_allowed.txt?raw';
+// Import the flat array from your JSON
+import data6 from "./words_6_allowed.json"; 
 
 const processWords = (rawContent: string): string[] => {
-  return Array.from(
-    new Set(
-      rawContent
-        .split(/\s+/)
-        .map((w) => w.trim().toUpperCase())
-        .filter((w) => w.length > 0)
-    )
-  ).sort();
+   return Array.from(
+      new Set(
+         rawContent
+            .split(/\s+/)
+            .map((w) => w.trim().toUpperCase())
+            .filter((w) => w.length > 0)
+      )
+   ).sort();
 };
 
+// 4 & 5 Letter Processing
+export const WORDS_4 = processWords(raw4Official);
+export const WORDS_4_ALLOWED = processWords(raw4Allowed);
 export const WORDS_5 = processWords(raw5Official);
-export const WORDS_5_ALLOWED = processWords(raw5Allowed)
+export const WORDS_5_ALLOWED = processWords(raw5Allowed);
 
+// 6 Letter Processing (Flat JSON Array)
+// We treat the JSON list as both Official and Allowed for the MVP
+export const WORDS_6 = Array.from(new Set(data6.map((w: string) => w.toUpperCase()))).sort();
+export const WORDS_6_ALLOWED = WORDS_6; // Using the same list for allowed guesses
+
+// Master Sets for O(1) validation
+export const VALID_GUESSES_4 = new Set([...WORDS_4, ...WORDS_4_ALLOWED]);
 export const VALID_GUESSES_5 = new Set([...WORDS_5, ...WORDS_5_ALLOWED]);
+export const VALID_GUESSES_6 = new Set(WORDS_6); // Only the JSON words are valid
+
+/**
+ * Dynamic getter for game logic
+ */
+export const getWordLists = (length: number) => {
+  if (length === 4) return { official: WORDS_4, valid: VALID_GUESSES_4 };
+  if (length === 6) return { official: WORDS_6, valid: VALID_GUESSES_6 };
+  return { official: WORDS_5, valid: VALID_GUESSES_5 };
+};

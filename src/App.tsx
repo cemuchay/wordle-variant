@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getDailyConfig, checkGuess } from './lib/gameLogic';
-import { VALID_GUESSES_5 } from './data/words';
+import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
 import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
+import { generateShareText } from './lib/share';
+import { ShareButton } from './components/ShareButton';
+import { RotateCcw } from 'lucide-react';
 
 // Helper to get initial state from localStorage
 const getSavedState = (date: string) => {
@@ -17,7 +20,7 @@ export default function App() {
  * One-time cleanup for Beta testers
  * Ensures old, buggy localStorage data is wiped for the new 5-letter version.
  */
-  const MIGRATION_KEY = 'wordle_v1_cleared';
+  const MIGRATION_KEY = 'wordle_v2_cleared';
 
   if (!localStorage.getItem(MIGRATION_KEY)) {
     // 1. Find all keys that start with our game prefix
@@ -81,45 +84,54 @@ export default function App() {
     if (isGameOver || currentGuess.length !== config.length) return;
 
     const upperGuess = currentGuess.toUpperCase();
-    const allWords = [...VALID_GUESSES_5];
 
-    if (!allWords.includes(upperGuess)) {
+    // 1. Dynamic Validation based on current length
+    const { valid } = getWordLists(config.length);
+
+    // Using .has() on a Set is O(1) performance vs O(n) for Array.includes
+    if (!valid.has(upperGuess)) {
       alert("Not in word list");
       return;
     }
 
+    // 2. Process Result
     const result = checkGuess(upperGuess, config.word);
     const newGuesses = [...guesses, result];
 
-    // Calculate new letter statuses
+    // 3. Update keyboard letter colors
     const newStatuses = { ...letterStatuses };
     result.forEach((res) => {
+      // Only update if we haven't already found the 'correct' spot for this letter
       if (newStatuses[res.letter] !== 'correct') {
         newStatuses[res.letter] = res.status;
       }
     });
 
-    // Update States
+    // 4. Update Game States
     setGuesses(newGuesses);
     setLetterStatuses(newStatuses);
     setCurrentGuess("");
 
-    // Win/Loss Check
+    // 5. Check Win/Loss
     const won = upperGuess === config.word;
     const lost = newGuesses.length === config.maxAttempts;
 
     if (won || lost) {
       setIsGameOver(true);
-      setTimeout(() => alert(won ? "🎉 Genius!" : `💥 Word was: ${config.word}`), 100);
+      // Timeout prevents the alert from blocking the final tile color render
+      setTimeout(() => {
+        alert(won ? "🎉 Genius!" : `💥 Word was: ${config.word}`);
+      }, 200);
     }
 
-    // Persist
+    // 6. Persistence
     localStorage.setItem(`wordle-${date}`, JSON.stringify({
       date,
       guesses: newGuesses,
       letterStatuses: newStatuses,
       status: won ? 'won' : (lost ? 'lost' : 'playing')
     }));
+
   }, [currentGuess, config, guesses, letterStatuses, date, isGameOver]);
 
   // Physical Keyboard Support
@@ -145,6 +157,13 @@ export default function App() {
         <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
+          <button
+            onClick={() => window.location.reload()}
+            className="p-1.5 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white active:rotate-180 duration-500"
+            title="Refresh Game"
+          >
+            <RotateCcw size={18} />
+          </button>
           <DatePicker currentDate={date} onDateChange={handleDateChange} />
         </div>
       </div>
@@ -172,6 +191,40 @@ export default function App() {
       </div>
 
       {/* Game Over Modal logic remains same... */}
+      {isGameOver && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 p-8 rounded-2xl border border-gray-700 text-center shadow-2xl max-w-sm w-full">
+            <h2 className="text-3xl font-black mb-1 uppercase tracking-tighter">
+              {guesses[guesses.length - 1].every(r => r.status === 'correct') ? 'Genius!' : 'Nice Try!'}
+            </h2>
+            <p className="text-gray-400 mb-6 font-mono text-sm">
+              The word was <span className="text-white font-bold">{config.word}</span>
+            </p>
+
+            <div className="mb-8">
+              <ShareButton
+                text={generateShareText(
+                  date,
+                  guesses,
+                  config.length,
+                  config.maxAttempts,
+                  guesses[guesses.length - 1].every(r => r.status === 'correct')
+                )}
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                handleDateChange(new Date().toISOString().split('T')[0])
+                setIsGameOver(false)
+              }}
+              className="text-gray-500 text-sm hover:text-white transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

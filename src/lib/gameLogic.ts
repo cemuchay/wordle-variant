@@ -1,26 +1,8 @@
 // import { WORDS_4, WORDS_5, WORDS_6 } from '../data/words';
 import type { GameConfig, GuessResult } from '../types/game';
 
-// export function getDailyConfig(dateOverride?: string): GameConfig {
-//   const date = dateOverride || new Date().toISOString().split('T')[0];
-  
-//   // Deterministic seed based on date string
-//   const seed = date.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  
-//   const lengths: (4 | 5 | 6)[] = [4, 5, 6];
-//   const length = lengths[seed % 3];
-  
-//   const wordList = length === 4 ? WORDS_4 : length === 5 ? WORDS_5 : WORDS_6;
-//   const word = wordList[seed % wordList.length].toUpperCase();
 
-//   return {
-//     word,
-//     length,
-//     maxAttempts: length + 1, // 4->5, 5->6, 6->7
-//   };
-// }
-
-import { WORDS_5 } from '../data/words';
+import { getWordLists,} from '../data/words';
 
 // lib/gameLogic.ts
 
@@ -39,32 +21,24 @@ const mulberry32 = (seed: number) => {
 
 export function getDailyConfig(dateOverride?: string): GameConfig {
   const date = dateOverride || new Date().toISOString().split('T')[0];
-  
-  // 1. Create a high-entropy numeric seed
-  // We use the date + a salt to ensure the sequence is unique to your game
-  const salt = "GFARMS_V1"; 
-  const numericSeed = (date + salt).split('').reduce((acc, char, i) => {
-    return acc + (char.charCodeAt(0) * (i + 1));
-  }, 0);
-
-  // 2. Initialize generator
+  const salt = "GFARMS_BETA_V2"; 
+  const numericSeed = (date + salt).split('').reduce((acc, char, i) => acc + (char.charCodeAt(0) * (i + 1)), 0);
   const random = mulberry32(numericSeed);
 
-  // 3. Constant 5-letter length
-  const length = 5;
+  // 1. Determine length (4, 5, or 6)
+  const lengthChoices = [4, 5, 6] as const;
+  const length = lengthChoices[Math.floor(random() * 3)];
   
-  // 4. Select from your Official WORDS_5 list
-  // Note: Ensure WORDS_5 is imported from your data/words.ts
-  const list = WORDS_5;
+  // 2. Get correct lists
+  const { official } = getWordLists(length);
   
-  // Using random() ensures today's word has no relation to tomorrow's alphabetically
-  const wordIndex = Math.floor(random() * list.length);
-  const word = list[wordIndex].toUpperCase();
+  // 3. Pick the word
+  const word = official[Math.floor(random() * official.length)].toUpperCase();
 
   return {
     word,
     length,
-    maxAttempts: 6, // Standard Wordle
+    maxAttempts: length + 1,
   };
 }
 
