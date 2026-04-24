@@ -206,7 +206,6 @@ export default function App() {
                 text={generateShareText(
                   date,
                   guesses,
-                  config.length,
                   config.maxAttempts,
                   guesses[guesses.length - 1].every(r => r.status === 'correct')
                 )}
