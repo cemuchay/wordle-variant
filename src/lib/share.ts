@@ -1,21 +1,28 @@
-import type { GuessResult } from '../types/game';
+import type { GuessResult } from "../types/game";
 
 export const generateShareText = (
-  date: string,
-  guesses: GuessResult[][],
-  maxAttempts: number,
-  won: boolean
+   date: string,
+   guesses: GuessResult[][],
+   maxAttempts: number,
+   won: boolean,
+   usedHint: boolean
 ) => {
-  const score = won ? guesses.length : 'X';
-  const header = `Wordle Variant ${date} ${score}/${maxAttempts}\n`;
-  
-  const grid = guesses.map(row => {
-    return row.map(cell => {
-      if (cell.status === 'correct') return '🟩';
-      if (cell.status === 'present') return '🟨';
-      return '⬛'; // Use '⬜' if you prefer light mode friendly
-    }).join('');
-  }).join('\n');
+   const score = won ? guesses.length : "X";
+   const hintMarker = usedHint ? " 💡" : "";
+   const header = `Wordle Variant - ${date} \n
+  ${score}/${maxAttempts}${hintMarker}\n`;
 
-  return `${header}\n${grid}`;
+   const grid = guesses
+      .map((row) => {
+         return row
+            .map((cell) => {
+               if (cell.status === "correct") return "🟩";
+               if (cell.status === "present") return "🟨";
+               return "⬛"; // Use '⬜' if you prefer light mode friendly
+            })
+            .join("");
+      })
+      .join("\n");
+   const footer = usedHint ? "\n* assisted by a hint (skill issue)" : "";
+   return `${header}\n${grid}${footer}`;
 };

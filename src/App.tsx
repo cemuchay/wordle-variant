@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getDailyConfig, checkGuess } from './lib/gameLogic';
+import { getDailyConfig, checkGuess, getHint } from './lib/gameLogic';
 import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
@@ -7,7 +7,10 @@ import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
 import { generateShareText } from './lib/share';
 import { ShareButton } from './components/ShareButton';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Lightbulb, HelpCircle, } from 'lucide-react';
+import { Toast } from './components/Toast';
+import { getLossMessage, getWinMessage } from './lib/messages';
+import { InfoModal } from './components/InfoModal';
 
 // Helper to get initial state from localStorage
 const getSavedState = (date: string) => {
@@ -42,6 +45,8 @@ export default function App() {
     new Date().toISOString().split('T')[0]
   );
 
+
+
   const config = useMemo(() => getDailyConfig(date), [date]);
 
   // Initialize state from storage or defaults
@@ -52,6 +57,12 @@ export default function App() {
     const saved = getSavedState(date);
     return saved?.status === 'won' || saved?.status === 'lost';
   });
+  const [toast, setToast] = useState({ show: false, message: "" });
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+  const triggerToast = (msg: string) => {
+    setToast({ show: true, message: msg });
+  };
 
   const handleDateChange = (newDate: string) => {
     const url = new URL(window.location.href);
@@ -90,7 +101,7 @@ export default function App() {
 
     // Using .has() on a Set is O(1) performance vs O(n) for Array.includes
     if (!valid.has(upperGuess)) {
-      alert("Not in word list");
+      triggerToast("Not in word list, buddy.");
       return;
     }
 
@@ -118,10 +129,14 @@ export default function App() {
 
     if (won || lost) {
       setIsGameOver(true);
-      // Timeout prevents the alert from blocking the final tile color render
+
+      const finalMessage = won
+        ? getWinMessage(newGuesses.length)
+        : getLossMessage(config.word);
+
       setTimeout(() => {
-        alert(won ? "🎉 Genius!" : `💥 Word was: ${config.word}`);
-      }, 200);
+        triggerToast(finalMessage);
+      }, 500); // Wait for the tile animations to finish
     }
 
     // 6. Persistence
@@ -149,14 +164,57 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onEnter, onDelete, onChar]);
 
+  //hints
+  const [usedHint, setUsedHint] = useState(false);
+
+  const handleHint = () => {
+    // Guard clause: Only allowed after 3rd attempt and if not used yet
+    if (guesses.length < 3 || usedHint || isGameOver) return;
+
+    const hint = getHint(config.word, guesses);
+
+    if (hint) {
+      setUsedHint(true);
+      triggerToast(`Pitiful. There is a "${hint.letter}" at position ${hint.index + 1}.`);
+    } else {
+      // This handles the edge case where they found all letters but haven't won
+      triggerToast("You've found all the letters. Just use your brain.");
+    }
+  };
   return (
     <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
+
+      <Toast
+        isVisible={toast.show}
+        message={toast.message}
+        onClose={() => setToast({ ...toast, show: false })}
+      />
+      <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 
       {/* Minimal Top Bar - Replaces the big header */}
       <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
         <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
+          <button
+            onClick={() => setIsInfoOpen(true)}
+            className="text-gray-500 hover:text-white transition-colors"
+          >
+            <HelpCircle size={20} />
+          </button>
+          {guesses.length >= 4 && !isGameOver && (
+            <button
+              onClick={handleHint}
+              disabled={usedHint}
+              className={`p-1.5 rounded-full transition-all ${usedHint
+                ? 'text-gray-600 cursor-not-allowed'
+                : 'text-yellow-500 hover:bg-yellow-500/10 animate-pulse'
+                }`}
+              title="Reveal a hint (at the cost of your dignity)"
+            >
+              <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+            </button>
+          )}
           <button
             onClick={() => window.location.reload()}
             className="p-1.5 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white active:rotate-180 duration-500"
@@ -207,7 +265,8 @@ export default function App() {
                   date,
                   guesses,
                   config.maxAttempts,
-                  guesses[guesses.length - 1].every(r => r.status === 'correct')
+                  guesses[guesses.length - 1].every(r => r.status === 'correct'),
+                  usedHint
                 )}
               />
             </div>
