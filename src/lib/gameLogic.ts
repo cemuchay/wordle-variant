@@ -102,3 +102,80 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
       index: randomIndex,
    };
 };
+
+export const updateStats = (won: boolean, attempts: number) => {
+   const raw = localStorage.getItem("wordle-statistics");
+   const stats = raw
+      ? JSON.parse(raw)
+      : {
+           gamesPlayed: 0,
+           gamesWon: 0,
+           currentStreak: 0,
+           maxStreak: 0,
+              guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0,  },
+          //  guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+        };
+
+   stats.gamesPlayed += 1;
+   if (won) {
+      stats.gamesWon += 1;
+      stats.currentStreak += 1;
+      stats.maxStreak = Math.max(stats.maxStreak, stats.currentStreak);
+      stats.guesses[attempts] += 1;
+   } else {
+      stats.currentStreak = 0;
+   }
+
+   localStorage.setItem("wordle-statistics", JSON.stringify(stats));
+};
+
+export const syncStatsFromLocalStorage = () => {
+   // Check if we've already done the big migration
+   if (localStorage.getItem("stats_synced_v1")) return;
+
+   const stats = {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      currentStreak: 0,
+      maxStreak: 0,
+      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, },
+   };
+
+   // 1. Find all keys that match your date pattern
+   const gameKeys = Object.keys(localStorage)
+      .filter((key) => /^wordle-\d{4}-\d{2}-\d{2}$/.test(key))
+      .sort(); // Sort by date to calculate streak correctly
+
+   gameKeys.forEach((key) => {
+      const data = localStorage.getItem(key);
+      if (!data) return;
+
+      try {
+         const game = JSON.parse(data);
+         if (game.status === "playing") return; // Don't count unfinished games
+
+         stats.gamesPlayed += 1;
+
+         if (game.status === "won") {
+            stats.gamesWon += 1;
+            stats.currentStreak += 1;
+            stats.maxStreak = Math.max(stats.maxStreak, stats.currentStreak);
+
+            // Use the number of rows in the guesses array
+            const attemptCount = game.guesses.length;
+            stats.guesses[attemptCount as keyof typeof stats.guesses] += 1;
+         } else {
+            // If they lost or it's a "lost" status, streak resets
+            stats.currentStreak = 0;
+         }
+      } catch (e) {
+         console.error("Error parsing game data for key:", key, e);
+      }
+   });
+
+   // 2. Save the aggregated stats
+   localStorage.setItem("wordle-statistics", JSON.stringify(stats));
+
+   // 3. Mark as synced so we don't recalculate the whole history on every load
+   localStorage.setItem("stats_synced_v1", "true");
+};

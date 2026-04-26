@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getDailyConfig, checkGuess, getHint } from './lib/gameLogic';
+import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage } from './lib/gameLogic';
 import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
@@ -7,10 +7,11 @@ import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
 import { generateShareText } from './lib/share';
 import { ShareButton } from './components/ShareButton';
-import { RotateCcw, Lightbulb, HelpCircle, } from 'lucide-react';
+import { RotateCcw, Lightbulb, HelpCircle, BarChart2, } from 'lucide-react';
 import { Toast } from './components/Toast';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { InfoModal } from './components/InfoModal';
+import { StatsModal } from './components/StatsModal';
 
 // Helper to get initial state from localStorage
 const getSavedState = (date: string) => {
@@ -40,6 +41,8 @@ export default function App() {
     console.log(`🧹 Beta Cleanup: Removed ${keysToRemove.length} old save files.`);
   }
 
+  syncStatsFromLocalStorage();
+
   const [date, setDate] = useState(() =>
     new URLSearchParams(window.location.search).get('date') ||
     new Date().toISOString().split('T')[0]
@@ -59,6 +62,7 @@ export default function App() {
   });
   const [toast, setToast] = useState({ show: false, message: "" });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
 
   const triggerToast = (msg: string) => {
     setToast({ show: true, message: msg });
@@ -134,6 +138,13 @@ export default function App() {
         ? getWinMessage(newGuesses.length)
         : getLossMessage(config.word);
 
+      const existingSave = localStorage.getItem(`wordle-${date}`);
+      const alreadyFinished = existingSave && JSON.parse(existingSave).status !== 'playing';
+
+      if (!alreadyFinished) {
+        updateStats(won, newGuesses.length);
+      }
+
       setTimeout(() => {
         triggerToast(finalMessage);
       }, 500); // Wait for the tile animations to finish
@@ -190,6 +201,7 @@ export default function App() {
         onClose={() => setToast({ ...toast, show: false })}
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+      <StatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} />
 
       {/* Minimal Top Bar - Replaces the big header */}
       <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
@@ -215,6 +227,9 @@ export default function App() {
               <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
             </button>
           )}
+          <button onClick={() => setIsStatsOpen(true)} className="text-gray-500 hover:text-white p-1">
+            <BarChart2 size={18} />
+          </button>
           <button
             onClick={() => window.location.reload()}
             className="p-1.5 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white active:rotate-180 duration-500"
