@@ -1,4 +1,4 @@
-import { Calendar, Lightbulb, X } from 'lucide-react';
+import { Calendar, Lightbulb, X, Zap } from 'lucide-react';
 import React from 'react';
 
 interface Props {
@@ -19,6 +19,29 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <h2 className="text-2xl font-black uppercase text-white tracking-tighter mb-6">How to Play</h2>
 
         <div className="space-y-6 text-sm">
+
+          {/* Score Calculator Info */}
+          <div className="flex gap-4">
+            <div className="bg-yellow-500/20 p-2 h-fit rounded-lg text-yellow-400">
+              <Zap size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-white mb-1 uppercase tracking-wide">Skill Index</p>
+              <div className="text-gray-400 text-sm space-y-2">
+                <p className="leading-relaxed">
+                  Global ranking is determined by your <span className="text-white font-bold">Skill Index</span>:
+                </p>
+                <ul className="grid grid-cols-2 gap-y-1 text-[10px] font-mono uppercase tracking-tighter">
+                  <li className="flex items-center gap-2"><span className="text-correct">●</span> Fewer Tries: +High</li>
+                  <li className="flex items-center gap-2"><span className="text-correct">●</span> Greens: +20 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span> Yellows: -5 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -200 pts</li>
+                </ul>
+                <p className="text-[10px] italic">Maximum precision earns the highest rank.</p>
+              </div>
+            </div>
+          </div>
+
           {/* Date Picker Info */}
           <div className="flex gap-4">
             <div className="bg-blue-500/20 p-2 h-fit rounded-lg text-blue-400">
@@ -46,7 +69,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <button 
+        <button
           onClick={onClose}
           className="mt-8 w-full bg-white text-black font-black py-3 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-tighter"
         >

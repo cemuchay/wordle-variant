@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage } from './lib/gameLogic';
+import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage, submitScoreToCloud } from './lib/gameLogic';
 import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
@@ -12,6 +12,7 @@ import { Toast } from './components/Toast';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { InfoModal } from './components/InfoModal';
 import { StatsModal } from './components/StatsModal';
+import { useAuth } from './hooks/useAuth';
 
 // Helper to get initial state from localStorage
 const getSavedState = (date: string) => {
@@ -63,6 +64,7 @@ export default function App() {
   const [toast, setToast] = useState({ show: false, message: "" });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const { user, signInWithGoogle, signOut } = useAuth();
 
   const triggerToast = (msg: string) => {
     setToast({ show: true, message: msg });
@@ -192,6 +194,31 @@ export default function App() {
       triggerToast("You've found all the letters. Just use your brain.");
     }
   };
+
+  // sync to cloud
+
+  useEffect(() => {
+  if (user && isGameOver) {
+    // Only sync if the game is actually finished
+    const currentSave = localStorage.getItem(`wordle-${date}`);
+    if (currentSave) {
+      const saveData = JSON.parse(currentSave);
+      if (saveData.status !== 'playing') {
+        submitScoreToCloud(
+          user.id,
+          date,
+          config,
+          guesses,
+          usedHint
+        ).then(score => {
+          if (score) triggerToast(`Synced to Leaderboard! Score: ${score}`);
+        });
+      }
+    }
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [user, isGameOver]);
+
   return (
     <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
 
@@ -201,13 +228,36 @@ export default function App() {
         onClose={() => setToast({ ...toast, show: false })}
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-      <StatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} />
+      <StatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)}  user={user}/>
 
       {/* Minimal Top Bar - Replaces the big header */}
       <div className="flex justify-between items-center px-2 py-2 max-w-md mx-auto w-full border-b border-gray-800 mb-2">
         <span className="font-black text-lg tracking-tighter uppercase">Wordle Variant</span>
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono text-gray-500">{config.length}L</span>
+          {user ? (
+            <div className="group relative">
+              <img
+                src={user.user_metadata.avatar_url}
+                alt="Profile"
+                className="w-7 h-7 rounded-full border border-gray-700 cursor-pointer"
+              />
+              {/* Tooltip-style Logout */}
+              <button
+                onClick={signOut}
+                className="absolute top-10 right-0 bg-red-500 text-[10px] px-2 py-1 rounded hidden group-hover:block whitespace-nowrap"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={signInWithGoogle}
+              className="text-[10px] font-bold bg-white text-black px-3 py-1 rounded-full uppercase tracking-tighter hover:bg-gray-200 transition-colors"
+            >
+              Login
+            </button>
+          )}
           <button
             onClick={() => setIsInfoOpen(true)}
             className="text-gray-500 hover:text-white transition-colors"
