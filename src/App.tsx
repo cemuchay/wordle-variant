@@ -202,7 +202,7 @@ export default function App() {
           >
             <HelpCircle size={20} />
           </button>
-          {guesses.length >= 4 && !isGameOver && (
+          {guesses.length >= 3 && !isGameOver && (
             <button
               onClick={handleHint}
               disabled={usedHint}
@@ -252,8 +252,8 @@ export default function App() {
       {isGameOver && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 p-8 rounded-2xl border border-gray-700 text-center shadow-2xl max-w-sm w-full">
-            <h2 className="text-3xl font-black mb-1 uppercase tracking-tighter">
-              {guesses[guesses.length - 1].every(r => r.status === 'correct') ? 'Genius!' : 'Nice Try!'}
+            <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-tighter">
+              {guesses[guesses.length - 1].every(r => r.status === 'correct') ? '' : 'Nice Try!'}
             </h2>
             <p className="text-gray-400 mb-6 font-mono text-sm">
               The word was <span className="text-white font-bold">{config.word}</span>

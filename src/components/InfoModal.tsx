@@ -16,7 +16,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl font-black uppercase tracking-tighter mb-6">How to Play</h2>
+        <h2 className="text-2xl font-black uppercase text-white tracking-tighter mb-6">How to Play</h2>
 
         <div className="space-y-6 text-sm">
           {/* Date Picker Info */}
