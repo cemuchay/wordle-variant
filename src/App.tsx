@@ -33,6 +33,7 @@ export default function App() {
   const [letterStatuses, setLetterStatuses] = useState<Record<string, LetterStatus>>({});
   const [currentGuess, setCurrentGuess] = useState("");
   const [isGameOver, setIsGameOver] = useState(false);
+  const [isGameOverModal, setIsGameOverModal] = useState(false)
   const [usedHint, setUsedHint] = useState(false);
   const [hintRecord, setHintRecord] = useState<{ letter: string, index: number } | null>(null);
 
@@ -63,6 +64,7 @@ export default function App() {
         }
         setHintRecord(local?.hintRecord || null);
         setIsGameOver(local?.status === 'won' || local?.status === 'lost');
+        setIsGameOverModal(local?.status === 'won' || local?.status === 'lost');
       }
 
       // Phase B: Cloud Load (SSoT)
@@ -83,6 +85,7 @@ export default function App() {
           setUsedHint(data.hints_used);
           setHintRecord(data.hint_record);
           setIsGameOver(data.status !== 'playing');
+          setIsGameOverModal(data.status !== 'playing');
 
           const newStatuses: Record<string, LetterStatus> = {};
           cloudGuesses.forEach((row: GuessResult[]) => {
@@ -160,6 +163,7 @@ export default function App() {
 
     if (won || lost) {
       setIsGameOver(true);
+      setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
       setTimeout(() => triggerToast(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word), 5000), 500);
     }
@@ -220,7 +224,7 @@ export default function App() {
         {/* Row 1: Game Identity & Date Selection */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-[10px] font-black text-white tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
+            <h2 className="text-[10px] text-white tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
             <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
               {config.length}L
             </span>
@@ -306,17 +310,19 @@ export default function App() {
       </div>
 
       {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
-      <div className="w-full max-w-125 mx-auto pt-2 pb-2 shrink-0">
-        <Keyboard
-          onChar={onChar}
-          onDelete={onDelete}
-          onEnter={onEnter}
-          letterStatuses={letterStatuses}
-        />
-      </div>
+      {
+        isGameOver ? null : <div className="w-full max-w-125 mx-auto pt-2 pb-2 shrink-0">
+          <Keyboard
+            onChar={onChar}
+            onDelete={onDelete}
+            onEnter={onEnter}
+            letterStatuses={letterStatuses}
+          />
+        </div>
+      }
 
-      {/* Game Over Modal logic remains same... */}
-      {isGameOver && (
+
+      {isGameOverModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 p-8 rounded-2xl border border-gray-700 text-center shadow-2xl max-w-sm w-full">
             <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-tighter">
@@ -341,7 +347,7 @@ export default function App() {
             <button
               onClick={() => {
                 // handleDateChange(new Date().toISOString().split('T')[0])
-                setIsGameOver(false)
+                setIsGameOverModal(false)
               }}
               className="text-gray-500 text-sm hover:text-white transition-colors"
             >

@@ -84,7 +84,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-black uppercase tracking-tighter mb-6 text-center">Statistics</h2>
+        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center">Statistics</h2>
 
         {/* Tab Switcher */}
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6 shrink-0">
