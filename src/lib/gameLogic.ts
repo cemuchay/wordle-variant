@@ -113,8 +113,8 @@ export const updateStats = (won: boolean, attempts: number) => {
            gamesWon: 0,
            currentStreak: 0,
            maxStreak: 0,
-              guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0,  },
-          //  guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
+           //  guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
         };
 
    stats.gamesPlayed += 1;
@@ -139,7 +139,7 @@ export const syncStatsFromLocalStorage = () => {
       gamesWon: 0,
       currentStreak: 0,
       maxStreak: 0,
-      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, },
+      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
    };
 
    // 1. Find all keys that match your date pattern
@@ -182,74 +182,116 @@ export const syncStatsFromLocalStorage = () => {
 };
 
 export const calculateSkillIndex = (
-  attempts: number, 
-  maxAttempts: number, 
-  usedHint: boolean, 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  guesses: any[][]
+   attempts: number,
+   maxAttempts: number,
+   usedHint: boolean,
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   guesses: any[][]
 ) => {
-  // Base score: 1000 for 1st try, 800 for 2nd, etc.
-  let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+   // Base score: 1000 for 1st try, 800 for 2nd, etc.
+   let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
 
-  // Penalty for being a scrub
-  if (usedHint) score -= 200;
+   // Penalty for being a scrub
+   if (usedHint) score -= 200;
 
-  // Precision weights
-  let greens = 0;
-  let yellows = 0;
-  let blacks = 0;
+   // Precision weights
+   let greens = 0;
+   let yellows = 0;
+   let blacks = 0;
 
-  guesses.forEach(row => {
-    row.forEach(cell => {
-      if (cell.status === 'correct') greens += 10;
-      if (cell.status === 'present') yellows += 5;
-      if (cell.status === 'absent') blacks += 1;
-    });
-  });
+   guesses.forEach((row) => {
+      row.forEach((cell) => {
+         if (cell.status === "correct") greens += 10;
+         if (cell.status === "present") yellows += 5;
+         if (cell.status === "absent") blacks += 1;
+      });
+   });
 
-  return Math.floor(score + greens - yellows - blacks);
+   return Math.floor(score + greens - yellows - blacks);
 };
 
 export const submitScoreToCloud = async (
-  userId: string,
-  gameDate: string,
-  config: { length: number; maxAttempts: number },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  guesses: any[][],
-  usedHint: boolean
+   userId: string,
+   gameDate: string,
+   config: { length: number; maxAttempts: number },
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   guesses: any[][],
+   usedHint: boolean
 ) => {
-  // 1. Calculate the Skill Index
-  const attempts = guesses.length;
-  let score = Math.floor(((config.maxAttempts - attempts + 1) / config.maxAttempts) * 1000);
+   // 1. Calculate the Skill Index
+   const attempts = guesses.length;
+   let score = Math.floor(
+      ((config.maxAttempts - attempts + 1) / config.maxAttempts) * 1000
+   );
 
-  // Apply weights
-  if (usedHint) score -= 200;
-  
-  let greens = 0;
-  guesses.forEach(row => {
-    row.forEach(cell => {
-      if (cell.status === 'correct') greens += 20;
-    });
-  });
+   // Apply weights
+   if (usedHint) score -= 200;
 
-  const finalSkillScore = score + greens;
+   let greens = 0;
+   guesses.forEach((row) => {
+      row.forEach((cell) => {
+         if (cell.status === "correct") greens += 20;
+      });
+   });
 
-  // 2. Push to Supabase
-  const { error } = await supabase
-    .from('scores')
-    .upsert({
-      user_id: userId,
-      game_date: gameDate,
-      word_length: config.length,
-      attempts: attempts,
-      hints_used: usedHint,
-      skill_score: finalSkillScore
-    }, { onConflict: 'user_id, game_date' });
+   const finalSkillScore = score + greens;
 
-  if (error) {
-    console.error("Cloud sync failed:", error.message);
-    return null;
-  }
+   // 2. Push to Supabase
+   const { error } = await supabase.from("scores").upsert(
+      {
+         user_id: userId,
+         game_date: gameDate,
+         word_length: config.length,
+         attempts: attempts,
+         hints_used: usedHint,
+         skill_score: finalSkillScore,
+      },
+      { onConflict: "user_id, game_date" }
+   );
 
-  return finalSkillScore;
+   if (error) {
+      console.error("Cloud sync failed:", error.message);
+      return null;
+   }
+
+   return finalSkillScore;
+};
+
+
+export const syncGameState = async (
+   userId: string,
+   date: string,
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   payload: any
+) => {
+   const isGameOver = payload.status !== "playing";
+
+   // Only calculate score if the game is actually over
+   const skillScore = isGameOver
+      ? calculateSkillIndex(
+           payload.guesses.length,
+           payload.config.maxAttempts,
+           payload.usedHint,
+           payload.guesses
+        )
+      : 0;
+     
+
+   const { error } = await supabase.from("scores").upsert(
+      {
+         user_id: userId,
+         game_date: date,
+         guesses: payload.guesses,
+         status: payload.status,
+         hints_used: payload.usedHint,
+         hint_record: payload.hintRecord,
+         word_length: payload.config.length,
+         skill_score: skillScore, // Authoritative score
+         attempts: payload.guesses.length
+      },
+      { onConflict: "user_id, game_date" }
+   );
+
+   if (error) console.error("Cloud sync failed:", error.message);
+   return skillScore;
 };

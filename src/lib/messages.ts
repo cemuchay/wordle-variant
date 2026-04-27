@@ -2,10 +2,11 @@ export const getWinMessage = (attempts: number): string => {
    const variations: Record<number, string[]> = {
       1: [
          "Cheater. Or a time traveler. Either way, reported.",
-         "Literal hack. I'm calling the police.",
-         "First try? Your life must be very boring and full of dictionaries.",
-         "I see you've met the dev and stole the source code.",
+         "No freaking way",
+         "First try? sus.",
+         "I see you've met the editor and got some `intel`.",
          "Statistically impossible. Stop lying to yourself.",
+         `nerd.. sighs`,
       ],
       2: [
          "Insane luck. Go buy a lottery ticket immediately.",
