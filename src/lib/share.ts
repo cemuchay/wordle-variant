@@ -7,6 +7,7 @@ export const generateShareText = (
    won: boolean,
    usedHint: boolean
 ) => {
+
    const score = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
    const header = `Wordle Variant - ${date} \n
@@ -23,6 +24,6 @@ export const generateShareText = (
             .join("");
       })
       .join("\n");
-   const footer = usedHint ? "\n* assisted by a hint (skill issue)" : "";
+   const footer = usedHint ? "\n* assisted by a hint" : "";
    return `${header}\n${grid}${footer}`;
 };

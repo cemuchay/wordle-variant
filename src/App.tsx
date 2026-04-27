@@ -57,6 +57,10 @@ export default function App() {
         setGuesses(local?.guesses || []);
         setLetterStatuses(local?.letterStatuses || {});
         setUsedHint(local?.usedHint || false);
+
+        if (local?.hintRecord && !local?.usedHint) {
+          setUsedHint(true);
+        }
         setHintRecord(local?.hintRecord || null);
         setIsGameOver(local?.status === 'won' || local?.status === 'lost');
       }
@@ -76,7 +80,7 @@ export default function App() {
         // Only overwrite if cloud has data or game is finished
         if (cloudGuesses.length > 0 || data.status !== 'playing') {
           setGuesses(cloudGuesses);
-          setUsedHint(data.used_hint);
+          setUsedHint(data.hints_used);
           setHintRecord(data.hint_record);
           setIsGameOver(data.status !== 'playing');
 
@@ -170,7 +174,6 @@ export default function App() {
   useEffect(() => {
     if (user && isGameOver) {
       submitScoreToCloud(user.id, date, config, guesses, usedHint)
-        .then(score => score && triggerToast(`Leaderboard Sync! Score: ${score}`));
     }
   }, [user, isGameOver, date, config, guesses, usedHint]);
 
