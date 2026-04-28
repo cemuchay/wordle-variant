@@ -165,7 +165,7 @@ export default function App() {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
-      setTimeout(() => triggerToast(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word), 5000), 500);
+      setTimeout(() => triggerToast(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word), 8500), 500);
     }
 
     const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config };
@@ -214,6 +214,7 @@ export default function App() {
       <Toast
         isVisible={toast.show}
         message={toast.message}
+        duration={toast.duration}
         onClose={() => setToast({ ...toast, show: false })}
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
