@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage, submitScoreToCloud, syncGameState } from './lib/gameLogic';
+import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage, submitScoreToCloud, syncGameState, fetchAndSyncCloudStats } from './lib/gameLogic';
 import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
 import { DatePicker } from './components/DatePicker';
@@ -46,6 +46,17 @@ export default function App() {
   const config = getDailyConfig(date);
 
   const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
+
+
+  const initializeUserStats = async (userId: string) => {
+    // 1. First, scrape any local-only legacy data into the aggregate object
+    syncStatsFromLocalStorage();
+
+    // 2. Then, sync with the cloud
+    // This function's conflict logic ensures that if step 1 found 
+    // more games than the cloud has, we keep the local version.
+    await fetchAndSyncCloudStats(userId);
+  };
 
   // 2. Authoritative Hydration Effect
   useEffect(() => {
@@ -110,9 +121,10 @@ export default function App() {
     };
 
     loadGameData();
-    syncStatsFromLocalStorage();
+    initializeUserStats(user?.id as string)
     return () => { isMounted = false; };
   }, [date, user?.id]);
+
 
   const handleDateChange = (newDate: string) => {
     const url = new URL(window.location.href);
@@ -329,10 +341,7 @@ export default function App() {
             <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-tighter">
               {guesses[guesses.length - 1].every(r => r.status === 'correct') ? '' : 'Nice Try!'}
             </h2>
-            <p className="text-gray-400 mb-6 font-mono text-sm">
-              The word was <span className="text-white font-bold">{config.word}</span>
-            </p>
-
+         
             <div className="mb-8">
               <ShareButton
                 text={generateShareText(

@@ -1,25 +1,54 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useMemo } from 'react';
 import { X, Trophy, User, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
-type Timeframe = 'weekly' | 'monthly' | 'all';
+// --- Types & Interfaces ---
+
+// type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
+type Timeframe = 'today' | 'weekly' 
+
+interface UserMetadata {
+  full_name?: string;
+  avatar_url?: string;
+}
+
+interface AppUser {
+  id: string;
+  user_metadata?: UserMetadata;
+}
+
+interface LeaderboardEntry {
+  username: string;
+  avatar_url: string;
+  total_score: number;
+}
+
+interface GameStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  currentStreak: number;
+  maxStreak: number;
+  guesses: Record<string, number>;
+}
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
+  user: AppUser | null;
 }
+
+// --- Component ---
 
 export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
-  const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [timeframe, setTimeframe] = useState<Timeframe>('today');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1. Memoize local stats to prevent parsing on every render
-  const stats = useMemo(() => {
+  // Memoize personal stats from localStorage
+  const stats = useMemo<GameStats>(() => {
     const raw = localStorage.getItem('wordle-statistics');
+    console.log(raw, "raw")
     return raw ? JSON.parse(raw) : {
       gamesPlayed: 0,
       gamesWon: 0,
@@ -30,10 +59,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   }, [isOpen]);
 
   const maxGuesses = useMemo(() => {
-    return Math.max(...Object.values(stats.guesses) as number[], 1);
+    return Math.max(...(Object.values(stats.guesses) as number[]), 1);
   }, [stats]);
 
-  // 2. Fetch Leaderboard Data with clean-up and mount guard
+  // Fetch Leaderboard Data
   useEffect(() => {
     let isMounted = true;
 
@@ -42,22 +71,21 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
 
       setLoading(true);
 
-      // Map your timeframe state to the actual view names in Supabase
       const viewMap: Record<Timeframe, string> = {
+        today: 'leaderboard_today',
         weekly: 'leaderboard_weekly',
-        monthly: 'leaderboard_monthly',
-        all: 'leaderboard_all_time'
+        // monthly: 'leaderboard_monthly',
+        // all: 'leaderboard_all_time'
       };
 
       const { data, error } = await supabase
         .from(viewMap[timeframe])
-        .select('*')
+        .select('username, avatar_url, total_points')
         .order('total_points', { ascending: false })
         .limit(20);
 
       if (isMounted && !error && data) {
-        // Map the view results to your component's leaderboard state
-        const formattedData = data.map(entry => ({
+        const formattedData: LeaderboardEntry[] = data.map((entry) => ({
           username: entry.username,
           avatar_url: entry.avatar_url,
           total_score: entry.total_points
@@ -80,6 +108,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+        
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
           <X size={20} />
         </button>
@@ -107,7 +136,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex justify-around mb-8 text-center">
                 <StatItem value={stats.gamesPlayed} label="Played" />
-                <StatItem value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`} label="Win %" />
+                <StatItem 
+                  value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`} 
+                  label="Win %" 
+                />
                 <StatItem value={stats.currentStreak} label="Streak" />
               </div>
 
@@ -119,9 +151,9 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
                     <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
                       <div
                         className="bg-correct py-0.5 px-2 text-right transition-all duration-1000 min-w-fit font-bold"
-                        style={{ width: `${Math.max(((count as number) / maxGuesses) * 100, 8)}%` }}
+                        style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
                       >
-                        {count as number}
+                        {count}
                       </div>
                     </div>
                   </div>
@@ -130,8 +162,9 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Timeframe Toggles */}
               <div className="flex gap-1 mb-6">
-                {(['weekly', 'monthly', 'all'] as Timeframe[]).map((t) => (
+                {(['today', 'weekly', 'monthly', 'all'] as Timeframe[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
@@ -176,21 +209,26 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   );
 };
 
-// Sub-components for cleaner code
-const StatItem = ({ value, label }: { value: any, label: string }) => (
+// --- Sub-components ---
+
+const StatItem: React.FC<{ value: string | number; label: string }> = ({ value, label }) => (
   <div>
     <div className="text-2xl font-black">{value}</div>
     <div className="text-[9px] uppercase text-gray-500 tracking-widest">{label}</div>
   </div>
 );
 
-const LeaderboardRow = ({ entry, index, isCurrentUser }: { entry: any, index: number, isCurrentUser: boolean }) => (
-  <div className={`flex items-center justify-between p-3 rounded-xl border ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => (
+  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
     <div className="flex items-center gap-3">
       <span className={`text-xs font-black w-4 ${index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
         {index + 1}
       </span>
-      <img src={entry.avatar_url || `https://ui-avatars.com/api/?name=${entry.username}`} className="w-6 h-6 rounded-full border border-gray-700" alt="" />
+      <img 
+        src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`} 
+        className="w-6 h-6 rounded-full border border-gray-700" 
+        alt={entry.username} 
+      />
       <span className="text-xs font-bold truncate max-w-[120px]">{entry.username}</span>
     </div>
     <div className="text-right">

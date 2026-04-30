@@ -6,6 +6,14 @@ export interface GameConfig {
   maxAttempts: number;
 }
 
+export interface GameStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  currentStreak: number;
+  maxStreak: number;
+  guesses: Record<string, number>;
+}
+
 export interface GuessResult {
   letter: string;
   status: LetterStatus;

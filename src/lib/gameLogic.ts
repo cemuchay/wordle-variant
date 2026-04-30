@@ -1,5 +1,5 @@
 // import { WORDS_4, WORDS_5, WORDS_6 } from '../data/words';
-import type { GameConfig, GuessResult } from "../types/game";
+import type { GameConfig, GameStats, GuessResult } from "../types/game";
 
 import { getWordLists } from "../data/words";
 import { supabase } from "./supabaseClient";
@@ -179,6 +179,66 @@ export const syncStatsFromLocalStorage = () => {
 
    // 3. Mark as synced so we don't recalculate the whole history on every load
    localStorage.setItem("stats_synced_v1", "true");
+};
+
+/**
+ * Fetches all user scores from Supabase and aggregates them into a 
+ * Wordle-standard statistics object.
+ */
+export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
+  try {
+    const { data: scores, error } = await supabase
+      .from('scores')
+      .select('status, attempts')
+      .eq('user_id', userId)
+      .order('game_date', { ascending: true });
+
+    if (error) throw error;
+
+    // 1. Aggregate Cloud Data
+    const cloudStats: GameStats = {
+      gamesPlayed: scores.length,
+      gamesWon: 0,
+      currentStreak: 0,
+      maxStreak: 0,
+      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
+    };
+
+    scores.forEach((game) => {
+      if (game.status === 'won') {
+        cloudStats.gamesWon += 1;
+        cloudStats.currentStreak += 1;
+        cloudStats.maxStreak = Math.max(cloudStats.maxStreak, cloudStats.currentStreak);
+        
+        const attemptKey = String(game.attempts);
+        if (cloudStats.guesses[attemptKey] !== undefined) {
+          cloudStats.guesses[attemptKey] += 1;
+        }
+      } else {
+        cloudStats.currentStreak = 0;
+      }
+    });
+
+    // 2. Handle Conflict with Local Storage
+    const localRaw = localStorage.getItem('wordle-statistics');
+    const localStats: GameStats | null = localRaw ? JSON.parse(localRaw) : null;
+
+    if (localStats) {
+      // Conflict Resolution: Use the version with more gameplay data
+      // This protects against data loss if the user played offline
+      if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
+        console.log("Local progress is ahead. Keeping local stats.");
+        return; 
+      }
+    }
+
+    // 3. Save Cloud as the new Local Source of Truth
+    localStorage.setItem('wordle-statistics', JSON.stringify(cloudStats));
+    localStorage.setItem("stats_synced_v1", "true");
+    
+  } catch (err) {
+    console.error("Cloud sync failed:", err);
+  }
 };
 
 export const calculateSkillIndex = (

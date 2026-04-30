@@ -18,7 +18,7 @@ export const getWinMessage = (attempts: number): string => {
       3: [
          "Solid effort. You're actually kind of good at this.",
          "Impressive. Still not a 2, but we'll take it.",
-         "The 'I have a degree but no social life' special.",
+         "The 'I have a degree but no social life' .",
          "Look at you, using that expensive brain of yours.",
          "Three? That’s almost respectable. Almost.",
       ],

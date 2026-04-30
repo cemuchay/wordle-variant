@@ -8,7 +8,6 @@ interface ToastProps {
 }
 
 export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, duration = 3000 }) => {
-  console.log("duration", duration)
   useEffect(() => {
     if (isVisible) {
       const timer = setTimeout(onClose, duration);
