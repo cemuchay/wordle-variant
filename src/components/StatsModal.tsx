@@ -164,7 +164,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}
               <div className="flex gap-1 mb-6">
-                {(['today', 'weekly', 'monthly', 'all'] as Timeframe[]).map((t) => (
+                {(['today', 'weekly', ] as Timeframe[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}

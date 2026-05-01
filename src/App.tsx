@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage, submitScoreToCloud, syncGameState, fetchAndSyncCloudStats } from './lib/gameLogic';
 import { getWordLists, } from './data/words';
 import type { GuessResult, LetterStatus } from './types/game';
-import { DatePicker } from './components/DatePicker';
+// import { DatePicker } from './components/DatePicker';
 import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
 import { generateShareText } from './lib/share';
@@ -24,8 +24,8 @@ export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
   // 1. Initial State
-  const [date, setDate] = useState(() =>
-    new URLSearchParams(window.location.search).get('date') ||
+  const [date] = useState(() =>
+    // new URLSearchParams(window.location.search).get('date') ||
     new Date().toISOString().split('T')[0]
   );
 
@@ -126,12 +126,12 @@ export default function App() {
   }, [date, user?.id]);
 
 
-  const handleDateChange = (newDate: string) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('date', newDate);
-    window.history.pushState({}, '', url);
-    setDate(newDate);
-  };
+  // const handleDateChange = (newDate: string) => {
+  //   const url = new URL(window.location.href);
+  //   url.searchParams.set('date', newDate);
+  //   window.history.pushState({}, '', url);
+  //   setDate(newDate);
+  // };
 
   const onChar = useCallback((char: string) => {
     if (isGameOver) return;
@@ -244,7 +244,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1">
-            <DatePicker currentDate={date} onDateChange={handleDateChange} />
+            {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
             <button
               onClick={() => window.location.reload()}
               className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
