@@ -12,6 +12,7 @@ import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameSt
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
 import type { GuessResult, LetterStatus } from './types/game';
+import { getServerDate } from './lib/time';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -21,10 +22,18 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
-  // 1. Initial State
-  const [date] = useState(() =>
-    new Date().toISOString().split('T')[0]
-  );
+  const [date, setDate] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const syncTime = async () => {
+      const serverDate = await getServerDate();
+      setDate(serverDate.formatted);
+      setIsLoading(false);
+    };
+
+    syncTime();
+  }, []);
 
   const [guesses, setGuesses] = useState<GuessResult[][]>([]);
   const [letterStatuses, setLetterStatuses] = useState<Record<string, LetterStatus>>({});
@@ -41,7 +50,7 @@ export default function App() {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
 
-  const config = getDailyConfig(date);
+  const config = getDailyConfig(date as string);
 
   const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
 
@@ -62,7 +71,7 @@ export default function App() {
 
     const loadGameData = async () => {
       // Phase A: Local Load
-      const local = getSavedState(date);
+      const local = getSavedState(date as string);
       if (isMounted) {
         setGuesses(local?.guesses || []);
         setLetterStatuses(local?.letterStatuses || {});
@@ -121,9 +130,9 @@ export default function App() {
     };
 
     loadGameData();
-    initializeUserStats(user?.id as string)
+   if (user) initializeUserStats(user?.id as string)
     return () => { isMounted = false; };
-  }, [date, user?.id]);
+  }, [date, user]);
 
   const onChar = useCallback((char: string) => {
     if (isGameOver) return;
@@ -212,6 +221,10 @@ export default function App() {
     }
   };
 
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Syncing with server...</div>;
+  }
 
   return (
     <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
@@ -329,9 +342,9 @@ export default function App() {
       {isGameOverModal && (
         <GameOverModal
           isOpen={isGameOverModal}
-          onClose={()=>setIsGameOverModal(false)}
+          onClose={() => setIsGameOverModal(false)}
           guesses={guesses}
-          date={date}
+          date={date as string}
           config={config}
           usedHint={usedHint}
           gameMessage={gameMessage} />

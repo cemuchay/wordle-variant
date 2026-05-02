@@ -2,10 +2,11 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { ShareButton } from './ShareButton'; // Adjust path
 import { generateShareText } from '../lib/share';
 import type { GuessResult } from '../types/game';
+import { getServerDate } from '../lib/time';
 
 interface Props {
     isOpen: boolean;
-    onClose: ()=> void;
+    onClose: () => void;
     guesses: GuessResult[][];
     date: string;
     config: { maxAttempts: number };
@@ -30,16 +31,38 @@ export const GameOverModal: React.FC<Props> = ({
     const [countdown, setCountdown] = useState("");
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            const now = new Date();
-            const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-            const diff = tomorrow.getTime() - now.getTime();
-            const h = Math.floor(diff / (1000 * 60 * 60));
-            const m = Math.floor((diff / (1000 * 60)) % 60);
-            const s = Math.floor((diff / 1000) % 60);
-            setCountdown(`${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        }, 1000);
-        return () => clearInterval(timer);
+        // This works in both browser (returns a number) and Node (returns a Timeout object)
+        let timer: ReturnType<typeof setInterval> | undefined;
+
+        const initCountdown = async () => {
+            const { raw } = await getServerDate();
+            const serverOffset = raw.getTime() - Date.now();
+
+            timer = setInterval(() => {
+                const now = new Date(Date.now() + serverOffset);
+                const nigeriaTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Lagos" });
+                const tomorrow = new Date(nigeriaTimeStr);
+                tomorrow.setHours(24, 0, 0, 0);
+
+                const diff = tomorrow.getTime() - new Date(nigeriaTimeStr).getTime();
+
+                if (diff <= 0) {
+                    setCountdown("0:00:00");
+                    return;
+                }
+
+                const h = Math.floor(diff / (1000 * 60 * 60));
+                const m = Math.floor((diff / (1000 * 60)) % 60);
+                const s = Math.floor((diff / 1000) % 60);
+
+                setCountdown(`${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+            }, 1000);
+        };
+
+        initCountdown();
+        return () => {
+            if (timer) clearInterval(timer);
+        };
     }, []);
 
     if (!isOpen) return null;

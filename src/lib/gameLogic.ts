@@ -264,10 +264,11 @@ export const calculateSkillIndex = (
 
 export const syncGameState = async (
    userId: string,
-   date: string,
+   date: string | null,
    // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any
 ) => {
+   if (!date) return
    const isGameOver = payload.status !== "playing";
 
    // Only calculate score if the game is actually over
