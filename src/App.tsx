@@ -1,16 +1,15 @@
 import { BarChart2, HelpCircle, Lightbulb, RotateCcw, } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
 import { InfoModal } from './components/InfoModal';
 import { Keyboard } from './components/Keyboard';
-import { ShareButton } from './components/ShareButton';
 import { StatsModal } from './components/StatsModal';
 import { Toast } from './components/Toast';
 import { getWordLists, } from './data/words';
 import { useAuth } from './hooks/useAuth';
 import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, updateStats } from './lib/gameLogic';
 import { getLossMessage, getWinMessage } from './lib/messages';
-import { generateShareText } from './lib/share';
 import { supabase } from './lib/supabaseClient';
 import type { GuessResult, LetterStatus } from './types/game';
 
@@ -184,7 +183,7 @@ export default function App() {
 
     if (user) await syncGameState(user.id, date, payload);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver, currentGuess, config, guesses, letterStatuses, date, usedHint, hintRecord, user]);
 
   // Physical Keyboard
@@ -328,35 +327,15 @@ export default function App() {
 
 
       {isGameOverModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 p-8 rounded-2xl border border-gray-700 text-center shadow-2xl max-w-sm w-full">
-            <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-tighter">
-              {guesses[guesses.length - 1].every(r => r.status === 'correct') ? '' : 'Nice Try!'}
-            </h2>
+        <GameOverModal
+          isOpen={isGameOverModal}
+          onClose={()=>setIsGameOverModal(false)}
+          guesses={guesses}
+          date={date}
+          config={config}
+          usedHint={usedHint}
+          gameMessage={gameMessage} />
 
-            <div className="mb-8">
-              <ShareButton
-                text={generateShareText(
-                  date,
-                  guesses,
-                  config.maxAttempts,
-                  guesses[guesses.length - 1].every(r => r.status === 'correct'),
-                  usedHint
-                )}
-              />
-            </div>
-
-            <button
-              onClick={() => {
-                // handleDateChange(new Date().toISOString().split('T')[0])
-                setIsGameOverModal(false)
-              }}
-              className="text-gray-500 text-sm hover:text-white transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
       )}
     </main>
   );

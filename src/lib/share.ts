@@ -1,13 +1,20 @@
 import type { GuessResult } from "../types/game";
 
-export const generateShareText = (
-   date: string,
-   guesses: GuessResult[][],
-   maxAttempts: number,
-   won: boolean,
-   usedHint: boolean
-) => {
-
+export const generateShareText = ({
+   date,
+   guesses,
+   maxAttempts,
+   won,
+   usedHint,
+   gameMessage,
+}: {
+   date: string;
+   guesses: GuessResult[][];
+   maxAttempts: number;
+   won: boolean;
+   usedHint: boolean;
+   gameMessage: string
+}) => {
    const score = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
    const header = `Wordle Variant - ${date} \n
@@ -25,5 +32,5 @@ export const generateShareText = (
       })
       .join("\n");
    const footer = usedHint ? "\n* assisted by a hint" : "";
-   return `${header}\n${grid}${footer}`;
+   return `${header}\n${grid}${footer}\n\n"${gameMessage}"`;
 };
