@@ -130,7 +130,7 @@ export default function App() {
     };
 
     loadGameData();
-   if (user) initializeUserStats(user?.id as string)
+    if (user) initializeUserStats(user?.id as string)
     return () => { isMounted = false; };
   }, [date, user]);
 

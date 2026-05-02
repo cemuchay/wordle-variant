@@ -15,23 +15,71 @@ const mulberry32 = (seed: number) => {
    };
 };
 
-export function getDailyConfig(dateOverride?: string): GameConfig {
-   const date = dateOverride || new Date().toISOString().split("T")[0];
-   const salt = "GFARMS_BETA_V2";
-   const numericSeed = (date + salt)
+const SALT = "GFARMS_BETA_V2";
+const TRANSITION_DATE = "2026-05-03";
+
+/**
+ * Hashing Algorithms
+ */
+const oldHash = (str: string) =>
+   str
       .split("")
       .reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 1), 0);
-   const random = mulberry32(numericSeed);
 
-   // 1. Determine length (4, 5, or 6)
-   const lengthChoices = [4, 5, 6] as const;
-   const length = lengthChoices[Math.floor(random() * 3)];
+const newHash = (str: string) =>
+   str
+      .split("")
+      .reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0);
 
-   // 2. Get correct lists
+/**
+ * Internal helper to get the word for any specific date
+ * based on the algorithm active at that time.
+ */
+function getWordAtDate(dateStr: string, attempt = 0): string {
+   const isNew = dateStr >= TRANSITION_DATE;
+   const seedBase = dateStr + SALT + (attempt > 0 ? `_retry_${attempt}` : "");
+
+   const seed = isNew ? newHash(seedBase) : oldHash(seedBase);
+   const random = mulberry32(seed);
+
+   const length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
    const { official } = getWordLists(length);
 
-   // 3. Pick the word
-   const word = official[Math.floor(random() * official.length)].toUpperCase();
+   return official[Math.floor(random() * official.length)].toUpperCase();
+}
+
+export function getDailyConfig(dateOverride?: string): GameConfig {
+   const dateStr = dateOverride || new Date().toISOString().split("T")[0];
+   const isNewEra = dateStr >= TRANSITION_DATE;
+
+   // 1. If before transition, return the legacy result immediately
+   if (!isNewEra) {
+      const word = getWordAtDate(dateStr);
+      const length = word.length as 4 | 6 | 5;
+      return { word, length, maxAttempts: length + 1 };
+   }
+
+   // 2. New Algorithm: Check previous 14 days for collisions
+   const history = new Set<string>();
+   const cursor = new Date(dateStr);
+
+   for (let i = 1; i <= 14; i++) {
+      const prevDate = new Date(cursor);
+      prevDate.setDate(cursor.getDate() - i);
+      const prevStr = prevDate.toISOString().split("T")[0];
+      history.add(getWordAtDate(prevStr));
+   }
+
+   // 3. Generate today's word with a retry loop if it exists in history
+   let attempt = 0;
+   let word;
+
+   do {
+      word = getWordAtDate(dateStr, attempt);
+      attempt++;
+   } while (history.has(word) && attempt < 50); // Safety cap
+
+   const length = word.length as 5 | 6 | 4;
 
    return {
       word,
@@ -109,7 +157,7 @@ export const updateStats = (won: boolean, attempts: number) => {
            gamesWon: 0,
            currentStreak: 0,
            maxStreak: 0,
-            guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
         };
 
    stats.gamesPlayed += 1;
@@ -177,63 +225,67 @@ export const syncStatsFromLocalStorage = () => {
 };
 
 /**
- * Fetches all user scores from Supabase and aggregates them into a 
+ * Fetches all user scores from Supabase and aggregates them into a
  * Wordle-standard statistics object.
  */
 export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
-  try {
-    const { data: scores, error } = await supabase
-      .from('scores')
-      .select('status, attempts')
-      .eq('user_id', userId)
-      .order('game_date', { ascending: true });
+   try {
+      const { data: scores, error } = await supabase
+         .from("scores")
+         .select("status, attempts")
+         .eq("user_id", userId)
+         .order("game_date", { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // 1. Aggregate Cloud Data
-    const cloudStats: GameStats = {
-      gamesPlayed: scores.length,
-      gamesWon: 0,
-      currentStreak: 0,
-      maxStreak: 0,
-      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
-    };
+      // 1. Aggregate Cloud Data
+      const cloudStats: GameStats = {
+         gamesPlayed: scores.length,
+         gamesWon: 0,
+         currentStreak: 0,
+         maxStreak: 0,
+         guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
+      };
 
-    scores.forEach((game) => {
-      if (game.status === 'won') {
-        cloudStats.gamesWon += 1;
-        cloudStats.currentStreak += 1;
-        cloudStats.maxStreak = Math.max(cloudStats.maxStreak, cloudStats.currentStreak);
-        
-        const attemptKey = String(game.attempts);
-        if (cloudStats.guesses[attemptKey] !== undefined) {
-          cloudStats.guesses[attemptKey] += 1;
-        }
-      } else {
-        cloudStats.currentStreak = 0;
+      scores.forEach((game) => {
+         if (game.status === "won") {
+            cloudStats.gamesWon += 1;
+            cloudStats.currentStreak += 1;
+            cloudStats.maxStreak = Math.max(
+               cloudStats.maxStreak,
+               cloudStats.currentStreak
+            );
+
+            const attemptKey = String(game.attempts);
+            if (cloudStats.guesses[attemptKey] !== undefined) {
+               cloudStats.guesses[attemptKey] += 1;
+            }
+         } else {
+            cloudStats.currentStreak = 0;
+         }
+      });
+
+      // 2. Handle Conflict with Local Storage
+      const localRaw = localStorage.getItem("wordle-statistics");
+      const localStats: GameStats | null = localRaw
+         ? JSON.parse(localRaw)
+         : null;
+
+      if (localStats) {
+         // Conflict Resolution: Use the version with more gameplay data
+         // This protects against data loss if the user played offline
+         if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
+            console.log("Local progress is ahead. Keeping local stats.");
+            return;
+         }
       }
-    });
 
-    // 2. Handle Conflict with Local Storage
-    const localRaw = localStorage.getItem('wordle-statistics');
-    const localStats: GameStats | null = localRaw ? JSON.parse(localRaw) : null;
-
-    if (localStats) {
-      // Conflict Resolution: Use the version with more gameplay data
-      // This protects against data loss if the user played offline
-      if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
-        console.log("Local progress is ahead. Keeping local stats.");
-        return; 
-      }
-    }
-
-    // 3. Save Cloud as the new Local Source of Truth
-    localStorage.setItem('wordle-statistics', JSON.stringify(cloudStats));
-    localStorage.setItem("stats_synced_v1", "true");
-    
-  } catch (err) {
-    console.error("Cloud sync failed:", err);
-  }
+      // 3. Save Cloud as the new Local Source of Truth
+      localStorage.setItem("wordle-statistics", JSON.stringify(cloudStats));
+      localStorage.setItem("stats_synced_v1", "true");
+   } catch (err) {
+      console.error("Cloud sync failed:", err);
+   }
 };
 
 export const calculateSkillIndex = (
@@ -249,7 +301,7 @@ export const calculateSkillIndex = (
    if (usedHint) score -= 200;
 
    // Precision weights
-   let bonus = 0
+   let bonus = 0;
 
    guesses.forEach((row) => {
       row.forEach((cell) => {
@@ -268,7 +320,7 @@ export const syncGameState = async (
    // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any
 ) => {
-   if (!date) return
+   if (!date) return;
    const isGameOver = payload.status !== "playing";
 
    // Only calculate score if the game is actually over
@@ -280,7 +332,6 @@ export const syncGameState = async (
            payload.guesses
         )
       : 0;
-     
 
    const { error } = await supabase.from("scores").upsert(
       {
@@ -292,7 +343,7 @@ export const syncGameState = async (
          hint_record: payload.hintRecord,
          word_length: payload.config.length,
          skill_score: skillScore, // Authoritative score
-         attempts: payload.guesses.length
+         attempts: payload.guesses.length,
       },
       { onConflict: "user_id, game_date" }
    );
