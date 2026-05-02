@@ -1,19 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getDailyConfig, checkGuess, getHint, updateStats, syncStatsFromLocalStorage, submitScoreToCloud, syncGameState, fetchAndSyncCloudStats } from './lib/gameLogic';
-import { getWordLists, } from './data/words';
-import type { GuessResult, LetterStatus } from './types/game';
-// import { DatePicker } from './components/DatePicker';
+import { BarChart2, HelpCircle, Lightbulb, RotateCcw, } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { Grid } from './components/Grid';
-import { Keyboard } from './components/Keyboard';
-import { generateShareText } from './lib/share';
-import { ShareButton } from './components/ShareButton';
-import { RotateCcw, Lightbulb, HelpCircle, BarChart2, } from 'lucide-react';
-import { Toast } from './components/Toast';
-import { getLossMessage, getWinMessage } from './lib/messages';
 import { InfoModal } from './components/InfoModal';
+import { Keyboard } from './components/Keyboard';
+import { ShareButton } from './components/ShareButton';
 import { StatsModal } from './components/StatsModal';
+import { Toast } from './components/Toast';
+import { getWordLists, } from './data/words';
 import { useAuth } from './hooks/useAuth';
+import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, updateStats } from './lib/gameLogic';
+import { getLossMessage, getWinMessage } from './lib/messages';
+import { generateShareText } from './lib/share';
 import { supabase } from './lib/supabaseClient';
+import type { GuessResult, LetterStatus } from './types/game';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -25,7 +24,6 @@ export default function App() {
 
   // 1. Initial State
   const [date] = useState(() =>
-    // new URLSearchParams(window.location.search).get('date') ||
     new Date().toISOString().split('T')[0]
   );
 
@@ -36,6 +34,7 @@ export default function App() {
   const [isGameOverModal, setIsGameOverModal] = useState(false)
   const [usedHint, setUsedHint] = useState(false);
   const [hintRecord, setHintRecord] = useState<{ letter: string, index: number } | null>(null);
+  const [gameMessage, setGameMessage] = useState("")
 
   const [toast, setToast] = useState<{
     show: boolean, message: string, duration: number | undefined
@@ -69,6 +68,7 @@ export default function App() {
         setGuesses(local?.guesses || []);
         setLetterStatuses(local?.letterStatuses || {});
         setUsedHint(local?.usedHint || false);
+        setGameMessage(local?.gameMessage|| "")
 
         if (local?.hintRecord && !local?.usedHint) {
           setUsedHint(true);
@@ -76,6 +76,7 @@ export default function App() {
         setHintRecord(local?.hintRecord || null);
         setIsGameOver(local?.status === 'won' || local?.status === 'lost');
         setIsGameOverModal(local?.status === 'won' || local?.status === 'lost');
+
       }
 
       // Phase B: Cloud Load (SSoT)
@@ -125,14 +126,6 @@ export default function App() {
     return () => { isMounted = false; };
   }, [date, user?.id]);
 
-
-  // const handleDateChange = (newDate: string) => {
-  //   const url = new URL(window.location.href);
-  //   url.searchParams.set('date', newDate);
-  //   window.history.pushState({}, '', url);
-  //   setDate(newDate);
-  // };
-
   const onChar = useCallback((char: string) => {
     if (isGameOver) return;
     setCurrentGuess(prev => (prev.length < config.length ? prev + char : prev));
@@ -173,25 +166,21 @@ export default function App() {
     setLetterStatuses(newStatuses);
     setCurrentGuess("");
 
+
     if (won || lost) {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
-      setTimeout(() => triggerToast(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word), 8500), 500);
+      setGameMessage(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word))
+      setTimeout(() => triggerToast(gameMessage, 8500), 500);
     }
 
-    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config };
+    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage };
     localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
 
     if (user) await syncGameState(user.id, date, payload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver, currentGuess, config, guesses, letterStatuses, date, usedHint, hintRecord, user]);
-
-  // Handle Leaderboard Sync on Game Over
-  useEffect(() => {
-    if (user && isGameOver) {
-      submitScoreToCloud(user.id, date, config, guesses, usedHint)
-    }
-  }, [user, isGameOver, date, config, guesses, usedHint]);
 
   // Physical Keyboard
   useEffect(() => {
@@ -234,30 +223,14 @@ export default function App() {
 
       <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 
-        {/* Row 1: Game Identity & Date Selection */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[10px] text-white tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
-            <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
-              {config.length}L
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
-            <button
-              onClick={() => window.location.reload()}
-              className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
-              title="Refresh Game"
-            >
-              <RotateCcw size={16} />
-            </button>
-          </div>
-        </div>
 
         {/* Row 2: User Stats, Hints, and Info */}
-        <div className="flex items-center justify-between bg-gray-900/50 py-1 px-2 rounded-xl border border-gray-800/50">
+        <div className="flex items-center justify-between bg-gray-900/50 py-2 px-2 rounded-xl border border-gray-800/50">
           <div className="flex items-center gap-2">
+            <h2 className="text-[10px] text-gray-100 tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
+
+          </div>
+          <div className="flex items-center gap-2 me-2">
             {user ? (
               <div className="group relative flex items-center gap-2">
                 <img
@@ -295,6 +268,20 @@ export default function App() {
                 <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
               </button>
             )}
+            <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
+              {config.length}L
+            </span>
+
+            <div className="flex items-center gap-1">
+              {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
+              <button
+                onClick={() => window.location.reload()}
+                className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
+                title="Refresh Game"
+              >
+                <RotateCcw size={16} />
+              </button>
+            </div>
 
             <button onClick={() => setIsStatsOpen(true)} className="text-gray-400 hover:text-white p-1">
               <BarChart2 size={18} />
@@ -341,7 +328,7 @@ export default function App() {
             <h2 className="text-3xl font-black text-white mb-1 uppercase tracking-tighter">
               {guesses[guesses.length - 1].every(r => r.status === 'correct') ? '' : 'Nice Try!'}
             </h2>
-         
+
             <div className="mb-8">
               <ShareButton
                 text={generateShareText(

@@ -1,4 +1,4 @@
-import { Calendar, Lightbulb, X, Zap } from 'lucide-react';
+import { Lightbulb, X, Zap } from 'lucide-react';
 import React from 'react';
 
 interface Props {
@@ -16,7 +16,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl  uppercase text-white tracking-tighter mb-6">How to Play</h2>
+        <h2 className="text-2xl  uppercase text-gray-100 tracking-tighter mb-6">How to Play</h2>
 
         <div className="space-y-6 text-sm">
 
@@ -32,10 +32,10 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   Base score: 1000 for 1st try, 800 for 2nd, etc.
                 </p>
 
-                <ul className="grid grid-cols-2 gap-y-1 text-[10px] font-mono uppercase tracking-tighter">
-                  <li className="flex items-center gap-2"><span className="text-correct">●</span> Fewer Tries: +High</li>
-                  <li className="flex items-center gap-2"><span className="text-correct">●</span> Greens: +20 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span> Yellows: -5 pts</li>
+                <ul className="grid grid-cols-2 gap-y-1 text-[12px] font-mono uppercase tracking-tighter">
+                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Each Green: +10 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Each Yellow: +2 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-black">●</span>Each Black: -4 pts</li>
                   <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -200 pts</li>
                 </ul>
                 <p className="text-[10px] italic">Maximum precision earns the highest rank.</p>
@@ -44,18 +44,6 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Date Picker Info */}
-          <div className="flex gap-4">
-            <div className="bg-blue-500/20 p-2 h-fit rounded-lg text-blue-400">
-              <Calendar size={20} />
-            </div>
-            <div>
-              <p className="font-bold text-white mb-1 uppercase tracking-wide">Time Travel</p>
-              <p className="text-gray-400 leading-relaxed">
-                Click the date to play past puzzles. Word length (4, 5, or 6) changes daily.
-              </p>
-            </div>
-          </div>
 
           {/* Hint Info */}
           <div className="flex gap-4">

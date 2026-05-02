@@ -1,5 +1,5 @@
 // src/data/words.ts
-import raw4Official from "./words_4_allowed.txt?raw";
+import raw4Official from "./words_4_official.txt?raw";
 import raw4Allowed from "./words_4_allowed.txt?raw";
 import raw5Official from "./words_5_official.txt?raw";
 import raw5Allowed from "./words_5_allowed.txt?raw";

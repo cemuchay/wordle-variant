@@ -1,10 +1,6 @@
-// import { WORDS_4, WORDS_5, WORDS_6 } from '../data/words';
 import type { GameConfig, GameStats, GuessResult } from "../types/game";
-
 import { getWordLists } from "../data/words";
 import { supabase } from "./supabaseClient";
-
-// lib/gameLogic.ts
 
 /**
  * Mulberry32 PRNG
@@ -113,8 +109,7 @@ export const updateStats = (won: boolean, attempts: number) => {
            gamesWon: 0,
            currentStreak: 0,
            maxStreak: 0,
-           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
-           //  guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+            guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
         };
 
    stats.gamesPlayed += 1;
@@ -245,8 +240,7 @@ export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   guesses: any[][]
+   guesses: Record<string, string>[][]
 ) => {
    // Base score: 1000 for 1st try, 800 for 2nd, etc.
    let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
@@ -255,68 +249,18 @@ export const calculateSkillIndex = (
    if (usedHint) score -= 200;
 
    // Precision weights
-   let greens = 0;
-   let yellows = 0;
-   let blacks = 0;
+   let bonus = 0
 
    guesses.forEach((row) => {
       row.forEach((cell) => {
-         if (cell.status === "correct") greens += 10;
-         if (cell.status === "present") yellows += 5;
-         if (cell.status === "absent") blacks += 1;
+         if (cell.status === "correct") bonus += 10;
+         if (cell.status === "present") bonus += 2;
+         if (cell.status === "absent") bonus -= 4;
       });
    });
 
-   return Math.floor(score + greens - yellows - blacks);
+   return Math.floor(score + bonus);
 };
-
-export const submitScoreToCloud = async (
-   userId: string,
-   gameDate: string,
-   config: { length: number; maxAttempts: number },
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   guesses: any[][],
-   usedHint: boolean
-) => {
-   // 1. Calculate the Skill Index
-   const attempts = guesses.length;
-   let score = Math.floor(
-      ((config.maxAttempts - attempts + 1) / config.maxAttempts) * 1000
-   );
-
-   // Apply weights
-   if (usedHint) score -= 200;
-
-   let greens = 0;
-   guesses.forEach((row) => {
-      row.forEach((cell) => {
-         if (cell.status === "correct") greens += 20;
-      });
-   });
-
-   const finalSkillScore = score + greens;
-
-   // 2. Push to Supabase
-   const { error } = await supabase.from("scores").upsert(
-      {
-         user_id: userId,
-         game_date: gameDate,
-         word_length: config.length,
-         attempts: attempts,
-         hints_used: usedHint,
-         skill_score: finalSkillScore,
-      },
-      { onConflict: "user_id, game_date" }
-   );
-
-   if (error) {
-      console.error("Cloud sync failed:", error.message);
-      return null;
-   }
-
-   return finalSkillScore;
-};
-
 
 export const syncGameState = async (
    userId: string,

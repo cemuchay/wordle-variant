@@ -1,6 +1,6 @@
 import React from 'react';
 import type { LetterStatus } from '../types/game';
-import { Delete, CornerDownLeft } from 'lucide-react';
+import { Delete, } from 'lucide-react';
 
 const ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -22,7 +22,7 @@ export const Keyboard: React.FC<Props> = ({ onChar, onDelete, onEnter, letterSta
       case 'correct': return 'bg-correct border-correct text-white';
       case 'present': return 'bg-present border-present text-white';
       case 'absent': return 'bg-absent border-absent text-white';
-      default: return 'bg-gray-700 border-gray-600 text-white';
+      default: return 'bg-default border-gray-600 text-white';
     }
   };
 
@@ -39,7 +39,6 @@ export const Keyboard: React.FC<Props> = ({ onChar, onDelete, onEnter, letterSta
                 type="button"
                 className={`
                   ${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'}
-                  /* Reduced height from h-14 to h-12/h-13 for vertical space */
                   h-12 sm:h-13 rounded-md font-bold transition-all border-b-2
                   flex items-center justify-center uppercase
                   cursor-pointer hover:brightness-110 active:translate-y-0.5 active:border-b-0
@@ -53,7 +52,8 @@ export const Keyboard: React.FC<Props> = ({ onChar, onDelete, onEnter, letterSta
                 }}
               >
                 {key === 'DELETE' ? <Delete size={18} /> : 
-                 key === 'ENTER' ? <CornerDownLeft size={18} /> : key}
+                //  key === 'ENTER' ? <CornerDownLeft size={18} /> : key}
+                    key === 'ENTER' ? key : key}
               </button>
             );
           })}

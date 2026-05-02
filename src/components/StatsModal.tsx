@@ -48,7 +48,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   // Memoize personal stats from localStorage
   const stats = useMemo<GameStats>(() => {
     const raw = localStorage.getItem('wordle-statistics');
-    console.log(raw, "raw")
+
     return raw ? JSON.parse(raw) : {
       gamesPlayed: 0,
       gamesWon: 0,
@@ -113,7 +113,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center">Statistics</h2>
+        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100">Statistics</h2>
 
         {/* Tab Switcher */}
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6 shrink-0">

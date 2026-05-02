@@ -119,6 +119,7 @@ code {
   --color-present: #c9b458;
   --color-absent: #787c7e;
   --color-dark: #121213;
+  --color-default: #818384;
 
   /* Custom Animations for tile flips */
   @keyframes flip {
