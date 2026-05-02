@@ -68,7 +68,7 @@ export default function App() {
         setGuesses(local?.guesses || []);
         setLetterStatuses(local?.letterStatuses || {});
         setUsedHint(local?.usedHint || false);
-        setGameMessage(local?.gameMessage|| "")
+        setGameMessage(local?.gameMessage || "")
 
         if (local?.hintRecord && !local?.usedHint) {
           setUsedHint(true);
@@ -165,21 +165,26 @@ export default function App() {
     setGuesses(newGuesses);
     setLetterStatuses(newStatuses);
     setCurrentGuess("");
+    let message = ""
 
 
     if (won || lost) {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
-      setGameMessage(won ? getWinMessage(newGuesses.length) : getLossMessage(config.word))
-      setTimeout(() => triggerToast(gameMessage, 8500), 500);
+      message = (won ? getWinMessage(newGuesses.length) : getLossMessage(config.word))
+      setTimeout(() => {
+        setGameMessage(message)
+        triggerToast(message || gameMessage, 8500)
+      }, 500);
     }
 
-    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage };
+    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
     localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
 
     if (user) await syncGameState(user.id, date, payload);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver, currentGuess, config, guesses, letterStatuses, date, usedHint, hintRecord, user]);
 
   // Physical Keyboard
