@@ -2,6 +2,7 @@
 
 :root {
   --text: #6b6375;
+  --custom:#121213;
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
@@ -116,7 +117,7 @@ code {
   /* Wordle Brand Colors */
   --color-correct: #6aaa64;
   --color-present: #c9b458;
-  --color-absent: #787c7e;
+  --color-absent: #3A3A3C;
   --color-dark: #121213;
   --color-default: #818384;
 

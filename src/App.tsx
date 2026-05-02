@@ -225,7 +225,7 @@ export default function App() {
 
 
         {/* Row 2: User Stats, Hints, and Info */}
-        <div className="flex items-center justify-between bg-gray-900/50 py-2 px-2 rounded-xl border border-gray-800/50">
+        <div className="flex items-center justify-between bg-custom py-2 px-2 rounded-xl border border-gray-800/50">
           <div className="flex items-center gap-2">
             <h2 className="text-[10px] text-gray-100 tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
 
