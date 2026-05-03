@@ -21,8 +21,9 @@ interface LeaderboardEntry {
   username: string;
   avatar_url: string;
   total_score: number;
-  attempts?: number;
-  game_length?: number;
+  attempts?: number | "X";
+  word_length?: number;
+  status?: "lost" | "won" | "playing"
 }
 
 interface GameStats {
@@ -82,7 +83,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
 
       // 1. Join array values into a comma-separated string for Supabase .select()
       const standardSelect = "username, avatar_url, total_points";
-      const todaySelect = `${standardSelect}, word_length, attempts`;
+      const todaySelect = `${standardSelect}, word_length, attempts, status`;
 
       const { data, error } = await supabase
         .from(viewMap[timeframe])
@@ -98,7 +99,8 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
           total_score: entry.total_points,
           // Pass these through if you want to display them in the UI for 'today'
           word_length: entry.word_length ?? null,
-          attempts: entry.attempts ?? null
+          attempts: entry.attempts ?? null,
+          status: entry.status
         }));
 
         setLeaderboard(formattedData);
@@ -229,10 +231,13 @@ const StatItem: React.FC<{ value: string | number; label: string }> = ({ value, 
 );
 
 const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => {
-  const attempts = entry.attempts
-  const wordLength = entry.game_length
+  let attempts = entry.attempts
+  const wordLength = entry.word_length
+  const status = entry.status
 
-  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength})` : ``
+  if (status === "lost") attempts = "X"
+
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ``
   return (
     <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
       <div className="flex items-center gap-3">
