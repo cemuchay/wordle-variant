@@ -16,9 +16,27 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl  uppercase text-gray-100 tracking-tighter mb-6">How to Play</h2>
+        <h2 className="text-2xl  uppercase text-gray-100 tracking-tighter mb-6">Game Info</h2>
 
-        <div className="space-y-6 text-sm">
+        <div className="mt-3 space-y-6 text-sm">
+
+          <div className="flex gap-4">
+            <div className="bg-yellow-500/20 p-2 h-fit rounded-lg text-green-400">
+              <Zap size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-white mb-1 uppercase tracking-wide">How It Works</p>
+              <div className="text-gray-400 text-sm space-y-2">
+                <p className="leading-relaxed mb-1">
+                  Basically Wordle, with 4 or 5 letter words on a given day.</p>
+                <p className="leading-relaxed mb-1">
+                  5 guesses (for 4), 6 guesses (for 5) and 7 guesses (for 6)
+                </p>
+
+              </div>
+            </div>
+          </div>
+
 
           {/* Score Calculator Info */}
           <div className="flex gap-4">

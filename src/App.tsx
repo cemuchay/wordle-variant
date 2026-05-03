@@ -138,6 +138,7 @@ export default function App() {
           setHintRecord(data.hint_record);
           setIsGameOver(data.status !== 'playing');
           setIsGameOverModal(data.status !== 'playing');
+          setGameMessage(data.game_message)
 
           const newStatuses: Record<string, LetterStatus> = {};
           cloudGuesses.forEach((row: GuessResult[]) => {
@@ -155,7 +156,8 @@ export default function App() {
             letterStatuses: newStatuses,
             status: data.status,
             usedHint: data.used_hint,
-            hintRecord: data.hint_record
+            hintRecord: data.hint_record,
+            gameMessage: data.game_message
           }));
         }
       }
@@ -178,10 +180,6 @@ export default function App() {
   }, [isGameOver]);
 
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
-
-  useEffect(() => {
-    console.log(syncStatus)
-  }, [syncStatus])
 
   const onEnter = useCallback(async () => {
     if (isGameOver || currentGuess.length !== config.length) return;

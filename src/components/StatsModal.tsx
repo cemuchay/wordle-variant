@@ -16,7 +16,8 @@ interface LeaderboardEntry {
   total_score: number;
   attempts?: number | "X";
   word_length?: number;
-  status?: "lost" | "won" | "playing"
+  status?: "lost" | "won" | "playing";
+  days_active: number
 }
 
 interface GameStats {
@@ -36,7 +37,7 @@ interface Props {
 
 // --- Component ---
 
-export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user,stats }) => {
+export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
   const [timeframe, setTimeframe] = useState<Timeframe>('today');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -63,8 +64,9 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user,stats }) => 
       };
 
       // 1. Join array values into a comma-separated string for Supabase .select()
-      const standardSelect = "username, avatar_url, total_points";
-      const todaySelect = `${standardSelect}, word_length, attempts, status`;
+      const baseSelect = "username, avatar_url, total_points"
+      const standardSelect = `${baseSelect}, days_active`;
+      const todaySelect = `${baseSelect}, word_length, attempts, status`;
 
       const { data, error } = await supabase
         .from(viewMap[timeframe])
@@ -81,7 +83,8 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user,stats }) => 
           // Pass these through if you want to display them in the UI for 'today'
           word_length: entry.word_length ?? null,
           attempts: entry.attempts ?? null,
-          status: entry.status
+          status: entry.status,
+          days_active: entry.days_active ?? 0
         }));
 
         setLeaderboard(formattedData);
@@ -224,7 +227,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
 
   if (status === "lost") attempts = "X"
 
-  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ``
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ` (${entry.days_active}/7)`
   return (
     <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
       <div className="flex items-center gap-3">
