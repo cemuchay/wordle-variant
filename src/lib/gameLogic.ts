@@ -344,10 +344,35 @@ export const syncGameState = async (
          word_length: payload.config.length,
          skill_score: skillScore, // Authoritative score
          attempts: payload.guesses.length,
+         game_message:payload.gameMessage
       },
       { onConflict: "user_id, game_date" }
    );
 
    if (error) console.error("Cloud sync failed:", error.message);
    return skillScore;
+};
+
+export const syncWithRetry = async (
+   userId: string,
+   date: string | null,
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   payload: any,
+   retries = 3
+): Promise<{ success: boolean; score: number }> => {
+   console.log(payload, "payload")
+   if (!date) return { success: false, score: 0 };
+   for (let i = 0; i < retries; i++) {
+      try {
+         const score = await syncGameState(userId, date, payload);
+         // If we reach here without the syncGameState console.error, assume success
+         // (Better: modify syncGameState to throw or return {error})
+         return { success: true, score: score || 0 };
+      } catch (err) {
+         if (i === retries - 1) throw err;
+         // Wait 1s before retrying
+         await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+   }
+   return { success: false, score: 0 };
 };

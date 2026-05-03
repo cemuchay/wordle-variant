@@ -48,8 +48,62 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // NEW: State for cloud-constructed stats
+  const [cloudStats, setCloudStats] = useState<GameStats | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!isOpen || !user || activeTab !== 'stats') return;
+
+    const fetchUserStats = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('scores')
+        .select('status, attempts, skill_score, game_date')
+        .eq('user_id', user.id)
+        .order('game_date', { ascending: true });
+
+      if (isMounted && !error && data) {
+        const constructedStats: GameStats = {
+          gamesPlayed: data.length,
+          gamesWon: data.filter(s => s.status === 'won').length,
+          currentStreak: 0,
+          maxStreak: 0,
+          guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 }
+        };
+
+        // Calculate streaks and distribution
+        let current = 0;
+        let max = 0;
+
+        data.forEach((score) => {
+          if (score.status === 'won') {
+            current++;
+            if (score.attempts) {
+              const att = score.attempts.toString();
+              constructedStats.guesses[att] = (constructedStats.guesses[att] || 0) + 1;
+            }
+          } else {
+            current = 0;
+          }
+          if (current > max) max = current;
+        });
+
+        constructedStats.currentStreak = current;
+        constructedStats.maxStreak = max;
+        setCloudStats(constructedStats);
+      }
+      if (isMounted) setLoading(false);
+    };
+
+    fetchUserStats();
+    return () => { isMounted = false; };
+  }, [isOpen, user, activeTab]);
+
   // Memoize personal stats from localStorage
   const stats = useMemo<GameStats>(() => {
+    if (user && cloudStats) return cloudStats;
+
     const raw = localStorage.getItem('wordle-statistics');
 
     return raw ? JSON.parse(raw) : {
@@ -145,33 +199,39 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
 
         <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
           {activeTab === 'stats' ? (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex justify-around mb-8 text-center">
-                <StatItem value={stats.gamesPlayed} label="Played" />
-                <StatItem
-                  value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
-                  label="Win %"
-                />
-                <StatItem value={stats.currentStreak} label="Streak" />
+            loading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <Loader2 className="animate-spin text-gray-600" size={24} />
+                <span className="text-[10px] text-gray-600 uppercase font-bold">Fetching your history...</span>
               </div>
+            ) : (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex justify-around mb-8 text-center">
+                  <StatItem value={stats.gamesPlayed} label="Played" />
+                  <StatItem
+                    value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
+                    label="Win %"
+                  />
+                  <StatItem value={stats.currentStreak} label="Streak" />
+                </div>
 
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4 text-gray-500">Guess Distribution</h3>
-              <div className="space-y-2">
-                {Object.entries(stats.guesses).map(([attempt, count]) => (
-                  <div key={attempt} className="flex items-center gap-2 text-xs font-mono">
-                    <span className="w-2">{attempt}</span>
-                    <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
-                      <div
-                        className="bg-correct py-0.5 px-2 text-right transition-all duration-1000 min-w-fit font-bold"
-                        style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
-                      >
-                        {count}
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4 text-gray-500">Guess Distribution</h3>
+                <div className="space-y-2">
+                  {Object.entries(stats.guesses).map(([attempt, count]) => (
+                    <div key={attempt} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-2">{attempt}</span>
+                      <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
+                        <div
+                          className="bg-correct py-0.5 px-2 text-right transition-all duration-1000 min-w-fit font-bold"
+                          style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
+                        >
+                          {count}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              </div>)
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}

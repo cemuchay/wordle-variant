@@ -8,11 +8,12 @@ import { StatsModal } from './components/StatsModal';
 import { Toast } from './components/Toast';
 import { getWordLists, } from './data/words';
 import { useAuth } from './hooks/useAuth';
-import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, updateStats } from './lib/gameLogic';
+import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
 import type { GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
+import { CloudSyncMenu } from './components/SyncCloudModal';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -98,6 +99,7 @@ export default function App() {
 
       // Phase B: Cloud Load (SSoT)
       if (user?.id) {
+        if (!date) return
         const { data, error } = await supabase
           .from('scores')
           .select('*')
@@ -109,7 +111,20 @@ export default function App() {
 
         const cloudGuesses = data.guesses || [];
         // Only overwrite if cloud has data or game is finished
-        if (cloudGuesses.length > 0 || data.status !== 'playing') {
+
+        // Only overwrite local if the cloud is actually ahead
+        const cloudIsAhead = cloudGuesses.length > (local?.guesses?.length || 0);
+        const cloudIsFinished = data.status !== 'playing';
+        const localIsFinished = local?.status === 'won' || local?.status === 'lost';
+
+        // If local is finished but cloud isn't, stick with local and trigger a re-sync
+        if (localIsFinished && !cloudIsFinished) {
+          console.log("Local is ahead (finished). Keeping local and re-syncing...");
+          syncGameState(user.id, date, local);
+          return; // Don't let cloud overwrite
+        }
+
+        if (cloudIsAhead || (cloudIsFinished && !localIsFinished)) {
           setGuesses(cloudGuesses);
           setUsedHint(data.hints_used);
           setHintRecord(data.hint_record);
@@ -153,6 +168,12 @@ export default function App() {
     setCurrentGuess(prev => prev.slice(0, -1));
   }, [isGameOver]);
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+
+  useEffect(() => {
+    console.log(syncStatus)
+  }, [syncStatus])
+
   const onEnter = useCallback(async () => {
     if (isGameOver || currentGuess.length !== config.length) return;
 
@@ -164,6 +185,7 @@ export default function App() {
       return;
     }
 
+    // 1. Calculate the new state locally first
     const result = checkGuess(upperGuess, config.word);
     const newGuesses = [...guesses, result];
     const newStatuses = { ...letterStatuses };
@@ -184,22 +206,45 @@ export default function App() {
     setCurrentGuess("");
     let message = ""
 
+    message = (won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "")
+    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
+
+    /*
+    save locally for today first
+    */
+    localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+
+    if (user) {
+      setSyncStatus('syncing');
+      try {
+        const { success } = await syncWithRetry(user.id, date, payload);
+        if (success) {
+          setSyncStatus('synced');
+          // Reset to idle or stay 'synced' for a few seconds
+          setTimeout(() => setSyncStatus('idle'), 500);
+        }
+        else {
+          setSyncStatus('error');
+        };
+      } catch (error) {
+        console.log(error)
+        setSyncStatus('error');
+        triggerToast("Connection lost. Retrying in background...", 5000);
+
+      }
+    }
+
 
     if (won || lost) {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
-      message = (won ? getWinMessage(newGuesses.length) : getLossMessage())
+
       setTimeout(() => {
         setGameMessage(message)
         triggerToast(message || gameMessage, 8500)
       }, 500);
     }
-
-    const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
-    localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
-
-    if (user) await syncGameState(user.id, date, payload);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver, currentGuess, config, guesses, letterStatuses, date, usedHint, hintRecord, user]);
@@ -246,7 +291,7 @@ export default function App() {
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
       <StatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} user={user} />
-
+      <CloudSyncMenu status={syncStatus} />
       <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 
 
