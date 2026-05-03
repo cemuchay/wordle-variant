@@ -180,7 +180,7 @@ export default function App() {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
-      message = (won ? getWinMessage(newGuesses.length) : getLossMessage(config.word))
+      message = (won ? getWinMessage(newGuesses.length) : getLossMessage())
       setTimeout(() => {
         setGameMessage(message)
         triggerToast(message || gameMessage, 8500)
@@ -347,7 +347,8 @@ export default function App() {
           date={date as string}
           config={config}
           usedHint={usedHint}
-          gameMessage={gameMessage} />
+          gameMessage={gameMessage}
+          word={config.word} />
 
       )}
     </main>

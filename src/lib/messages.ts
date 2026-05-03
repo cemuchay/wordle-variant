@@ -7,13 +7,15 @@ export const getWinMessage = (attempts: number): string => {
          "I see you've met the editor and got some `intel`.",
          "Statistically impossible. Stop lying to yourself.",
          `nerd.. sighs`,
+         "sus!!!!",
       ],
       2: [
          "Insane luck. Go buy a lottery ticket immediately.",
          "Show off. It’s just a game, calm down.",
-         "Purely accidental. Don't let it go to your head.",
+         "Purely accidental. Don't let it get to your head.",
          "Two tries? You’re peaking. it's all downhill from here.",
          "Absolute fluke. Do it again tomorrow, I dare you.",
+          "very sus",
       ],
       3: [
          "Solid effort. You're actually kind of good at this.",
@@ -99,11 +101,11 @@ const lastGuess = [
    "6/6. A win with heavy apologies attached.",
 ];
 
-export const getLossMessage = (word: string): string => {
+export const getLossMessage = (): string => {
    const losses = [
-      `Ouch. The word was ${word}. Stick to ludo.`,
-      `Pathetic. ${word} was right there.`,
-      `Even my source code knew it was ${word}.`,
+      `Ouch. The word was easy sha. Stick to ludo.`,
+      `Pathetic. it was right there....`,
+      `Even my source code knew it was trivial.`,
       `Game Over. You're the reason we have 'Easy Mode' in other games.`,
       `Better luck next time. Maybe try a 2-letter word version?`,
       "don't cry",
