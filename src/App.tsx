@@ -76,14 +76,23 @@ export default function App() {
         setGuesses(local?.guesses || []);
         setLetterStatuses(local?.letterStatuses || {});
         setUsedHint(local?.usedHint || false);
-        setGameMessage(local?.gameMessage || "")
+
 
         if (local?.hintRecord && !local?.usedHint) {
           setUsedHint(true);
         }
         setHintRecord(local?.hintRecord || null);
-        setIsGameOver(local?.status === 'won' || local?.status === 'lost');
-        setIsGameOverModal(local?.status === 'won' || local?.status === 'lost');
+
+        const localGameOver = (local?.status === 'won' || local?.status === 'lost')
+        let localGameMessage = local?.gameMessage || ""
+        setIsGameOver(localGameOver)
+
+        if (localGameOver && !localGameMessage) {
+          localGameMessage = local?.status === 'won' ? getWinMessage(local?.guesses.length) : getLossMessage()
+        }
+
+        setGameMessage(localGameMessage)
+        setIsGameOverModal(localGameOver);
 
       }
 
