@@ -1,21 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { X, Trophy, User, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import type { AppUser } from '../types/game';
 
 // --- Types & Interfaces ---
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'weekly'
 
-interface UserMetadata {
-  full_name?: string;
-  avatar_url?: string;
-}
 
-interface AppUser {
-  id: string;
-  user_metadata?: UserMetadata;
-}
 
 interface LeaderboardEntry {
   username: string;
@@ -38,82 +31,16 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   user: AppUser | null;
+  stats: GameStats
 }
 
 // --- Component ---
 
-export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
+export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user,stats }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
   const [timeframe, setTimeframe] = useState<Timeframe>('today');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // NEW: State for cloud-constructed stats
-  const [cloudStats, setCloudStats] = useState<GameStats | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (!isOpen || !user || activeTab !== 'stats') return;
-
-    const fetchUserStats = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('scores')
-        .select('status, attempts, skill_score, game_date')
-        .eq('user_id', user.id)
-        .order('game_date', { ascending: true });
-
-      if (isMounted && !error && data) {
-        const constructedStats: GameStats = {
-          gamesPlayed: data.length,
-          gamesWon: data.filter(s => s.status === 'won').length,
-          currentStreak: 0,
-          maxStreak: 0,
-          guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 }
-        };
-
-        // Calculate streaks and distribution
-        let current = 0;
-        let max = 0;
-
-        data.forEach((score) => {
-          if (score.status === 'won') {
-            current++;
-            if (score.attempts) {
-              const att = score.attempts.toString();
-              constructedStats.guesses[att] = (constructedStats.guesses[att] || 0) + 1;
-            }
-          } else {
-            current = 0;
-          }
-          if (current > max) max = current;
-        });
-
-        constructedStats.currentStreak = current;
-        constructedStats.maxStreak = max;
-        setCloudStats(constructedStats);
-      }
-      if (isMounted) setLoading(false);
-    };
-
-    fetchUserStats();
-    return () => { isMounted = false; };
-  }, [isOpen, user, activeTab]);
-
-  // Memoize personal stats from localStorage
-  const stats = useMemo<GameStats>(() => {
-    if (user && cloudStats) return cloudStats;
-
-    const raw = localStorage.getItem('wordle-statistics');
-
-    return raw ? JSON.parse(raw) : {
-      gamesPlayed: 0,
-      gamesWon: 0,
-      currentStreak: 0,
-      maxStreak: 0,
-      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 }
-    };
-  }, [isOpen]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);

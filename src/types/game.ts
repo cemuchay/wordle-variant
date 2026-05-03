@@ -18,3 +18,13 @@ export interface GuessResult {
   letter: string;
   status: LetterStatus;
 }
+
+interface UserMetadata {
+  full_name?: string;
+  avatar_url?: string;
+}
+
+export interface AppUser {
+  id: string;
+  user_metadata?: UserMetadata;
+}

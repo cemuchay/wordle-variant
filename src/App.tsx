@@ -14,6 +14,7 @@ import { supabase } from './lib/supabaseClient';
 import type { GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
+import { useWordleStats } from './hooks/useStats';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -23,8 +24,13 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
+
   const [date, setDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+
+  // Initialize the hook
+  const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
 
   useEffect(() => {
     const syncTime = async () => {
@@ -35,6 +41,7 @@ export default function App() {
 
     syncTime();
   }, []);
+
 
   const [guesses, setGuesses] = useState<GuessResult[][]>([]);
   const [letterStatuses, setLetterStatuses] = useState<Record<string, LetterStatus>>({});
@@ -49,7 +56,7 @@ export default function App() {
     show: boolean, message: string, duration: number | undefined
   }>({ show: false, message: "", duration: undefined });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
-  const [isStatsOpen, setIsStatsOpen] = useState(false);
+
 
   const config = getDailyConfig(date as string);
 
@@ -85,6 +92,7 @@ export default function App() {
         setHintRecord(local?.hintRecord || null);
 
         const localGameOver = (local?.status === 'won' || local?.status === 'lost')
+        if (localGameOver) refresh()
         let localGameMessage = local?.gameMessage || ""
         setIsGameOver(localGameOver)
 
@@ -156,6 +164,7 @@ export default function App() {
     loadGameData();
     if (user) initializeUserStats(user?.id as string)
     return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user]);
 
   const onChar = useCallback((char: string) => {
@@ -239,6 +248,7 @@ export default function App() {
       setIsGameOver(true);
       setIsGameOverModal(true);
       updateStats(won, newGuesses.length);
+      await refresh();
 
       setTimeout(() => {
         setGameMessage(message)
@@ -290,7 +300,7 @@ export default function App() {
         onClose={() => setToast({ ...toast, show: false })}
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-      <StatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} user={user} />
+      <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} />
       <CloudSyncMenu status={syncStatus} />
       <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 
@@ -402,8 +412,7 @@ export default function App() {
           config={config}
           usedHint={usedHint}
           gameMessage={gameMessage}
-          word={config.word} />
-
+          word={config.word} stats={stats} />
       )}
     </main>
   );

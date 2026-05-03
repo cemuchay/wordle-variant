@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { ShareButton } from './ShareButton'; // Adjust path
+import React, { useEffect, useState } from 'react';
 import { generateShareText } from '../lib/share';
-import type { GuessResult } from '../types/game';
 import { getServerDate } from '../lib/time';
+import type { GameStats, GuessResult } from '../types/game';
+import { ShareButton } from './ShareButton'; // Adjust path
 
 interface Props {
     isOpen: boolean;
@@ -13,21 +13,15 @@ interface Props {
     usedHint: boolean;
     gameMessage: string;
     word: string;
+    stats: GameStats
 }
 
 export const GameOverModal: React.FC<Props> = ({
-    isOpen, onClose, guesses, date, config, usedHint, gameMessage, word
+    isOpen, onClose, guesses, date, config, usedHint, gameMessage, word, stats
 }) => {
     const won = guesses[guesses.length - 1].every(r => r.status === 'correct');
 
-    // Reuse your localStorage logic
-    const stats = useMemo(() => {
-        const raw = localStorage.getItem('wordle-statistics');
-        return raw ? JSON.parse(raw) : {
-            gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0,
-            guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 }
-        };
-    }, [isOpen]);
+   
 
     const [countdown, setCountdown] = useState("");
 
