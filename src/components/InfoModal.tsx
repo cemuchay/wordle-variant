@@ -33,9 +33,9 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </p>
 
                 <ul className="grid grid-cols-2 gap-y-1 text-[12px] font-mono uppercase tracking-tighter">
-                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Each Green: +10 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Each Green: +15 pts</li>
                   <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Each Yellow: +2 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-black">●</span>Each Black: -4 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-black">●</span>Each Black: -10 pts</li>
                   <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -200 pts</li>
                 </ul>
                 <p className="text-[10px] italic">Maximum precision earns the highest rank.</p>

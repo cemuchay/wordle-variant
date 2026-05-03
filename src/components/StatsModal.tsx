@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 // --- Types & Interfaces ---
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
-type Timeframe = 'today' | 'weekly' 
+type Timeframe = 'today' | 'weekly'
 
 interface UserMetadata {
   full_name?: string;
@@ -21,6 +21,8 @@ interface LeaderboardEntry {
   username: string;
   avatar_url: string;
   total_score: number;
+  attempts?: number;
+  game_length?: number;
 }
 
 interface GameStats {
@@ -78,17 +80,25 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
         // all: 'leaderboard_all_time'
       };
 
+      // 1. Join array values into a comma-separated string for Supabase .select()
+      const standardSelect = "username, avatar_url, total_points";
+      const todaySelect = `${standardSelect}, word_length, attempts`;
+
       const { data, error } = await supabase
         .from(viewMap[timeframe])
-        .select('username, avatar_url, total_points')
+        .select(timeframe === 'today' ? todaySelect : standardSelect)
         .order('total_points', { ascending: false })
         .limit(20);
 
       if (isMounted && !error && data) {
-        const formattedData: LeaderboardEntry[] = data.map((entry) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const formattedData: LeaderboardEntry[] = data.map((entry: any) => ({
           username: entry.username,
           avatar_url: entry.avatar_url,
-          total_score: entry.total_points
+          total_score: entry.total_points,
+          // Pass these through if you want to display them in the UI for 'today'
+          word_length: entry.word_length ?? null,
+          attempts: entry.attempts ?? null
         }));
 
         setLeaderboard(formattedData);
@@ -108,7 +118,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
-        
+
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
           <X size={20} />
         </button>
@@ -136,9 +146,9 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex justify-around mb-8 text-center">
                 <StatItem value={stats.gamesPlayed} label="Played" />
-                <StatItem 
-                  value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`} 
-                  label="Win %" 
+                <StatItem
+                  value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
+                  label="Win %"
                 />
                 <StatItem value={stats.currentStreak} label="Streak" />
               </div>
@@ -164,7 +174,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user }) => {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}
               <div className="flex gap-1 mb-6">
-                {(['today', 'weekly', ] as Timeframe[]).map((t) => (
+                {(['today', 'weekly',] as Timeframe[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
@@ -218,22 +228,28 @@ const StatItem: React.FC<{ value: string | number; label: string }> = ({ value, 
   </div>
 );
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => (
-  <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
-    <div className="flex items-center gap-3">
-      <span className={`text-xs font-black w-4 ${index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
-        {index + 1}
-      </span>
-      <img 
-        src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`} 
-        className="w-6 h-6 rounded-full border border-gray-700" 
-        alt={entry.username} 
-      />
-      <span className="text-xs font-bold truncate max-w-[120px]">{entry.username}</span>
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => {
+  const attempts = entry.attempts
+  const wordLength = entry.game_length
+
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength})` : ``
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
+      <div className="flex items-center gap-3">
+        <span className={`text-xs font-black w-4 ${index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
+          {index + 1}
+        </span>
+        <img
+          src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`}
+          className="w-6 h-6 rounded-full border border-gray-700"
+          alt={entry.username}
+        />
+        <span className="text-xs font-bold truncate max-w-[120px]">{entry.username}</span>
+      </div>
+      <div className="text-right">
+        <div className="text-xs font-black text-white">{entry.total_score} {formattedGameScore}</div>
+        <div className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Skill PTS</div>
+      </div>
     </div>
-    <div className="text-right">
-      <div className="text-xs font-black text-white">{entry.total_score}</div>
-      <div className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Skill PTS</div>
-    </div>
-  </div>
-);
+  )
+};

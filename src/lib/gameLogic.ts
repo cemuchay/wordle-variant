@@ -305,9 +305,9 @@ export const calculateSkillIndex = (
 
    guesses.forEach((row) => {
       row.forEach((cell) => {
-         if (cell.status === "correct") bonus += 10;
+         if (cell.status === "correct") bonus += 15;
          if (cell.status === "present") bonus += 2;
-         if (cell.status === "absent") bonus -= 4;
+         if (cell.status === "absent") bonus -= 10;
       });
    });
 
