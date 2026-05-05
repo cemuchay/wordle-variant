@@ -27,7 +27,7 @@ export const ShareButton: React.FC<Props> = ({ text }) => {
   return (
     <button
       onClick={handleShare}
-      className="flex items-center justify-center gap-2 bg-correct hover:brightness-110 text-white font-bold py-3 px-8 rounded-lg transition-all active:scale-95 w-full"
+      className="flex items-center justify-center gap-2 bg-correct hover:brightness-110 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 w-full"
     >
       {copied ? (
         <>

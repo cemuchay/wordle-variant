@@ -1,4 +1,4 @@
-import { BarChart2, HelpCircle, Lightbulb, RotateCcw, } from 'lucide-react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
@@ -11,11 +11,12 @@ import { useAuth } from './hooks/useAuth';
 import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
-import type { GuessResult, LetterStatus } from './types/game';
+import type { AppUser, GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import ChatRoom from './components/chatRoom';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -25,10 +26,10 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
-
   const [date, setDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Initialize the hook
   const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
@@ -60,7 +61,7 @@ export default function App() {
 
   // Handles automatic updates of the app
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered',r) });
+  useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered', r) });
 
   // const enableNotifications = async () => {
   //   const permission = await Notification.requestPermission();
@@ -179,7 +180,7 @@ export default function App() {
     loadGameData();
     if (user) initializeUserStats(user?.id as string)
     return () => { isMounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user]);
 
   const onChar = useCallback((char: string) => {
@@ -250,7 +251,6 @@ export default function App() {
         console.log(error)
         setSyncStatus('error');
         triggerToast("Connection lost. Retrying in background...", 5000);
-
       }
     }
 
@@ -302,131 +302,159 @@ export default function App() {
   }
 
   return (
-    <main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
+    <div className="min-h-screen bg-black text-white font-sans">
+      {
+        isChatOpen ? null : (<main className="h-svh flex flex-col bg-dark text-white overflow-hidden p-2 sm:p-4">
 
-      <Toast
-        isVisible={toast.show}
-        message={toast.message}
-        duration={toast.duration}
-        onClose={() => setToast({ ...toast, show: false })}
-      />
-      <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-      <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
-      <CloudSyncMenu status={syncStatus} />
-      <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
+          <Toast
+            isVisible={toast.show}
+            message={toast.message}
+            duration={toast.duration}
+            onClose={() => setToast({ ...toast, show: false })}
+          />
+          <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+          <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
+          <CloudSyncMenu status={syncStatus} />
+          <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 
 
-        {/* Row 2: User Stats, Hints, and Info */}
-        <div className="flex items-center justify-between bg-custom py-2 px-2 rounded-xl border border-gray-800/50">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[10px] text-gray-100 tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
+            {/* Row 2: User Stats, Hints, and Info */}
+            <div className="flex items-center justify-between bg-custom py-2 px-2 rounded-xl border border-gray-800/50">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[10px] text-gray-100 tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
 
-          </div>
-          <div className="flex items-center gap-2 me-2">
-            {user ? (
-              <div className="group relative flex items-center gap-2">
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="Profile"
-                  className="w-6 h-6 rounded-full border border-gray-700 cursor-pointer"
-                />
-                <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:block">
-                  {user.user_metadata.full_name?.split(' ')[0]}
+              </div>
+              <div className="flex items-center gap-2 me-2">
+                {user ? (
+                  <div className="group relative flex items-center gap-2">
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt="Profile"
+                      className="w-6 h-6 rounded-full border border-gray-700 cursor-pointer"
+                    />
+                    <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:block">
+                      {user.user_metadata.full_name?.split(' ')[0]}
+                    </span>
+                    <button
+                      onClick={signOut}
+                      className="absolute top-8 left-0 bg-red-500 text-[9px] font-black px-2 py-1 rounded-md hidden group-hover:block whitespace-nowrap z-50 shadow-xl"
+                    >
+                      LOGOUT
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={signInWithGoogle}
+                    className="text-[9px] font-black bg-white text-black px-3 py-1 rounded-full uppercase tracking-widest hover:bg-gray-200 transition-colors"
+                  >
+                    Login
+                  </button>
+                )}
+              </div>
+
+              {/* <button onClick={enableNotifications}>Remind me of daily words</button> */}
+
+              <div className="flex items-center gap-2">
+                {guesses.length >= 3 && !isGameOver && (
+                  <button
+                    onClick={handleHint}
+                    disabled={usedHint}
+                    className={`transition-all ${usedHint ? 'text-gray-700' : 'text-yellow-500 animate-pulse'}`}
+                  >
+                    <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                  </button>
+                )}
+                <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
+                  {config.length}L
                 </span>
+
+                <div className="flex items-center gap-1">
+                  {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
+                    title="Refresh Game"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                </div>
+
+                <button onClick={() => setIsStatsOpen(true)} className="text-gray-400 hover:text-white p-1">
+                  <BarChart2 size={18} />
+                </button>
+
                 <button
-                  onClick={signOut}
-                  className="absolute top-8 left-0 bg-red-500 text-[9px] font-black px-2 py-1 rounded-md hidden group-hover:block whitespace-nowrap z-50 shadow-xl"
+                  onClick={() => setIsInfoOpen(true)}
+                  className="text-gray-400 hover:text-white"
                 >
-                  LOGOUT
+                  <HelpCircle size={18} />
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={signInWithGoogle}
-                className="text-[9px] font-black bg-white text-black px-3 py-1 rounded-full uppercase tracking-widest hover:bg-gray-200 transition-colors"
-              >
-                Login
-              </button>
-            )}
-          </div>
-
-          {/* <button onClick={enableNotifications}>Remind me of daily words</button> */}
-
-          <div className="flex items-center gap-2">
-            {guesses.length >= 3 && !isGameOver && (
-              <button
-                onClick={handleHint}
-                disabled={usedHint}
-                className={`transition-all ${usedHint ? 'text-gray-700' : 'text-yellow-500 animate-pulse'}`}
-              >
-                <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-              </button>
-            )}
-            <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
-              {config.length}L
-            </span>
-
-            <div className="flex items-center gap-1">
-              {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
-              <button
-                onClick={() => window.location.reload()}
-                className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
-                title="Refresh Game"
-              >
-                <RotateCcw size={16} />
-              </button>
             </div>
-
-            <button onClick={() => setIsStatsOpen(true)} className="text-gray-400 hover:text-white p-1">
-              <BarChart2 size={18} />
-            </button>
-
-            <button
-              onClick={() => setIsInfoOpen(true)}
-              className="text-gray-400 hover:text-white"
-            >
-              <HelpCircle size={18} />
-            </button>
           </div>
-        </div>
-      </div>
 
-      {/* Grid Area - This will now shrink or grow to fit available space */}
-      <div className="flex-1 flex items-center justify-center min-h-0 w-full px-2">
-        <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
-          <Grid
-            wordLength={config.length}
-            maxAttempts={config.maxAttempts}
-            guesses={guesses}
-            currentGuess={currentGuess}
-          />
-        </div>
-      </div>
+          {/* Grid Area - This will now shrink or grow to fit available space */}
+          <div className="flex-1 flex items-center justify-center min-h-0 w-full px-2">
+            <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
+              <Grid
+                wordLength={config.length}
+                maxAttempts={config.maxAttempts}
+                guesses={guesses}
+                currentGuess={currentGuess}
+              />
+            </div>
+          </div>
 
-      {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
-      {
-        isGameOver ? null : <div className="w-full max-w-125 mx-auto pt-2 pb-2 shrink-0">
-          <Keyboard
-            onChar={onChar}
-            onDelete={onDelete}
-            onEnter={onEnter}
-            letterStatuses={letterStatuses}
-          />
-        </div>
+          {/* Keyboard Section - Forced to stay at the bottom, slightly more compact */}
+          {
+            isGameOver ? null : <div className="w-full max-w-125 mx-auto pt-2 pb-2 shrink-0">
+              <Keyboard
+                onChar={onChar}
+                onDelete={onDelete}
+                onEnter={onEnter}
+                letterStatuses={letterStatuses}
+              />
+            </div>
+          }
+
+
+          {isGameOverModal && (
+            <GameOverModal
+              isOpen={isGameOverModal}
+              onClose={() => setIsGameOverModal(false)}
+              guesses={guesses}
+              date={date as string}
+              config={config}
+              usedHint={usedHint}
+              gameMessage={gameMessage}
+              stats={stats} />
+          )}
+        </main>)
       }
 
+      {/* Chat Trigger - Floating Action Button (FAB) */}
+      <button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className={`fixed z-50 transition-all hover:scale-110 active:scale-95 shadow-2xl rounded-xl sm:rounded-2xl
+    top-24 right-4 p-3 
+    sm:top-auto sm:bottom-4 sm:right-26 sm:p-4 
+    ${isChatOpen ? 'bg-red-500 text-white' : 'bg-correct text-black'}`}
+      >
+        <div className={`transition-transform duration-300 pointer ${isChatOpen ? 'rotate-90' : 'rotate-0'}`}>
+          {isChatOpen ? (
+            <X className="w-4 h-4 sm:w-6 sm:h-6" />
+          ) : (
+            <MessageSquare className="w-4 h-4 sm:w-6 sm:h-6" />
+          )}
+        </div>
+      </button>
 
-      {isGameOverModal && (
-        <GameOverModal
-          isOpen={isGameOverModal}
-          onClose={() => setIsGameOverModal(false)}
-          guesses={guesses}
-          date={date as string}
-          config={config}
-          usedHint={usedHint}
-          gameMessage={gameMessage}
-          stats={stats} />
-      )}
-    </main>
+      {/* Chat Side Drawer / Overlay */}
+      {isChatOpen && (
+        <ChatRoom
+          user={user as AppUser}
+        />)}
+
+    </div>
   );
 }

@@ -96,7 +96,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-120 p-4">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
@@ -258,7 +258,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
           className="w-6 h-6 rounded-full border border-gray-700"
           alt={entry.username}
         />
-        <span className="text-xs font-bold truncate max-w-[120px]">{index === 0 ? "👑 " : " "}{entry.username} </span>
+        <span className="text-xs font-bold truncate max-w-30">{index === 0 ? "👑 " : " "}{entry.username} </span>
       </div>
       <div className="text-right">
         <div className="text-xs font-black text-white">{entry.total_score} {formattedGameScore}</div>

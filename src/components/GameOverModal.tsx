@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { generateShareText } from '../lib/share';
 import { getServerDate } from '../lib/time';
-import type { GameStats, GuessResult } from '../types/game';
-import { ShareButton } from './ShareButton'; 
+import type { GameConfig, GameStats, GuessResult } from '../types/game';
+import { ShareButton } from './ShareButton';
+import { Eye } from 'lucide-react';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
     guesses: GuessResult[][];
     date: string;
-    config: { maxAttempts: number };
+    config: GameConfig;
     usedHint: boolean;
     gameMessage: string;
     stats: GameStats
@@ -57,14 +58,48 @@ export const GameOverModal: React.FC<Props> = ({
         };
     }, []);
 
+    const [showWord, setShowWord] = useState(false);
+
+    const revealWord = () => {
+        if (showWord) return; // Prevent multiple timers
+        setShowWord(true);
+        setTimeout(() => {
+            setShowWord(false);
+        }, 15000); // 15 seconds
+    };
+
     if (!isOpen) return null;
 
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4">
             <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 shadow-2xl text-center">
 
-                <h2 className="text-2xl font-serif font-bold text-white mb-6 mt-2">{gameMessage}</h2>
+
+                <div className="mb-3 mt-2 flex flex-col items-center">
+                    {showWord ? (
+                        <h2 className="text-2xl font-serif font-bold text-white tracking-widest animate-in fade-in zoom-in duration-300">
+                            {config.word}
+                        </h2>
+                    ) : (
+                        <button
+                            onClick={revealWord}
+                            className="group flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all"
+                        >
+                            <Eye size={14} className="text-gray-500 group-hover:text-correct transition-colors" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-white">
+                                Tap to reveal answer
+                            </span>
+                        </button>
+                    )}
+
+                    {showWord && (
+                        <div className="w-full max-w-25 h-0.5 bg-gray-800 mt-2 rounded-full overflow-hidden">
+                            <div className="h-full bg-correct animate-[progress_15s_linear_forwards]" />
+                        </div>
+                    )}
+                </div>
+                <p className="text-base font-serif font-bold text-white mb-6 mt-2">{gameMessage}</p>
 
                 {/* Statistics Section */}
                 <div className="mb-8">
@@ -90,7 +125,7 @@ export const GameOverModal: React.FC<Props> = ({
                                     <div className="flex-1 h-4 bg-gray-800/50 rounded-md">
                                         <div
                                             style={{ width: `${Math.max((count as number / maxVal) * 100, 8)}%` }}
-                                            className={`h-full flex items-center justify-end px-1 font-bold text-white transition-all duration-1000 ${isCurrentDist ? 'bg-correct' : num ==="X"? `bg-red-400`: 'bg-gray-600'}`}
+                                            className={`h-full flex items-center justify-end px-1 font-bold text-white transition-all duration-1000 ${isCurrentDist ? 'bg-correct' : num === "X" ? `bg-red-400` : 'bg-gray-600'}`}
                                         >
                                             {count as number}
                                         </div>

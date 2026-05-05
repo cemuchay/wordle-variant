@@ -19,8 +19,8 @@ export default defineConfig({
             name: "Wordle Variant: 4-5-6 Challenge",
             short_name: "WordleVariant",
             description: "Daily word challenge with 4, 5, and 6 letter words",
-            theme_color: "#030712",
-            background_color: "#030712",
+            theme_color: "#121213",
+            background_color: "#121213",
             display: "standalone",
             icons: [
                {

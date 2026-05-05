@@ -298,7 +298,7 @@ export const calculateSkillIndex = (
    let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
 
    // Penalty for being a scrub
-   if (usedHint) score -= 200;
+   if (usedHint) score -= 100;
 
    // Precision weights
    let bonus = 0;

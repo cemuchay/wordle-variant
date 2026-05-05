@@ -10,7 +10,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-110 p-4">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
           <X size={20} />
@@ -54,7 +54,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   <li className="flex items-center gap-2"><span className="text-correct">●</span>Each Green: +15 pts</li>
                   <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Each Yellow: +2 pts</li>
                   <li className="flex items-center gap-2"><span className="text-black">●</span>Each Black: -10 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -200 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -100 pts</li>
                 </ul>
                 <p className="text-[10px] italic">Maximum precision earns the highest rank.</p>
 
