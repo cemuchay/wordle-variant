@@ -15,6 +15,7 @@ import type { GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -56,6 +57,18 @@ export default function App() {
     show: boolean, message: string, duration: number | undefined
   }>({ show: false, message: "", duration: undefined });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+  // Handles automatic updates of the app
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered',r) });
+
+  const enableNotifications = async () => {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      // Logic to subscribe user and save to Supabase 'profiles' table
+      console.log("Notifications enabled for the weekly leaderboard.");
+    }
+  };
 
 
   const config = getDailyConfig(date as string);
@@ -336,6 +349,8 @@ export default function App() {
               </button>
             )}
           </div>
+
+          <button onClick={enableNotifications}>Remind me of daily words</button>
 
           <div className="flex items-center gap-2">
             {guesses.length >= 3 && !isGameOver && (
