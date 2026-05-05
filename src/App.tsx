@@ -425,7 +425,7 @@ export default function App() {
           config={config}
           usedHint={usedHint}
           gameMessage={gameMessage}
-          word={config.word} stats={stats} />
+          stats={stats} />
       )}
     </main>
   );

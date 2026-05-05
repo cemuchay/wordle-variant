@@ -12,16 +12,13 @@ interface Props {
     config: { maxAttempts: number };
     usedHint: boolean;
     gameMessage: string;
-    word: string;
     stats: GameStats
 }
 
 export const GameOverModal: React.FC<Props> = ({
-    isOpen, onClose, guesses, date, config, usedHint, gameMessage, word, stats
+    isOpen, onClose, guesses, date, config, usedHint, gameMessage, stats
 }) => {
     const won = guesses[guesses.length - 1].every(r => r.status === 'correct');
-
-   
 
     const [countdown, setCountdown] = useState("");
 
@@ -66,8 +63,8 @@ export const GameOverModal: React.FC<Props> = ({
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
             <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 shadow-2xl text-center">
-                <h2 className="text-2xl font-serif font-bold text-white mb-6">ANSWER: {word}</h2>
-                <h2 className="text-2xl font-serif font-bold text-white mb-6">{gameMessage}</h2>
+
+                <h2 className="text-2xl font-serif font-bold text-white mb-6 mt-2">{gameMessage}</h2>
 
                 {/* Statistics Section */}
                 <div className="mb-8">
