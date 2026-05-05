@@ -14,8 +14,8 @@ self.addEventListener('push', (event:any) => {
   const data = event.data.json();
   const options = {
     body: data.body,
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    icon: '/pwa_192x192.png',
+    badge: '/pwa_192x192.png',
     vibrate: [100, 50, 100],
     data: { url: '/' }
   };
@@ -32,8 +32,8 @@ self.addEventListener('push', (event: any) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
+      icon: '/pwa_192x192.png',
+      badge: '/pwa_192x192.png',
     })
   );
 });
