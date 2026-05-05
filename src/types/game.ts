@@ -28,3 +28,14 @@ export interface AppUser {
   id: string;
   user_metadata?: UserMetadata;
 }
+
+export interface LeaderboardEntry {
+  username: string;
+  avatar_url: string;
+  total_score: number;
+  attempts?: number | "X";
+  word_length?: number;
+  status?: "lost" | "won" | "playing";
+  days_active: number;
+  user_id?: string;
+}

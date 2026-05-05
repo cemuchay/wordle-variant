@@ -311,7 +311,7 @@ export default function App() {
         onClose={() => setToast({ ...toast, show: false })}
       />
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-      <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} />
+      <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
       <CloudSyncMenu status={syncStatus} />
       <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 

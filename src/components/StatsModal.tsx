@@ -1,24 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { X, Trophy, User, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import type { AppUser } from '../types/game';
+import type { AppUser, LeaderboardEntry } from '../types/game';
+import GuessPreviewModal from './GuessPreviewModal';
 
 // --- Types & Interfaces ---
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'weekly'
 
-
-
-interface LeaderboardEntry {
-  username: string;
-  avatar_url: string;
-  total_score: number;
-  attempts?: number | "X";
-  word_length?: number;
-  status?: "lost" | "won" | "playing";
-  days_active: number
-}
 
 interface GameStats {
   gamesPlayed: number;
@@ -32,16 +22,18 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   user: AppUser | null;
-  stats: GameStats
+  stats: GameStats;
+  isGameOver: boolean;
 }
 
 // --- Component ---
 
-export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) => {
+export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
   const [timeframe, setTimeframe] = useState<Timeframe>('today');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
@@ -66,7 +58,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
       // 1. Join array values into a comma-separated string for Supabase .select()
       const baseSelect = "username, avatar_url, total_points"
       const standardSelect = `${baseSelect}, days_active`;
-      const todaySelect = `${baseSelect}, word_length, attempts, status`;
+      const todaySelect = `${baseSelect}, word_length, attempts, status, user_id`;
 
       const { data, error } = await supabase
         .from(viewMap[timeframe])
@@ -84,7 +76,8 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
           word_length: entry.word_length ?? null,
           attempts: entry.attempts ?? null,
           status: entry.status,
-          days_active: entry.days_active ?? 0
+          days_active: entry.days_active ?? 0,
+          user_id: entry.user_id ?? null
         }));
 
         setLeaderboard(formattedData);
@@ -99,6 +92,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
     return () => { isMounted = false; };
   }, [isOpen, activeTab, timeframe]);
 
+  const canViewGuess = isGameOver && timeframe === "today" && (user ? true : false)
   if (!isOpen) return null;
 
   return (
@@ -152,7 +146,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
                       <span className="w-2">{attempt}</span>
                       <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
                         <div
-                          className={`${attempt=== "X"? `bg-red-400`:`bg-correct`} py-0.5 px-1 text-right transition-all duration-1000 min-w-fit font-bold`}
+                          className={`${attempt === "X" ? `bg-red-400` : `bg-correct`} py-0.5 px-1 text-right transition-all duration-1000 min-w-fit font-bold`}
                           style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
                         >
                           {count}
@@ -165,7 +159,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}
-              <div className="flex gap-1 mb-6">
+              <div className="flex gap-1 mb-2">
                 {(['today', 'weekly',] as Timeframe[]).map((t) => (
                   <button
                     key={t}
@@ -175,7 +169,17 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
                     {t}
                   </button>
                 ))}
+
+
               </div>
+
+              {
+                canViewGuess && (
+                  <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Click on user to see their guesses...</p>
+                )
+              }
+
+
 
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
@@ -183,18 +187,29 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
                   <span className="text-[10px] text-gray-600 uppercase font-bold">Ranking Players...</span>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {leaderboard.length > 0 ? leaderboard.map((entry, i) => (
-                    <LeaderboardRow
-                      key={entry.username}
-                      entry={entry}
-                      index={i}
-                      isCurrentUser={entry.username === user?.user_metadata?.full_name}
+                <>
+                  <div className="space-y-2">
+                    {leaderboard.length > 0 ? leaderboard.map((entry, i) => (
+                      <LeaderboardRow
+                        key={entry.username}
+                        entry={entry}
+                        index={i}
+                        isCurrentUser={entry.username === user?.user_metadata?.full_name}
+                        canViewGuesses={canViewGuess}
+                        onShowGuesses={(e) => setSelectedEntry(e)}
+                      />
+                    )) : (
+                      <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
+                    )}
+                  </div>
+                  {/* The Modal */}
+                  {(selectedEntry && timeframe === "today") && (
+                    <GuessPreviewModal
+                      entry={selectedEntry}
+                      onClose={() => setSelectedEntry(null)}
                     />
-                  )) : (
-                    <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
                   )}
-                </div>
+                </>
               )}
             </div>
           )}
@@ -224,7 +239,7 @@ const pluralCheck = (num: number) => {
   return num > 1 ? "s" : ""
 }
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => {
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; }> = ({ entry, index, isCurrentUser, canViewGuesses, onShowGuesses }) => {
   let attempts = entry.attempts
   const wordLength = entry.word_length
   const status = entry.status
@@ -233,7 +248,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
 
   const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
   return (
-    <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
+    <div onClick={() => canViewGuesses && onShowGuesses(entry)} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'} ${canViewGuesses ? `pointer` : ``}`}>
       <div className="flex items-center gap-3">
         <span className={`text-xs font-black w-4 ${index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
           {index + 1}
@@ -243,7 +258,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
           className="w-6 h-6 rounded-full border border-gray-700"
           alt={entry.username}
         />
-        <span className="text-xs font-bold truncate max-w-[120px]">{entry.username} {index === 0 ? " 👑" : " "}</span>
+        <span className="text-xs font-bold truncate max-w-[120px]">{index === 0 ? "👑 " : " "}{entry.username} </span>
       </div>
       <div className="text-right">
         <div className="text-xs font-black text-white">{entry.total_score} {formattedGameScore}</div>
