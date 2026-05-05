@@ -136,7 +136,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex justify-around mb-8 text-center">
+                <div className="flex justify-around mb-4 text-center">
                   <StatItem value={stats.gamesPlayed} label="Played" />
                   <StatItem
                     value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
@@ -145,14 +145,14 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
                   <StatItem value={stats.currentStreak} label="Streak" />
                 </div>
 
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4 text-gray-500">Guess Distribution</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-3 text-gray-500">Guess Distribution</h3>
                 <div className="space-y-2">
                   {Object.entries(stats.guesses).map(([attempt, count]) => (
                     <div key={attempt} className="flex items-center gap-2 text-xs font-mono">
                       <span className="w-2">{attempt}</span>
                       <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
                         <div
-                          className="bg-correct py-0.5 px-2 text-right transition-all duration-1000 min-w-fit font-bold"
+                          className={`${attempt=== "X"? `bg-red-400`:`bg-correct`} py-0.5 px-1 text-right transition-all duration-1000 min-w-fit font-bold`}
                           style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
                         >
                           {count}
@@ -202,7 +202,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats }) =>
 
         <button
           onClick={onClose}
-          className="mt-6 w-full bg-correct py-3 rounded-xl font-bold uppercase tracking-tighter hover:brightness-110 transition-all active:scale-95 shrink-0"
+          className="mt-4 w-full bg-correct py-2 rounded-xl font-bold uppercase tracking-tighter hover:brightness-110 transition-all active:scale-95 shrink-0"
         >
           Close
         </button>
@@ -220,6 +220,10 @@ const StatItem: React.FC<{ value: string | number; label: string }> = ({ value, 
   </div>
 );
 
+const pluralCheck = (num: number) => {
+  return num > 1 ? "s" : ""
+}
+
 const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean }> = ({ entry, index, isCurrentUser }) => {
   let attempts = entry.attempts
   const wordLength = entry.word_length
@@ -227,7 +231,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
 
   if (status === "lost") attempts = "X"
 
-  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ` (${entry.days_active}/7)`
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
   return (
     <div className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'}`}>
       <div className="flex items-center gap-3">
@@ -239,7 +243,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
           className="w-6 h-6 rounded-full border border-gray-700"
           alt={entry.username}
         />
-        <span className="text-xs font-bold truncate max-w-[120px]">{entry.username}</span>
+        <span className="text-xs font-bold truncate max-w-[120px]">{entry.username} {index === 0 ? " 👑" : " "}</span>
       </div>
       <div className="text-right">
         <div className="text-xs font-black text-white">{entry.total_score} {formattedGameScore}</div>

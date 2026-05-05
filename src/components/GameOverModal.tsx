@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { generateShareText } from '../lib/share';
 import { getServerDate } from '../lib/time';
 import type { GameStats, GuessResult } from '../types/game';
-import { ShareButton } from './ShareButton'; // Adjust path
+import { ShareButton } from './ShareButton'; 
 
 interface Props {
     isOpen: boolean;
@@ -85,12 +85,12 @@ export const GameOverModal: React.FC<Props> = ({
                             const isCurrentDist = won && guesses.length === parseInt(num);
                             const maxVal = Math.max(...Object.values(stats.guesses) as number[], 1);
                             return (
-                                <div key={num} className="flex items-center gap-2 text-xs">
+                                <div key={num} className={`flex items-center gap-2 text-xs `}>
                                     <span className="w-2 font-medium text-gray-300">{num}</span>
-                                    <div className="flex-1 h-5 bg-gray-800/50">
+                                    <div className="flex-1 h-4 bg-gray-800/50 rounded-md">
                                         <div
                                             style={{ width: `${Math.max((count as number / maxVal) * 100, 8)}%` }}
-                                            className={`h-full flex items-center justify-end px-2 font-bold text-white transition-all duration-1000 ${isCurrentDist ? 'bg-correct' : 'bg-gray-600'}`}
+                                            className={`h-full flex items-center justify-end px-1 font-bold text-white transition-all duration-1000 ${isCurrentDist ? 'bg-correct' : num ==="X"? `bg-red-400`: 'bg-gray-600'}`}
                                         >
                                             {count as number}
                                         </div>
