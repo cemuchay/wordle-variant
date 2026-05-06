@@ -31,14 +31,29 @@ export default function App() {
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
+  const [toast, setToast] = useState<{
+    show: boolean, message: string, duration: number | undefined
+  }>({ show: false, message: "", duration: undefined });
+
   // Initialize the hook
   const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
+  const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
 
   useEffect(() => {
     const syncTime = async () => {
-      const serverDate = await getServerDate();
-      setDate(serverDate.formatted);
-      setIsLoading(false);
+      try {
+        // 1. This returns instantly now (either from cache or optimistic client time)
+
+        const serverDate = await getServerDate();
+        setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
+        setIsLoading(false); // Game starts immediately
+
+      } catch (err) {
+        // This will catch the 'throw error' from your background sync if it fails
+        console.error("Initialization error:", err);
+        // Optional: show a toast or error state here
+        triggerToast("Error fetching date from server, refresh page")
+      }
     };
 
     syncTime();
@@ -54,9 +69,6 @@ export default function App() {
   const [hintRecord, setHintRecord] = useState<{ letter: string, index: number } | null>(null);
   const [gameMessage, setGameMessage] = useState("")
 
-  const [toast, setToast] = useState<{
-    show: boolean, message: string, duration: number | undefined
-  }>({ show: false, message: "", duration: undefined });
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // Handles automatic updates of the app
@@ -73,9 +85,6 @@ export default function App() {
 
 
   const config = getDailyConfig(date as string);
-
-  const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
-
 
   const initializeUserStats = async (userId: string) => {
     // 1. First, scrape any local-only legacy data into the aggregate object

@@ -56,6 +56,7 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
    if (!isNewEra) {
       const word = getWordAtDate(dateStr);
       const length = word.length as 4 | 6 | 5;
+
       return { word, length, maxAttempts: length + 1 };
    }
 
@@ -81,10 +82,24 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
 
    const length = word.length as 5 | 6 | 4;
 
+   /**
+    * OLD LOGIC of maxAttempts, length + 1
+ 
    return {
       word,
       length,
       maxAttempts: length + 1,
+   };
+      */
+
+   /**
+    * STARTING 6th May, 2026
+    * All words will have maxAttempts of 6 to ensure fairness
+    */
+   return {
+      word,
+      length,
+      maxAttempts: 6,
    };
 }
 
@@ -344,7 +359,7 @@ export const syncGameState = async (
          word_length: payload.config.length,
          skill_score: skillScore, // Authoritative score
          attempts: payload.guesses.length,
-         game_message:payload.gameMessage
+         game_message: payload.gameMessage,
       },
       { onConflict: "user_id, game_date" }
    );
@@ -360,7 +375,7 @@ export const syncWithRetry = async (
    payload: any,
    retries = 3
 ): Promise<{ success: boolean; score: number }> => {
-   console.log(payload, "payload")
+   console.log(payload, "payload");
    if (!date) return { success: false, score: 0 };
    for (let i = 0; i < retries; i++) {
       try {
