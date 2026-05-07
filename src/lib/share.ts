@@ -7,18 +7,20 @@ export const generateShareText = ({
    won,
    usedHint,
    gameMessage,
+   wordLength,
 }: {
    date: string;
    guesses: GuessResult[][];
    maxAttempts: number;
    won: boolean;
    usedHint: boolean;
-   gameMessage: string
+   gameMessage: string;
+   wordLength: number;
 }) => {
    const score = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
    const header = `Wordle Variant - ${date} \n
-  ${score}/${maxAttempts}${hintMarker}\n`;
+  ${score}/${maxAttempts}${` (${wordLength}L)`}${hintMarker}\n`;
 
    const grid = guesses
       .map((row) => {

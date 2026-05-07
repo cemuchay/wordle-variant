@@ -151,7 +151,9 @@ export const GameOverModal: React.FC<Props> = ({
                                 guesses,
                                 maxAttempts: config.maxAttempts,
                                 won: guesses[guesses.length - 1].every(r => r.status === 'correct'),
-                                usedHint, gameMessage
+                                usedHint,
+                                 gameMessage,
+                                 wordLength: config.word.length,
                             }
                             )}
                         />

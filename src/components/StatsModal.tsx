@@ -246,7 +246,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
 
   if (status === "lost") attempts = "X"
 
-  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${wordLength + 1})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${6})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
   return (
     <div onClick={() => canViewGuesses && onShowGuesses(entry)} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'} ${canViewGuesses ? `pointer` : ``}`}>
       <div className="flex items-center gap-3">
