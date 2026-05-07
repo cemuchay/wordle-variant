@@ -5,30 +5,19 @@ export interface ServerTimeResponse {
   formatted: string;
 }
 
-const SESSION_KEY = "app_synced_date";
-
 export const getServerDate = async (): Promise<ServerTimeResponse> => {
-  // 1. Check Session Storage first (Already verified this session)
-  const cachedDate = sessionStorage.getItem(SESSION_KEY);
-  if (cachedDate) {
-    const dateObj = new Date(cachedDate);
-    return {
-      raw: dateObj,
-      formatted: formatDate(dateObj),
-    };
-  }
 
-  // 2. Immediately assume client is right (Optimistic UI)
+  // 1. Immediately assume client is right (Optimistic UI)
   const clientTime = new Date();
   const optimisticResponse: ServerTimeResponse = {
     raw: clientTime,
     formatted: formatDate(clientTime),
   };
 
-  // 3. Trigger background verification
+  // 2. Trigger background verification
   // We wrap this in a promise that will eventually update our storage
   verifyAndSyncTime().catch((err) => {
-    // 4. If verification fails, we throw the error as requested
+    // 3. If verification fails, we throw the error as requested
     console.error("Critical Sync Error:", err);
     throw new Error("Time synchronization failed. Please check your connection.");
   });
@@ -47,8 +36,6 @@ const verifyAndSyncTime = async () => {
   }
 
   const serverTime = new Date(data);
-  // Store the ISO string in session storage for the next call
-  sessionStorage.setItem(SESSION_KEY, serverTime.toISOString());
   
   return serverTime;
 };
