@@ -3,7 +3,13 @@
 
 /// <reference lib="webworker" />
 
+import { precacheAndRoute } from 'workbox-precaching';
+
 const sw = self as unknown as ServiceWorkerGlobalScope;
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+//@ts-expect-error
+precacheAndRoute(self.__WB_MANIFEST);
 
 sw.addEventListener('push', (event: PushEvent) => {
   // eslint-disable-next-line no-useless-assignment
