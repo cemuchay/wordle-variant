@@ -464,6 +464,9 @@ export default function App() {
           user={user as AppUser}
         />)}
 
+      <a href="/privacy" className="text-[10px] text-gray-600 hover:underline">
+        Privacy Policy
+      </a>
     </div>
   );
 }
