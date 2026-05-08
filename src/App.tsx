@@ -17,6 +17,8 @@ import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
+import PWAInstallBanner from './components/PWAInstallBanner';
+import { NotificationToggle } from './components/NotificationToggle';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -321,6 +323,9 @@ export default function App() {
             duration={toast.duration}
             onClose={() => setToast({ ...toast, show: false })}
           />
+          {
+            user && (<><NotificationToggle /> <PWAInstallBanner /></>)
+          }
           <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
           <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
           <CloudSyncMenu status={syncStatus} />
@@ -350,6 +355,8 @@ export default function App() {
                     >
                       LOGOUT
                     </button>
+
+
                   </div>
                 ) : (
                   <button

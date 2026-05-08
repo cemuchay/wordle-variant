@@ -1,39 +1,50 @@
-// src/service-worker.ts
-import { precacheAndRoute } from 'workbox-precaching';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Define the service worker scope for proper type hinting
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare let self: any;
+/// <reference lib="webworker" />
 
-precacheAndRoute(self.__WB_MANIFEST);
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
-// Handle Push Notifications
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-self.addEventListener('push', (event:any) => {
-  if (!event.data) return;
-  
-  const data = event.data.json();
-  const options = {
-    body: data.body,
-    icon: '/pwa_192x192.png',
-    badge: '/pwa_192x192.png',
-    vibrate: [100, 50, 100],
-    data: { url: '/' }
+sw.addEventListener('push', (event: PushEvent) => {
+  // eslint-disable-next-line no-useless-assignment
+  let data: any = {};
+
+  try {
+    data = event.data?.json() ?? {};
+  } catch (e) {
+    // Fallback for non-JSON or empty payloads
+    console.log(e)
+    data = { body: event.data?.text() };
+  }
+
+  const title = data.title || 'New Update';
+  const options: NotificationOptions = {
+    body: data.body || 'You have a new message.',
+    icon: '/icon-192x192.png',
+    badge: '/badge-72x72.png',
+    data: { url: data.url || '/' },
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(sw.registration.showNotification(title, options));
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-self.addEventListener('push', (event: any) => {
-  const data = event.data?.json() ?? { title: 'New Challenge!', body: 'A new word is ready.' };
-  
+sw.addEventListener('notificationclick', (event: NotificationEvent) => {
+  event.notification.close();
+
+  const urlToOpen = new URL(event.notification.data.url, sw.location.origin).href;
+
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/pwa_192x192.png',
-      badge: '/pwa_192x192.png',
+    sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Check if the tab is already open and focus it
+      for (const client of windowClients) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If not open, open a new window
+      if (sw.clients.openWindow) {
+        return sw.clients.openWindow(urlToOpen);
+      }
     })
   );
 });

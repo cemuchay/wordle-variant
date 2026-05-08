@@ -9,6 +9,9 @@ export default defineConfig({
       react(),
       tailwindcss(),
       VitePWA({
+         strategies: "injectManifest",
+         srcDir: "src",
+         filename: "service-worker.ts",
          registerType: "autoUpdate", // Automatically update the SW when new content is available
          includeAssets: [
             "favicon.ico",
