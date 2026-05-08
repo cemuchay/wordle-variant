@@ -48,7 +48,7 @@ export default function App() {
 
         const serverDate = await getServerDate();
         setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
-        setIsLoading(false); // Game starts immediately
+        setIsLoading(false); 
 
       } catch (err) {
         // This will catch the 'throw error' from your background sync if it fails
