@@ -77,15 +77,6 @@ export default function App() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered', r) });
 
-  // const enableNotifications = async () => {
-  //   const permission = await Notification.requestPermission();
-  //   if (permission === 'granted') {
-  //     // Logic to subscribe user and save to Supabase 'profiles' table
-  //     console.log("Notifications enabled for the weekly leaderboard.");
-  //   }
-  // };
-
-
   const config = getDailyConfig(date as string);
 
   const initializeUserStats = async (userId: string) => {
