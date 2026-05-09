@@ -3,7 +3,7 @@
 
 /// <reference lib="webworker" />
 
-import { precacheAndRoute } from "workbox-precaching";
+import { precacheAndRoute,cleanupOutdatedCaches } from "workbox-precaching";
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -20,6 +20,8 @@ self.addEventListener("activate", (event) => {
    //@ts-expect-error
    event.waitUntil(self.clients.claim());
 });
+
+cleanupOutdatedCaches();
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 //@ts-expect-error
