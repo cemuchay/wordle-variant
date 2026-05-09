@@ -26,13 +26,28 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <p className="font-bold text-white mb-1 uppercase tracking-wide">How It Works</p>
-              <div className="text-gray-400 text-sm space-y-2">
-                <p className="leading-relaxed mb-1">
-                  Basically Wordle, with 4 or 5 letter words on a given day.</p>
-                <p className="leading-relaxed mb-1">
-                  5 guesses (for 4), 6 guesses (for 5) and 7 guesses (for 6)
-                </p>
+              <p className="mb-4 leading-relaxed border-b border-gray-800 pb-3">
+                Basically Wordle, with a <span className="text-indigo-400 font-medium">4, 5, or 6 letter</span> word changing daily. You have <span className="text-white">6 tries</span> to find it.
+              </p>
 
+              <div className="space-y-3">
+                {/* Green State */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 h-3 w-3 shrink-0 rounded-sm bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                  <p><span className="text-gray-200 font-medium">Green:</span> In the word and in the <span className="text-green-400">right position</span>.</p>
+                </div>
+
+                {/* Yellow State */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 h-3 w-3 shrink-0 rounded-sm bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]" />
+                  <p><span className="text-gray-200 font-medium">Yellow:</span> In the word, but in the <span className="text-yellow-400">wrong position</span>.</p>
+                </div>
+
+                {/* Black/Dark State */}
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 h-3 w-3 shrink-0 rounded-sm bg-gray-700" />
+                  <p><span className="text-gray-200 font-medium">Gray:</span> Not in the word at all.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -71,7 +86,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <div>
               <p className="font-bold text-white mb-1 uppercase tracking-wide">Scrub Mode</p>
               <p className="text-gray-400 leading-relaxed">
-                Stuck? A hint unlocks after your <span className="text-white font-bold">3rd attempt</span>. Using it marks your results with shame.
+                Stuck? A hint unlocks after your <span className="text-white font-bold">3rd attempt</span>. Using it marks your result with shame.
               </p>
             </div>
           </div>

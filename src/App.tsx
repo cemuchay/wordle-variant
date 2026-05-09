@@ -48,7 +48,7 @@ export default function App() {
 
         const serverDate = await getServerDate();
         setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
-        setIsLoading(false); 
+        setIsLoading(false);
 
       } catch (err) {
         // This will catch the 'throw error' from your background sync if it fails
@@ -403,6 +403,19 @@ export default function App() {
           {/* Grid Area - This will now shrink or grow to fit available space */}
           <div className="flex-1 flex items-center justify-center min-h-0 w-full px-2">
             <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
+              {
+                guesses.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <p className="text-[14px] text-gray-100 tracking-tighter py-3">enter any {config.length} letter word ...</p>  <button
+                      onClick={() => setIsInfoOpen(true)}
+                      className="text-white py-1 p-2 text-[12px] rounded-md bg-green-500 hover:text-white cursor-pointer "
+                    >
+                      Help
+                    </button>
+                  </div>
+                ) : null
+              }
+
               <Grid
                 wordLength={config.length}
                 maxAttempts={config.maxAttempts}
