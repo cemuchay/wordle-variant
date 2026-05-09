@@ -322,6 +322,8 @@ export default function App() {
             duration={toast.duration}
             onClose={() => setToast({ ...toast, show: false })}
           />
+          {/* The PWA Reload Listener */}
+          <ReloadPrompt />
           {
             user && (<><NotificationToggle /> <PWAInstallBanner /></>)
           }

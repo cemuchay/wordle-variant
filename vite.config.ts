@@ -12,7 +12,7 @@ export default defineConfig({
          strategies: "injectManifest",
          srcDir: "src",
          filename: "service-worker.ts",
-         registerType: "autoUpdate", // Automatically update the SW when new content is available
+       registerType: 'prompt', // Ask user first
          workbox: {
             cleanupOutdatedCaches: true, // This clears old hashes immediately
             skipWaiting: true,
