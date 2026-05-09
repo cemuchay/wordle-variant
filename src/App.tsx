@@ -28,6 +28,16 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
+  if ('serviceWorker' in navigator) {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+  }
+
   const [date, setDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
