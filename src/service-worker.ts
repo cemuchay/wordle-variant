@@ -3,7 +3,7 @@
 
 /// <reference lib="webworker" />
 
-import { precacheAndRoute,cleanupOutdatedCaches } from "workbox-precaching";
+import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -19,6 +19,21 @@ self.addEventListener("activate", (event) => {
    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
    //@ts-expect-error
    event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("activate", (event) => {
+   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+   //@ts-expect-error
+   event.waitUntil(
+      caches.keys().then((cacheNames) => {
+         return Promise.all(
+            cacheNames.map((cacheName) => {
+               // Delete old caches that don't match the current Workbox version
+               return caches.delete(cacheName);
+            })
+         );
+      })
+   );
 });
 
 cleanupOutdatedCaches();
