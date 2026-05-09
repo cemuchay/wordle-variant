@@ -17,6 +17,7 @@ export default defineConfig({
             cleanupOutdatedCaches: true, // This clears old hashes immediately
             skipWaiting: true,
             clientsClaim: true,
+            globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
          },
          includeAssets: [
             "favicon.ico",

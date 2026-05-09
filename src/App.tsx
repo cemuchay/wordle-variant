@@ -28,13 +28,11 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
+  // Add this at the very top of your main entry file
   if ('serviceWorker' in navigator) {
-    let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
+      // This fires when the new service worker takes over (skipWaiting)
+      window.location.reload();
     });
   }
 
