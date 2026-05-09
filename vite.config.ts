@@ -13,6 +13,11 @@ export default defineConfig({
          srcDir: "src",
          filename: "service-worker.ts",
          registerType: "autoUpdate", // Automatically update the SW when new content is available
+         workbox: {
+            cleanupOutdatedCaches: true, // This clears old hashes immediately
+            skipWaiting: true,
+            clientsClaim: true,
+         },
          includeAssets: [
             "favicon.ico",
             "apple-touch-icon.png",
