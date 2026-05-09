@@ -19,6 +19,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import { NotificationToggle } from './components/NotificationToggle';
+import ReloadPrompt from './components/ReloadPrompt';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
