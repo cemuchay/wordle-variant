@@ -15,7 +15,8 @@ export const getWinMessage = (attempts: number): string => {
          "Purely accidental. Don't let it get to your head.",
          "Two tries? You’re peaking. it's all downhill from here.",
          "Absolute fluke. Do it again tomorrow, I dare you.",
-          "very sus",
+         "very sus",
+         "You tried",
       ],
       3: [
          "Solid effort. You're actually kind of good at this.",
@@ -28,14 +29,14 @@ export const getWinMessage = (attempts: number): string => {
          "Nice one. so make we clap for you?",
          "3 tries? You sabi book, but can you cook?",
          "You're smart small, no let it enter your head.",
-         "3/6. Evidence that overthinking sometimes pays rent.",
+         "3/6. Evidence that overthinking sometimes pays ...",
          "You solved it in three like person wey dey argue with Google.",
          "Not bad. You clearly peaked in group projects.",
          "3 tries? Brain dey work, character still loading.",
          "You got 3/6. Congratulations, local champion of unnecessary intelligence.",
       ],
       4: [
-         "Standard. The human embodiment of room-temperature water.",
+         "Standard. The human embodiment of room temperature water.",
          "Aggressively average. You are the 'Default Settings' of people.",
          "Four is the participation trophy of Wordle scores.",
          "Mid. Just... purely mid.",
@@ -79,13 +80,12 @@ export const getWinMessage = (attempts: number): string => {
 };
 
 const lastGuess = [
-   "Yikes. 6/6 isn't a win, it's a miracle you're alive.",
-   "Clutching at straws. That was painful to witness.",
+   "Yikes. 6/6 isn't a win, it's a miracle",
+   "That was painful to witness.",
    "The 'Last Minute Homework' energy is strong here.",
    "Embarrassing, but technically a win. Barely.",
-   "You finished. So does a turtle in a marathon.",
+   "You finished. So does a tortoise in a marathon, eventually",
    "6/6? You didn't solve it, you survived it.",
-   "Last try win. Nollywood comeback of the year.",
    "You came through like generator after blackout.",
    "6 tries? Brain dey buffer with poor network.",
    "Victory entered through the back door.",
@@ -93,22 +93,24 @@ const lastGuess = [
    "This score has 'let me just jam anything' energy.",
    "6/6. Even the word is disappointed.",
    "You won the way Nigeria fixes roads: eventually.",
-   "That wasn't skill. That was divine intervention.",
+   "That was divine intervention.",
    "6 tries? Your keyboard worked harder than you.",
    "You crossed the finish line crawling, but counts sha.",
    "This result smells like panic and random vowels.",
-   "You got there late like African time with traffic.",
+   "You got there late like African time",
    "6/6. A win with heavy apologies attached.",
 ];
 
 export const getLossMessage = (): string => {
    const losses = [
-      `Ouch. The word was easy sha. Stick to ludo.`,
-      `Pathetic. it was right there....`,
-      `Even my source code knew it was trivial.`,
-      `Game Over. You're the reason we have 'Easy Mode' in other games.`,
-      `Better luck next time. Maybe try a 2-letter word version?`,
+      `Ouch. The word was easy sha.`,
+      `The answer was was right there....`,
+      `Game Over. We usually have 'Easy Mode' in games.`,
+      `Better luck next time.`,
       "don't cry",
+      "Chai... kpele",
+      "It happens to the best of us",
+      "Tomorrow will be better...",
    ];
    return losses[Math.floor(Math.random() * losses.length)];
 };
