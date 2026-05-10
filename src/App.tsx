@@ -273,6 +273,8 @@ export default function App() {
       updateStats(won, newGuesses.length);
       await refresh();
 
+      if (lost) triggerToast(`The word is: ${config.word}`, 5000)
+
       setTimeout(() => {
         setGameMessage(message)
         triggerToast(message || gameMessage, 8500)
@@ -414,9 +416,11 @@ export default function App() {
                 >
                   <HelpCircle size={18} />
                 </button>
-                <button onClick={() => setIsSettingsOpen(true)}>
+               {
+                user&&( <button onClick={() => setIsSettingsOpen(true)}>
                   <SettingsIcon />
-                </button>
+                </button>)
+               }
               </div>
             </div>
           </div>
@@ -474,31 +478,34 @@ export default function App() {
       }
 
       {/* Chat Trigger - Floating Action Button (FAB) */}
-      <div className="fixed z-50 top-24 right-4 sm:top-auto sm:bottom-4 sm:right-26">
-        {/* Unread Badge - Positioned relative to this container */}
-        {unreadCount > 0 && !isChatOpen && (
-          <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 z-60 min-w-4.5 h-4.5 sm:min-w-5.5 sm:h-5.5 px-1 bg-white text-red-400 border-2 border-red-950 text-[9px] sm:text-[13px] font-black rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-in zoom-in duration-300">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </div>
-        )}
+      {
+        user && (<div className="fixed z-50 top-24 right-4 sm:top-auto sm:bottom-4 sm:right-26">
+          {/* Unread Badge - Positioned relative to this container */}
+          {unreadCount > 0 && !isChatOpen && (
+            <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 z-60 min-w-4.5 h-4.5 sm:min-w-5.5 sm:h-5.5 px-1 bg-white text-red-400 border-2 border-red-950 text-[9px] sm:text-[13px] font-black rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-in zoom-in duration-300">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </div>
+          )}
 
-        <button
-          onClick={() => {
-            setIsChatOpen(!isChatOpen)
-             setUnreadCount(0)
-          }}
-          className={`transition-all hover:scale-110 active:scale-95 shadow-2xl rounded-xl sm:rounded-2xl p-3 sm:p-4 
+          <button
+            onClick={() => {
+              setIsChatOpen(!isChatOpen)
+              setUnreadCount(0)
+            }}
+            className={`transition-all hover:scale-110 active:scale-95 shadow-2xl rounded-xl sm:rounded-2xl p-3 sm:p-4 
     ${isChatOpen ? 'bg-red-500 text-white' : 'bg-correct text-black'}`}
-        >
-          <div className={`transition-transform duration-300 ${isChatOpen ? 'rotate-90' : 'rotate-0'}`}>
-            {isChatOpen ? (
-              <X className="w-4 h-4 sm:w-6 sm:h-6" />
-            ) : (
-              <MessageSquare className="w-4 h-4 sm:w-6 sm:h-6" />
-            )}
-          </div>
-        </button>
-      </div>
+          >
+            <div className={`transition-transform duration-300 ${isChatOpen ? 'rotate-90' : 'rotate-0'}`}>
+              {isChatOpen ? (
+                <X className="w-4 h-4 sm:w-6 sm:h-6" />
+              ) : (
+                <MessageSquare className="w-4 h-4 sm:w-6 sm:h-6" />
+              )}
+            </div>
+          </button>
+        </div>)
+      }
+
 
       {/* Chat Side Drawer / Overlay */}
       {isChatOpen && (

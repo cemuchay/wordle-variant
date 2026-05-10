@@ -17,6 +17,7 @@ const mulberry32 = (seed: number) => {
 
 const SALT = "GFARMS_BETA_V2";
 const TRANSITION_DATE = "2026-05-03";
+const LENGTH_TRANSITION_DATE = "2026-05-11";
 
 /**
  * Hashing Algorithms
@@ -37,12 +38,34 @@ const newHash = (str: string) =>
  */
 function getWordAtDate(dateStr: string, attempt = 0): string {
    const isNew = dateStr >= TRANSITION_DATE;
+   const isNewLength = dateStr >= LENGTH_TRANSITION_DATE;
    const seedBase = dateStr + SALT + (attempt > 0 ? `_retry_${attempt}` : "");
 
    const seed = isNew ? newHash(seedBase) : oldHash(seedBase);
    const random = mulberry32(seed);
 
-   const length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
+   /**
+    * OLD LENGTH randomizer (all have ~33% chance)
+    */
+   let length: 5 | 6 | 4 | 3 | 7;
+
+   if (isNewLength) {
+      const r = random();
+      // Sequential buckets:
+      length =
+         r < 0.05
+            ? 3 // 0.00 to 0.05 (5%)
+            : r < 0.1
+            ? 7 // 0.05 to 0.10 (5%)
+            : r < 0.25
+            ? 4 // 0.10 to 0.30 (15%)
+            : r < 0.65
+            ? 5 // 0.30 to 0.65 (35%)
+            : 6; // 0.65 to 1.00 (30%)
+   } else {
+      length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
+   }
+
    const { official } = getWordLists(length);
 
    return official[Math.floor(random() * official.length)].toUpperCase();
@@ -50,6 +73,7 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
 
 export function getDailyConfig(dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
+
    const isNewEra = dateStr >= TRANSITION_DATE;
 
    // 1. If before transition, return the legacy result immediately
@@ -80,7 +104,7 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
       attempt++;
    } while (history.has(word) && attempt < 50); // Safety cap
 
-   const length = word.length as 5 | 6 | 4;
+   const length = word.length as 5 | 6 | 4 | 3 | 7;
 
    /**
     * OLD LOGIC of maxAttempts, length + 1
