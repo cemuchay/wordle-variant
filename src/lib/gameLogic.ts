@@ -290,7 +290,6 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
          // Conflict Resolution: Use the version with more gameplay data
          // This protects against data loss if the user played offline
          if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
-            console.log("Local progress is ahead. Keeping local stats.");
             return;
          }
       }
@@ -375,7 +374,6 @@ export const syncWithRetry = async (
    payload: any,
    retries = 3
 ): Promise<{ success: boolean; score: number }> => {
-   console.log(payload, "payload");
    if (!date) return { success: false, score: 0 };
    for (let i = 0; i < retries; i++) {
       try {
