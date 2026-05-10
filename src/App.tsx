@@ -1,4 +1,4 @@
-import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X,SettingsIcon } from 'lucide-react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
@@ -47,7 +47,7 @@ export default function App() {
 
   // Initialize the hook
   const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
-    const { toast,triggerToast, setToast } = useApp();
+  const { toast, triggerToast, setToast, preferences } = useApp();
 
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function App() {
     };
 
     syncTime();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -124,7 +124,7 @@ export default function App() {
         setIsGameOver(localGameOver)
 
         if (localGameOver && !localGameMessage) {
-          localGameMessage = local?.status === 'won' ? getWinMessage(local?.guesses.length) : getLossMessage()
+          localGameMessage = preferences.allowRoasts ? local?.status === 'won' ? getWinMessage(local?.guesses.length) : getLossMessage() : ""
         }
 
         setGameMessage(localGameMessage)
@@ -240,7 +240,7 @@ export default function App() {
     setCurrentGuess("");
     let message = ""
 
-    message = (won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "")
+    message = (preferences.allowRoasts ? won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "":"")
     const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
 
     /*
@@ -329,11 +329,11 @@ export default function App() {
           <ReloadPrompt />
           {
             user && (<><PWAInstallBanner />
-             <SettingsModal
-              isOpen={isSettingsOpen}
-              onClose={() => setIsSettingsOpen(false)}
-              
-            /></>)
+              <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+
+              /></>)
           }
 
           <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
