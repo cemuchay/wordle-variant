@@ -18,7 +18,9 @@ interface AppContextType {
         show: boolean, message: string, duration: number | undefined
     };
     triggerToast: ((msg: string, duration?: number) => any);
-    setToast:any
+    setToast: any,
+    unreadCount: number;
+    setUnreadCount: any;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -33,6 +35,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [profile, setProfile] = useState<any | null>(null);
     const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
     const [loading, setLoading] = useState(true);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     const [toast, setToast] = useState<{
         show: boolean, message: string, duration: number | undefined
@@ -90,6 +93,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             toast,
             triggerToast,
             setToast,
+            unreadCount,
+            setUnreadCount
 
         }}>
             {children}

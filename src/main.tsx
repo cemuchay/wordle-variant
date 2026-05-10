@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.tsx'
 import { Analytics } from "@vercel/analytics/react";
 import { AppProvider } from './context/AppContext';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary.tsx';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppProvider>
-    <App />
-    </AppProvider>
-    <Analytics />
+    <GlobalErrorBoundary>
+      <AppProvider>
+        <App />
+      </AppProvider>
+      <Analytics />
+    </GlobalErrorBoundary>
   </StrictMode>,
 )

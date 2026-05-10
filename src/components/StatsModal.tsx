@@ -160,7 +160,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}
               <div className="flex gap-1 mb-2">
-                {(['today', 'weekly',] as Timeframe[]).map((t) => (
+                {(['today', 'weekly', 'monthly'] as Timeframe[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
@@ -176,6 +176,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
               {
                 canViewGuess && (
                   <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Click on user to see their guesses...</p>
+                )
+              }
+              {
+                timeframe ==="weekly" && (
+                  <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Weekly leaderboard runs from mon - sun</p>
                 )
               }
 
@@ -266,7 +271,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
             {index + 1}
           </span>
           {isFirst && (
-            <div className="absolute -top-5 -left-0.5 text-[16px]">👑</div>
+            <div className="absolute -top-6 left-8 text-[18px]">👑</div>
           )}
         </div>
 
