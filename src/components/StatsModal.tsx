@@ -247,22 +247,47 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
   if (status === "lost") attempts = "X"
 
   const formattedGameScore = attempts && wordLength ? ` (${attempts}/${6})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
+  const isFirst = index === 0;
   return (
-    <div onClick={() => canViewGuesses && onShowGuesses(entry)} className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'} ${canViewGuesses ? `pointer` : ``}`}>
+    <div
+      onClick={() => canViewGuesses && onShowGuesses(entry)}
+      className={`
+    flex items-center justify-between p-3 rounded-xl border transition-all duration-300
+    ${isFirst
+          ? 'bg-linear-to-r from-yellow-900/40 via-yellow-600/10 to-transparent border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]'
+          : isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'
+        } 
+    ${canViewGuesses ? 'cursor-pointer hover:brightness-110' : ''}
+  `}
+    >
       <div className="flex items-center gap-3">
-        <span className={`text-xs font-black w-4 ${index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
-          {index + 1}
-        </span>
+        <div className="relative">
+          <span className={`text-xs font-black w-4 flex justify-center ${isFirst ? 'text-yellow-400' : index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
+            {index + 1}
+          </span>
+          {isFirst && (
+            <div className="absolute -top-5 -left-0.5 text-[16px]">👑</div>
+          )}
+        </div>
+
         <img
           src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`}
-          className="w-6 h-6 rounded-full border border-gray-700"
+          className={`w-7 h-7 rounded-full border ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
           alt={entry.username}
         />
-        <span className="text-xs font-bold truncate max-w-30">{index === 0 ? "👑 " : " "}{entry.username} </span>
+
+        <span className={`text-xs font-bold truncate max-w-30 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}>
+          {entry.username}
+        </span>
       </div>
+
       <div className="text-right">
-        <div className="text-xs font-black text-white">{entry.total_score} {formattedGameScore}</div>
-        <div className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Skill PTS</div>
+        <div className={`text-xs font-black ${isFirst ? 'text-yellow-400' : 'text-white'}`}>
+          {entry.total_score} {formattedGameScore}
+        </div>
+        <div className={`text-[8px] uppercase font-bold tracking-tighter ${isFirst ? 'text-yellow-600/80' : 'text-gray-500'}`}>
+          Skill PTS
+        </div>
       </div>
     </div>
   )

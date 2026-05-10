@@ -18,7 +18,7 @@ import { useWordleStats } from './hooks/useStats';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
 import PWAInstallBanner from './components/PWAInstallBanner';
-import { NotificationToggle } from './components/NotificationToggle';
+// import { NotificationToggle } from './components/NotificationToggle';
 import ReloadPrompt from './components/ReloadPrompt';
 
 const getSavedState = (date: string) => {
@@ -326,7 +326,7 @@ export default function App() {
           {/* The PWA Reload Listener */}
           <ReloadPrompt />
           {
-            user && (<><NotificationToggle /> <PWAInstallBanner /></>)
+            user && (<><PWAInstallBanner /></>)
           }
           <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
           <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />

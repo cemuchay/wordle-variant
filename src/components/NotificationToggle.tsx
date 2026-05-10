@@ -29,7 +29,7 @@ export const NotificationToggle = () => {
   }
 
   return (
-    <div className="flex justify-center w-full my-4">
+    <div className="flex justify-center w-full my-2">
       {permission === 'denied' ? (
         <div className="flex flex-col items-center gap-2 p-4 border border-red-200 rounded-lg bg-red-50 text-center max-w-sm">
           <div className="flex items-center gap-2 text-red-700 font-semibold">
