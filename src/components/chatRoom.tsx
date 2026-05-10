@@ -7,7 +7,6 @@ import { useAuth } from "../hooks/useAuth";
 const ChatRoom = ({ user }: { user: AppUser }) => {
     const { messages, sendMessage, typingUsers, setTyping, markAsRead,firstUnreadId } = useChat(user?.id);
 
-  
     const [input, setInput] = useState("");
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
