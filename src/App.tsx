@@ -1,4 +1,4 @@
-import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, } from 'lucide-react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
@@ -20,6 +20,8 @@ import ChatRoom from './components/chatRoom';
 import PWAInstallBanner from './components/PWAInstallBanner';
 // import { NotificationToggle } from './components/NotificationToggle';
 import ReloadPrompt from './components/ReloadPrompt';
+import { SettingsModal } from './components/SettingsModal';
+import { useApp } from './context/AppContext';
 
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
@@ -42,13 +44,11 @@ export default function App() {
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const [toast, setToast] = useState<{
-    show: boolean, message: string, duration: number | undefined
-  }>({ show: false, message: "", duration: undefined });
 
   // Initialize the hook
   const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
-  const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
+  const { toast, triggerToast, setToast, preferences } = useApp();
+
 
   useEffect(() => {
     const syncTime = async () => {
@@ -68,6 +68,7 @@ export default function App() {
     };
 
     syncTime();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -79,6 +80,7 @@ export default function App() {
   const [usedHint, setUsedHint] = useState(false);
   const [hintRecord, setHintRecord] = useState<{ letter: string, index: number } | null>(null);
   const [gameMessage, setGameMessage] = useState("")
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
@@ -122,7 +124,7 @@ export default function App() {
         setIsGameOver(localGameOver)
 
         if (localGameOver && !localGameMessage) {
-          localGameMessage = local?.status === 'won' ? getWinMessage(local?.guesses.length) : getLossMessage()
+          localGameMessage = preferences.allowRoasts ? local?.status === 'won' ? getWinMessage(local?.guesses.length) : getLossMessage() : ""
         }
 
         setGameMessage(localGameMessage)
@@ -238,7 +240,7 @@ export default function App() {
     setCurrentGuess("");
     let message = ""
 
-    message = (won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "")
+    message = (preferences.allowRoasts ? won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "":"")
     const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
 
     /*
@@ -326,8 +328,14 @@ export default function App() {
           {/* The PWA Reload Listener */}
           <ReloadPrompt />
           {
-            user && (<><PWAInstallBanner /></>)
+            user && (<><PWAInstallBanner />
+              <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+
+              /></>)
           }
+
           <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
           <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
           <CloudSyncMenu status={syncStatus} />
@@ -406,6 +414,9 @@ export default function App() {
                   className="text-gray-400 hover:text-white"
                 >
                   <HelpCircle size={18} />
+                </button>
+                <button onClick={() => setIsSettingsOpen(true)}>
+                  <SettingsIcon />
                 </button>
               </div>
             </div>

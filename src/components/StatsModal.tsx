@@ -7,7 +7,7 @@ import GuessPreviewModal from './GuessPreviewModal';
 // --- Types & Interfaces ---
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
-type Timeframe = 'today' | 'weekly'
+type Timeframe = 'today' | 'weekly' | 'monthly'
 
 
 interface GameStats {
@@ -51,7 +51,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       const viewMap: Record<Timeframe, string> = {
         today: 'leaderboard_today',
         weekly: 'leaderboard_weekly',
-        // monthly: 'leaderboard_monthly',
+        monthly: 'leaderboard_monthly',
         // all: 'leaderboard_all_time'
       };
 
