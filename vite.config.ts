@@ -9,6 +9,7 @@ export default defineConfig({
       react(),
       tailwindcss(),
       VitePWA({
+         disable: true,
          strategies: "injectManifest",
          srcDir: "src",
          filename: "service-worker.ts",
