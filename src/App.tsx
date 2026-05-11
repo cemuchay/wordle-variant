@@ -18,9 +18,9 @@ import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
 // import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
-import PWAInstallBanner from './components/PWAInstallBanner';
+// import PWAInstallBanner from './components/PWAInstallBanner';
 // import { NotificationToggle } from './components/NotificationToggle';
-import ReloadPrompt from './components/ReloadPrompt';
+// import ReloadPrompt from './components/ReloadPrompt';
 import { SettingsModal } from './components/SettingsModal';
 import { useApp } from './context/AppContext';
 
