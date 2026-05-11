@@ -24,6 +24,8 @@ import ReloadPrompt from './components/ReloadPrompt';
 import { SettingsModal } from './components/SettingsModal';
 import { useApp } from './context/AppContext';
 
+const APP_VERSION = "1.0.4";
+
 const getSavedState = (date: string) => {
   const saved = localStorage.getItem(`wordle-${date}`);
   return saved ? JSON.parse(saved) : null;
@@ -32,41 +34,68 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister();
-        console.log('SW Unregistered safely');
+  async function checkVersionAndRefresh() {
+    const lastVersion = localStorage.getItem("app_version");
+
+    // Only execute if the version has changed
+    if (lastVersion !== APP_VERSION) {
+      console.log(`[Version Control] New version detected: ${APP_VERSION}. Cleaning...`);
+
+      // 1. Kill Service Workers
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
       }
-    });
-  }
 
-  const STORAGE_KEY = "wordle-2026-05-11"; 
+      // 2. Clear Cache API
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
 
-const wipeIncompleteToday = () => {
-  const rawData = localStorage.getItem(STORAGE_KEY);
+      // 3. Update version in storage BEFORE reload to prevent loops
+      localStorage.setItem("app_version", APP_VERSION);
 
-  if (!rawData) return;
+      // 4. Force hard reload from server
+      // The timestamp ensures we hit the network, not a CDN/ISP cache
+      const url = new URL(window.location.href);
+      url.searchParams.set("v_update", APP_VERSION);
 
-  try {
-    const state = JSON.parse(rawData);
-
-    console.log(state)
-
-    // Condition: It's today's date AND the status is not terminal (not won or lost)
-    if (state.status !== "won" && state.status !== "lost") {
-      localStorage.removeItem(STORAGE_KEY);
-      console.log("Incomplete state for today wiped. Starting fresh.");
-      
-      // Optional: reload to ensure the UI doesn't try to use the old object
-      window.location.reload();
+      window.location.replace(url.toString());
     }
-  } catch (error) {
-    console.error("Error parsing game state for wipe-check:", error);
   }
-};
 
-wipeIncompleteToday();
+  // Execute immediately at the start of your entry file
+  checkVersionAndRefresh();
+
+  const STORAGE_KEY = "wordle-2026-05-11";
+
+  const wipeIncompleteToday = () => {
+    const rawData = localStorage.getItem(STORAGE_KEY);
+
+    if (!rawData) return;
+
+    try {
+      const state = JSON.parse(rawData);
+
+      console.log(state)
+
+      // Condition: It's today's date AND the status is not terminal (not won or lost)
+      if (state.status !== "won" && state.status !== "lost") {
+        localStorage.removeItem(STORAGE_KEY);
+        console.log("Incomplete state for today wiped. Starting fresh.");
+
+        // Optional: reload to ensure the UI doesn't try to use the old object
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error parsing game state for wipe-check:", error);
+    }
+  };
+
+  wipeIncompleteToday();
 
   // Add this at the very top of your main entry file
   if ('serviceWorker' in navigator) {
