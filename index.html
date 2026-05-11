@@ -2,6 +2,22 @@
 <html lang="en">
 
 <head>
+  <script>
+    // 1. Force unregister immediately
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        for (let reg of regs) reg.unregister();
+      });
+    }
+
+    // 2. Check version against a hardcoded string here
+    const CURRENT_V = "1.0.5";
+    if (localStorage.getItem("app_v") !== CURRENT_V) {
+      localStorage.setItem("app_v", CURRENT_V);
+      // Adding a random query param is the only way to kill iOS disk cache
+      window.location.replace(window.location.href.split('?')[0] + '?clear=' + Date.now());
+    }
+  </script>
   <meta charset="UTF-8" />
   <meta name="google-site-verification" content="0QuU-38aY6RvHWubbXN86m3RbaHYCl5JQpHpXQciS4U" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
