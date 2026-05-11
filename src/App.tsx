@@ -391,9 +391,10 @@ export default function App() {
             onClose={() => setToast({ ...toast, show: false })}
           />
           {/* The PWA Reload Listener */}
-          <ReloadPrompt />
+          {/* <ReloadPrompt /> */}
           {
-            user && (<><PWAInstallBanner />
+            user && (<>
+            {/* <PWAInstallBanner /> */}
               <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
