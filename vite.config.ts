@@ -12,7 +12,8 @@ export default defineConfig({
          disable: true,
          strategies: "injectManifest",
          srcDir: "src",
-         filename: "service-worker.ts",
+         filename: "null.ts",
+         //   filename: "service-worker.ts",
        registerType: 'prompt', // Ask user first
          workbox: {
             cleanupOutdatedCaches: true, // This clears old hashes immediately

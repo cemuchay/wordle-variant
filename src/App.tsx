@@ -64,46 +64,45 @@ export default function App() {
       url.searchParams.set("v_update", APP_VERSION);
 
       window.location.replace(url.toString());
+
+      const STORAGE_KEY = "wordle-2026-05-11";
+
+      const wipeIncompleteToday = () => {
+        const rawData = localStorage.getItem(STORAGE_KEY);
+
+        if (!rawData) return;
+
+        try {
+          const state = JSON.parse(rawData)
+
+          // Condition: It's today's date AND the status is not terminal (not won or lost)
+          if (state.status !== "won" && state.status !== "lost") {
+            localStorage.removeItem(STORAGE_KEY);
+            console.log("Incomplete state for today wiped. Starting fresh.");
+
+            // Optional: reload to ensure the UI doesn't try to use the old object
+            window.location.reload();
+          }
+        } catch (error) {
+          console.error("Error parsing game state for wipe-check:", error);
+        }
+      };
+
+      wipeIncompleteToday();
     }
   }
 
   // Execute immediately at the start of your entry file
   checkVersionAndRefresh();
 
-  const STORAGE_KEY = "wordle-2026-05-11";
 
-  const wipeIncompleteToday = () => {
-    const rawData = localStorage.getItem(STORAGE_KEY);
-
-    if (!rawData) return;
-
-    try {
-      const state = JSON.parse(rawData);
-
-      console.log(state)
-
-      // Condition: It's today's date AND the status is not terminal (not won or lost)
-      if (state.status !== "won" && state.status !== "lost") {
-        localStorage.removeItem(STORAGE_KEY);
-        console.log("Incomplete state for today wiped. Starting fresh.");
-
-        // Optional: reload to ensure the UI doesn't try to use the old object
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Error parsing game state for wipe-check:", error);
-    }
-  };
-
-  wipeIncompleteToday();
-
-  // Add this at the very top of your main entry file
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // This fires when the new service worker takes over (skipWaiting)
-      window.location.reload();
-    });
-  }
+  // // Add this at the very top of your main entry file
+  // if ('serviceWorker' in navigator) {
+  //   navigator.serviceWorker.addEventListener('controllerchange', () => {
+  //     // This fires when the new service worker takes over (skipWaiting)
+  //     window.location.reload();
+  //   });
+  // }
 
   const [date, setDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
