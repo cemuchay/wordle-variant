@@ -16,7 +16,7 @@ import type { AppUser, GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+// import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
 import PWAInstallBanner from './components/PWAInstallBanner';
 // import { NotificationToggle } from './components/NotificationToggle';
@@ -31,6 +31,42 @@ const getSavedState = (date: string) => {
 
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+        console.log('SW Unregistered safely');
+      }
+    });
+  }
+
+  const STORAGE_KEY = "wordle-2026-05-11"; 
+
+const wipeIncompleteToday = () => {
+  const rawData = localStorage.getItem(STORAGE_KEY);
+
+  if (!rawData) return;
+
+  try {
+    const state = JSON.parse(rawData);
+
+    console.log(state)
+
+    // Condition: It's today's date AND the status is not terminal (not won or lost)
+    if (state.status !== "won" && state.status !== "lost") {
+      localStorage.removeItem(STORAGE_KEY);
+      console.log("Incomplete state for today wiped. Starting fresh.");
+      
+      // Optional: reload to ensure the UI doesn't try to use the old object
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error("Error parsing game state for wipe-check:", error);
+  }
+};
+
+wipeIncompleteToday();
 
   // Add this at the very top of your main entry file
   if ('serviceWorker' in navigator) {
@@ -86,8 +122,8 @@ export default function App() {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // Handles automatic updates of the app
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered', r) });
+
+  // useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered', r) });
 
   const config = getDailyConfig(date as string);
 
@@ -416,11 +452,11 @@ export default function App() {
                 >
                   <HelpCircle size={18} />
                 </button>
-               {
-                user&&( <button onClick={() => setIsSettingsOpen(true)}>
-                  <SettingsIcon />
-                </button>)
-               }
+                {
+                  user && (<button onClick={() => setIsSettingsOpen(true)}>
+                    <SettingsIcon />
+                  </button>)
+                }
               </div>
             </div>
           </div>
