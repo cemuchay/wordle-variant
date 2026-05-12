@@ -271,7 +271,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
             {index + 1}
           </span>
           {isFirst && (
-            <div className="absolute -top-6 left-8 text-[18px]">👑</div>
+            <div className="absolute -top-6 left-7.5 text-[18px]">👑</div>
           )}
         </div>
 
