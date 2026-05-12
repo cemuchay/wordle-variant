@@ -9,7 +9,7 @@ import { StatsModal } from './components/StatsModal';
 import { Toast } from './components/Toast';
 import { getWordLists, } from './data/words';
 import { useAuth } from './hooks/useAuth';
-import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
+import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
 import type { AppUser, GuessResult, LetterStatus } from './types/game';
@@ -173,8 +173,9 @@ export default function App() {
       // Phase A: Local Load
       const local = getSavedState(date as string);
       if (isMounted) {
-        setGuesses(local?.guesses || []);
-        setLetterStatuses(local?.letterStatuses || {});
+        const initialGuesses = local?.guesses || [];
+        setGuesses(initialGuesses);
+        setLetterStatuses(getLetterStatuses(initialGuesses));
         setUsedHint(local?.usedHint || false);
 
 
@@ -231,14 +232,7 @@ export default function App() {
           setIsGameOverModal(data.status !== 'playing');
           setGameMessage(data.game_message)
 
-          const newStatuses: Record<string, LetterStatus> = {};
-          cloudGuesses.forEach((row: GuessResult[]) => {
-            row.forEach((res) => {
-              if (newStatuses[res.letter] !== 'correct') {
-                newStatuses[res.letter] = res.status;
-              }
-            });
-          });
+          const newStatuses = getLetterStatuses(cloudGuesses);
           setLetterStatuses(newStatuses);
 
           localStorage.setItem(`wordle-${date}`, JSON.stringify({
@@ -286,13 +280,7 @@ export default function App() {
     // 1. Calculate the new state locally first
     const result = checkGuess(upperGuess, config.word);
     const newGuesses = [...guesses, result];
-    const newStatuses = { ...letterStatuses };
-
-    result.forEach((res) => {
-      if (newStatuses[res.letter] !== 'correct') {
-        newStatuses[res.letter] = res.status;
-      }
-    });
+    const newStatuses = getLetterStatuses(newGuesses);
 
     const won = upperGuess === config.word;
     const lost = newGuesses.length === config.maxAttempts;

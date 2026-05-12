@@ -1,6 +1,23 @@
-import type { GameConfig, GameStats, GuessResult } from "../types/game";
+import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../types/game";
 import { getWordLists } from "../data/words";
 import { supabase } from "./supabaseClient";
+
+export function getLetterStatuses(guesses: GuessResult[][]): Record<string, LetterStatus> {
+   const statuses: Record<string, LetterStatus> = {};
+   guesses.forEach((row) => {
+      row.forEach((res) => {
+         const current = statuses[res.letter];
+         if (res.status === "correct") {
+            statuses[res.letter] = "correct";
+         } else if (res.status === "present" && current !== "correct") {
+            statuses[res.letter] = "present";
+         } else if (res.status === "absent" && !current) {
+            statuses[res.letter] = "absent";
+         }
+      });
+   });
+   return statuses;
+}
 
 /**
  * Mulberry32 PRNG
