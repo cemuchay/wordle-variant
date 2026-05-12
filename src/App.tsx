@@ -143,7 +143,7 @@ export default function App() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isGameOverModal, setIsGameOverModal] = useState(false)
   const [usedHint, setUsedHint] = useState(false);
-  const [hintRecord, setHintRecord] = useState<{ letter: string, index: number } | null>(null);
+  const [hintRecord, setHintRecord] = useState<{ letter: string, index: number, row?: number } | null>(null);
   const [gameMessage, setGameMessage] = useState("")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -353,9 +353,10 @@ export default function App() {
     if (guesses.length < 3 || usedHint || isGameOver) return;
     const hint = getHint(config.word, guesses);
     if (hint) {
+      const hintWithRow = { ...hint, row: guesses.length };
       setUsedHint(true);
-      setHintRecord(hint);
-      const payload = { date, guesses, letterStatuses, status: 'playing', usedHint: true, hintRecord: hint, config };
+      setHintRecord(hintWithRow);
+      const payload = { date, guesses, letterStatuses, status: 'playing', usedHint: true, hintRecord: hintWithRow, config };
       localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
       if (user) await syncGameState(user.id, date, payload);
       triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
