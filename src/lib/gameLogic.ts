@@ -79,6 +79,7 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
             : r < 0.65
             ? 5 // 0.30 to 0.65 (35%)
             : 6; // 0.65 to 1.00 (30%)
+
    } else {
       length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
    }

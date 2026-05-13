@@ -27,7 +27,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <div>
               <p className="font-bold text-white mb-1 uppercase tracking-wide">How It Works</p>
               <p className="mb-4 leading-relaxed border-b border-gray-800 pb-3">
-                Basically Wordle, with a <span className="text-indigo-400 font-medium">4, 5, or 6 letter</span> word changing daily. You have <span className="text-white">6 tries</span> to find it.
+                Basically Wordle, with a <span className="text-indigo-400 font-medium">3, 4, 5, 6 or 7 letter</span> word changing daily. You have <span className="text-white">6 tries</span> to find it.
               </p>
 
               <div className="space-y-3">
