@@ -22,7 +22,7 @@ interface AppContextType {
     setToast: any,
     unreadCount: number;
     setUnreadCount: any;
-    date: string;
+    date: string | null;
     isLoadingDate: boolean;
     setIsLoadingDate: any;
 }
