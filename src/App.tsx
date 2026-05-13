@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon } from 'lucide-react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
@@ -95,19 +95,11 @@ export default function App() {
   // Execute immediately at the start of your entry file
   checkVersionAndRefresh();
 
-
-  // // Add this at the very top of your main entry file
-  // if ('serviceWorker' in navigator) {
-  //   navigator.serviceWorker.addEventListener('controllerchange', () => {
-  //     // This fires when the new service worker takes over (skipWaiting)
-  //     window.location.reload();
-  //   });
-  // }
-
   const [date, setDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const ICON_SIZE = 16;
 
   // Initialize the hook
   const { stats, refresh, updateOptimistically } = useWordleStats(user, isStatsOpen, date);
@@ -390,7 +382,7 @@ export default function App() {
           {/* <ReloadPrompt /> */}
           {
             user && (<>
-            {/* <PWAInstallBanner /> */}
+              {/* <PWAInstallBanner /> */}
               <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
@@ -416,7 +408,7 @@ export default function App() {
                     <img
                       src={user.user_metadata.avatar_url}
                       alt="Profile"
-                      className="w-6 h-6 rounded-full border border-gray-700 cursor-pointer"
+                      className="w-7 h-7 rounded-full border border-gray-700 cursor-pointer"
                     />
                     <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:block">
                       {user.user_metadata.full_name?.split(' ')[0]}
@@ -449,10 +441,10 @@ export default function App() {
                     className={`transition-all ${usedHint ? 'text-yellow-500/50' : 'text-yellow-500 animate-pulse'}`}
                     title={usedHint ? "Show Hint Reminder" : "Get a Hint"}
                   >
-                    <Lightbulb size={18} fill={usedHint ? "currentColor" : "currentColor"} />
+                    <Lightbulb size={ICON_SIZE} fill={usedHint ? "currentColor" : "currentColor"} />
                   </button>
                 )}
-                <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
+                <span className="px-1 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
                   {config.length}L
                 </span>
 
@@ -460,26 +452,36 @@ export default function App() {
                   {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
                   <button
                     onClick={() => window.location.reload()}
-                    className="p-2 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
+                    className="p-1 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
                     title="Refresh Game"
                   >
-                    <RotateCcw size={16} />
+                    <RotateCcw size={ICON_SIZE} />
                   </button>
                 </div>
 
                 <button onClick={() => setIsStatsOpen(true)} className="text-gray-400 hover:text-white p-1">
-                  <BarChart2 size={18} />
+                  <BarChart2 size={ICON_SIZE} />
                 </button>
 
                 <button
                   onClick={() => setIsInfoOpen(true)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-white p-1"
                 >
-                  <HelpCircle size={18} />
+                  <HelpCircle size={ICON_SIZE} />
                 </button>
                 {
-                  user && (<button onClick={() => setIsSettingsOpen(true)}>
-                    <SettingsIcon />
+                  isGameOver && (
+                    <button
+                      onClick={() => setIsGameOverModal(true)}
+                      className="text-gray-400 hover:text-white p-1"
+                    >
+                      <Share size={ICON_SIZE} />
+                    </button>
+                  )
+                }
+                {
+                  user && (<button onClick={() => setIsSettingsOpen(true)} className="text-gray-400 hover:text-white p-1">
+                    <SettingsIcon size={ICON_SIZE} />
                   </button>)
                 }
               </div>
