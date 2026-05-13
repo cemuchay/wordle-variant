@@ -1,6 +1,23 @@
-import type { GameConfig, GameStats, GuessResult } from "../types/game";
+import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../types/game";
 import { getWordLists } from "../data/words";
 import { supabase } from "./supabaseClient";
+
+export function getLetterStatuses(guesses: GuessResult[][]): Record<string, LetterStatus> {
+   const statuses: Record<string, LetterStatus> = {};
+   guesses.forEach((row) => {
+      row.forEach((res) => {
+         const current = statuses[res.letter];
+         if (res.status === "correct") {
+            statuses[res.letter] = "correct";
+         } else if (res.status === "present" && current !== "correct") {
+            statuses[res.letter] = "present";
+         } else if (res.status === "absent" && !current) {
+            statuses[res.letter] = "absent";
+         }
+      });
+   });
+   return statuses;
+}
 
 /**
  * Mulberry32 PRNG
@@ -17,6 +34,7 @@ const mulberry32 = (seed: number) => {
 
 const SALT = "GFARMS_BETA_V2";
 const TRANSITION_DATE = "2026-05-03";
+const LENGTH_TRANSITION_DATE = "2026-05-11";
 
 /**
  * Hashing Algorithms
@@ -37,12 +55,35 @@ const newHash = (str: string) =>
  */
 function getWordAtDate(dateStr: string, attempt = 0): string {
    const isNew = dateStr >= TRANSITION_DATE;
+   const isNewLength = dateStr >= LENGTH_TRANSITION_DATE;
    const seedBase = dateStr + SALT + (attempt > 0 ? `_retry_${attempt}` : "");
 
    const seed = isNew ? newHash(seedBase) : oldHash(seedBase);
    const random = mulberry32(seed);
 
-   const length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
+   /**
+    * OLD LENGTH randomizer (all have ~33% chance)
+    */
+   let length: 5 | 6 | 4 | 3 | 7;
+
+   if (isNewLength) {
+      const r = random();
+      // Sequential buckets:
+      length =
+         r < 0.05
+            ? 3 // 0.00 to 0.05 (5%)
+            : r < 0.1
+            ? 7 // 0.05 to 0.10 (5%)
+            : r < 0.25
+            ? 4 // 0.10 to 0.30 (15%)
+            : r < 0.65
+            ? 5 // 0.30 to 0.65 (35%)
+            : 6; // 0.65 to 1.00 (30%)
+
+   } else {
+      length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
+   }
+
    const { official } = getWordLists(length);
 
    return official[Math.floor(random() * official.length)].toUpperCase();
@@ -50,6 +91,7 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
 
 export function getDailyConfig(dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
+
    const isNewEra = dateStr >= TRANSITION_DATE;
 
    // 1. If before transition, return the legacy result immediately
@@ -80,7 +122,7 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
       attempt++;
    } while (history.has(word) && attempt < 50); // Safety cap
 
-   const length = word.length as 5 | 6 | 4;
+   const length = word.length as 5 | 6 | 4 | 3 | 7;
 
    /**
     * OLD LOGIC of maxAttempts, length + 1
@@ -163,17 +205,22 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
    };
 };
 
-export const updateStats = (won: boolean, attempts: number) => {
+export const updateStats = (won: boolean, attempts: number): GameStats => {
    const raw = localStorage.getItem("wordle-statistics");
-   const stats = raw
+   const stats: GameStats = raw
       ? JSON.parse(raw)
       : {
            gamesPlayed: 0,
            gamesWon: 0,
            currentStreak: 0,
            maxStreak: 0,
-           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
         };
+
+   // Ensure "X" exists if we are updating an old stats object
+   if (stats.guesses["X"] === undefined) {
+      stats.guesses["X"] = 0;
+   }
 
    stats.gamesPlayed += 1;
    if (won) {
@@ -183,21 +230,23 @@ export const updateStats = (won: boolean, attempts: number) => {
       stats.guesses[attempts] += 1;
    } else {
       stats.currentStreak = 0;
+      stats.guesses["X"] += 1;
    }
 
    localStorage.setItem("wordle-statistics", JSON.stringify(stats));
+   return stats;
 };
 
 export const syncStatsFromLocalStorage = () => {
    // Check if we've already done the big migration
    if (localStorage.getItem("stats_synced_v1")) return;
 
-   const stats = {
+   const stats: GameStats = {
       gamesPlayed: 0,
       gamesWon: 0,
       currentStreak: 0,
       maxStreak: 0,
-      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
+      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
    };
 
    // 1. Find all keys that match your date pattern
@@ -221,10 +270,15 @@ export const syncStatsFromLocalStorage = () => {
             stats.maxStreak = Math.max(stats.maxStreak, stats.currentStreak);
 
             // Use the number of rows in the guesses array
-            const attemptCount = game.guesses.length;
-            stats.guesses[attemptCount as keyof typeof stats.guesses] += 1;
-         } else {
+            const attemptCount = String(game.guesses.length);
+            if (stats.guesses[attemptCount] !== undefined) {
+               stats.guesses[attemptCount] += 1;
+            }
+         } else if (game.status === "lost") {
             // If they lost or it's a "lost" status, streak resets
+            stats.currentStreak = 0;
+            stats.guesses["X"] += 1;
+         } else {
             stats.currentStreak = 0;
          }
       } catch (e) {
@@ -290,7 +344,6 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
          // Conflict Resolution: Use the version with more gameplay data
          // This protects against data loss if the user played offline
          if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
-            console.log("Local progress is ahead. Keeping local stats.");
             return;
          }
       }
@@ -375,7 +428,6 @@ export const syncWithRetry = async (
    payload: any,
    retries = 3
 ): Promise<{ success: boolean; score: number }> => {
-   console.log(payload, "payload");
    if (!date) return { success: false, score: 0 };
    for (let i = 0; i < retries; i++) {
       try {

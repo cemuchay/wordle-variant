@@ -5,14 +5,17 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
+
    plugins: [
       react(),
       tailwindcss(),
       VitePWA({
+         disable: true,
          strategies: "injectManifest",
          srcDir: "src",
-         filename: "service-worker.ts",
-       registerType: 'prompt', // Ask user first
+         filename: "null.ts",
+         //   filename: "service-worker.ts",
+         registerType: 'prompt', // Ask user first
          workbox: {
             cleanupOutdatedCaches: true, // This clears old hashes immediately
             skipWaiting: true,

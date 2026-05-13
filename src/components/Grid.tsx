@@ -6,9 +6,10 @@ interface GridProps {
   maxAttempts: number;
   guesses: GuessResult[][];
   currentGuess: string;
+  hintRecord?: { letter: string, index: number } | null;
 }
 
-export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess }) => {
+export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess, hintRecord }) => {
   const empties = Math.max(0, maxAttempts - guesses.length - 1);
 
   // Responsive Tile Size logic:
@@ -49,24 +50,38 @@ export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, cu
 
       {/* Current Guess Row */}
       {guesses.length < maxAttempts && (
-        Array.from({ length: wordLength }).map((_, i) => (
-          <div 
-            key={`current-${i}`} 
-            className={`${tileClass} border-2 border-gray-500 text-white animate-pulse`}
-          >
-            {currentGuess[i] || ''}
-          </div>
-        ))
+        Array.from({ length: wordLength }).map((_, i) => {
+          const isHinted = hintRecord?.index === i;
+          const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+          
+          return (
+            <div 
+              key={`current-${i}`} 
+              className={`${tileClass} border-2 text-white animate-pulse
+                ${currentGuess[i] ? 'border-gray-500' : isHinted ? 'border-yellow-600/50 text-yellow-500/50' : 'border-gray-500'}`}
+            >
+              {letter}
+            </div>
+          );
+        })
       )}
 
       {/* Empty Rows */}
       {Array.from({ length: empties }).map((_, i) => (
-        Array.from({ length: wordLength }).map((_, j) => (
-          <div 
-            key={`empty-${i}-${j}`} 
-            className={`${tileClass} border-2 border-gray-800`}
-          ></div>
-        ))
+        <React.Fragment key={`empty-row-${i}`}>
+          {Array.from({ length: wordLength }).map((_, j) => {
+            const isHinted = hintRecord?.index === j;
+            return (
+              <div 
+                key={`empty-${i}-${j}`} 
+                className={`${tileClass} border-2 
+                  ${isHinted ? 'border-yellow-600/20 text-yellow-500/30' : 'border-gray-800'}`}
+              >
+                {isHinted ? hintRecord?.letter : ''}
+              </div>
+            );
+          })}
+        </React.Fragment>
       ))}
     </div>
   );
