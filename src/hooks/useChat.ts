@@ -11,7 +11,7 @@ export interface Message {
    reply_to?: string;
    mentions?: string[];
    is_read: boolean;
-   profiles: { username: string; avatar_url: string };
+   profiles: { username: string; avatar_url: string; id: string };
 }
 
 export const useChat = (userId: string) => {
@@ -79,12 +79,12 @@ export const useChat = (userId: string) => {
 
                const messageWithProfile = { ...newMessage, profiles: profile };
 
-               setMessages((prev) => {
+               setMessages((prev: any[]) => {
                   const exists = prev.some((m) => m.id === newMessage.id);
 
                   if (exists) {
                      // Update the optimistic message with real DB data/profile
-                     return prev.map((m) => (m.id === newMessage.id ? messageWithProfile : m));
+                     return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
                   }
 
                   // Append new message from other users
@@ -179,7 +179,7 @@ export const useChat = (userId: string) => {
          reply_to: replyToId,
          mentions: mentions,
          is_read: false,
-         profiles: messages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '' }
+         profiles: messages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '', id: userId }
       };
 
       // 1. Add optimistically
