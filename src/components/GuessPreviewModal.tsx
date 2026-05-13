@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { X, Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { LeaderboardEntry } from "../types/game";
+import { useApp } from "../context/AppContext";
 
-const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void }> = ({ entry, onClose }) => {
+const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void; }> = ({ entry, onClose, }) => {
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
         hints_used: boolean;
@@ -12,6 +13,7 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
         hint_record: { letter: string; index: number; row?: number } | null;
     } | null>(null);
     const [loading, setLoading] = useState(true);
+    const { date } = useApp();
 
     useEffect(() => {
         const fetchGuesses = async () => {
@@ -20,7 +22,7 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
                 .from('scores')
                 .select('guesses, hints_used, skill_score, hint_record')
                 .eq('user_id', entry.user_id)
-                .eq('game_date', new Date().toISOString().split('T')[0])
+                .eq('game_date', date)
                 .single();
 
             if (data) setGameData(data);
@@ -29,7 +31,7 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
         };
 
         fetchGuesses();
-    }, [entry.user_id]);
+    }, [date, entry.user_id]);
 
     const calculateRowScore = (row: any[]) => {
         return row.reduce((acc, cell) => {
@@ -132,3 +134,4 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
 };
 
 export default GuessPreviewModal
+
