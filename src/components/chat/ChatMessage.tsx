@@ -18,9 +18,10 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const x = useMotionValue(0);
 
-    // Transform x position to reply icon opacity/scale
-    const replyIconOpacity = useTransform(x, [0, 50], [0, 1]);
-    const replyIconScale = useTransform(x, [0, 50], [0.5, 1.2]);
+    // Transform x position to reply icon properties
+    const replyIconOpacity = useTransform(x, [0, 60], [0, 1]);
+    const replyIconScale = useTransform(x, [0, 60], [0.5, 1.1]);
+    const replyIconTranslateX = useTransform(x, [0, 60], [-20, 12]);
 
     const renderContent = (content: string) => {
         if (!content) return null;
@@ -74,7 +75,7 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
         <div className="relative group overflow-visible">
             {/* Swipe Reply Indicator */}
             <motion.div
-                style={{ opacity: replyIconOpacity, scale: replyIconScale, x: -40 }}
+                style={{ opacity: replyIconOpacity, scale: replyIconScale, x: replyIconTranslateX }}
                 className="absolute left-0 top-1/2 -translate-y-1/2 text-correct pointer-events-none"
             >
                 <Reply size={24} />
@@ -82,11 +83,12 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
 
             <motion.div
                 drag="x"
-                dragConstraints={{ left: 0, right: 100 }}
-                dragElastic={0.2}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragSnapToOrigin
+                dragElastic={0.6}
                 style={{ x }}
                 onDragEnd={(_, info) => {
-                    if (info.offset.x > 60) {
+                    if (info.offset.x > 80) {
                         onReply(msg);
                     }
                 }}
