@@ -5,6 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
+
    plugins: [
       react(),
       tailwindcss(),
@@ -14,7 +15,7 @@ export default defineConfig({
          srcDir: "src",
          filename: "null.ts",
          //   filename: "service-worker.ts",
-       registerType: 'prompt', // Ask user first
+         registerType: 'prompt', // Ask user first
          workbox: {
             cleanupOutdatedCaches: true, // This clears old hashes immediately
             skipWaiting: true,

@@ -110,7 +110,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Initialize the hook
-  const { stats, refresh } = useWordleStats(user, isStatsOpen, date);
+  const { stats, refresh, updateOptimistically } = useWordleStats(user, isStatsOpen, date);
 
   const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount } = useApp();
 
@@ -322,7 +322,8 @@ export default function App() {
     if (won || lost) {
       setIsGameOver(true);
       setIsGameOverModal(true);
-      updateStats(won, newGuesses.length);
+      const updatedStats = updateStats(won, newGuesses.length);
+      updateOptimistically(updatedStats);
       await refresh();
 
       if (lost) triggerToast(`The word is: ${config.word}`, 5000)
@@ -350,7 +351,13 @@ export default function App() {
   }, [onEnter, onDelete, onChar]);
 
   const handleHint = async () => {
-    if (guesses.length < 3 || usedHint || isGameOver) return;
+    if (guesses.length < 3 || isGameOver) return;
+
+    if (usedHint && hintRecord) {
+      triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
+      return;
+    }
+
     const hint = getHint(config.word, guesses);
     if (hint) {
       const hintWithRow = { ...hint, row: guesses.length };
@@ -439,10 +446,10 @@ export default function App() {
                 {guesses.length >= 3 && !isGameOver && (
                   <button
                     onClick={handleHint}
-                    disabled={usedHint}
-                    className={`transition-all ${usedHint ? 'text-gray-700' : 'text-yellow-500 animate-pulse'}`}
+                    className={`transition-all ${usedHint ? 'text-yellow-500/50' : 'text-yellow-500 animate-pulse'}`}
+                    title={usedHint ? "Show Hint Reminder" : "Get a Hint"}
                   >
-                    <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                    <Lightbulb size={18} fill={usedHint ? "currentColor" : "currentColor"} />
                   </button>
                 )}
                 <span className="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
@@ -500,6 +507,7 @@ export default function App() {
                 maxAttempts={config.maxAttempts}
                 guesses={guesses}
                 currentGuess={currentGuess}
+                hintRecord={hintRecord}
               />
             </div>
           </div>

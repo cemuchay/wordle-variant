@@ -106,6 +106,10 @@ export const useWordleStats = (
       }
    }, [isOpen, userId, fetchCloudStats]);
 
+   const updateOptimistically = useCallback((newStats: GameStats) => {
+      setCloudStats(newStats);
+   }, []);
+
    const stats = useMemo(() => {
       if (userId && cloudStats) return cloudStats;
 
@@ -113,5 +117,5 @@ export const useWordleStats = (
       return raw ? JSON.parse(raw) : INITIAL_STATS;
    }, [userId, cloudStats]);
 
-   return { stats, loading, refresh: fetchCloudStats };
+   return { stats, loading, refresh: fetchCloudStats, updateOptimistically };
 };

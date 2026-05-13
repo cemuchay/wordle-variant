@@ -205,17 +205,22 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
    };
 };
 
-export const updateStats = (won: boolean, attempts: number) => {
+export const updateStats = (won: boolean, attempts: number): GameStats => {
    const raw = localStorage.getItem("wordle-statistics");
-   const stats = raw
+   const stats: GameStats = raw
       ? JSON.parse(raw)
       : {
            gamesPlayed: 0,
            gamesWon: 0,
            currentStreak: 0,
            maxStreak: 0,
-           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 },
+           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
         };
+
+   // Ensure "X" exists if we are updating an old stats object
+   if (stats.guesses["X"] === undefined) {
+      stats.guesses["X"] = 0;
+   }
 
    stats.gamesPlayed += 1;
    if (won) {
@@ -225,21 +230,23 @@ export const updateStats = (won: boolean, attempts: number) => {
       stats.guesses[attempts] += 1;
    } else {
       stats.currentStreak = 0;
+      stats.guesses["X"] += 1;
    }
 
    localStorage.setItem("wordle-statistics", JSON.stringify(stats));
+   return stats;
 };
 
 export const syncStatsFromLocalStorage = () => {
    // Check if we've already done the big migration
    if (localStorage.getItem("stats_synced_v1")) return;
 
-   const stats = {
+   const stats: GameStats = {
       gamesPlayed: 0,
       gamesWon: 0,
       currentStreak: 0,
       maxStreak: 0,
-      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
+      guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
    };
 
    // 1. Find all keys that match your date pattern
@@ -263,10 +270,15 @@ export const syncStatsFromLocalStorage = () => {
             stats.maxStreak = Math.max(stats.maxStreak, stats.currentStreak);
 
             // Use the number of rows in the guesses array
-            const attemptCount = game.guesses.length;
-            stats.guesses[attemptCount as keyof typeof stats.guesses] += 1;
-         } else {
+            const attemptCount = String(game.guesses.length);
+            if (stats.guesses[attemptCount] !== undefined) {
+               stats.guesses[attemptCount] += 1;
+            }
+         } else if (game.status === "lost") {
             // If they lost or it's a "lost" status, streak resets
+            stats.currentStreak = 0;
+            stats.guesses["X"] += 1;
+         } else {
             stats.currentStreak = 0;
          }
       } catch (e) {

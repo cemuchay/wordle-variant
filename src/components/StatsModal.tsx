@@ -121,7 +121,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
+        <div className="overflow-y-auto flex-1 pr-1 scrollbar-hide">
           {activeTab === 'stats' ? (
             loading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2">
