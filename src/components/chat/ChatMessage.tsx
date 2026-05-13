@@ -6,15 +6,16 @@ import type { JSX } from "react";
 interface ChatMessageProps {
     msg: Message;
     isMe: boolean;
+    isMentioned?: boolean;
     replyMsg?: Message;
     onReply: (msg: Message) => void;
     onMarkAsRead: (id: string) => void;
-    users: { username: string; avatar_url: string }[];
+    users: { username: string; avatar_url: string; id?: string }[];
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 
-const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: ChatMessageProps) => {
+const ChatMessage = ({ msg, isMe, isMentioned, replyMsg, onReply, onMarkAsRead, users }: ChatMessageProps) => {
     const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const x = useMotionValue(0);
 
@@ -122,7 +123,7 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
 
                 <div className={`relative max-w-[85%] p-3 px-4 shadow-lg transition-all ${isMe
                     ? 'bg-linear-to-br from-correct to-emerald-600 text-black font-semibold rounded-2xl rounded-tr-none'
-                    : 'bg-[#202c33] border border-white/5 text-[#e9edef] rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
+                    : `bg-[#202c33] border ${isMentioned ? 'border-correct/50 shadow-[0_0_20px_rgba(0,255,0,0.15)] border-[5px]' : 'border-white/5'} text-[#e9edef] rounded-2xl rounded-tl-none hover:bg-[#2a3942]`
                     }`}>
 
                     <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap wrap-break-word">

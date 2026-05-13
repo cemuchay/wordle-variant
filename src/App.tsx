@@ -16,6 +16,8 @@ import type { AppUser, GuessResult, LetterStatus } from './types/game';
 import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
+import { useChat } from './hooks/useChat';
+import { useUnreadTracker } from './hooks/useUnreadTracker';
 // import { useRegisterSW } from 'virtual:pwa-register/react';
 import ChatRoom from './components/chatRoom';
 // import PWAInstallBanner from './components/PWAInstallBanner';
@@ -114,6 +116,8 @@ export default function App() {
 
   const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount } = useApp();
 
+  const chatData = useChat(user?.id, isChatOpen);
+  useUnreadTracker(user?.id, isChatOpen, chatData.isAtBottom);
 
   useEffect(() => {
     const syncTime = async () => {
@@ -552,7 +556,6 @@ export default function App() {
           <button
             onClick={() => {
               setIsChatOpen(!isChatOpen)
-              setUnreadCount(0)
             }}
             className={`transition-all hover:scale-110 active:scale-95 shadow-2xl rounded-xl sm:rounded-2xl p-3 sm:p-4 
     ${isChatOpen ? 'bg-red-500 text-white' : 'bg-correct text-black'}`}
@@ -573,6 +576,7 @@ export default function App() {
       {isChatOpen && (
         <ChatRoom
           user={user as AppUser}
+          chatData={chatData}
         />)}
 
       <a href="/privacy" className="text-[10px] text-gray-600 hover:underline">

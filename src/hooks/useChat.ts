@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useApp } from "../context/AppContext";
 
 export interface Message {
    id: string;
@@ -14,26 +13,24 @@ export interface Message {
    profiles: { username: string; avatar_url: string; id: string };
 }
 
-export const useChat = (userId: string) => {
+export const useChat = (userId?: string, isChatOpen: boolean = false) => {
    const [messages, setMessages] = useState<Message[]>([]);
    const [typingUsers, setTypingUsers] = useState<string[]>([]);
+   const [isAtBottom, setIsAtBottom] = useState(true);
    const channelRef = useRef<any>(null);
-   const { setUnreadCount } = useApp();
 
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
-   // Get the timestamp from the browser's local storage
-   const getLastSeen = () =>
-      localStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString();
-
    const typingTimeoutRef = useRef<number | null>(null);
-
-   // Guard to prevent redundant track calls
    const isCurrentlyTypingLocally = useRef(false);
 
+   // 1. Fetch messages only when chat is open
    useEffect(() => {
-      if (!userId) return;
-      // 1. Fetch messages with timezone conversion via JS Date
+      if (!userId || !isChatOpen) {
+         if (!isChatOpen) setMessages([]); // Clear messages when closed to save memory
+         return;
+      }
+
       const fetchMessages = async () => {
          const { data } = await supabase
             .from("messages")
@@ -42,24 +39,23 @@ export const useChat = (userId: string) => {
 
          if (data) {
             setMessages(data);
-            const lastSeen = getLastSeen();
-            // Find messages that are NOT yours and are NEWER than your last visit
-            const unreads = data.filter(
-               (m) => m.user_id !== userId && m.created_at > lastSeen
-            );
-
-            setUnreadCount(unreads.length);
-            if (unreads.length > 0) {
-               setFirstUnreadId(unreads[0].id);
-            }
+            
+            // Identify first unread for the UI divider
+            const lastSeen = localStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString();
+            const firstUnread = data.find(m => m.user_id !== userId && m.created_at > lastSeen);
+            if (firstUnread) setFirstUnreadId(firstUnread.id);
          }
       };
 
       fetchMessages();
+   }, [userId, isChatOpen]);
 
-      const channelId = `chat_${userId.substring(0, 8)}`;
+   // 2. Realtime Channel for Presence (always active for logged in users)
+   // and Messages (only updates state when open)
+   useEffect(() => {
+      if (!userId) return;
 
-      // 2. Setup Realtime Channel for Messages and Presence
+      const channelId = `chat_global`; // Use a consistent channel for everyone
       const channel = supabase.channel(channelId, {
          config: { presence: { key: userId } },
       });
@@ -71,28 +67,27 @@ export const useChat = (userId: string) => {
             if (payload.eventType === "INSERT") {
                const newMessage = payload.new as Message;
 
-               const { data: profile } = await supabase
-                  .from("profiles")
-                  .select("username, avatar_url")
-                  .eq("id", newMessage.user_id)
-                  .single();
+               // Only process full message update if chat is open
+               if (isChatOpen) {
+                  const { data: profile } = await supabase
+                     .from("profiles")
+                     .select("username, avatar_url")
+                     .eq("id", newMessage.user_id)
+                     .single();
 
-               const messageWithProfile = { ...newMessage, profiles: profile };
+                  const messageWithProfile = { ...newMessage, profiles: profile };
 
-               setMessages((prev: any[]) => {
-                  const exists = prev.some((m) => m.id === newMessage.id);
-
-                  if (exists) {
-                     // Update the optimistic message with real DB data/profile
-                     return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
-                  }
-
-                  // Append new message from other users
-                  return [...prev, messageWithProfile];
-               });
+                  setMessages((prev: any[]) => {
+                     const exists = prev.some((m) => m.id === newMessage.id);
+                     if (exists) {
+                        return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
+                     }
+                     return [...prev, messageWithProfile];
+                  });
+               }
             }
-            // Update local state for read receipts
-            if (payload.eventType === "UPDATE") {
+            
+            if (payload.eventType === "UPDATE" && isChatOpen) {
                setMessages((prev) =>
                   prev.map((m) =>
                      m.id === payload.new.id
@@ -103,6 +98,7 @@ export const useChat = (userId: string) => {
             }
          }
       );
+
       channel
          .on("presence", { event: "sync" }, () => {
             const state = channel.presenceState();
@@ -110,10 +106,7 @@ export const useChat = (userId: string) => {
 
             Object.keys(state).forEach((key) => {
                const sessions = state[key] as any[];
-               // Sort by timestamp to get the absolute latest intent
-               const latest = sessions.sort(
-                  (a, b) => (b.ts || 0) - (a.ts || 0)
-               )[0];
+               const latest = sessions.sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
 
                if (latest?.isTyping && latest?.username) {
                   typingNames.add(latest.username);
@@ -130,45 +123,32 @@ export const useChat = (userId: string) => {
          channel.unsubscribe();
          supabase.removeChannel(channel);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [userId]);
+   }, [userId, isChatOpen]);
 
    const setTyping = useCallback((isTyping: boolean, username: string) => {
       if (!channelRef.current) return;
 
-      // 1. If we are stopping (input cleared or message sent)
       if (!isTyping) {
          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
          isCurrentlyTypingLocally.current = false;
-         channelRef.current.track({
-            isTyping: false,
-            username,
-            ts: Date.now(),
-         });
+         channelRef.current.track({ isTyping: false, username, ts: Date.now() });
          return;
       }
 
-      // 2. If we are starting (First keystroke after being idle)
       if (!isCurrentlyTypingLocally.current) {
          isCurrentlyTypingLocally.current = true;
          channelRef.current.track({ isTyping: true, username, ts: Date.now() });
       }
 
-      // 3. Refresh the 5-second timer regardless
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
       typingTimeoutRef.current = setTimeout(() => {
          isCurrentlyTypingLocally.current = false;
-         channelRef.current?.track({
-            isTyping: false,
-            username,
-            ts: Date.now(),
-         });
+         channelRef.current?.track({ isTyping: false, username, ts: Date.now() });
       }, 2000);
    }, []);
 
    const sendMessage = async (content: string, replyToId?: string, mentions?: string[]) => {
-      if (!content.trim()) return;
+      if (!content.trim() || !userId) return;
 
       const tempId = crypto.randomUUID();
       const optimisticMessage: Message = {
@@ -182,10 +162,8 @@ export const useChat = (userId: string) => {
          profiles: messages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '', id: userId }
       };
 
-      // 1. Add optimistically
       setMessages((prev) => [...prev, optimisticMessage]);
 
-      // 2. Insert to DB
       const { error } = await supabase.from("messages").insert([
          {
             id: tempId,
@@ -197,7 +175,6 @@ export const useChat = (userId: string) => {
          },
       ]);
 
-      // 3. Only handle errors. The Realtime listener handles the success state.
       if (error) {
          setMessages((prev) => prev.filter((m) => m.id !== tempId));
          console.error("Failed to send message:", error);
@@ -205,9 +182,6 @@ export const useChat = (userId: string) => {
    };
 
    const markAsRead = async (messageId: string) => {
-      localStorage.setItem(`lastSeen_${userId}`, new Date().toISOString());
-      setUnreadCount(0);
-      setFirstUnreadId(null);
       await supabase
          .from("messages")
          .update({ is_read: true })
@@ -218,13 +192,21 @@ export const useChat = (userId: string) => {
 
    useEffect(() => {
       const fetchUsers = async () => {
-         const { data } = await supabase
-            .from("profiles")
-            .select("username, avatar_url,id");
+         const { data } = await supabase.from("profiles").select("username, avatar_url, id");
          if (data) setUsers(data);
       };
       fetchUsers();
    }, []);
 
-   return { messages, sendMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
+   return { 
+      messages, 
+      sendMessage, 
+      typingUsers, 
+      setTyping, 
+      markAsRead, 
+      firstUnreadId, 
+      users, 
+      isAtBottom, 
+      setIsAtBottom 
+   };
 };
