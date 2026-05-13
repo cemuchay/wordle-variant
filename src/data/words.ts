@@ -6,7 +6,7 @@ import raw6Allowed from "./words_6_allowed.txt?raw";
 import raw7Allowed from "./words_7_allowed.txt?raw";
 import raw7Official from "./words_7_official.txt";
 import raw3Allowed from "./words_3_allowed.txt?raw";
-import raw3Official from "./words_3_official.txt";
+import raw3Official from "./words_3_official.txt?raw";
 
 // Import the flat array from your JSON
 import data6 from "./words_6_official.json";
