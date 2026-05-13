@@ -122,9 +122,8 @@ export default function App() {
   useEffect(() => {
     const syncTime = async () => {
       try {
-        // 1. This returns instantly now (either from cache or optimistic client time)
-
-        const serverDate = await getServerDate();
+        // 1. Force a server sync before proceeding to ensure robust time sync
+        const serverDate = await getServerDate(true);
         setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
         setIsLoading(false);
 
