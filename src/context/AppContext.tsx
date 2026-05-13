@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getServerDate } from '../lib/time';
 
 interface UserPreferences {
     allowRoasts: boolean;
@@ -21,6 +22,9 @@ interface AppContextType {
     setToast: any,
     unreadCount: number;
     setUnreadCount: any;
+    date: string | null;
+    isLoadingDate: boolean;
+    setIsLoadingDate: any;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -84,6 +88,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
+    const [date, setDate] = useState<string | null>(null);
+    const [isLoadingDate, setIsLoadingDate] = useState(true);
+
+    useEffect(() => {
+        const syncTime = async () => {
+            try {
+                const serverDate = await getServerDate();
+                setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
+                setIsLoadingDate(false);
+            } catch (err) {
+                console.error("Initialization error:", err);
+                triggerToast("Error fetching date from server, refresh page")
+            }
+        };
+
+        syncTime();
+    }, []);
+
     return (
         <AppContext.Provider value={{
             profile,
@@ -94,7 +116,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             triggerToast,
             setToast,
             unreadCount,
-            setUnreadCount
+            setUnreadCount,
+            date,
+            isLoadingDate,
+            setIsLoadingDate
 
         }}>
             {children}

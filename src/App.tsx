@@ -13,7 +13,6 @@ import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, getLetterS
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
 import type { AppUser, GuessResult, LetterStatus } from './types/game';
-import { getServerDate } from './lib/time';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { useWordleStats } from './hooks/useStats';
 // import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -33,6 +32,7 @@ const getSavedState = (date: string) => {
 
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
+  const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount, date, isLoadingDate } = useApp();
 
   async function checkVersionAndRefresh() {
     const lastVersion = localStorage.getItem("app_version");
@@ -95,38 +95,12 @@ export default function App() {
   // Execute immediately at the start of your entry file
   checkVersionAndRefresh();
 
-  const [date, setDate] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const ICON_SIZE = 16;
 
   // Initialize the hook
   const { stats, refresh, updateOptimistically } = useWordleStats(user, isStatsOpen, date);
-
-  const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount } = useApp();
-
-
-  useEffect(() => {
-    const syncTime = async () => {
-      try {
-        // 1. This returns instantly now (either from cache or optimistic client time)
-
-        const serverDate = await getServerDate();
-        setDate(prev => prev !== serverDate.formatted ? serverDate.formatted : prev);
-        setIsLoading(false);
-
-      } catch (err) {
-        // This will catch the 'throw error' from your background sync if it fails
-        console.error("Initialization error:", err);
-        // Optional: show a toast or error state here
-        triggerToast("Error fetching date from server, refresh page")
-      }
-    };
-
-    syncTime();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
 
   const [guesses, setGuesses] = useState<GuessResult[][]>([]);
@@ -363,7 +337,7 @@ export default function App() {
   };
 
 
-  if (isLoading) {
+  if (isLoadingDate) {
     return <div className="flex items-center justify-center h-screen">Syncing with server...</div>;
   }
 
@@ -438,15 +412,12 @@ export default function App() {
                 {guesses.length >= 3 && !isGameOver && (
                   <button
                     onClick={handleHint}
-                    className={`transition-all ${usedHint ? 'text-yellow-500/50' : 'text-yellow-500 animate-pulse'}`}
+                    className={`p-1 transition-all ${usedHint ? 'text-yellow-500/50' : 'text-yellow-500 animate-pulse'}`}
                     title={usedHint ? "Show Hint Reminder" : "Get a Hint"}
                   >
                     <Lightbulb size={ICON_SIZE} fill={usedHint ? "currentColor" : "currentColor"} />
                   </button>
                 )}
-                <span className="px-1 rounded bg-gray-800 text-[10px] font-mono text-gray-400 border border-gray-700 me-1">
-                  {config.length}L
-                </span>
 
                 <div className="flex items-center gap-1">
                   {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
