@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .env
 dev-dist/
+GEMINI.md
 
 # Editor directories and files
 .vscode/*

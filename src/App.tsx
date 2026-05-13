@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon } from 'lucide-react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon, } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
@@ -393,7 +393,7 @@ export default function App() {
           {/* <ReloadPrompt /> */}
           {
             user && (<>
-            {/* <PWAInstallBanner /> */}
+              {/* <PWAInstallBanner /> */}
               <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
