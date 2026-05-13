@@ -11,15 +11,15 @@ export interface Message {
    reply_to?: string;
    mentions?: string[];
    is_read: boolean;
-   profiles: { username: string; avatar_url: string };
+   profiles: { username: string; avatar_url: string; id: string };
 }
 
 export const useChat = (userId: string) => {
    const [messages, setMessages] = useState<Message[]>([]);
    const [typingUsers, setTypingUsers] = useState<string[]>([]);
    const channelRef = useRef<any>(null);
-     const {setUnreadCount } = useApp();
-  
+   const { setUnreadCount } = useApp();
+
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
    // Get the timestamp from the browser's local storage
@@ -69,16 +69,27 @@ export const useChat = (userId: string) => {
          { event: "*", schema: "public", table: "messages" },
          async (payload) => {
             if (payload.eventType === "INSERT") {
-               const { data } = await supabase
+               const newMessage = payload.new as Message;
+
+               const { data: profile } = await supabase
                   .from("profiles")
                   .select("username, avatar_url")
-                  .eq("id", payload.new.user_id)
+                  .eq("id", newMessage.user_id)
                   .single();
 
-               setMessages((prev) => [
-                  ...prev,
-                  { ...payload.new, profiles: data } as Message,
-               ]);
+               const messageWithProfile = { ...newMessage, profiles: profile };
+
+               setMessages((prev: any[]) => {
+                  const exists = prev.some((m) => m.id === newMessage.id);
+
+                  if (exists) {
+                     // Update the optimistic message with real DB data/profile
+                     return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
+                  }
+
+                  // Append new message from other users
+                  return [...prev, messageWithProfile];
+               });
             }
             // Update local state for read receipts
             if (payload.eventType === "UPDATE") {
@@ -156,14 +167,28 @@ export const useChat = (userId: string) => {
       }, 2000);
    }, []);
 
-   const sendMessage = async (
-      content: string,
-      replyToId?: string,
-      mentions?: string[]
-   ) => {
+   const sendMessage = async (content: string, replyToId?: string, mentions?: string[]) => {
       if (!content.trim()) return;
-      await supabase.from("messages").insert([
+
+      const tempId = crypto.randomUUID();
+      const optimisticMessage: Message = {
+         id: tempId,
+         content,
+         user_id: userId,
+         created_at: new Date().toISOString(),
+         reply_to: replyToId,
+         mentions: mentions,
+         is_read: false,
+         profiles: messages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '', id: userId }
+      };
+
+      // 1. Add optimistically
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      // 2. Insert to DB
+      const { error } = await supabase.from("messages").insert([
          {
+            id: tempId,
             content,
             user_id: userId,
             reply_to: replyToId,
@@ -171,6 +196,12 @@ export const useChat = (userId: string) => {
             is_read: false,
          },
       ]);
+
+      // 3. Only handle errors. The Realtime listener handles the success state.
+      if (error) {
+         setMessages((prev) => prev.filter((m) => m.id !== tempId));
+         console.error("Failed to send message:", error);
+      }
    };
 
    const markAsRead = async (messageId: string) => {
@@ -183,5 +214,17 @@ export const useChat = (userId: string) => {
          .eq("id", messageId);
    };
 
-   return { messages, sendMessage, typingUsers, setTyping, markAsRead, firstUnreadId, };
+   const [users, setUsers] = useState<{ username: string, avatar_url: string, id: string }[]>([]);
+
+   useEffect(() => {
+      const fetchUsers = async () => {
+         const { data } = await supabase
+            .from("profiles")
+            .select("username, avatar_url,id");
+         if (data) setUsers(data);
+      };
+      fetchUsers();
+   }, []);
+
+   return { messages, sendMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
 };

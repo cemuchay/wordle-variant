@@ -179,8 +179,14 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                 )
               }
               {
-                timeframe ==="weekly" && (
+                timeframe === "weekly" && (
                   <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Weekly leaderboard runs from mon - sun</p>
+                )
+              }
+
+              {
+                timeframe === "monthly" && (
+                  <p className="text-[9px] text-gray-100 uppercase font-bold mb-4">Monthly leaderboard runs from 1st to last day of the month</p>
                 )
               }
 
