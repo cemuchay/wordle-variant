@@ -335,10 +335,11 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         }
     }, [isOpen, initialChallengeId, handleViewChallenge, loadMyChallenges, loadProfiles]);
 
-    const copyLink = (id: string) => {
-        const url = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
-        navigator.clipboard.writeText(url);
-        triggerToast('Challenge link copied!', 2000);
+    const copyLink = (challenge: Challenge) => {
+        const url = `${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
+        const text = `Hey! I challenge you to a ${challenge.word_length}-letter Wordle match (${challenge.mode} mode)! 🏆\n\nJoin here: ${url}`;
+        navigator.clipboard.writeText(text);
+        triggerToast('Challenge link copied to clipboard!', 2000);
     };
 
     if (!isOpen) return null;
@@ -722,14 +723,6 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,
                         hints_used: previewParticipant.hints_used,
-                        hint_record: previewParticipant.hint_record
-                    }}
-                />
-            )}
-        </div>
-    );
-};
-iewParticipant.hints_used,
                         hint_record: previewParticipant.hint_record
                     }}
                 />
