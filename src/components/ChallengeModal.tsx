@@ -95,14 +95,22 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const handleViewChallenge = useCallback(async (id: string) => {
         const challenge = await fetchChallenge(id);
         if (challenge) {
+            // Check if expired
+            if (new Date(challenge.expires_at) < new Date()) {
+                triggerToast("This challenge has expired.", 4000);
+                return;
+            }
+
             cleanupSubscription();
             setSelectedChallenge(challenge);
             const participation = await joinChallenge(challenge.id);
             setMyParticipation(participation);
             setActiveTab('join');
             channelRef.current = subscribeToParticipants(challenge.id);
+        } else {
+            triggerToast("Invalid challenge link or code.", 4000);
         }
-    }, [fetchChallenge, joinChallenge, subscribeToParticipants, cleanupSubscription]);
+    }, [fetchChallenge, joinChallenge, subscribeToParticipants, cleanupSubscription, triggerToast]);
 
     const toggleInvite = (id: string) => {
         setInvitedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -134,7 +142,10 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 hints_used: usedHint,
                 hint_record: hintRecord
             });
-            setIsPlaying(false); // Back to leaderboard
+
+            setTimeout(() => {
+                setIsPlaying(false);
+            }, 2000);
         }
     }, [myParticipation, isGameOver, guesses, submitChallengeResult, triggerToast, usedHint, hintRecord]);
 
@@ -163,6 +174,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const handleStartGame = async () => {
         if (!selectedChallenge || !myParticipation) return;
 
+        // Check if expired
+        if (new Date(selectedChallenge.expires_at) < new Date()) {
+            triggerToast("This challenge has expired.", 4000);
+            return;
+        }
+
         // Decrypt/Deobfuscate word only at start of game
         const plainWord = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
         const activeChallenge = { ...selectedChallenge, target_word: plainWord };
@@ -187,7 +204,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             const startedAt = myParticipation.started_at ? new Date(myParticipation.started_at).getTime() : Date.now();
             const endTime = startedAt + selectedChallenge.max_time * 60 * 1000;
             const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-            setTimeLeft(remaining);
+
+            if (remaining <= 0 && !isGameAlreadyOver) {
+                handleTimeExpired();
+            } else {
+                setTimeLeft(remaining);
+            }
         } else {
             setTimeLeft(null);
         }
@@ -341,6 +363,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-6">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">It is still in development, test it out. Expect bugs 😉</p>
                     <button
                         onClick={() => setIsPlaying(false)}
                         className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
@@ -383,15 +406,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                     </div>
                                 </div>
 
-                                <div className="w-full max-w-lg mx-auto pb-1">
-                                    <Keyboard
-                                        onChar={onChar}
-                                        onDelete={onDelete}
-                                        onEnter={onEnter}
-                                        letterStatuses={letterStatuses}
-                                    />
-
-                                </div>
+                                {!isGameOver && (
+                                    <div className="w-full max-w-lg mx-auto pb-1">
+                                        <Keyboard
+                                            onChar={onChar}
+                                            onDelete={onDelete}
+                                            onEnter={onEnter}
+                                            letterStatuses={letterStatuses}
+                                        />
+                                    </div>
+                                )}
                             </motion.div>
                         ) : (
                             <motion.div
