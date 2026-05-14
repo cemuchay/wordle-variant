@@ -5,6 +5,7 @@ import { getRandomWord } from '../lib/gameLogic';
 import type { AppUser } from '../types/game';
 
 export interface Challenge {
+    profiles: any;
     id: string;
     creator_id: string;
     mode: 'LIVE' | 'ANYTIME';
@@ -176,8 +177,16 @@ export const useChallenge = (user: AppUser | null) => {
     }, []);
 
     const subscribeToParticipants = useCallback((challengeId: string) => {
+        const channelName = `challenge_participants_${challengeId}`;
+
+        // Remove existing channel if it exists to avoid "after subscribe" error
+        const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
+        if (existingChannel) {
+            supabase.removeChannel(existingChannel);
+        }
+
         const channel = supabase
-            .channel(`challenge_participants_${challengeId}`)
+            .channel(channelName)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
@@ -205,9 +214,7 @@ export const useChallenge = (user: AppUser | null) => {
                 if (data) setParticipants(data as ChallengeParticipant[]);
             });
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return channel;
     }, []);
 
     const fetchMyChallenges = useCallback(async () => {

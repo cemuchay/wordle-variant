@@ -8,6 +8,7 @@ import { Keyboard } from './Keyboard';
 import { checkGuess, getLetterStatuses, calculateSkillIndex } from '../lib/gameLogic';
 import { getWordLists } from '../data/words';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../lib/supabaseClient';
 
 interface ChallengeModalProps {
     isOpen: boolean;
@@ -41,6 +42,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [myChallenges, setMyChallenges] = useState<any[]>([]);
     const [joinId, setJoinId] = useState('');
 
+    // Realtime subscription management
+    const channelRef = useRef<any>(null);
+
+    const cleanupSubscription = useCallback(() => {
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+        }
+    }, []);
+
     // Gameplay state
     const [isPlaying, setIsPlaying] = useState(false);
     const [guesses, setGuesses] = useState<any[]>([]);
@@ -69,13 +80,14 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const handleViewChallenge = useCallback(async (id: string) => {
         const challenge = await fetchChallenge(id);
         if (challenge) {
+            cleanupSubscription();
             setSelectedChallenge(challenge);
             const participation = await joinChallenge(challenge.id);
             setMyParticipation(participation);
             setActiveTab('join');
-            subscribeToParticipants(challenge.id);
+            channelRef.current = subscribeToParticipants(challenge.id);
         }
-    }, [fetchChallenge, joinChallenge, subscribeToParticipants]);
+    }, [fetchChallenge, joinChallenge, subscribeToParticipants, cleanupSubscription]);
 
     const toggleInvite = (id: string) => {
         setInvitedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -110,6 +122,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     }, [myParticipation, isGameOver, guesses, submitChallengeResult, triggerToast]);
 
     useEffect(() => {
+        return () => {
+            cleanupSubscription();
+        };
+    }, [cleanupSubscription]);
+
+    useEffect(() => {
         if (timeLeft !== null && timeLeft > 0 && !isGameOver && isPlaying) {
             timerRef.current = window.setInterval(() => {
                 setTimeLeft(prev => {
@@ -137,7 +155,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         setGuesses(initialGuesses);
         setLetterStatuses(getLetterStatuses(initialGuesses));
         setCurrentGuess("");
-        
+
         const isGameAlreadyOver = myParticipation.status === 'completed' || myParticipation.status === 'timed_out';
         setIsGameOver(isGameAlreadyOver);
 
@@ -194,7 +212,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 attempts: newGuesses.length,
                 guesses: newGuesses
             });
-            
+
             setTimeout(() => {
                 setIsPlaying(false);
                 triggerToast(won ? "Challenge Completed! 🎉" : `The word was ${selectedChallenge.target_word}`, 5000);
@@ -221,6 +239,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             initialProcessed.current = true;
             handleViewChallenge(initialChallengeId);
         } else if (isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             loadMyChallenges();
             loadProfiles();
         }
@@ -252,7 +271,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                 {isPlaying ? 'Challenge Gameplay' : 'Challenges'}
                             </h2>
                             <p className="text-gray-400 text-xs">
-                                {isPlaying ? `vs ${selectedChallenge?.creator_profile?.username || 'Opponent'}` : 'Compete with friends'}
+                                {isPlaying ? `vs ${selectedChallenge?.profiles?.username || 'Opponent'}` : 'Compete with friends'}
                             </p>
                         </div>
                     </div>

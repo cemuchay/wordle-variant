@@ -185,6 +185,7 @@ export default function App() {
     loadGameData();
     if (user) initializeUserStats(user?.id as string);
     return () => { isMounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, user]);
 
   const onChar = useCallback((char: string) => {
@@ -254,6 +255,7 @@ export default function App() {
         triggerToast(message || gameMessage, 8500);
       }, 500);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGameOver, currentGuess, config, guesses, letterStatuses, date, usedHint, hintRecord, user]);
 
   useEffect(() => {
