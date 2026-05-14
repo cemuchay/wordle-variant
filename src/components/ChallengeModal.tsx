@@ -335,10 +335,11 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         }
     }, [isOpen, initialChallengeId, handleViewChallenge, loadMyChallenges, loadProfiles]);
 
-    const copyLink = (id: string) => {
-        const url = `${window.location.origin}${window.location.pathname}?challenge=${id}`;
-        navigator.clipboard.writeText(url);
-        triggerToast('Challenge link copied!', 2000);
+    const copyLink = (challenge: Challenge) => {
+        const url = `${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
+        const text = `Hey! I challenge you to a ${challenge.word_length}-letter Wordle match (${challenge.mode} mode)! 🏆\n\nJoin here: ${url}`;
+        navigator.clipboard.writeText(text);
+        triggerToast('Challenge link copied to clipboard!', 2000);
     };
 
     if (!isOpen) return null;
@@ -468,7 +469,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                         {selectedChallenge.mode} Mode
                                                     </span>
                                                     <button
-                                                        onClick={() => copyLink(selectedChallenge.id)}
+                                                        onClick={() => copyLink(selectedChallenge)}
                                                         className="text-gray-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase"
                                                     >
                                                         <Share2 size={14} /> Share Link
