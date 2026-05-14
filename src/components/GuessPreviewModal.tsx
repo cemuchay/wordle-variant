@@ -29,7 +29,15 @@ const GuessPreviewModal: React.FC<{
     const { date } = useApp();
 
     useEffect(() => {
-        if (initialData) return;
+        if (initialData) {
+            setGameData({
+                guesses: initialData.guesses,
+                hints_used: initialData.hints_used || false,
+                skill_score: initialData.skill_score || 0,
+                hint_record: initialData.hint_record || null
+            });
+            return;
+        }
 
         const fetchGuesses = async () => {
             setLoading(true);
@@ -46,7 +54,7 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [date, entry.user_id, initialData]);
+    }, [date, entry.user_id, initialData?.guesses, initialData?.hints_used, initialData?.skill_score, initialData?.hint_record]);
 
     const calculateRowScore = (row: any[]) => {
         return row.reduce((acc, cell) => {

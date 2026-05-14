@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Trophy, Plus, Users, Clock, Share2, Play, Eye, Lightbulb } from 'lucide-react';
@@ -44,16 +45,23 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [joinId, setJoinId] = useState('');
     const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
 
-    // Keep myParticipation in sync with participants list
+    // Keep myParticipation and previewParticipant in sync with participants list
     useEffect(() => {
-        if (user && participants.length > 0) {
-            const current = participants.find(p => p.user_id === user.id);
-            if (current) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect
-                setMyParticipation(current);
+        if (participants.length > 0) {
+            if (user) {
+                const current = participants.find(p => p.user_id === user.id);
+                if (current) {
+                    setMyParticipation(current);
+                }
+            }
+            if (previewParticipant) {
+                const updated = participants.find(p => p.id === previewParticipant.id);
+                if (updated) {
+                    setPreviewParticipant(updated);
+                }
             }
         }
-    }, [participants, user]);
+    }, [participants, user, previewParticipant]);
 
     // Realtime subscription management
     const channelRef = useRef<any>(null);
@@ -329,7 +337,6 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             initialProcessed.current = true;
             handleViewChallenge(initialChallengeId);
         } else if (isOpen) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             loadMyChallenges();
             loadProfiles();
         }
@@ -492,11 +499,11 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                         <div
                                                             key={p.id}
                                                             onClick={() => {
-                                                                if (myHasFinished && (p.status === 'completed' || p.status === 'timed_out')) {
+                                                                if (myHasFinished) {
                                                                     setPreviewParticipant(p);
                                                                 }
                                                             }}
-                                                            className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished && (p.status === 'completed' || p.status === 'timed_out') ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
+                                                            className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
                                                         >
                                                             <div className="flex items-center gap-3">
                                                                 <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
@@ -512,7 +519,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                                         <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
                                                                     </div>
                                                                 )}
-                                                                {myHasFinished && (p.status === 'completed' || p.status === 'timed_out') && (
+                                                                {myHasFinished && (
                                                                     <div className="text-gray-500 group-hover:text-white transition-colors">
                                                                         <Eye size={16} />
                                                                     </div>
