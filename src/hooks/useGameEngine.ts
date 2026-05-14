@@ -62,10 +62,13 @@ export const useGameEngine = (date: string) => {
         localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
 
         if (user) {
+            dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
             try {
                 await syncWithRetry(user.id, date, payload);
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
+                setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
             } catch (error) {
+                dispatch({ type: 'SET_SYNC_STATUS', status: 'error' });
                 triggerToast("Connection lost. Retrying in background...", 5000);
             }
         }
@@ -102,7 +105,16 @@ export const useGameEngine = (date: string) => {
                 config
             };
             localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
-            if (user) await syncGameState(user.id, date, payload);
+            if (user) {
+                dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
+                try {
+                    await syncGameState(user.id, date, payload);
+                    dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
+                    setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
+                } catch (error) {
+                    dispatch({ type: 'SET_SYNC_STATUS', status: 'error' });
+                }
+            }
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
         }
     }, [state.guesses, state.isGameOver, state.usedHint, state.hintRecord, config, date, user, triggerToast]);

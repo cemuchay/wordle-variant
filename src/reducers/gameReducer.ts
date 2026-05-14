@@ -10,6 +10,7 @@ export interface GameState {
     gameMessage: string;
     isGameOver: boolean;
     isGameOverModalOpen: boolean;
+    syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
 }
 
 export type GameAction =
@@ -19,7 +20,8 @@ export type GameAction =
     | { type: 'SET_HINT'; hint: { letter: string; index: number; row?: number } }
     | { type: 'LOAD_STATE'; payload: Partial<GameState> }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
-    | { type: 'RESET_CURRENT_GUESS' };
+    | { type: 'RESET_CURRENT_GUESS' }
+    | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error' };
 
 export const initialState: GameState = {
     guesses: [],
@@ -31,10 +33,16 @@ export const initialState: GameState = {
     gameMessage: '',
     isGameOver: false,
     isGameOverModalOpen: false,
+    syncStatus: 'idle',
 };
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
     switch (action.type) {
+        case 'SET_SYNC_STATUS':
+            return {
+                ...state,
+                syncStatus: action.status,
+            };
         case 'ADD_LETTER':
             if (state.isGameOver || state.currentGuess.length >= action.maxLength) return state;
             return {

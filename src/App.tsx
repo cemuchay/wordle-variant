@@ -128,7 +128,7 @@ export default function App() {
                         onChallengeCreated={handleChallengeCreated}
                     />
 
-                    <CloudSyncMenu status="idle" /> {/* Simplified for now, can be wired to sync state if needed */}
+                    <CloudSyncMenu status={state.syncStatus} />
                 </main>
             )}
 
