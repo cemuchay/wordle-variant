@@ -5,7 +5,7 @@ import { useChallenge, type Challenge, type ChallengeParticipant } from '../hook
 import { motion, AnimatePresence } from 'framer-motion';
 import { Grid } from './Grid';
 import { Keyboard } from './Keyboard';
-import { checkGuess, getLetterStatuses, calculateSkillIndex, getHint } from '../lib/gameLogic';
+import { checkGuess, getLetterStatuses, calculateSkillIndex, getHint, deobfuscateWord } from '../lib/gameLogic';
 import { getWordLists } from '../data/words';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
@@ -162,6 +162,11 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     const handleStartGame = async () => {
         if (!selectedChallenge || !myParticipation) return;
+
+        // Decrypt/Deobfuscate word only at start of game
+        const plainWord = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
+        const activeChallenge = { ...selectedChallenge, target_word: plainWord };
+        setSelectedChallenge(activeChallenge);
 
         if (myParticipation.status === 'pending') {
             await startChallenge(myParticipation.id);
