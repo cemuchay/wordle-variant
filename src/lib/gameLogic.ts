@@ -89,6 +89,11 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
    return official[Math.floor(random() * official.length)].toUpperCase();
 }
 
+export function getRandomWord(length: number): string {
+   const { official } = getWordLists(length);
+   return official[Math.floor(Math.random() * official.length)].toUpperCase();
+}
+
 export function getDailyConfig(dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
 
@@ -360,7 +365,7 @@ export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
-   guesses: Record<string, string>[][]
+   guesses: GuessResult[][]
 ) => {
    // Base score: 1000 for 1st try, 800 for 2nd, etc.
    let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;

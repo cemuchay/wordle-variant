@@ -23,53 +23,84 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
     const replyIconScale = useTransform(x, [0, 60], [0.5, 1.1]);
     const replyIconTranslateX = useTransform(x, [0, 60], [-20, 12]);
 
-    const renderContent = (content: string) => {
-        if (!content) return null;
-        const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
-        let parts: (string | JSX.Element)[] = [content];
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
-        sortedUsers.forEach((user) => {
-            const userIndex = users.findIndex(u => u.username === user.username);
-            const color = MENTION_COLORS[userIndex % MENTION_COLORS.length];
-            const mention = `@${user.username}`;
+const renderContent = (content: string) => {
+    if (!content) return null;
+    const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
+    let parts: (string | JSX.Element)[] = [content];
 
-            const newParts: (string | JSX.Element)[] = [];
-            parts.forEach((part) => {
-                if (typeof part !== 'string') {
-                    newParts.push(part);
-                    return;
+    // Handle Mentions
+    sortedUsers.forEach((user) => {
+        const userIndex = users.findIndex(u => u.username === user.username);
+        const color = MENTION_COLORS[userIndex % MENTION_COLORS.length];
+        const mention = `@${user.username}`;
+
+        const newParts: (string | JSX.Element)[] = [];
+        parts.forEach((part) => {
+            if (typeof part !== 'string') {
+                newParts.push(part);
+                return;
+            }
+
+            const subParts = part.split(new RegExp(`(${mention}(?:\\s|$))`, 'g'));
+            subParts.forEach((subPart) => {
+                if (subPart.startsWith(mention)) {
+                    const endsWithSpace = subPart.endsWith(' ');
+                    const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
+
+                    newParts.push(
+                        <span
+                            key={`${user.username}-${Math.random()}`}
+                            className={`inline-block px-1.5 py-0.5 rounded-md text-[12px] font-black transition-all`}
+                            style={{
+                                backgroundColor: `${color}33`,
+                                color: isMe ? '#000' : color,
+                                border: isMe ? 'none' : `1px solid ${color}20`
+                            }}
+                        >
+                            {cleanMention}
+                        </span>
+                    );
+                    if (endsWithSpace) newParts.push(' ');
+                } else if (subPart !== '') {
+                    newParts.push(subPart);
                 }
-
-                const subParts = part.split(new RegExp(`(${mention}(?:\\s|$))`, 'g'));
-                subParts.forEach((subPart) => {
-                    if (subPart.startsWith(mention)) {
-                        const endsWithSpace = subPart.endsWith(' ');
-                        const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
-
-                        newParts.push(
-                            <span
-                                key={`${user.username}-${Math.random()}`}
-                                className={`inline-block px-1.5 py-0.5 rounded-md text-[12px] font-black transition-all`}
-                                style={{
-                                    backgroundColor: `${color}33`,
-                                    color: isMe ? '#000' : color,
-                                    border: isMe ? 'none' : `1px solid ${color}20`
-                                }}
-                            >
-                                {cleanMention}
-                            </span>
-                        );
-                        if (endsWithSpace) newParts.push(' ');
-                    } else if (subPart !== '') {
-                        newParts.push(subPart);
-                    }
-                });
             });
-            parts = newParts;
         });
+        parts = newParts;
+    });
 
-        return parts;
-    };
+    // Handle URLs
+    const finalParts: (string | JSX.Element)[] = [];
+    parts.forEach((part) => {
+        if (typeof part !== 'string') {
+            finalParts.push(part);
+            return;
+        }
+
+        const subParts = part.split(URL_REGEX);
+        subParts.forEach((subPart) => {
+            if (URL_REGEX.test(subPart)) {
+                finalParts.push(
+                    <a
+                        key={subPart + Math.random()}
+                        href={subPart}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`underline break-all transition-colors ${isMe ? 'text-black/80 hover:text-black' : 'text-correct hover:text-correct/80'}`}
+                    >
+                        {subPart}
+                    </a>
+                );
+            } else if (subPart !== '') {
+                finalParts.push(subPart);
+            }
+        });
+    });
+
+    return finalParts;
+};
 
     return (
         <div className="relative group overflow-visible">
