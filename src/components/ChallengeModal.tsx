@@ -468,7 +468,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                         {selectedChallenge.mode} Mode
                                                     </span>
                                                     <button
-                                                        onClick={() => copyLink(selectedChallenge.id)}
+                                                        onClick={() => copyLink(selectedChallenge)}
                                                         className="text-gray-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase"
                                                     >
                                                         <Share2 size={14} /> Share Link
@@ -722,6 +722,14 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,
                         hints_used: previewParticipant.hints_used,
+                        hint_record: previewParticipant.hint_record
+                    }}
+                />
+            )}
+        </div>
+    );
+};
+iewParticipant.hints_used,
                         hint_record: previewParticipant.hint_record
                     }}
                 />
