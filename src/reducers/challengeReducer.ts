@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { GuessResult } from '../types/game';
 
 export interface ChallengeGameState {
     guesses: any[];

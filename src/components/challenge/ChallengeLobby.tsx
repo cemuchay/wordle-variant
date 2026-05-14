@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { memo } from 'react';
-import { Share2, Eye, Play } from 'lucide-react';
+import { Eye, Play, Share2 } from 'lucide-react';
+import { memo } from 'react';
 import type { Challenge, ChallengeParticipant } from '../../hooks/useChallenge';
 
 interface ChallengeLobbyProps {
@@ -16,7 +16,7 @@ interface ChallengeLobbyProps {
 }
 
 export const ChallengeLobby = memo(({
-    selectedChallenge, myParticipation, participants, myHasFinished, user,
+    selectedChallenge, myParticipation, participants, myHasFinished,
     copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge
 }: ChallengeLobbyProps) => {
     return (

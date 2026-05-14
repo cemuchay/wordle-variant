@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { memo } from 'react';
-import { Plus, Clock, Play } from 'lucide-react';
+import { Clock, Play, Plus } from 'lucide-react';
+import { memo } from 'react';
 
 interface ChallengeCreateProps {
     mode: 'LIVE' | 'ANYTIME';

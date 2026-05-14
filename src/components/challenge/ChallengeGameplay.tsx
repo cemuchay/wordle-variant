@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useReducer, useEffect, useCallback, useRef, memo } from 'react';
 import { Lightbulb } from 'lucide-react';
+import { memo, useCallback, useEffect, useReducer, useRef } from 'react';
+import { getWordLists } from '../../data/words';
+import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../../lib/gameLogic';
+import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
-import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
-import { checkGuess, getLetterStatuses, calculateSkillIndex, getHint } from '../../lib/gameLogic';
-import { getWordLists } from '../../data/words';
 
 interface ChallengeGameplayProps {
     challenge: any;
@@ -36,11 +36,12 @@ export const ChallengeGameplay = memo(({
             const startedAt = participation.started_at ? new Date(participation.started_at).getTime() : Date.now();
             const endTime = startedAt + challenge.max_time * 60 * 1000;
             const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-            
+
             dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: remaining, isGameOver: participation.status === 'completed' || participation.status === 'timed_out' || remaining <= 0 } });
         } else {
             dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: null, isGameOver: participation.status === 'completed' || participation.status === 'timed_out' } });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Timer Tick
@@ -53,6 +54,7 @@ export const ChallengeGameplay = memo(({
             handleTimeExpired();
         }
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [timeLeft, isGameOver]);
 
     const handleTimeExpired = useCallback(async () => {
