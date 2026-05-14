@@ -122,6 +122,7 @@ export default function App() {
                             usedHint: state.usedHint,
                             gameMessage: state.gameMessage,
                             stats,
+                            isGameOver: state.isGameOver,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
                         onChallengeCreated={handleChallengeCreated}
