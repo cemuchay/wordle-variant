@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Trophy, Plus, Users, Clock, Share2, Play } from 'lucide-react';
+import { X, Trophy, Plus, Users, Clock, Share2, Play, Eye } from 'lucide-react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Grid } from './Grid';
@@ -9,6 +9,7 @@ import { checkGuess, getLetterStatuses, calculateSkillIndex } from '../lib/gameL
 import { getWordLists } from '../data/words';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
+import GuessPreviewModal from './GuessPreviewModal';
 
 interface ChallengeModalProps {
     isOpen: boolean;
@@ -41,6 +42,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
     const [myChallenges, setMyChallenges] = useState<any[]>([]);
     const [joinId, setJoinId] = useState('');
+    const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
 
     // Realtime subscription management
     const channelRef = useRef<any>(null);
@@ -253,6 +255,8 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     if (!isOpen) return null;
 
+    const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
+
     return (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
@@ -385,7 +389,15 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                 </div>
                                                 <div className="space-y-2">
                                                     {participants.map((p) => (
-                                                        <div key={p.id} className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
+                                                        <div
+                                                            key={p.id}
+                                                            onClick={() => {
+                                                                if (myHasFinished && (p.status === 'completed' || p.status === 'timed_out')) {
+                                                                    setPreviewParticipant(p);
+                                                                }
+                                                            }}
+                                                            className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished && (p.status === 'completed' || p.status === 'timed_out') ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
+                                                        >
                                                             <div className="flex items-center gap-3">
                                                                 <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
                                                                 <div>
@@ -393,12 +405,19 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                                     <p className="text-[10px] text-gray-500 uppercase font-black">{p.status}</p>
                                                                 </div>
                                                             </div>
-                                                            {p.status === 'completed' && (
-                                                                <div className="text-right">
-                                                                    <p className="text-correct font-black">{p.score}</p>
-                                                                    <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
-                                                                </div>
-                                                            )}
+                                                            <div className="flex items-center gap-4">
+                                                                {p.status === 'completed' && (
+                                                                    <div className="text-right">
+                                                                        <p className="text-correct font-black">{p.score}</p>
+                                                                        <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
+                                                                    </div>
+                                                                )}
+                                                                {myHasFinished && (p.status === 'completed' || p.status === 'timed_out') && (
+                                                                    <div className="text-gray-500 group-hover:text-white transition-colors">
+                                                                        <Eye size={16} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -594,6 +613,20 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                     </AnimatePresence>
                 </div>
             </motion.div>
+
+            {/* Guess Preview Modal for Challenges */}
+            {previewParticipant && (
+                <GuessPreviewModal
+                    entry={previewParticipant}
+                    onClose={() => setPreviewParticipant(null)}
+                    initialData={{
+                        guesses: previewParticipant.guesses,
+                        skill_score: previewParticipant.score,
+                        hints_used: false, // Challenges don't support hints yet
+                        hint_record: null
+                    }}
+                />
+            )}
         </div>
     );
 };
