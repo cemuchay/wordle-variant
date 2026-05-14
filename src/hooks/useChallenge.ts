@@ -117,13 +117,25 @@ export const useChallenge = (user: AppUser | null) => {
     const joinChallenge = useCallback(async (challengeId: string) => {
         if (!user) return null;
         try {
+            // First check if already participating
+            const { data: existing, error: fetchError } = await supabase
+                .from('challenge_participants')
+                .select('*')
+                .eq('challenge_id', challengeId)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (fetchError) throw fetchError;
+            if (existing) return existing as ChallengeParticipant;
+
+            // If not, then join as pending
             const { data, error } = await supabase
                 .from('challenge_participants')
-                .upsert([{
+                .insert([{
                     challenge_id: challengeId,
                     user_id: user.id,
                     status: 'pending'
-                }], { onConflict: 'challenge_id, user_id' })
+                }])
                 .select()
                 .single();
 

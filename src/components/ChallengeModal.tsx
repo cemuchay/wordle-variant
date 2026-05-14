@@ -44,6 +44,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [joinId, setJoinId] = useState('');
     const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
 
+    // Keep myParticipation in sync with participants list
+    useEffect(() => {
+        if (user && participants.length > 0) {
+            const current = participants.find(p => p.user_id === user.id);
+            if (current) {
+                setMyParticipation(current);
+            }
+        }
+    }, [participants, user]);
+
     // Realtime subscription management
     const channelRef = useRef<any>(null);
 
