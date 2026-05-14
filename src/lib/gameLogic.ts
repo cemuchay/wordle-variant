@@ -94,6 +94,33 @@ export function getRandomWord(length: number): string {
    return official[Math.floor(Math.random() * official.length)].toUpperCase();
 }
 
+/**
+ * Simple XOR obfuscation to hide words from network inspection.
+ * This is "good enough" for a friendly game to prevent accidental exposure.
+ */
+export const obfuscateWord = (word: string, salt: string) => {
+   const result = word.split('').map((char, i) => {
+      const charCode = char.charCodeAt(0);
+      const saltCode = salt.charCodeAt(i % salt.length);
+      return String.fromCharCode(charCode ^ saltCode);
+   }).join('');
+   return btoa(result);
+};
+
+export const deobfuscateWord = (obfuscated: string, salt: string) => {
+   try {
+      const decoded = atob(obfuscated);
+      return decoded.split('').map((char, i) => {
+         const charCode = char.charCodeAt(0);
+         const saltCode = salt.charCodeAt(i % salt.length);
+         return String.fromCharCode(charCode ^ saltCode);
+      }).join('');
+   } catch (e) {
+      console.error("Deobfuscation failed:", e);
+      return "";
+   }
+};
+
 export function getDailyConfig(dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
 

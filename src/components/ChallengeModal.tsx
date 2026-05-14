@@ -340,15 +340,19 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                         onClick={() => setIsPlaying(false)}
                         className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
                     >
-                        Back to Lobby
+                        Go Back
                     </button>
-                    <button
-                        onClick={handleHint}
-                        className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
-                        title={usedHint ? "Hint Used" : "Get Hint"}
-                    >
-                        <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                    </button>
+                    {
+                        (guesses.length >= 3 && !myHasFinished) && (
+                            <button
+                                onClick={handleHint}
+                                className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
+                                title={usedHint ? "Hint Used" : "Get Hint"}
+                            >
+                                <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                            </button>
+                        )
+                    }
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
