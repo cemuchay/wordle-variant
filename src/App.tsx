@@ -87,10 +87,10 @@ export default function App() {
   const { stats, refresh, updateOptimistically } = useWordleStats(user, isStatsOpen, date);
   const { sendMessage } = useChat(user?.id || "");
 
-  const handleChallengeCreated = (challenge: Challenge, invitedUsernames: string[]) => {
+  const handleChallengeCreated = (challenge: Challenge, invitedUsernames: string[], invitedIds: string[]) => {
     const mentions = invitedUsernames.map(name => `@${name}`).join(' ');
     const message = `${mentions} I challenge you to a ${challenge.mode} ${challenge.word_length}-letter Wordle! 🏆 \n\n Join here: ${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
-    sendMessage(message, undefined, invitedUsernames);
+    sendMessage(message, undefined, invitedIds);
     triggerToast(`Challenge created and shared in chat!`, 3000);
   };
 

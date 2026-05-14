@@ -14,7 +14,7 @@ interface ChallengeModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: any;
-    onChallengeCreated?: (challenge: Challenge, invitedUsernames: string[]) => void;
+    onChallengeCreated?: (challenge: Challenge, invitedUsernames: string[], invitedIds: string[]) => void;
     initialChallengeId?: string | null;
 }
 
@@ -101,7 +101,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 .map(p => p.username);
 
             if (onChallengeCreated) {
-                onChallengeCreated(challenge, invitedUsernames);
+                onChallengeCreated(challenge, invitedUsernames, invitedIds);
             }
             handleViewChallenge(challenge.id);
         }
