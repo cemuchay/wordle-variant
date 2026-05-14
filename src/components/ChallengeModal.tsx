@@ -218,7 +218,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     };
 
     const handleHint = async () => {
-        if (isGameOver || !selectedChallenge) return;
+        if (isGameOver || !selectedChallenge || !myParticipation) return;
 
         if (usedHint && hintRecord) {
             triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
@@ -236,6 +236,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             setUsedHint(true);
             setHintRecord(hintWithRow);
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`, 5000);
+
+            // Sync hint usage immediately
+            await submitChallengeResult(myParticipation.id, {
+                status: 'playing',
+                score: 0,
+                attempts: guesses.length,
+                guesses: guesses,
+                hints_used: true,
+                hint_record: hintWithRow
+            });
         }
     };
 
@@ -287,6 +297,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 setIsPlaying(false);
                 triggerToast(won ? "Challenge Completed! 🎉" : `The word was ${selectedChallenge.target_word}`, 5000);
             }, 2000);
+        } else {
+            // Sync intermediate progress
+            await submitChallengeResult(myParticipation.id, {
+                status: 'playing',
+                score: 0,
+                attempts: newGuesses.length,
+                guesses: newGuesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
+            });
         }
     }, [isGameOver, selectedChallenge, myParticipation, currentGuess, guesses, triggerToast, submitChallengeResult, usedHint, hintRecord]);
 

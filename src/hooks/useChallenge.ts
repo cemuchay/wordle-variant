@@ -181,12 +181,14 @@ export const useChallenge = (user: AppUser | null) => {
         hint_record?: any | null
     }) => {
         try {
+            const updateData: any = { ...result };
+            if (result.status !== 'playing') {
+                updateData.completed_at = new Date().toISOString();
+            }
+
             const { error } = await supabase
                 .from('challenge_participants')
-                .update({
-                    ...result,
-                    completed_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', participationId);
 
             if (error) throw error;
