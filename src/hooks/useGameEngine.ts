@@ -1,0 +1,132 @@
+import { useReducer, useCallback, useMemo } from 'react';
+import { gameReducer, initialState } from '../reducers/gameReducer';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/gameLogic';
+import { getWordLists } from '../data/words';
+import { getLossMessage, getWinMessage } from '../lib/messages';
+import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { useWordleStats } from './useStats';
+
+export const useGameEngine = (date: string) => {
+    const [state, dispatch] = useReducer(gameReducer, initialState);
+    const { user } = useAuth();
+    const { triggerToast, preferences } = useApp();
+    const config = useMemo(() => getDailyConfig(date), [date]);
+    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
+
+    const onChar = useCallback((char: string) => {
+        dispatch({ type: 'ADD_LETTER', char, maxLength: config.length });
+    }, [config.length]);
+
+    const onDelete = useCallback(() => {
+        dispatch({ type: 'DELETE_LETTER' });
+    }, []);
+
+    const onEnter = useCallback(async () => {
+        if (state.isGameOver || state.currentGuess.length !== config.length) return;
+
+        const upperGuess = state.currentGuess.toUpperCase();
+        const { valid } = getWordLists(config.length);
+
+        if (!valid.has(upperGuess)) {
+            triggerToast("Not in word list.");
+            return;
+        }
+
+        const result = checkGuess(upperGuess, config.word);
+        const won = upperGuess === config.word;
+        const lost = (state.guesses.length + 1) === config.maxAttempts;
+        const message = preferences.allowRoasts ? (won ? getWinMessage(state.guesses.length + 1) : lost ? getLossMessage() : "") : "";
+
+        dispatch({
+            type: 'SUBMIT_GUESS',
+            result,
+            isWon: won,
+            isLost: lost,
+            message
+        });
+
+        const newGuesses = [...state.guesses, result];
+        const newStatus = won ? 'won' : (lost ? 'lost' : 'playing');
+        const payload = {
+            date,
+            guesses: newGuesses,
+            letterStatuses: getLetterStatuses(newGuesses),
+            status: newStatus,
+            usedHint: state.usedHint,
+            hintRecord: state.hintRecord,
+            config,
+            gameMessage: message
+        };
+
+        localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+
+        if (user) {
+            try {
+                await syncWithRetry(user.id, date, payload);
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (error) {
+                triggerToast("Connection lost. Retrying in background...", 5000);
+            }
+        }
+
+        if (won || lost) {
+            const updatedStats = updateStats(won, newGuesses.length);
+            updateOptimistically(updatedStats);
+            await refresh();
+            if (lost) triggerToast(`The word is: ${config.word}`, 5000);
+            setTimeout(() => {
+                triggerToast(message || state.gameMessage, 8500);
+            }, 500);
+        }
+    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
+
+    const handleHint = useCallback(async () => {
+        if (state.guesses.length < 3 || state.isGameOver) return;
+        if (state.usedHint && state.hintRecord) {
+            triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, 3000);
+            return;
+        }
+        const hint = getHint(config.word, state.guesses);
+        if (hint) {
+            const hintWithRow = { ...hint, row: state.guesses.length };
+            dispatch({ type: 'SET_HINT', hint: hintWithRow });
+
+            const payload = {
+                date,
+                guesses: state.guesses,
+                letterStatuses: getLetterStatuses(state.guesses),
+                status: 'playing',
+                usedHint: true,
+                hintRecord: hintWithRow,
+                config
+            };
+            localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+            if (user) await syncGameState(user.id, date, payload);
+            triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
+        }
+    }, [state.guesses, state.isGameOver, state.usedHint, state.hintRecord, config, date, user, triggerToast]);
+
+    const setGameOverModalOpen = useCallback((isOpen: boolean) => {
+        dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen });
+    }, []);
+
+    const loadState = useCallback((payload: Partial<typeof initialState>) => {
+        dispatch({ type: 'LOAD_STATE', payload });
+    }, []);
+
+    const letterStatuses = useMemo(() => getLetterStatuses(state.guesses), [state.guesses]);
+
+    return {
+        state: { ...state, letterStatuses },
+        actions: {
+            onChar,
+            onDelete,
+            onEnter,
+            handleHint,
+            setGameOverModalOpen,
+            loadState
+        },
+        config
+    };
+};
