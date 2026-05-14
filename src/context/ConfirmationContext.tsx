@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
 interface ConfirmationOptions {
@@ -54,6 +54,7 @@ export const ConfirmationProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useConfirmation = () => {
     const context = useContext(ConfirmationContext);
     if (!context) {
