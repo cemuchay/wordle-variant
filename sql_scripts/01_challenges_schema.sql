@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.challenges (
     mode VARCHAR(20) NOT NULL CHECK (mode IN ('LIVE', 'ANYTIME')),
     word_length INTEGER NOT NULL CHECK (word_length >= 3 AND word_length <= 7),
     target_word VARCHAR(10) NOT NULL,
+    salt VARCHAR(50) DEFAULT '',
     max_time INTEGER, -- In minutes, for LIVE mode
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -19,6 +20,8 @@ CREATE TABLE IF NOT EXISTS public.challenge_participants (
     score INTEGER DEFAULT 0,
     attempts INTEGER DEFAULT 0,
     guesses JSONB DEFAULT '[]'::jsonb,
+    hints_used BOOLEAN DEFAULT FALSE,
+    hint_record JSONB DEFAULT NULL,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     UNIQUE(challenge_id, user_id)

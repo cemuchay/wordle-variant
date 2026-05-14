@@ -2,20 +2,35 @@
 import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { LeaderboardEntry } from "../types/game";
 import { useApp } from "../context/AppContext";
 
-const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void; }> = ({ entry, onClose, }) => {
+const GuessPreviewModal: React.FC<{
+    entry: any; // More flexible for challenge participants
+    onClose: () => void;
+    initialData?: {
+        guesses: any[] | null;
+        hints_used?: boolean;
+        skill_score?: number;
+        hint_record?: any | null;
+    }
+}> = ({ entry, onClose, initialData }) => {
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
         hints_used: boolean;
         skill_score: number;
         hint_record: { letter: string; index: number; row?: number } | null;
-    } | null>(null);
-    const [loading, setLoading] = useState(true);
+    } | null>(initialData ? {
+        guesses: initialData.guesses,
+        hints_used: initialData.hints_used || false,
+        skill_score: initialData.skill_score || 0,
+        hint_record: initialData.hint_record || null
+    } : null);
+    const [loading, setLoading] = useState(!initialData);
     const { date } = useApp();
 
     useEffect(() => {
+        if (initialData) return;
+
         const fetchGuesses = async () => {
             setLoading(true);
             const { data, error } = await supabase
@@ -31,7 +46,7 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
         };
 
         fetchGuesses();
-    }, [date, entry.user_id]);
+    }, [date, entry.user_id, initialData]);
 
     const calculateRowScore = (row: any[]) => {
         return row.reduce((acc, cell) => {
@@ -44,17 +59,17 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
 
     const maxAttempts = 6;
     const attempts = entry.attempts === 'X' ? maxAttempts : Number(entry.attempts);
-    const baseScore = entry.status === 'won' ? Math.floor(((maxAttempts - attempts + 1) / maxAttempts) * 1000) : 0;
+    const baseScore = entry.status === 'won' || entry.status === 'completed' ? Math.floor(((maxAttempts - attempts + 1) / maxAttempts) * 1000) : 0;
     const totalRowBonuses = gameData?.guesses?.reduce((acc, row) => acc + calculateRowScore(row), 0) || 0;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-120 p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[130] p-4" onClick={onClose}>
             <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />
                 </button>
 
-                <p className="text-sm uppercase tracking-tighter mb-4 pb-4 text-center text-gray-100 font-bold">{entry.username}'s Guesses</p>
+                <p className="text-sm uppercase tracking-tighter mb-4 pb-4 text-center text-gray-100 font-bold">{entry.username || entry.profiles?.username}'s Guesses</p>
 
                 {loading ? (
                     <div className="flex justify-center py-12"><Loader2 className="animate-spin text-correct" size={24} /></div>
@@ -134,4 +149,3 @@ const GuessPreviewModal: React.FC<{ entry: LeaderboardEntry; onClose: () => void
 };
 
 export default GuessPreviewModal
-

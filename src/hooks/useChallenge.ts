@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { getRandomWord } from '../lib/gameLogic';
+import { getRandomWord, obfuscateWord } from '../lib/gameLogic';
 import type { AppUser } from '../types/game';
 
 export interface Challenge {
@@ -11,6 +11,7 @@ export interface Challenge {
     mode: 'LIVE' | 'ANYTIME';
     word_length: number;
     target_word: string;
+    salt: string;
     max_time: number | null;
     expires_at: string;
     created_at: string;
@@ -25,6 +26,8 @@ export interface ChallengeParticipant {
     score: number;
     attempts: number;
     guesses: any[];
+    hints_used: boolean;
+    hint_record: any | null;
     started_at: string | null;
     completed_at: string | null;
     profiles?: { username: string, avatar_url: string };
@@ -53,7 +56,10 @@ export const useChallenge = (user: AppUser | null) => {
         try {
             // If length is 0 (Random), pick a random length between 3 and 7
             const actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
-            const targetWord = getRandomWord(actualLength);
+            const plainWord = getRandomWord(actualLength);
+            const salt = Math.random().toString(36).substring(2, 15);
+            const obfuscatedWord = obfuscateWord(plainWord, salt);
+
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -63,7 +69,8 @@ export const useChallenge = (user: AppUser | null) => {
                     creator_id: user.id,
                     mode,
                     word_length: actualLength,
-                    target_word: targetWord,
+                    target_word: obfuscatedWord,
+                    salt: salt,
                     max_time: maxTimeMinutes,
                     expires_at: expiresAt.toISOString()
                 }])
@@ -117,13 +124,25 @@ export const useChallenge = (user: AppUser | null) => {
     const joinChallenge = useCallback(async (challengeId: string) => {
         if (!user) return null;
         try {
+            // First check if already participating
+            const { data: existing, error: fetchError } = await supabase
+                .from('challenge_participants')
+                .select('*')
+                .eq('challenge_id', challengeId)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (fetchError) throw fetchError;
+            if (existing) return existing as ChallengeParticipant;
+
+            // If not, then join as pending
             const { data, error } = await supabase
                 .from('challenge_participants')
-                .upsert([{
+                .insert([{
                     challenge_id: challengeId,
                     user_id: user.id,
                     status: 'pending'
-                }], { onConflict: 'challenge_id, user_id' })
+                }])
                 .select()
                 .single();
 
@@ -157,7 +176,9 @@ export const useChallenge = (user: AppUser | null) => {
         status: 'completed' | 'timed_out' | 'playing',
         score: number,
         attempts: number,
-        guesses: any[]
+        guesses: any[],
+        hints_used?: boolean,
+        hint_record?: any | null
     }) => {
         try {
             const { error } = await supabase

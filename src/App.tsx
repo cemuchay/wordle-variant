@@ -325,7 +325,7 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="bg-correct/10 px-3 py-1 rounded-full border border-correct/20">
-                  <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
+                  <h1 className="text-lg font-black uppercase tracking-[0.2em] text-white">
                     Wordle Variant<span className="text-correct">.</span>
                   </h1>
                 </div>
