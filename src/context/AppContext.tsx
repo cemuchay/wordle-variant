@@ -3,12 +3,21 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { getServerDate } from '../lib/time';
+import { type GameStats } from '../types/game';
 
 interface UserPreferences {
     allowRoasts: boolean;
     theme: 'dark' | 'light';
     compactMode: boolean;
 }
+
+const INITIAL_STATS: GameStats = {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    currentStreak: 0,
+    maxStreak: 0,
+    guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, X: 0 },
+};
 
 interface AppContextType {
     profile: any | null;
@@ -25,6 +34,8 @@ interface AppContextType {
     date: string | null;
     isLoadingDate: boolean;
     setIsLoadingDate: any;
+    stats: GameStats;
+    setStats: (stats: GameStats) => void;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -40,6 +51,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
 
     const [toast, setToast] = useState<{
         show: boolean, message: string, duration: number | undefined
@@ -119,7 +131,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setUnreadCount,
             date,
             isLoadingDate,
-            setIsLoadingDate
+            setIsLoadingDate,
+            stats,
+            setStats
 
         }}>
             {children}

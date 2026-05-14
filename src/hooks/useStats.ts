@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { AppUser, GameStats } from "../types/game";
+import { useApp } from "../context/AppContext";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
@@ -15,7 +16,7 @@ export const useWordleStats = (
    isOpen: boolean,
    date: string | null
 ) => {
-   const [cloudStats, setCloudStats] = useState<GameStats | null>(null);
+   const { stats, setStats } = useApp();
    const [loading, setLoading] = useState(false);
    const isMounted = useRef(true);
 
@@ -92,11 +93,11 @@ export const useWordleStats = (
          constructed.currentStreak = current;
          constructed.maxStreak = max;
 
-         setCloudStats(constructed);
+         setStats(constructed);
       }
 
       if (isMounted.current) setLoading(false);
-   }, [userId]);
+   }, [userId, setStats]);
 
    // Trigger fetch when modal opens
    useEffect(() => {
@@ -106,16 +107,19 @@ export const useWordleStats = (
       }
    }, [isOpen, userId, fetchCloudStats]);
 
+   // Load initial stats from local storage if no user
+   useEffect(() => {
+      if (!userId) {
+         const raw = localStorage.getItem("wordle-statistics");
+         if (raw) {
+            setStats(JSON.parse(raw));
+         }
+      }
+   }, [userId, setStats]);
+
    const updateOptimistically = useCallback((newStats: GameStats) => {
-      setCloudStats(newStats);
-   }, []);
-
-   const stats = useMemo(() => {
-      if (userId && cloudStats) return cloudStats;
-
-      const raw = localStorage.getItem("wordle-statistics");
-      return raw ? JSON.parse(raw) : INITIAL_STATS;
-   }, [userId, cloudStats]);
+      setStats(newStats);
+   }, [setStats]);
 
    return { stats, loading, refresh: fetchCloudStats, updateOptimistically };
 };
