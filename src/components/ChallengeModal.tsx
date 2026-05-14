@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Trophy, Plus, Users, Clock, Share2, Play, Eye } from 'lucide-react';
+import { X, Trophy, Plus, Users, Clock, Share2, Play, Eye, Lightbulb } from 'lucide-react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Grid } from './Grid';
 import { Keyboard } from './Keyboard';
-import { checkGuess, getLetterStatuses, calculateSkillIndex } from '../lib/gameLogic';
+import { checkGuess, getLetterStatuses, calculateSkillIndex, getHint } from '../lib/gameLogic';
 import { getWordLists } from '../data/words';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
@@ -49,6 +49,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         if (user && participants.length > 0) {
             const current = participants.find(p => p.user_id === user.id);
             if (current) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setMyParticipation(current);
             }
         }
@@ -71,6 +72,8 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [letterStatuses, setLetterStatuses] = useState<any>({});
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [isGameOver, setIsGameOver] = useState(false);
+    const [usedHint, setUsedHint] = useState(false);
+    const [hintRecord, setHintRecord] = useState<{ letter: string, index: number, row?: number } | null>(null);
     const timerRef = useRef<number | null>(null);
 
     // Invitation State
@@ -127,11 +130,13 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 status: 'timed_out',
                 score: 0,
                 attempts: guesses.length,
-                guesses: guesses
+                guesses: guesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
             });
             setIsPlaying(false); // Back to leaderboard
         }
-    }, [myParticipation, isGameOver, guesses, submitChallengeResult, triggerToast]);
+    }, [myParticipation, isGameOver, guesses, submitChallengeResult, triggerToast, usedHint, hintRecord]);
 
     useEffect(() => {
         return () => {
@@ -167,6 +172,8 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         setGuesses(initialGuesses);
         setLetterStatuses(getLetterStatuses(initialGuesses));
         setCurrentGuess("");
+        setUsedHint(myParticipation.hints_used || false);
+        setHintRecord(myParticipation.hint_record || null);
 
         const isGameAlreadyOver = myParticipation.status === 'completed' || myParticipation.status === 'timed_out';
         setIsGameOver(isGameAlreadyOver);
@@ -181,6 +188,28 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         }
 
         setIsPlaying(true);
+    };
+
+    const handleHint = async () => {
+        if (isGameOver || !selectedChallenge) return;
+
+        if (usedHint && hintRecord) {
+            triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
+            return;
+        }
+
+        if (guesses.length < 3) {
+            triggerToast("Hint unlocks after 3 attempts.", 3000);
+            return;
+        }
+
+        const hint = getHint(selectedChallenge.target_word, guesses);
+        if (hint) {
+            const hintWithRow = { ...hint, row: guesses.length };
+            setUsedHint(true);
+            setHintRecord(hintWithRow);
+            triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`, 5000);
+        }
     };
 
     const onChar = useCallback((char: string) => {
@@ -217,12 +246,14 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
         if (won || lost) {
             setIsGameOver(true);
-            const skillScore = calculateSkillIndex(newGuesses.length, 6, false, newGuesses);
+            const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
             await submitChallengeResult(myParticipation.id, {
                 status: 'completed',
                 score: skillScore,
                 attempts: newGuesses.length,
-                guesses: newGuesses
+                guesses: newGuesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
             });
 
             setTimeout(() => {
@@ -230,7 +261,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 triggerToast(won ? "Challenge Completed! 🎉" : `The word was ${selectedChallenge.target_word}`, 5000);
             }, 2000);
         }
-    }, [isGameOver, selectedChallenge, myParticipation, currentGuess, guesses, triggerToast, submitChallengeResult]);
+    }, [isGameOver, selectedChallenge, myParticipation, currentGuess, guesses, triggerToast, submitChallengeResult, usedHint, hintRecord]);
 
     // Physical Keyboard for Challenge
     useEffect(() => {
@@ -302,6 +333,22 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                             <X size={20} />
                         </button>
                     </div>
+
+                </div>
+                <div className="mt-4 flex items-center justify-center gap-6">
+                    <button
+                        onClick={() => setIsPlaying(false)}
+                        className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+                    >
+                        Back to Lobby
+                    </button>
+                    <button
+                        onClick={handleHint}
+                        className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
+                        title={usedHint ? "Hint Used" : "Get Hint"}
+                    >
+                        <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
@@ -321,26 +368,20 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                             maxAttempts={6}
                                             guesses={guesses}
                                             currentGuess={currentGuess}
+                                            hintRecord={hintRecord}
                                             isChallengeMode={true}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="w-full max-w-lg mx-auto pb-4">
+                                <div className="w-full max-w-lg mx-auto pb-1">
                                     <Keyboard
                                         onChar={onChar}
                                         onDelete={onDelete}
                                         onEnter={onEnter}
                                         letterStatuses={letterStatuses}
                                     />
-                                    <div className="mt-4 flex justify-center">
-                                        <button
-                                            onClick={() => setIsPlaying(false)}
-                                            className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
-                                        >
-                                            Back to Lobby
-                                        </button>
-                                    </div>
+
                                 </div>
                             </motion.div>
                         ) : (
@@ -632,8 +673,8 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                     initialData={{
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,
-                        hints_used: false, // Challenges don't support hints yet
-                        hint_record: null
+                        hints_used: previewParticipant.hints_used,
+                        hint_record: previewParticipant.hint_record
                     }}
                 />
             )}

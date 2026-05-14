@@ -25,6 +25,8 @@ export interface ChallengeParticipant {
     score: number;
     attempts: number;
     guesses: any[];
+    hints_used: boolean;
+    hint_record: any | null;
     started_at: string | null;
     completed_at: string | null;
     profiles?: { username: string, avatar_url: string };
@@ -169,7 +171,9 @@ export const useChallenge = (user: AppUser | null) => {
         status: 'completed' | 'timed_out' | 'playing',
         score: number,
         attempts: number,
-        guesses: any[]
+        guesses: any[],
+        hints_used?: boolean,
+        hint_record?: any | null
     }) => {
         try {
             const { error } = await supabase
