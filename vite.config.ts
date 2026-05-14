@@ -5,7 +5,6 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
-
    plugins: [
       react(),
       tailwindcss(),
@@ -14,10 +13,9 @@ export default defineConfig({
          strategies: "injectManifest",
          srcDir: "src",
          filename: "null.ts",
-         //   filename: "service-worker.ts",
-         registerType: 'prompt', // Ask user first
+         registerType: 'prompt',
          workbox: {
-            cleanupOutdatedCaches: true, // This clears old hashes immediately
+            cleanupOutdatedCaches: true,
             skipWaiting: true,
             clientsClaim: true,
             globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
@@ -50,8 +48,37 @@ export default defineConfig({
             ],
          },
          devOptions: {
-            enabled: true, // Allows testing PWA features in dev mode
+            enabled: true,
          },
       }),
    ],
+   build: {
+      rollupOptions: {
+         output: {
+            manualChunks(id) {
+               if (id.includes('node_modules')) {
+                  // Extract top-level package name from node_modules path
+                  const match = id.match(/node_modules\/([^/]+)/);
+                  if (match) {
+                     const packageName = match[1];
+                     // Group common packages
+                     if (['react', 'react-dom'].includes(packageName)) {
+                        return 'vendor-react';
+                     }
+                     if (packageName === '@supabase/supabase-js') {
+                        return 'vendor-supabase';
+                     }
+                     if (['lucide-react', 'framer-motion'].includes(packageName)) {
+                        return 'vendor-ui';
+                     }
+                     // For other packages, create a vendor chunk based on the package name
+                     return `vendor-${packageName}`;
+                  }
+               }
+               return null;
+            },
+         },
+      },
+      chunkSizeWarningLimit: 1000,
+   },
 });

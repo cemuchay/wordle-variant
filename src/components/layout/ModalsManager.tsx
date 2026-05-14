@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ChallengeModal } from '../ChallengeModal';
-import { GameOverModal } from '../GameOverModal';
-import { InfoModal } from '../InfoModal';
-import { SettingsModal } from '../SettingsModal';
-import { StatsModal } from '../StatsModal';
+import { lazy, Suspense } from 'react';
 import type { AppUser, GuessResult } from '../../types/game';
+
+const ChallengeModal = lazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
+const GameOverModal = lazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
+const InfoModal = lazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
+const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
+const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
 
 interface ModalsManagerProps {
     modals: {
@@ -41,34 +43,40 @@ export const ModalsManager = ({
     onChallengeCreated
 }: ModalsManagerProps) => {
     return (
-        <>
-            {gameContext.user && (
+        <Suspense fallback={null}>
+            {gameContext.user && modals.isSettingsOpen && (
                 <SettingsModal
                     isOpen={modals.isSettingsOpen}
                     onClose={() => actions.setSettingsOpen(false)}
                 />
             )}
 
-            <InfoModal
-                isOpen={modals.isInfoOpen}
-                onClose={() => actions.setInfoOpen(false)}
-            />
+            {modals.isInfoOpen && (
+                <InfoModal
+                    isOpen={modals.isInfoOpen}
+                    onClose={() => actions.setInfoOpen(false)}
+                />
+            )}
 
-            <StatsModal
-                isOpen={modals.isStatsOpen}
-                stats={gameContext.stats}
-                onClose={() => actions.setStatsOpen(false)}
-                user={gameContext.user}
-                isGameOver={gameContext.isGameOverOpen}
-            />
+            {modals.isStatsOpen && (
+                <StatsModal
+                    isOpen={modals.isStatsOpen}
+                    stats={gameContext.stats}
+                    onClose={() => actions.setStatsOpen(false)}
+                    user={gameContext.user}
+                    isGameOver={gameContext.isGameOverOpen}
+                />
+            )}
 
-            <ChallengeModal
-                isOpen={modals.isChallengeOpen}
-                onClose={() => actions.setChallengeOpen(false)}
-                user={gameContext.user}
-                onChallengeCreated={onChallengeCreated}
-                initialChallengeId={new URLSearchParams(window.location.search).get('challenge')}
-            />
+            {modals.isChallengeOpen && (
+                <ChallengeModal
+                    isOpen={modals.isChallengeOpen}
+                    onClose={() => actions.setChallengeOpen(false)}
+                    user={gameContext.user}
+                    onChallengeCreated={onChallengeCreated}
+                    initialChallengeId={new URLSearchParams(window.location.search).get('challenge')}
+                />
+            )}
 
             {modals.isGameOverOpen && (
                 <GameOverModal
@@ -82,6 +90,6 @@ export const ModalsManager = ({
                     stats={gameContext.stats}
                 />
             )}
-        </>
+        </Suspense>
     );
 };

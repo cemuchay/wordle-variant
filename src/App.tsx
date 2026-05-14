@@ -1,12 +1,13 @@
 import { MessageSquare, X } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { CloudSyncMenu } from './components/SyncCloudModal';
-import ChatRoom from './components/chatRoom';
+
+const ChatRoom = lazy(() => import('./components/chatRoom'));
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useChat } from './hooks/useChat';
@@ -156,7 +157,11 @@ export default function App() {
                 </div>
             )}
 
-            {isChatOpen && <ChatRoom user={user as AppUser} />}
+            {isChatOpen && (
+                <Suspense fallback={null}>
+                    <ChatRoom user={user as AppUser} />
+                </Suspense>
+            )}
 
             <a href="/privacy" className="fixed bottom-2 left-2 text-[10px] text-gray-600 hover:underline">
                 Privacy Policy
