@@ -24,6 +24,7 @@ interface ModalsManagerProps {
         setGameOverOpen: (open: boolean) => void;
     };
     gameContext: {
+        isGameOver: boolean;
         isGameOverOpen: boolean;
         user: AppUser | null;
         date: string;
@@ -64,7 +65,7 @@ export const ModalsManager = ({
                     stats={gameContext.stats}
                     onClose={() => actions.setStatsOpen(false)}
                     user={gameContext.user}
-                    isGameOver={gameContext.isGameOverOpen}
+                    isGameOver={gameContext.isGameOver}
                 />
             )}
 

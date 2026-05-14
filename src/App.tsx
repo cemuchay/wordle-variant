@@ -122,12 +122,13 @@ export default function App() {
                             usedHint: state.usedHint,
                             gameMessage: state.gameMessage,
                             stats,
+                            isGameOver: state.isGameOver,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
                         onChallengeCreated={handleChallengeCreated}
                     />
 
-                    <CloudSyncMenu status="idle" /> {/* Simplified for now, can be wired to sync state if needed */}
+                    <CloudSyncMenu status={state.syncStatus} />
                 </main>
             )}
 

@@ -29,7 +29,16 @@ const GuessPreviewModal: React.FC<{
     const { date } = useApp();
 
     useEffect(() => {
-        if (initialData) return;
+        if (initialData) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setGameData({
+                guesses: initialData.guesses,
+                hints_used: initialData.hints_used || false,
+                skill_score: initialData.skill_score || 0,
+                hint_record: initialData.hint_record || null
+            });
+            return;
+        }
 
         const fetchGuesses = async () => {
             setLoading(true);
@@ -46,7 +55,8 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [date, entry.user_id, initialData]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [date, entry.user_id, initialData?.guesses, initialData?.hints_used, initialData?.skill_score, initialData?.hint_record]);
 
     const calculateRowScore = (row: any[]) => {
         return row.reduce((acc, cell) => {
@@ -63,7 +73,7 @@ const GuessPreviewModal: React.FC<{
     const totalRowBonuses = gameData?.guesses?.reduce((acc, row) => acc + calculateRowScore(row), 0) || 0;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[130] p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-130 p-4" onClick={onClose}>
             <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />

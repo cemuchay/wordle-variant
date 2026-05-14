@@ -1,0 +1,219 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Lightbulb } from 'lucide-react';
+import { memo, useCallback, useEffect, useReducer, useRef } from 'react';
+import { getWordLists } from '../../data/words';
+import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../../lib/gameLogic';
+import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
+import { Grid } from '../Grid';
+import { Keyboard } from '../Keyboard';
+
+interface ChallengeGameplayProps {
+    challenge: any;
+    participation: any;
+    triggerToast: (msg: string, duration?: number) => void;
+    submitChallengeResult: (participationId: string, result: any) => Promise<boolean>;
+    onFinish: () => void;
+}
+
+export const ChallengeGameplay = memo(({
+    challenge, participation, triggerToast, submitChallengeResult, onFinish
+}: ChallengeGameplayProps) => {
+    const [state, dispatch] = useReducer(challengeGameReducer, {
+        ...initialChallengeState,
+        guesses: participation.guesses || [],
+        letterStatuses: getLetterStatuses(participation.guesses || []),
+        usedHint: participation.hints_used || false,
+        hintRecord: participation.hint_record || null,
+        status: participation.status
+    });
+
+    const { guesses, currentGuess, letterStatuses, isGameOver, usedHint, hintRecord, timeLeft } = state;
+    const timerRef = useRef<number | null>(null);
+
+    // Initialize timer
+    useEffect(() => {
+        if (challenge.mode === 'LIVE' && challenge.max_time) {
+            const startedAt = participation.started_at ? new Date(participation.started_at).getTime() : Date.now();
+            const endTime = startedAt + challenge.max_time * 60 * 1000;
+            const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+
+            dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: remaining, isGameOver: participation.status === 'completed' || participation.status === 'timed_out' || remaining <= 0 } });
+        } else {
+            dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: null, isGameOver: participation.status === 'completed' || participation.status === 'timed_out' } });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Timer Tick
+    useEffect(() => {
+        if (timeLeft !== null && timeLeft > 0 && !isGameOver) {
+            timerRef.current = window.setInterval(() => {
+                dispatch({ type: 'TICK_TIMER' });
+            }, 1000);
+        } else if (timeLeft === 0 && !isGameOver) {
+            handleTimeExpired();
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [timeLeft, isGameOver]);
+
+    const handleTimeExpired = useCallback(async () => {
+        dispatch({ type: 'TIME_UP' });
+        triggerToast("Time's up!", 3000);
+        await submitChallengeResult(participation.id, {
+            status: 'timed_out',
+            score: 0,
+            attempts: guesses.length,
+            guesses: guesses,
+            hints_used: usedHint,
+            hint_record: hintRecord
+        });
+        setTimeout(onFinish, 2000);
+    }, [participation.id, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish]);
+
+    const handleHint = async () => {
+        if (isGameOver) return;
+
+        if (usedHint && hintRecord) {
+            triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
+            return;
+        }
+
+        if (guesses.length < 3) {
+            triggerToast("Hint unlocks after 3 attempts.", 3000);
+            return;
+        }
+
+        const hint = getHint(challenge.target_word, guesses);
+        if (hint) {
+            const hintWithRow = { ...hint, row: guesses.length };
+            dispatch({ type: 'SET_HINT', hint: hintWithRow });
+            triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`, 5000);
+
+            await submitChallengeResult(participation.id, {
+                status: 'playing',
+                score: 0,
+                attempts: guesses.length,
+                guesses: guesses,
+                hints_used: true,
+                hint_record: hintWithRow
+            });
+        }
+    };
+
+    const onChar = useCallback((char: string) => {
+        dispatch({ type: 'TYPE_CHAR', char, wordLength: challenge.word_length });
+    }, [challenge.word_length]);
+
+    const onDelete = useCallback(() => {
+        dispatch({ type: 'DELETE_CHAR' });
+    }, []);
+
+    const onEnter = useCallback(async () => {
+        if (isGameOver || currentGuess.length !== challenge.word_length) return;
+
+        const upperGuess = currentGuess.toUpperCase();
+        const { valid } = getWordLists(challenge.word_length);
+
+        if (!valid.has(upperGuess)) {
+            triggerToast("Not in word list.");
+            return;
+        }
+
+        const result = checkGuess(upperGuess, challenge.target_word);
+        const newGuesses = [...guesses, result];
+        const newStatuses = getLetterStatuses(newGuesses);
+        const won = upperGuess === challenge.target_word;
+        const lost = newGuesses.length === 6;
+
+        dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
+
+        if (won || lost) {
+            const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
+            await submitChallengeResult(participation.id, {
+                status: 'completed',
+                score: skillScore,
+                attempts: newGuesses.length,
+                guesses: newGuesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
+            });
+            setTimeout(() => {
+                triggerToast(won ? "Challenge Completed! 🎉" : `The word was ${challenge.target_word}`, 5000);
+                onFinish();
+            }, 2000);
+        } else {
+            await submitChallengeResult(participation.id, {
+                status: 'playing',
+                score: 0,
+                attempts: newGuesses.length,
+                guesses: newGuesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
+            });
+        }
+    }, [isGameOver, currentGuess, challenge, guesses, usedHint, hintRecord, participation.id, submitChallengeResult, triggerToast, onFinish]);
+
+    // Physical Keyboard
+    useEffect(() => {
+        if (isGameOver) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey || e.metaKey) return;
+            const key = e.key.toUpperCase();
+            if (key === 'ENTER') onEnter();
+            else if (key === 'BACKSPACE') onDelete();
+            else if (/^[A-Z]$/.test(key)) onChar(key);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isGameOver, onEnter, onDelete, onChar]);
+
+    return (
+        <div className="flex-1 flex flex-col p-4 gap-6">
+            {/* Gameplay Header (Timer & Hint) */}
+            <div className="flex items-center justify-between px-4">
+                <div className="flex items-center gap-4">
+                    {timeLeft !== null && (
+                        <div className="flex items-center gap-2 bg-red-500/10 px-3 py-1.5 rounded-xl border border-red-500/20">
+                            <span className="text-xs font-black text-red-500 tabular-nums">
+                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                {guesses.length >= 3 && !isGameOver && (
+                    <button
+                        onClick={handleHint}
+                        className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
+                    >
+                        <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                    </button>
+                )}
+            </div>
+
+            <div className="flex-1 flex items-center justify-center min-h-0">
+                <div className="scale-[0.8] sm:scale-100 origin-center">
+                    <Grid
+                        wordLength={challenge.word_length}
+                        maxAttempts={6}
+                        guesses={guesses}
+                        currentGuess={currentGuess}
+                        hintRecord={hintRecord}
+                        isChallengeMode={true}
+                    />
+                </div>
+            </div>
+
+            {!isGameOver && (
+                <div className="w-full max-w-lg mx-auto pb-1">
+                    <Keyboard
+                        onChar={onChar}
+                        onDelete={onDelete}
+                        onEnter={onEnter}
+                        letterStatuses={letterStatuses}
+                    />
+                </div>
+            )}
+        </div>
+    );
+});

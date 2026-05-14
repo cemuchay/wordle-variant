@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, Trophy, User, Loader2 } from 'lucide-react';
+import { X, Trophy, User, Loader2, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
@@ -90,7 +90,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     return () => { isMounted = false; };
   }, [isOpen, activeTab, timeframe]);
 
-  const canViewGuess = isGameOver && timeframe === "today" && (user ? true : false)
+  const canViewGuess = isGameOver && timeframe === "today" && !!user;
   if (!isOpen) return null;
 
   return (
@@ -153,6 +153,21 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                     </div>
                   ))}
                 </div>
+
+                {isGameOver && user && (
+                  <button
+                    onClick={() => setSelectedEntry({
+                      username: user.user_metadata?.full_name || 'You',
+                      avatar_url: user.user_metadata?.avatar_url || '',
+                      user_id: user.id,
+                      total_score: 0,
+                      days_active: 0
+                    })}
+                    className="mt-8 w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-300 transition-all border border-white/5"
+                  >
+                    <Eye size={14} /> View Today's Game
+                  </button>
+                )}
               </div>)
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -196,33 +211,32 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                   <span className="text-[10px] text-gray-600 uppercase font-bold">Ranking Players...</span>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-2">
-                    {leaderboard.length > 0 ? leaderboard.map((entry, i) => (
-                      <LeaderboardRow
-                        key={entry.username}
-                        entry={entry}
-                        index={i}
-                        isCurrentUser={entry.username === user?.user_metadata?.full_name}
-                        canViewGuesses={canViewGuess}
-                        onShowGuesses={(e) => setSelectedEntry(e)}
-                      />
-                    )) : (
-                      <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
-                    )}
-                  </div>
-                  {/* The Modal */}
-                  {(selectedEntry && timeframe === "today") && (
-                    <GuessPreviewModal
-                      entry={selectedEntry}
-                      onClose={() => setSelectedEntry(null)}
+                <div className="space-y-2">
+                  {leaderboard.length > 0 ? leaderboard.map((entry, i) => (
+                    <LeaderboardRow
+                      key={`${entry.username}-${i}`}
+                      entry={entry}
+                      index={i}
+                      isCurrentUser={entry.user_id === user?.id}
+                      canViewGuesses={canViewGuess}
+                      onShowGuesses={(e) => setSelectedEntry(e)}
                     />
+                  )) : (
+                    <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
         </div>
+
+        {/* The Modal */}
+        {(selectedEntry && (timeframe === "today" || activeTab === 'stats')) && (
+          <GuessPreviewModal
+            entry={selectedEntry}
+            onClose={() => setSelectedEntry(null)}
+          />
+        )}
 
         <button
           onClick={onClose}
@@ -285,9 +299,16 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
           alt={entry.username}
         />
 
-        <span className={`text-xs font-bold truncate max-w-30 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}>
-          {entry.username}
-        </span>
+        <div className="flex flex-col">
+          <span className={`text-xs font-bold truncate max-w-24 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}>
+            {entry.username}
+          </span>
+          {canViewGuesses && (
+            <div className="flex items-center gap-1 text-gray-500 text-[8px] font-black uppercase">
+              <Eye size={10} /> Preview
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="text-right">
