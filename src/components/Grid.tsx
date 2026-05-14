@@ -7,9 +7,10 @@ interface GridProps {
   guesses: GuessResult[][];
   currentGuess: string;
   hintRecord?: { letter: string, index: number } | null;
+  isChallengeMode?: boolean;
 }
 
-export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess, hintRecord }) => {
+export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode }) => {
   const empties = Math.max(0, maxAttempts - guesses.length - 1);
 
   // Responsive Tile Size logic:
@@ -26,7 +27,7 @@ export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, cu
 
   return (
     <div 
-      className="grid gap-1.5 sm:gap-2 mx-auto h-full items-center content-center" 
+      className={`grid gap-1.5 sm:gap-2 mx-auto h-full items-center content-center transition-all duration-500 p-4 rounded-3xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_40px_rgba(0,255,0,0.1)] border border-correct/20' : ''}`} 
       style={{ 
         gridTemplateColumns: `repeat(${wordLength}, minmax(0, 1fr))`,
         // We remove the hardcoded width and use a max-content constraint

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon, Share } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { BarChart2, HelpCircle, Lightbulb, MessageSquare, RotateCcw, X, SettingsIcon, Share, Trophy, Clock } from 'lucide-react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { GameOverModal } from './components/GameOverModal';
 import { Grid } from './components/Grid';
 import { InfoModal } from './components/InfoModal';
@@ -9,7 +9,7 @@ import { StatsModal } from './components/StatsModal';
 import { Toast } from './components/Toast';
 import { getWordLists, } from './data/words';
 import { useAuth } from './hooks/useAuth';
-import { checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
+import { calculateSkillIndex, checkGuess, fetchAndSyncCloudStats, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncStatsFromLocalStorage, syncWithRetry, updateStats } from './lib/gameLogic';
 import { getLossMessage, getWinMessage } from './lib/messages';
 import { supabase } from './lib/supabaseClient';
 import type { AppUser, GuessResult, LetterStatus } from './types/game';
@@ -22,6 +22,10 @@ import ChatRoom from './components/chatRoom';
 // import ReloadPrompt from './components/ReloadPrompt';
 import { SettingsModal } from './components/SettingsModal';
 import { useApp } from './context/AppContext';
+import { ChallengeModal } from './components/ChallengeModal';
+import { useChallenge, type Challenge, type ChallengeParticipant } from './hooks/useChallenge';
+import { useChat } from './hooks/useChat';
+import { motion } from 'framer-motion';
 
 const APP_VERSION = "1.0.4";
 
@@ -33,6 +37,7 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
   const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount, date, isLoadingDate } = useApp();
+  const [isGameOver, setIsGameOver] = useState(false);
 
   async function checkVersionAndRefresh() {
     const lastVersion = localStorage.getItem("app_version");
@@ -93,7 +98,9 @@ export default function App() {
   }
 
   // Execute immediately at the start of your entry file
-  checkVersionAndRefresh();
+  useEffect(() => {
+    checkVersionAndRefresh();
+  }, []);
 
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -101,12 +108,94 @@ export default function App() {
 
   // Initialize the hook
   const { stats, refresh, updateOptimistically } = useWordleStats(user, isStatsOpen, date);
+  const { sendMessage } = useChat(user?.id || "");
 
+  const handleChallengeCreated = (challenge: Challenge, invitedUsernames: string[]) => {
+    const mentions = invitedUsernames.map(name => `@${name}`).join(' ');
+    const message = `${mentions} I challenge you to a ${challenge.mode} ${challenge.word_length}-letter Wordle! 🏆 \n\n Join here: ${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
 
+    sendMessage(message, undefined, invitedUsernames);
+    triggerToast(`Challenge created and shared in chat!`, 3000);
+  };
+
+  // --- Challenge System ---
+  const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('challenge');
+  });
+  const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
+  const [activeParticipation, setActiveParticipation] = useState<ChallengeParticipant | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const { submitChallengeResult, startChallenge } = useChallenge(user);
+  const timerRef = useRef<number | null>(null);
   const [guesses, setGuesses] = useState<GuessResult[][]>([]);
   const [letterStatuses, setLetterStatuses] = useState<Record<string, LetterStatus>>({});
   const [currentGuess, setCurrentGuess] = useState("");
-  const [isGameOver, setIsGameOver] = useState(false);
+
+  const handleTimeExpired = useCallback(async () => {
+    if (activeParticipation && !isGameOver) {
+      setIsGameOver(true);
+      triggerToast("Time's up!", 3000);
+      await submitChallengeResult(activeParticipation.id, {
+        status: 'timed_out',
+        score: 0,
+        attempts: guesses.length,
+        guesses: guesses
+      });
+      setIsChallengeModalOpen(true); // Show leaderboard
+    }
+  }, [activeParticipation, isGameOver, guesses, submitChallengeResult, triggerToast]);
+
+  const handleStartChallenge = useCallback(async (challenge: Challenge, participation: ChallengeParticipant) => {
+    setActiveChallenge(challenge);
+    setActiveParticipation(participation);
+    setIsChallengeModalOpen(false);
+
+    // If it was already completed, we just show the results (handled by isGameOver check later)
+    if (participation.status === 'pending') {
+      await startChallenge(participation.id);
+    }
+
+    // Set up timer for LIVE mode
+    if (challenge.mode === 'LIVE' && challenge.max_time) {
+      const startedAt = participation.started_at ? new Date(participation.started_at).getTime() : Date.now();
+      const endTime = startedAt + challenge.max_time * 60 * 1000;
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    }
+
+    // Load participation guesses if any
+    if (participation.guesses && participation.guesses.length > 0) {
+      setGuesses(participation.guesses);
+      setLetterStatuses(getLetterStatuses(participation.guesses));
+      if (participation.status === 'completed' || participation.status === 'timed_out') {
+        setIsGameOver(true);
+      }
+    } else {
+      setGuesses([]);
+      setLetterStatuses({});
+      setIsGameOver(false);
+    }
+    setCurrentGuess("");
+  }, [startChallenge]);
+
+  useEffect(() => {
+    if (timeLeft !== null && timeLeft > 0 && !isGameOver) {
+      timerRef.current = window.setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev === null || prev <= 1) {
+            clearInterval(timerRef.current!);
+            handleTimeExpired();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, isGameOver]);
+
   const [isGameOverModal, setIsGameOverModal] = useState(false)
   const [usedHint, setUsedHint] = useState(false);
   const [hintRecord, setHintRecord] = useState<{ letter: string, index: number, row?: number } | null>(null);
@@ -119,7 +208,11 @@ export default function App() {
 
   // useRegisterSW({ onRegistered: (r: any) => console.log('SW Registered', r) });
 
-  const config = getDailyConfig(date as string);
+  const config = activeChallenge ? {
+    word: activeChallenge.target_word,
+    length: activeChallenge.word_length as 3 | 4 | 5 | 6 | 7,
+    maxAttempts: 6
+  } : getDailyConfig(date as string);
 
   const initializeUserStats = async (userId: string) => {
     // 1. First, scrape any local-only legacy data into the aggregate object
@@ -259,6 +352,22 @@ export default function App() {
     let message = ""
 
     message = (preferences.allowRoasts ? won ? getWinMessage(newGuesses.length) : lost ? getLossMessage() : "" : "")
+
+    if (activeChallenge && activeParticipation) {
+      if (won || lost) {
+        setIsGameOver(true);
+        const skillScore = calculateSkillIndex(newGuesses.length, 6, false, newGuesses);
+        await submitChallengeResult(activeParticipation.id, {
+          status: 'completed',
+          score: skillScore,
+          attempts: newGuesses.length,
+          guesses: newGuesses
+        });
+        setIsChallengeModalOpen(true);
+      }
+      return;
+    }
+
     const payload = { date, guesses: newGuesses, letterStatuses: newStatuses, status: newStatus, usedHint, hintRecord, config, gameMessage: message };
 
     /*
@@ -366,111 +475,156 @@ export default function App() {
 
           <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
           <StatsModal isOpen={isStatsOpen} stats={stats} onClose={() => setIsStatsOpen(false)} user={user} isGameOver={isGameOver} />
+
+          <ChallengeModal
+            isOpen={isChallengeModalOpen}
+            onClose={() => setIsChallengeModalOpen(false)}
+            user={user}
+            onStartChallenge={handleStartChallenge}
+            onChallengeCreated={handleChallengeCreated}
+            initialChallengeId={new URLSearchParams(window.location.search).get('challenge')}
+          />
           <CloudSyncMenu status={syncStatus} />
-          <div className="flex flex-col gap-2 w-full max-w-lg mx-auto pb-1 border-b border-gray-800">
 
-
-            {/* Row 2: User Stats, Hints, and Info */}
-            <div className="flex items-center justify-between bg-custom py-2 px-2 rounded-xl border border-gray-800/50">
+          <div className="w-full max-w-lg mx-auto flex flex-col gap-3 mb-4">
+            {/* Top Row: Brand & User Profile */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h2 className="text-[10px] text-gray-100 tracking-tighter uppercase">Wordle Variant<span className="text-correct">.</span></h2>
-
+                <div className="bg-correct/10 px-3 py-1 rounded-full border border-correct/20">
+                  <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
+                    Wordle Variant<span className="text-correct">.</span>
+                  </h1>
+                </div>
               </div>
-              <div className="flex items-center gap-2 me-2">
+
+              <div className="flex items-center gap-3">
                 {user ? (
-                  <div className="group relative flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/5 pl-1 pr-3 py-1 rounded-full border border-white/10 group relative">
                     <img
                       src={user.user_metadata.avatar_url}
                       alt="Profile"
-                      className="w-7 h-7 rounded-full border border-gray-700 cursor-pointer"
+                      className="w-6 h-6 rounded-full border border-white/10"
                     />
-                    <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:block">
+                    <span className="text-[10px] font-black uppercase text-gray-400">
                       {user.user_metadata.full_name?.split(' ')[0]}
                     </span>
                     <button
                       onClick={signOut}
-                      className="absolute top-8 left-0 bg-red-500 text-[9px] font-black px-2 py-1 rounded-md hidden group-hover:block whitespace-nowrap z-50 shadow-xl"
+                      className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-[9px] font-black px-3 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap"
                     >
                       LOGOUT
                     </button>
-
-
                   </div>
                 ) : (
                   <button
                     onClick={signInWithGoogle}
-                    className="text-[9px] font-black bg-white text-black px-3 py-1 rounded-full uppercase tracking-widest hover:bg-gray-200 transition-colors"
+                    className="text-[10px] font-black bg-white text-black px-4 py-1.5 rounded-full uppercase tracking-widest hover:bg-gray-200 transition-colors"
                   >
                     Login
                   </button>
                 )}
+
+                <button onClick={() => setIsSettingsOpen(true)} className="text-gray-500 hover:text-white transition-colors">
+                  <SettingsIcon size={18} />
+                </button>
               </div>
+            </div>
 
-              {/* <button onClick={enableNotifications}>Remind me of daily words</button> */}
-
-              <div className="flex items-center gap-2">
-                {guesses.length >= 3 && !isGameOver && (
-                  <button
-                    onClick={handleHint}
-                    className={`p-1 transition-all ${usedHint ? 'text-yellow-500/50' : 'text-yellow-500 animate-pulse'}`}
-                    title={usedHint ? "Show Hint Reminder" : "Get a Hint"}
-                  >
-                    <Lightbulb size={ICON_SIZE} fill={usedHint ? "currentColor" : "currentColor"} />
-                  </button>
-                )}
-
-                <div className="flex items-center gap-1">
-                  {/* <DatePicker currentDate={date} onDateChange={handleDateChange} /> */}
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="p-1 hover:bg-gray-800 rounded-full transition-all text-gray-500 hover:text-white active:rotate-180 duration-500"
-                    title="Refresh Game"
-                  >
-                    <RotateCcw size={ICON_SIZE} />
-                  </button>
-                </div>
-
-                <button onClick={() => setIsStatsOpen(true)} className="text-gray-400 hover:text-white p-1">
+            {/* Bottom Row: Game Actions */}
+            <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl border border-white/10">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsChallengeModalOpen(true)}
+                  className={`p-2 rounded-xl transition-all ${activeChallenge ? 'bg-correct text-black' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                  title="Challenges"
+                >
+                  <Trophy size={ICON_SIZE} />
+                </button>
+                <button
+                  onClick={() => setIsStatsOpen(true)}
+                  className="p-2 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all"
+                  title="Statistics"
+                >
                   <BarChart2 size={ICON_SIZE} />
                 </button>
-
                 <button
                   onClick={() => setIsInfoOpen(true)}
-                  className="text-gray-400 hover:text-white p-1"
+                  className="p-2 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all"
+                  title="How to play"
                 >
                   <HelpCircle size={ICON_SIZE} />
                 </button>
-                {
-                  isGameOver && (
+              </div>
+
+              <div className="flex items-center gap-3">
+                {timeLeft !== null && (
+                  <div className="flex items-center gap-2 bg-red-500/10 px-3 py-1.5 rounded-xl border border-red-500/20">
+                    <Clock size={14} className="text-red-500 animate-pulse" />
+                    <span className="text-xs font-black text-red-500 tabular-nums">
+                      {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1 border-l border-white/10 pl-2 ml-1">
+                  {guesses.length >= 3 && !isGameOver && (
+                    <button
+                      onClick={handleHint}
+                      className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
+                      title={usedHint ? "Hint Used" : "Get Hint"}
+                    >
+                      <Lightbulb size={ICON_SIZE} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (activeChallenge) {
+                        setActiveChallenge(null);
+                        setActiveParticipation(null);
+                        setTimeLeft(null);
+                        window.location.replace(window.location.pathname);
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                    className="p-2 text-gray-500 hover:text-white rounded-xl hover:bg-white/5 transition-all active:rotate-180 duration-500"
+                    title="Reset"
+                  >
+                    <RotateCcw size={ICON_SIZE} />
+                  </button>
+                  {isGameOver && (
                     <button
                       onClick={() => setIsGameOverModal(true)}
-                      className="text-gray-400 hover:text-white p-1"
+                      className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/5 transition-all"
                     >
                       <Share size={ICON_SIZE} />
                     </button>
-                  )
-                }
-                {
-                  user && (<button onClick={() => setIsSettingsOpen(true)} className="text-gray-400 hover:text-white p-1">
-                    <SettingsIcon size={ICON_SIZE} />
-                  </button>)
-                }
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Grid Area - This will now shrink or grow to fit available space */}
-          <div className="flex-1 flex items-center justify-center min-h-0 w-full px-2">
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-4">
+            {activeChallenge && (
+              <motion.div
+                initial={{ y: -10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="flex flex-col items-center gap-1"
+              >
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-correct">Challenge Active</span>
+                <h2 className="text-lg font-black uppercase tracking-tighter text-white">
+                  vs {activeChallenge.creator_profile?.username || 'Opponent'}
+                </h2>
+              </motion.div>
+            )}
+
             <div className="scale-[0.85] sm:scale-100 transition-transform origin-center">
               {
                 guesses.length === 0 ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <p className="text-[14px] text-gray-100 tracking-tighter py-3">enter any {config.length} letter word ...</p>  <button
-                      onClick={() => setIsInfoOpen(true)}
-                      className="text-white py-1 p-2 text-[12px] rounded-md bg-green-500 hover:text-white cursor-pointer "
-                    >
-                      Help
-                    </button>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <p className="text-[14px] text-gray-400 tracking-tighter">Enter any {config.length} letter word ...</p>
                   </div>
                 ) : null
               }
@@ -481,6 +635,7 @@ export default function App() {
                 guesses={guesses}
                 currentGuess={currentGuess}
                 hintRecord={hintRecord}
+                isChallengeMode={!!activeChallenge}
               />
             </div>
           </div>
