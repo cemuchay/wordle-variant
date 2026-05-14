@@ -57,60 +57,67 @@ export const useChat = (userId: string) => {
 
       fetchMessages();
 
-      const channelId = `chat_${userId.substring(0, 8)}`;
+      const channelId = "chat_global";
 
       // 2. Setup Realtime Channel for Messages and Presence
+      const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelId}`);
+
+      if (existingChannel) {
+         supabase.removeChannel(existingChannel);
+      }
+
       const channel = supabase.channel(channelId, {
          config: { presence: { key: userId } },
       });
 
-      channel.on(
-         "postgres_changes",
-         { event: "*", schema: "public", table: "messages" },
-         async (payload) => {
-            if (payload.eventType === "INSERT") {
-               const newMessage = payload.new as Message;
+      let mounted = true;
 
-               const { data: profile } = await supabase
-                  .from("profiles")
-                  .select("username, avatar_url")
-                  .eq("id", newMessage.user_id)
-                  .single();
-
-               const messageWithProfile = { ...newMessage, profiles: profile };
-
-               setMessages((prev: any[]) => {
-                  const exists = prev.some((m) => m.id === newMessage.id);
-
-                  if (exists) {
-                     // Update the optimistic message with real DB data/profile
-                     return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
-                  }
-
-                  // Append new message from other users
-                  return [...prev, messageWithProfile];
-               });
-            }
-            // Update local state for read receipts
-            if (payload.eventType === "UPDATE") {
-               setMessages((prev) =>
-                  prev.map((m) =>
-                     m.id === payload.new.id
-                        ? { ...m, is_read: payload.new.is_read }
-                        : m
-                  )
-               );
-            }
-         }
-      );
       channel
+         .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "messages" },
+            async (payload) => {
+               if (!mounted) return;
+               if (payload.eventType === "INSERT") {
+                  const newMessage = payload.new as Message;
+
+                  const { data: profile } = await supabase
+                     .from("profiles")
+                     .select("id, username, avatar_url")
+                     .eq("id", newMessage.user_id)
+                     .single();
+
+                  if (!mounted) return;
+                  const messageWithProfile = { ...newMessage, profiles: profile };
+
+                  setMessages((prev: any[]) => {
+                     const exists = prev.some((m) => m.id === newMessage.id);
+
+                     if (exists) {
+                        return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
+                     }
+
+                     return [...prev, messageWithProfile];
+                  });
+               }
+               if (payload.eventType === "UPDATE") {
+                  setMessages((prev) =>
+                     prev.map((m) =>
+                        m.id === payload.new.id
+                           ? { ...m, ...payload.new }
+                           : m
+                     )
+                  );
+               }
+            }
+         )
          .on("presence", { event: "sync" }, () => {
+            if (!mounted) return;
             const state = channel.presenceState();
             const typingNames = new Set<string>();
 
             Object.keys(state).forEach((key) => {
                const sessions = state[key] as any[];
-               // Sort by timestamp to get the absolute latest intent
                const latest = sessions.sort(
                   (a, b) => (b.ts || 0) - (a.ts || 0)
                )[0];
@@ -127,11 +134,12 @@ export const useChat = (userId: string) => {
       channelRef.current = channel;
 
       return () => {
+         mounted = false;
          channel.unsubscribe();
          supabase.removeChannel(channel);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [userId]);
+   }, [userId, setUnreadCount]);
 
    const setTyping = useCallback((isTyping: boolean, username: string) => {
       if (!channelRef.current) return;
