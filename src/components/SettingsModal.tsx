@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, ShieldCheck, MessageSquareQuote, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
+import { useConfirmation } from '../hooks/useConfirmation';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -10,9 +12,25 @@ interface SettingsModalProps {
 
 export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const { profile, preferences, refreshProfile, triggerToast } = useApp();
+    const { signOut } = useAuth();
+    const { ask } = useConfirmation();
     const [loading, setLoading] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
+
+    const handleSignOut = async () => {
+        const confirmed = await ask({
+            title: 'Sign Out',
+            message: 'Are you sure you want to sign out? Your local game state and statistics will be cleared.',
+            confirmLabel: 'Sign Out',
+            type: 'danger'
+        });
+
+        if (confirmed) {
+            signOut();
+            onClose();
+        }
+    };
 
     // Sync internal state when preferences change
     useEffect(() => {
@@ -134,7 +152,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     </button>
 
                     <button
-                        onClick={() => supabase.auth.signOut()}
+                        onClick={handleSignOut}
                         className="flex items-center justify-center gap-2 w-full py-2.5 text-gray-500 hover:text-red-400 text-[11px] font-bold transition-colors uppercase tracking-widest"
                     >
                         <LogOut size={12} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
+import { useApp } from '../context/AppContext';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -22,6 +23,8 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const { triggerToast } = useApp();
+
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -33,7 +36,19 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout error:", error.message);
+      triggerToast("Error signing out");
+    } else {
+      // Clear localStorage that starts with wordle
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('wordle')) {
+          localStorage.removeItem(key);
+        }
+      });
+      triggerToast("Signed out successfully");
+    }
   };
 
   return { user, loading, signInWithGoogle, signOut };

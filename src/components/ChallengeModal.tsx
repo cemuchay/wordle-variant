@@ -364,12 +364,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-6">
                     <p className="text-xs font-black uppercase tracking-widest text-gray-500">It is still in development, test it out. Expect bugs 😉</p>
-                    <button
-                        onClick={() => setIsPlaying(false)}
-                        className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
-                    >
-                        Go Back
-                    </button>
+
                     {
                         (guesses.length >= 3 && !myHasFinished) && (
                             <button

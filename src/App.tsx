@@ -21,6 +21,7 @@ import { useApp } from './context/AppContext';
 import { ChallengeModal } from './components/ChallengeModal';
 import { type Challenge } from './hooks/useChallenge';
 import { useChat } from './hooks/useChat';
+import { useConfirmation } from './hooks/useConfirmation';
 
 const APP_VERSION = "1.0.4";
 
@@ -32,7 +33,21 @@ const getSavedState = (date: string) => {
 export default function App() {
   const { user, signInWithGoogle, signOut } = useAuth();
   const { toast, triggerToast, setToast, preferences, unreadCount, setUnreadCount, date, isLoadingDate } = useApp();
+  const { ask } = useConfirmation();
   const [isGameOver, setIsGameOver] = useState(false);
+
+  const handleSignOut = async () => {
+    const confirmed = await ask({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out? Your local game state and statistics will be cleared.',
+      confirmLabel: 'Sign Out',
+      type: 'danger'
+    });
+
+    if (confirmed) {
+      signOut();
+    }
+  };
 
   async function checkVersionAndRefresh() {
     const lastVersion = localStorage.getItem("app_version");
@@ -343,7 +358,7 @@ export default function App() {
                       {user.user_metadata.full_name?.split(' ')[0]}
                     </span>
                     <button
-                      onClick={signOut}
+                      onClick={handleSignOut}
                       className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-[9px] font-black px-3 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap"
                     >
                       LOGOUT
