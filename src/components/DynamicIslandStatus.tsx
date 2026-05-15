@@ -27,8 +27,21 @@ export const DynamicIslandStatus = () => {
         return date.toLocaleDateString();
     };
 
+    const sortedProfiles = [...allProfiles].sort((a, b) => {
+        const aOnline = onlineUsers.some(u => u.id === a.id);
+        const bOnline = onlineUsers.some(u => u.id === b.id);
+
+        if (aOnline && !bOnline) return -1;
+        if (!aOnline && bOnline) return 1;
+
+        const aTime = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+        const bTime = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+
+        return bTime - aTime;
+    });
+
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
+        <div className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none transition-transform duration-500 ${isExpanded ? 'translate-y-2' : ''}`}>
             <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
@@ -43,10 +56,11 @@ export const DynamicIslandStatus = () => {
                 `}
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
-                    width: isExpanded ? '300px' : (otherOnlineUsers.length === 1 ? '160px' : '100px'),
-                    height: isExpanded ? '400px' : '36px',
+                    width: isExpanded ? 'min(90vw, 300px)' : (otherOnlineUsers.length === 1 ? '160px' : '100px'),
+                    height: isExpanded ? 'min(70vh, 400px)' : '32px',
                 }}
             >
+
                 {!isExpanded ? (
                     <motion.div
                         layout
@@ -102,9 +116,9 @@ export const DynamicIslandStatus = () => {
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
                             <div className="space-y-4">
-                                {allProfiles.map((p) => {
+                                {sortedProfiles.map((p) => {
                                     const isOnline = onlineUsers.some(u => u.id === p.id);
                                     return (
                                         <div key={p.id} className="flex items-center justify-between group">

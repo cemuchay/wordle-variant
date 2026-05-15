@@ -66,7 +66,7 @@ export default function App() {
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
             <DynamicIslandStatus />
             {!isChatOpen && (
-                <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4">
+                <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-16 sm:pt-4">
                     <Toast
                         isVisible={toast.show}
                         message={toast.message}

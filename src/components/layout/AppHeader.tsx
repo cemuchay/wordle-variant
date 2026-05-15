@@ -25,8 +25,8 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
 
     return (
         <div className="w-full max-w-lg mx-auto flex flex-col gap-3 mb-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between relative h-10">
+                <div className="flex items-center gap-2 absolute left-0 top-1/2 -translate-y-1/2 sm:relative sm:top-auto sm:translate-y-0">
                     <div className="bg-correct/10 px-3 py-1 rounded-full border border-correct/20">
                         <h1 className="text-lg font-black uppercase tracking-[0.2em] text-white">
                             Wordle Variant<span className="text-correct">.</span>
@@ -34,7 +34,7 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 absolute right-0 top-1/2 -translate-y-1/2 sm:relative sm:top-auto sm:translate-y-0">
                     {user ? (
                         <div className="flex items-center gap-2 bg-white/5 pl-1 pr-3 py-1 rounded-full border border-white/10 group relative">
                             <img
