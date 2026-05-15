@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
-import { supabase } from '../lib/supabaseClient';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const { 
-        activeCall, 
-        setActiveCall, 
-        setIsChallengeOpen, 
+    const {
+        activeCall,
+        setIsChallengeOpen,
         triggerToast,
         onlineUsers,
         allProfiles,
@@ -19,7 +17,7 @@ export const DynamicIslandStatus = () => {
         setIncomingCall,
         audioChat
     } = useApp();
-    
+
     const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
@@ -34,36 +32,15 @@ export const DynamicIslandStatus = () => {
     // Show island if: expanded OR online users > 0 OR active call OR incoming call
     if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !incomingCall) return null;
 
-    const handleAnswer = (e: React.MouseEvent) => {
+    const handleGoToLobby = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (incomingCall) {
-            setActiveCall({ challengeId: incomingCall.challengeId, userId: user?.id || "", isInitiator: false });
-
             // Navigate to challenge
             const url = new URL(window.location.href);
             url.searchParams.set('challenge', incomingCall.challengeId);
             window.history.pushState({}, '', url);
             setIsChallengeOpen(true);
 
-            setIncomingCall(null);
-            setIsExpanded(false);
-        }
-    };
-    const handleReject = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (incomingCall) {
-            // Send rejection signal to the specific audio_chat channel
-            const channel = supabase.channel(`audio_chat_${incomingCall.challengeId}`);
-            channel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    channel.send({
-                        type: 'broadcast',
-                        event: 'signal',
-                        payload: { type: 'call_rejected', from: user?.id }
-                    });
-                    channel.unsubscribe();
-                }
-            });
             setIncomingCall(null);
             setIsExpanded(false);
         }
@@ -189,18 +166,12 @@ export const DynamicIslandStatus = () => {
                                         <h3 className="text-white font-black text-sm uppercase">{incomingCall.from.username}</h3>
                                         <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
                                     </div>
-                                    <div className="flex items-center gap-4 w-full">
+                                    <div className="w-full">
                                         <button
-                                            onClick={handleReject}
-                                            className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-red-500/20"
+                                            onClick={handleGoToLobby}
+                                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20"
                                         >
-                                            Decline
-                                        </button>
-                                        <button
-                                            onClick={handleAnswer}
-                                            className="flex-1 bg-emerald-500 hover:bg-emerald-500 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 animate-pulse"
-                                        >
-                                            Answer
+                                            Go to Lobby
                                         </button>
                                     </div>
                                 </div>
