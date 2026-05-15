@@ -1,5 +1,5 @@
 import { MessageSquare, X } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
 import { DynamicIslandStatus } from './components/DynamicIslandStatus';
 import { AppHeader } from './components/layout/AppHeader';
@@ -16,6 +16,7 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
 import { type AppUser } from './types/game';
+import { useChallenge } from './hooks/useChallenge';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
 
@@ -30,11 +31,25 @@ export default function App() {
         unreadCount,
         setUnreadCount,
         isChallengeOpen,
-        setIsChallengeOpen
+        setIsChallengeOpen,
+        setChallengeUnreadCount,
     } = useApp();
 
     // Core Game Engine
     const { state, actions, config } = useGameEngine(date as string);
+
+    const { fetchMyChallenges } = useChallenge(user as AppUser);
+
+    // Initial Challenges Fetch
+    useEffect(() => {
+        if (user) {
+            fetchMyChallenges().then(data => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const count = data.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
+                setChallengeUnreadCount(count);
+            });
+        }
+    }, [user, fetchMyChallenges, setChallengeUnreadCount]);
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
