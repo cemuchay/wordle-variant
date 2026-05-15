@@ -1,9 +1,9 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, Phone } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Clock, Phone, Users } from 'lucide-react';
 import { useState } from 'react';
+import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useGlobalPresence } from '../hooks/useGlobalPresence';
-import { useApp } from '../context/AppContext';
 import { AudioChatControls } from './challenge/AudioChatControls';
 
 export const DynamicIslandStatus = () => {
