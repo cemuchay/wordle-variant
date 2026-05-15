@@ -6,6 +6,7 @@ import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { CloudSyncMenu } from './components/SyncCloudModal';
+import { DynamicIslandStatus } from './components/DynamicIslandStatus';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
 import { useApp } from './context/AppContext';
@@ -63,6 +64,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
+            <DynamicIslandStatus />
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4">
                     <Toast

@@ -34,11 +34,13 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                 setCallDuration(Math.floor((Date.now() - startTime) / 1000));
             }, 1000);
         } else if (!isEnabled) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCallDuration(0);
         }
         return () => {
             if (interval) clearInterval(interval);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEnabled, isConnected]);
 
     // Attach remote stream to audio element
@@ -80,6 +82,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
         if (!localStream || !isMicOn) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
@@ -137,16 +140,16 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         )}
                     </div>
 
-                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
 
                     {/* Call Timer */}
-                    <div className="px-2 min-w-[3rem] text-center">
+                    <div className="px-2 min-w-12 text-center">
                         <span className="text-[10px] font-mono font-bold text-zinc-400 tabular-nums">
                             {Math.floor(callDuration / 60)}:{String(callDuration % 60).padStart(2, '0')}
                         </span>
                     </div>
 
-                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
 
                     {/* Mic Toggle with Local Speaking Visualizer */}
                     <button
