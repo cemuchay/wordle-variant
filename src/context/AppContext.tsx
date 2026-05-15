@@ -48,9 +48,8 @@ interface AppContextType {
     // Global Presence & Audio Chat
     onlineUsers: PresenceUser[];
     allProfiles: PresenceUser[];
-    incomingCall: { from: PresenceUser, challengeId: string } | null;
-    setIncomingCall: (call: { from: PresenceUser, challengeId: string } | null) => void;
     audioChat: AudioChatState;
+    activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
 }
 
 const defaultPreferences: UserPreferences = {
@@ -74,6 +73,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return params.has('challenge');
     });
 
+    const [myParticipations, setMyParticipations] = useState<string[]>([]);
+
     const [toast, setToast] = useState<{
         show: boolean, message: string, duration: number | undefined
     }>({ show: false, message: "", duration: undefined });
@@ -81,7 +82,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
 
     // Global Presence Hook
-    const { onlineUsers, allProfiles, incomingCall, setIncomingCall, sendIncomingCall } = useGlobalPresence(profile?.id);
+    const { onlineUsers, allProfiles } = useGlobalPresence(profile?.id, activeCall?.challengeId || null);
 
     // Global Audio Chat Hook
     const audioChat = useAudioChat({
@@ -90,22 +91,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         enabled: !!activeCall
     });
 
-    // Handle sending invitations when a call is started
-    useEffect(() => {
-        if (activeCall?.isInitiator && audioChat.logs.length > 0) {
-            const hasJoined = audioChat.logs.some(l => l.message.includes('Joining audio channel'));
-            const hasNotified = audioChat.logs.some(l => l.message.includes('Notification sent'));
+    // Compute Active Voice Rooms (filtered by my participations)
+    const activeVoiceRooms = onlineUsers
+        .filter(u => u.id !== profile?.id && u.activeVoiceRoomId && myParticipations.includes(u.activeVoiceRoomId))
+        .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
 
-            if (hasJoined && !hasNotified) {
-                sendIncomingCall(activeCall.challengeId);
-                audioChat.addLog('Notification sent to other party', 'success');
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeCall, audioChat.logs, sendIncomingCall, audioChat.addLog]);
+    // Fetch my participations to filter active voice rooms
+    const fetchMyParticipations = useCallback(async () => {
+        if (!profile?.id) return;
+        const { data } = await supabase
+            .from('challenge_participants')
+            .select('challenge_id')
+            .eq('user_id', profile.id);
+        if (data) setMyParticipations(data.map(p => p.challenge_id));
+    }, [profile?.id]);
+
+    useEffect(() => {
+        fetchMyParticipations();
+    }, [fetchMyParticipations]);
 
     // Live Challenge Unread Counter
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const refreshChallengeUnreadCount = useCallback(async () => {
         if (!profile?.id) return;
         try {
@@ -113,13 +118,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 .from('challenge_participants')
                 .select('status, challenge:challenges(expires_at)')
                 .eq('user_id', profile.id);
-
+            
             if (data) {
-                const count = data.filter((c: any) =>
-                    (c.status === 'pending' || c.status === 'playing') &&
+                const count = data.filter((c: any) => 
+                    (c.status === 'pending' || c.status === 'playing') && 
                     new Date(c.challenge.expires_at) > new Date()
                 ).length;
                 setChallengeUnreadCount(count);
+                // Also update participations list for voice filtering
+                setMyParticipations(data.map((p: any) => p.challenge_id));
             }
         } catch (err) {
             console.error('Error refreshing challenge unread count:', err);
@@ -129,10 +136,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!profile?.id) return;
 
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         refreshChallengeUnreadCount();
 
-        // Subscribe to participant changes for this user
         const channel = supabase
             .channel(`unread_challenges_${profile.id}`)
             .on('postgres_changes', {
@@ -142,13 +147,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 filter: `user_id=eq.${profile.id}`
             }, () => {
                 refreshChallengeUnreadCount();
+                fetchMyParticipations();
             })
             .subscribe();
-
+        
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [profile?.id, refreshChallengeUnreadCount]);
+    }, [profile?.id, refreshChallengeUnreadCount, fetchMyParticipations]);
 
     const fetchProfile = async () => {
         try {
@@ -179,7 +185,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchProfile();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
@@ -231,16 +236,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setIsChallengeOpen,
             onlineUsers,
             allProfiles,
-            incomingCall,
-            setIncomingCall,
-            audioChat
+            audioChat,
+            activeVoiceRooms
         }}>
             {children}
         </AppContext.Provider>
     );
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useApp = () => {
     const context = useContext(AppContext);
     if (context === undefined) {

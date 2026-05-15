@@ -2,6 +2,7 @@ import { MessageSquare, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
 import { DynamicIslandStatus } from './components/DynamicIslandStatus';
+import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
 import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
@@ -88,6 +89,7 @@ export default function App() {
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
             <DynamicIslandStatus />
             <AudioConnectionLog />
+            <GlobalAudioPlayer />
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-16 sm:pt-4">
                     <Toast

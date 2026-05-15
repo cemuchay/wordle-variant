@@ -1,5 +1,5 @@
 import { Mic, MicOff, Volume2, VolumeX, Phone, PhoneOff, AlertCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 interface AudioChatControlsProps {
@@ -38,10 +38,10 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         error,
         toggleMic,
         toggleSpeaker,
-        addLog
+
     } = audioChat;
 
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
     const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
 
@@ -62,42 +62,6 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEnabled, isConnected]);
-
-    // Attach remote stream to audio element
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (audio && remoteStream && isEnabled) {
-            console.log('AudioChat: Attaching remote stream', remoteStream.id);
-            addLog(`Attaching remote audio stream (${remoteStream.getAudioTracks().length} tracks)`, 'info');
-
-            audio.srcObject = remoteStream;
-            audio.muted = false; // Never mute the element itself, use volume instead for better browser compatibility
-            audio.volume = isSpeakerOn ? 1.0 : 0.0;
-
-            const playAudio = () => {
-                audio.play().catch(err => {
-                    console.warn('AudioChat: Playback blocked, waiting for interaction', err);
-                    addLog('Audio playback blocked by browser - click anywhere to enable', 'warning');
-                });
-            };
-
-            playAudio();
-
-            const handleInteraction = () => {
-                if (audio.paused) playAudio();
-                window.removeEventListener('click', handleInteraction);
-                window.removeEventListener('touchstart', handleInteraction);
-            };
-            window.addEventListener('click', handleInteraction);
-            window.addEventListener('touchstart', handleInteraction);
-
-            return () => {
-                window.removeEventListener('click', handleInteraction);
-                window.removeEventListener('touchstart', handleInteraction);
-                audio.srcObject = null;
-            };
-        }
-    }, [remoteStream, isSpeakerOn, isEnabled, addLog]);
 
     // Simple volume detection for "speaking" animation (Remote)
     useEffect(() => {
@@ -193,14 +157,6 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
     return (
         <div className="flex items-center gap-2">
-            {/* Audio element for remote stream (hidden) */}
-            <audio
-                ref={audioRef}
-                autoPlay
-                playsInline
-                style={{ display: 'none' }}
-            />
-
             {!isEnabled ? (
                 <button
                     onClick={toggleCall}
