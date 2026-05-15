@@ -20,16 +20,16 @@ import { type AppUser } from './types/game';
 
 export default function App() {
     const { user } = useAuth();
-    const { 
-        toast, 
-        setToast, 
-        triggerToast, 
-        date, 
-        isLoadingDate, 
-        unreadCount, 
+    const {
+        toast,
+        setToast,
+        triggerToast,
+        date,
+        isLoadingDate,
+        unreadCount,
         setUnreadCount,
         isChallengeOpen,
-        setIsChallengeOpen 
+        setIsChallengeOpen
     } = useApp();
 
     // Core Game Engine
@@ -63,7 +63,7 @@ export default function App() {
     if (isLoadingDate || isInitializing) {
         return (
             <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
-                Syncing with server...
+                loading game ...
             </div>
         );
     }
@@ -141,7 +141,7 @@ export default function App() {
             )}
 
             {user && (
-                <div className="fixed z-50 top-40 right-4 sm:top-auto sm:bottom-4 sm:right-26">
+                <div className="fixed z-50 top-44 right-4 sm:top-auto sm:bottom-6 sm:right-26">
                     {unreadCount > 0 && !isChatOpen && (
                         <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 z-60 min-w-4.5 h-4.5 sm:min-w-5.5 sm:h-5.5 px-1 bg-white text-red-400 border-2 border-red-950 text-[9px] sm:text-[13px] font-black rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-in zoom-in duration-300">
                             {unreadCount > 99 ? '99+' : unreadCount}
