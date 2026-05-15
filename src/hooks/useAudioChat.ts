@@ -27,7 +27,32 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         ],
     };
 
-    const cleanup = useCallback(() => {
+    const cleanup = useCallback(async () => {
+        // Send cancellation signal to opponents
+        if (enabled && !isConnected) {
+            const { data: participants } = await supabase
+                .from('challenge_participants')
+                .select('user_id')
+                .eq('challenge_id', challengeId);
+
+            if (participants) {
+                participants.forEach(p => {
+                    if (p.user_id === userId) return;
+                    const signalChannel = supabase.channel(`user_signals_${p.user_id}`);
+                    signalChannel.subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            signalChannel.send({
+                                type: 'broadcast',
+                                event: 'call_cancelled',
+                                payload: { challengeId }
+                            });
+                            signalChannel.unsubscribe();
+                        }
+                    });
+                });
+            }
+        }
+
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
@@ -39,7 +64,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         setRemoteStream(null);
         setIsConnected(false);
         setError(null);
-    }, [localStream]);
+    }, [challengeId, userId, enabled, isConnected, localStream]);
 
     const sendSignal = useCallback((data: any) => {
         if (channelRef.current) {
@@ -50,6 +75,37 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             });
         }
     }, [userId]);
+
+    const broadcastCallRequest = useCallback(async () => {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .eq('id', userId)
+            .single();
+
+        if (!profile) return;
+
+        const { data: participants } = await supabase
+            .from('challenge_participants')
+            .select('user_id')
+            .eq('challenge_id', challengeId);
+
+        if (!participants) return;
+
+        participants.forEach(p => {
+            if (p.user_id === userId) return;
+            const signalChannel = supabase.channel(`user_signals_${p.user_id}`);
+            signalChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    signalChannel.send({
+                        type: 'broadcast',
+                        event: 'incoming_call',
+                        payload: { from: profile, challengeId }
+                    });
+                }
+            });
+        });
+    }, [challengeId, userId]);
 
     const localStreamRef = useRef<MediaStream | null>(null);
 
@@ -63,7 +119,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
 
         pc.ontrack = (event) => {
-            console.log('WebRTC: Received remote track', event.track.kind);
             if (event.streams && event.streams[0]) {
                 setRemoteStream(event.streams[0]);
             } else {
@@ -73,14 +128,12 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
 
         pc.onconnectionstatechange = () => {
-            console.log('WebRTC: Connection state', pc.connectionState);
             if (pc.connectionState === 'connected') setIsConnected(true);
             if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
                 setIsConnected(false);
             }
         };
 
-        // Important: Add local tracks if they exist
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(track => {
                 pc.addTrack(track, localStreamRef.current!);
@@ -104,15 +157,14 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             setIsMicOn(true);
             setError(null);
 
-            // If a peer connection already exists, add tracks to it
             if (pcRef.current) {
                 stream.getTracks().forEach(track => {
                     pcRef.current!.addTrack(track, stream);
                 });
             }
 
-            // Signaling handles the actual connection initiation
             sendSignal({ type: 'ready' });
+            broadcastCallRequest();
         } catch (err: any) {
             let msg = 'Error accessing microphone';
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -121,9 +173,8 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                 msg = 'No microphone found on this device.';
             }
             setError(msg);
-            console.error('Error accessing microphone:', err);
         }
-    }, [sendSignal]);
+    }, [sendSignal, broadcastCallRequest]);
 
     useEffect(() => {
         if (enabled && !localStream && !error) {
@@ -147,7 +198,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                 const { type, offer, answer, candidate } = payload;
 
                 if (type === 'ready') {
-                    // Logic to decide who initiates (e.g., lower ID)
                     if (userId < payload.from) {
                         const pc = pcRef.current || createPeerConnection();
                         const offer = await pc.createOffer();
@@ -170,6 +220,9 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                     }
                 } else if (type === 'status') {
                     setOpponentStatus({ mic: payload.mic, speaker: payload.speaker });
+                } else if (type === 'call_rejected') {
+                    setError('Call was declined by opponent.');
+                    cleanup();
                 }
             })
             .subscribe();
@@ -182,7 +235,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
     }, [challengeId, userId, enabled, createPeerConnection, sendSignal, cleanup]);
 
-    // Update opponent about our status
     useEffect(() => {
         if (enabled && isConnected) {
             sendSignal({ type: 'status', mic: isMicOn, speaker: isSpeakerOn });
