@@ -67,19 +67,28 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
         pc.onicecandidate = ({ candidate }) => {
-            if (candidate) sendSignal({ type: 'candidate', candidate });
-        };
-
-        pc.ontrack = (event) => {
-            if (event.streams && event.streams[0]) {
-                setRemoteStream(event.streams[0]);
-            } else {
-                setRemoteStream(new MediaStream([event.track]));
+            if (candidate) {
+                console.log('WebRTC: Sending ICE candidate');
+                sendSignal({ type: 'candidate', candidate });
             }
         };
 
+        pc.ontrack = (event) => {
+            console.log('WebRTC: Received remote track', event.track.kind, event.streams);
+            const stream = event.streams[0] || new MediaStream([event.track]);
+            setRemoteStream(stream);
+        };
+
         pc.onconnectionstatechange = () => {
+            console.log('WebRTC: Connection state changed to:', pc.connectionState);
             setIsConnected(pc.connectionState === 'connected');
+            if (pc.connectionState === 'failed') {
+                setError('Connection failed. Please check your network.');
+            }
+        };
+
+        pc.onsignalingstatechange = () => {
+            console.log('WebRTC: Signaling state changed to:', pc.signalingState);
         };
 
         // Standard Negotiation Needed handler

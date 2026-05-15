@@ -72,9 +72,31 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
     // Attach remote stream to audio element
     useEffect(() => {
-        if (audioRef.current && remoteStream && isSpeakerOn) {
-            audioRef.current.srcObject = remoteStream;
-            audioRef.current.play().catch(console.error);
+        const audio = audioRef.current;
+        if (audio && remoteStream) {
+            console.log('AudioChat: Attaching remote stream', remoteStream.id);
+            audio.srcObject = remoteStream;
+            audio.muted = !isSpeakerOn;
+            
+            const playAudio = () => {
+                audio.play().catch(err => {
+                    console.warn('AudioChat: Playback blocked, waiting for interaction', err);
+                });
+            };
+
+            playAudio();
+            
+            // Re-attempt play on user interaction if blocked
+            const handleInteraction = () => {
+                if (audio.paused) playAudio();
+                window.removeEventListener('click', handleInteraction);
+            };
+            window.addEventListener('click', handleInteraction);
+            
+            return () => {
+                window.removeEventListener('click', handleInteraction);
+                audio.srcObject = null;
+            };
         }
     }, [remoteStream, isSpeakerOn]);
 
@@ -82,59 +104,78 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     useEffect(() => {
         if (!remoteStream || !isConnected) return;
 
-        const audioContext = new AudioContext();
-        const source = audioContext.createMediaStreamSource(remoteStream);
-        const analyzer = audioContext.createAnalyser();
-        analyzer.fftSize = 512;
-        source.connect(analyzer);
-
-        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        let audioContext: AudioContext;
         let animationFrame: number;
 
-        const checkVolume = () => {
-            analyzer.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            setIsOpponentSpeaking(average > 10); // Threshold for speaking
-            animationFrame = requestAnimationFrame(checkVolume);
+        const setupAnalyzer = async () => {
+            audioContext = new AudioContext();
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            const source = audioContext.createMediaStreamSource(remoteStream);
+            const analyzer = audioContext.createAnalyser();
+            analyzer.fftSize = 512;
+            source.connect(analyzer);
+
+            const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+            const checkVolume = () => {
+                analyzer.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                setIsOpponentSpeaking(average > 10);
+                animationFrame = requestAnimationFrame(checkVolume);
+            };
+
+            checkVolume();
         };
 
-        checkVolume();
+        setupAnalyzer();
 
         return () => {
-            cancelAnimationFrame(animationFrame);
-            audioContext.close();
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (audioContext) audioContext.close();
         };
     }, [remoteStream, isConnected]);
 
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
         if (!localStream || !isMicOn) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
 
-        const audioContext = new AudioContext();
-        const source = audioContext.createMediaStreamSource(localStream);
-        const analyzer = audioContext.createAnalyser();
-        analyzer.fftSize = 512;
-        source.connect(analyzer);
-
-        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        let audioContext: AudioContext;
         let animationFrame: number;
 
-        const checkVolume = () => {
-            analyzer.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            setIsLocalSpeaking(average > 10);
-            animationFrame = requestAnimationFrame(checkVolume);
+        const setupAnalyzer = async () => {
+            audioContext = new AudioContext();
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            const source = audioContext.createMediaStreamSource(localStream);
+            const analyzer = audioContext.createAnalyser();
+            analyzer.fftSize = 512;
+            source.connect(analyzer);
+
+            const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+            const checkVolume = () => {
+                analyzer.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                setIsLocalSpeaking(average > 10);
+                animationFrame = requestAnimationFrame(checkVolume);
+            };
+
+            checkVolume();
         };
 
-        checkVolume();
+        setupAnalyzer();
 
         return () => {
-            cancelAnimationFrame(animationFrame);
-            audioContext.close();
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (audioContext) audioContext.close();
         };
     }, [localStream, isMicOn]);
 
