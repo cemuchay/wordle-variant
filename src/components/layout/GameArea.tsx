@@ -31,8 +31,8 @@ export const GameArea = ({
         <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-4">
             <div className="scale-[0.85] sm:scale-100 transition-transform origin-center relative">
                 {guesses.length === 0 && (
-                    <div className="absolute -top-8 left-0 right-0 flex items-center justify-center pointer-events-none">
-                        <p className="text-[12px] sm:text-[14px] text-gray-500 font-bold uppercase tracking-widest animate-in fade-in slide-in-from-bottom-2 duration-700">
+                    <div className="absolute -top-14 sm:-top-8 left-0 right-0 flex items-center justify-center pointer-events-none">
+                        <p className="text-[10px] sm:text-[14px] text-gray-500 font-bold uppercase tracking-widest animate-in fade-in slide-in-from-bottom-2 duration-700">
                             Enter any {wordLength} letter word
                         </p>
                     </div>

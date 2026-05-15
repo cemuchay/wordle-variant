@@ -1,5 +1,7 @@
 import { BarChart2, HelpCircle, Lightbulb, RotateCcw, Share, Trophy } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { CloudSyncMenu } from '../SyncCloudModal';
+import type { SyncStatus } from '../../types/game';
 
 interface GameToolbarProps {
     onOpenChallenge: () => void;
@@ -11,6 +13,7 @@ interface GameToolbarProps {
     isGameOver: boolean;
     usedHint: boolean;
     canShowHint: boolean;
+    syncStatus: SyncStatus;
 }
 
 const ICON_SIZE = 16;
@@ -24,7 +27,8 @@ export const GameToolbar = ({
     onShare,
     isGameOver,
     usedHint,
-    canShowHint
+    canShowHint,
+    syncStatus
 }: GameToolbarProps) => {
     const { challengeUnreadCount } = useApp();
 
@@ -62,6 +66,7 @@ export const GameToolbar = ({
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 border-l border-white/10 pl-2 ml-1">
+                        <CloudSyncMenu status={syncStatus} />
                         {canShowHint && !isGameOver && (
                             <button
                                 onClick={onHint}

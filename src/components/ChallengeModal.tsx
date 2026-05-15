@@ -25,7 +25,7 @@ interface ChallengeModalProps {
 
 export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
     const { triggerToast } = useApp();
-    const [activeTab, setActiveTab] = useState<'create' | 'my' | 'join'>('create');
+    const [activeTab, setActiveTab] = useState<'create' | 'my' | 'join'>('my');
     const {
         createChallenge,
         fetchChallenge,
@@ -46,6 +46,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
     const [myChallenges, setMyChallenges] = useState<any[]>([]);
+
     const [joinId, setJoinId] = useState('');
     const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
     const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
@@ -102,10 +103,10 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                     {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`} left
                 </span>
                 <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${percent}%` }}
-                        className={`h-full ${colorClass}`} 
+                        className={`h-full ${colorClass}`}
                     />
                 </div>
             </div>
@@ -132,6 +133,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             channelRef.current = null;
         }
     }, []);
+
 
     const loadProfiles = useCallback(async () => {
         const profiles = await fetchProfiles();
@@ -259,12 +261,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                             >
                                 {selectedChallenge ? null : (
                                     <div className="flex border-b border-white/5 shrink-0">
-                                        <button
-                                            onClick={() => setActiveTab('create')}
-                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'create' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
-                                        >
-                                            Create
-                                        </button>
+
                                         <button
                                             onClick={() => { setActiveTab('my'); loadMyChallenges(); }}
                                             className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${activeTab === 'my' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
@@ -275,6 +272,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                     {unplayedCount}
                                                 </span>
                                             )}
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveTab('create')}
+                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'create' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
+                                        >
+                                            Create
                                         </button>
                                     </div>
                                 )}
@@ -306,7 +309,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                 myChallenges.map((item) => {
                                                     const isExpired = new Date(item.challenge.expires_at) < new Date();
                                                     const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-                                                    
+
                                                     return (
                                                         <button
                                                             key={item.id}
@@ -324,7 +327,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                             </div>
                                                             <div className="flex items-end justify-between">
                                                                 <div>
-                                                                    <p className="font-bold text-sm">Challenge by {item.challenge.profiles?.username || 'User'}</p>
+                                                                    <p className="font-bold text-sm">Me <span className="text-gray-500">vs</span> {item.challenge.profiles?.username || 'User'}</p>
                                                                     <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
                                                                 </div>
                                                                 <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">

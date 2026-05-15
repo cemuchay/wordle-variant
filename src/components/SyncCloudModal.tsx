@@ -1,13 +1,12 @@
 import { Cloud, CloudCheck, CloudOff, Loader2 } from "lucide-react";
-
-type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+import type { SyncStatus } from "../types/game";
 
 export function CloudSyncMenu({ status }: { status: SyncStatus }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 text-xs font-medium">
+    <div className="flex items-center gap-2 px-1 py-1 rounded-full bg-secondary/50 text-xs font-medium">
       {status === 'syncing' && (
         <>
-          <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+          <Loader2 className="w-3 h-2 animate-spin text-blue-500" />
           <span>Syncing to Cloud...</span>
         </>
       )}
