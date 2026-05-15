@@ -10,6 +10,7 @@ interface AudioChatControlsProps {
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
     const [isEnabled, setIsEnabled] = useState(false);
     const {
+        localStream,
         remoteStream,
         isMicOn,
         isSpeakerOn,
@@ -21,6 +22,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
+    const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
 
     // Attach remote stream to audio element
     useEffect(() => {
@@ -30,7 +32,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         }
     }, [remoteStream, isSpeakerOn]);
 
-    // Simple volume detection for "speaking" animation
+    // Simple volume detection for "speaking" animation (Remote)
     useEffect(() => {
         if (!remoteStream || !isConnected) return;
 
@@ -57,6 +59,37 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
             audioContext.close();
         };
     }, [remoteStream, isConnected]);
+
+    // Simple volume detection for "speaking" animation (Local)
+    useEffect(() => {
+        if (!localStream || !isMicOn) {
+            setIsLocalSpeaking(false);
+            return;
+        }
+
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(localStream);
+        const analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 512;
+        source.connect(analyzer);
+
+        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        let animationFrame: number;
+
+        const checkVolume = () => {
+            analyzer.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            setIsLocalSpeaking(average > 10);
+            animationFrame = requestAnimationFrame(checkVolume);
+        };
+
+        checkVolume();
+
+        return () => {
+            cancelAnimationFrame(animationFrame);
+            audioContext.close();
+        };
+    }, [localStream, isMicOn]);
 
     return (
         <div className="flex items-center gap-2">
@@ -89,13 +122,16 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
                     <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
 
-                    {/* Mic Toggle */}
+                    {/* Mic Toggle with Local Speaking Visualizer */}
                     <button
                         onClick={toggleMic}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-zinc-800 text-zinc-400' : 'bg-red-500/10 text-red-500'}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${isMicOn ? (isLocalSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-red-500/10 text-red-500'}`}
                         title={isMicOn ? 'Mute Mic' : 'Unmute Mic'}
                     >
-                        {isMicOn ? <Mic size={14} /> : <MicOff size={14} />}
+                        {isMicOn ? <Mic size={14} className={isLocalSpeaking ? 'text-white' : 'text-zinc-400'} /> : <MicOff size={14} />}
+                        {isMicOn && isLocalSpeaking && (
+                            <div className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping opacity-20" />
+                        )}
                     </button>
 
                     {/* Speaker Toggle */}
