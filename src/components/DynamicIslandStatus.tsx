@@ -1,22 +1,37 @@
 import { motion } from 'framer-motion';
 import { Clock, Phone, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useGlobalPresence } from '../hooks/useGlobalPresence';
 import { AudioChatControls } from './challenge/AudioChatControls';
 import { supabase } from '../lib/supabaseClient';
+import { useAudioChat } from '../hooks/useAudioChat';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const { activeCall, setActiveCall, setIsChallengeOpen } = useApp();
+    const { activeCall, setActiveCall, setIsChallengeOpen, triggerToast } = useApp();
     const { onlineUsers, allProfiles, incomingCall, setIncomingCall } = useGlobalPresence(user?.id);
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // PERSISTENCE: Run audio hook here so it never unmounts while a call is active
+    const audioChat = useAudioChat({
+        challengeId: activeCall?.challengeId || '',
+        userId: user?.id || '',
+        enabled: !!activeCall
+    });
+
+    useEffect(() => {
+        if (audioChat.error) {
+            triggerToast(audioChat.error, 5000);
+        }
+    }, [audioChat.error, triggerToast]);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-    if (otherOnlineUsers.length === 0 && !isExpanded && !activeCall && !incomingCall) return null;
+    // Show island if: expanded OR online users > 0 OR active call OR incoming call
+    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !incomingCall) return null;
 
     const handleAnswer = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -33,7 +48,6 @@ export const DynamicIslandStatus = () => {
             setIsExpanded(false);
         }
     };
-
     const handleReject = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (incomingCall) {
@@ -203,7 +217,11 @@ export const DynamicIslandStatus = () => {
                                     <Phone size={14} className="text-emerald-500" />
                                 </div>
                                 <div className="bg-white/5 p-4 rounded-2xl flex justify-center">
-                                    <AudioChatControls challengeId={activeCall.challengeId} userId={activeCall.userId} />
+                                    <AudioChatControls
+                                        challengeId={activeCall.challengeId}
+                                        userId={activeCall.userId}
+                                        externalAudioChat={audioChat}
+                                    />
                                 </div>
                             </div>
                         )}
