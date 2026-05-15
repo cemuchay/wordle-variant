@@ -38,6 +38,8 @@ interface AppContextType {
     setStats: (stats: GameStats) => void;
     activeCall: { challengeId: string, userId: string } | null;
     setActiveCall: (call: { challengeId: string, userId: string } | null) => void;
+    isChallengeOpen: boolean;
+    setIsChallengeOpen: (val: boolean) => void;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -55,6 +57,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
     const [activeCall, setActiveCall] = useState<{ challengeId: string, userId: string } | null>(null);
+    const [isChallengeOpen, setIsChallengeOpen] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.has('challenge');
+    });
 
     const [toast, setToast] = useState<{
         show: boolean, message: string, duration: number | undefined
@@ -138,7 +144,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             stats,
             setStats,
             activeCall,
-            setActiveCall
+            setActiveCall,
+            isChallengeOpen,
+            setIsChallengeOpen
         }}>
             {children}
         </AppContext.Provider>

@@ -20,7 +20,17 @@ import { type AppUser } from './types/game';
 
 export default function App() {
     const { user } = useAuth();
-    const { toast, setToast, triggerToast, date, isLoadingDate, unreadCount, setUnreadCount } = useApp();
+    const { 
+        toast, 
+        setToast, 
+        triggerToast, 
+        date, 
+        isLoadingDate, 
+        unreadCount, 
+        setUnreadCount,
+        isChallengeOpen,
+        setIsChallengeOpen 
+    } = useApp();
 
     // Core Game Engine
     const { state, actions, config } = useGameEngine(date as string);
@@ -30,10 +40,6 @@ export default function App() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
-    const [isChallengeOpen, setIsChallengeOpen] = useState(() => {
-        const params = new URLSearchParams(window.location.search);
-        return params.has('challenge');
-    });
 
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);

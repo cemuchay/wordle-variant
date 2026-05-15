@@ -10,7 +10,7 @@ interface AudioChatControlsProps {
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
     const { triggerToast, activeCall, setActiveCall } = useApp();
-    
+
     // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
     const isEnabled = activeCall?.challengeId === challengeId;
 
@@ -49,7 +49,8 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         if (error) {
             triggerToast(error, 5000);
         }
-    }, [error, triggerToast]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [error,]);
 
     // Call duration timer
     useEffect(() => {
@@ -60,11 +61,13 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                 setCallDuration(Math.floor((Date.now() - startTime) / 1000));
             }, 1000);
         } else if (!isEnabled) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCallDuration(0);
         }
         return () => {
             if (interval) clearInterval(interval);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEnabled, isConnected]);
 
     // Attach remote stream to audio element
@@ -106,6 +109,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
         if (!localStream || !isMicOn) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
@@ -163,16 +167,16 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         )}
                     </div>
 
-                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
 
                     {/* Call Timer */}
-                    <div className="px-2 min-w-[3rem] text-center">
+                    <div className="px-2 min-w-12 text-center">
                         <span className="text-[10px] font-mono font-bold text-zinc-400 tabular-nums">
                             {Math.floor(callDuration / 60)}:{String(callDuration % 60).padStart(2, '0')}
                         </span>
                     </div>
 
-                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
 
                     {/* Mic Toggle with Local Speaking Visualizer */}
                     <button
@@ -197,7 +201,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
                     >
                         {isSpeakerOn ? <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-zinc-400'} /> : <VolumeX size={14} />}
-                        
+
                         {/* Opponent Speaker Status Indicator (Green dot if they are listening) */}
                         {isSpeakerOn && opponentStatus.speaker && !isOpponentSpeaking && (
                             <div className="absolute top-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border border-zinc-900" title="Opponent Listening" />

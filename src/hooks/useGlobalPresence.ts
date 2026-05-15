@@ -12,7 +12,9 @@ export interface PresenceUser {
 export const useGlobalPresence = (userId: string | undefined) => {
     const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
     const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
+    const [incomingCall, setIncomingCall] = useState<{ from: PresenceUser, challengeId: string } | null>(null);
     const channelRef = useRef<any>(null);
+    const signalChannelRef = useRef<any>(null);
 
     const fetchProfiles = useCallback(async () => {
         const { data } = await supabase
@@ -45,6 +47,7 @@ export const useGlobalPresence = (userId: string | undefined) => {
 
         if (!userId) return () => clearInterval(heartbeat);
 
+        // 1. Presence Channel
         const channelId = 'global_presence';
         const channel = supabase.channel(channelId, {
             config: { presence: { key: userId } }
@@ -57,7 +60,7 @@ export const useGlobalPresence = (userId: string | undefined) => {
 
                 Object.keys(state).forEach((key) => {
                     const sessions = state[key] as any[];
-                    const latest = sessions[0]; // Just take the latest session info
+                    const latest = sessions[0]; 
                     if (latest && latest.user) {
                         online.set(latest.user.id, latest.user);
                     }
@@ -67,7 +70,6 @@ export const useGlobalPresence = (userId: string | undefined) => {
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    // Fetch user info for presence
                     const { data: profile } = await supabase
                         .from('profiles')
                         .select('id, username, avatar_url')
@@ -85,12 +87,28 @@ export const useGlobalPresence = (userId: string | undefined) => {
 
         channelRef.current = channel;
 
+        // 2. Private Signal Channel (for Incoming Calls)
+        const signalChannelId = `user_signals_${userId}`;
+        const signalChannel = supabase.channel(signalChannelId);
+
+        signalChannel
+            .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
+                setIncomingCall({ from: payload.from, challengeId: payload.challengeId });
+            })
+            .on('broadcast', { event: 'call_cancelled' }, () => {
+                setIncomingCall(null);
+            })
+            .subscribe();
+
+        signalChannelRef.current = signalChannel;
+
         return () => {
             clearInterval(heartbeat);
             channel.unsubscribe();
-            updateLastSeen(); // Final update on leave
+            signalChannel.unsubscribe();
+            updateLastSeen();
         };
     }, [userId, fetchProfiles, updateLastSeen]);
 
-    return { onlineUsers, allProfiles, refreshProfiles: fetchProfiles };
+    return { onlineUsers, allProfiles, incomingCall, setIncomingCall, refreshProfiles: fetchProfiles };
 };

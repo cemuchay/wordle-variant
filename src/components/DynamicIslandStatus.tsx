@@ -8,14 +8,50 @@ import { AudioChatControls } from './challenge/AudioChatControls';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const { activeCall } = useApp();
-    const { onlineUsers, allProfiles } = useGlobalPresence(user?.id);
+    const { activeCall, setActiveCall, setIsChallengeOpen } = useApp();
+    const { onlineUsers, allProfiles, incomingCall, setIncomingCall } = useGlobalPresence(user?.id);
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-    if (otherOnlineUsers.length === 0 && !isExpanded && !activeCall) return null;
+    if (otherOnlineUsers.length === 0 && !isExpanded && !activeCall && !incomingCall) return null;
+
+    const handleAnswer = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (incomingCall) {
+            setActiveCall({ challengeId: incomingCall.challengeId, userId: user?.id || "" });
+            
+            // Navigate to challenge
+            const url = new URL(window.location.href);
+            url.searchParams.set('challenge', incomingCall.challengeId);
+            window.history.pushState({}, '', url);
+            setIsChallengeOpen(true);
+            
+            setIncomingCall(null);
+            setIsExpanded(false);
+        }
+    };
+
+    const handleReject = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (incomingCall) {
+            // Send rejection signal to the specific audio_chat channel
+            const channel = supabase.channel(`audio_chat_${incomingCall.challengeId}`);
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    channel.send({
+                        type: 'broadcast',
+                        event: 'signal',
+                        payload: { type: 'call_rejected', from: user?.id }
+                    });
+                    channel.unsubscribe();
+                }
+            });
+            setIncomingCall(null);
+            setIsExpanded(false);
+        }
+    };
 
     const formatLastSeen = (dateString?: string) => {
         if (!dateString) return 'Never';
@@ -69,7 +105,14 @@ export const DynamicIslandStatus = () => {
                         layout
                         className="flex items-center gap-3 px-3 h-full w-full justify-center"
                     >
-                        {activeCall ? (
+                        {incomingCall ? (
+                            <div className="flex items-center gap-2">
+                                <Phone size={12} className="text-emerald-500 animate-bounce" />
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                    Call from {incomingCall.from.username}
+                                </span>
+                            </div>
+                        ) : activeCall ? (
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                                 <Phone size={12} className="text-emerald-500 animate-bounce" />
@@ -112,6 +155,42 @@ export const DynamicIslandStatus = () => {
                         transition={{ delay: 0.2 }}
                         className="w-full h-full flex flex-col p-6"
                     >
+                        {/* Incoming Call Section */}
+                        {incomingCall && (
+                            <div className="mb-6 pb-6 border-b border-white/10">
+                                <div className="flex flex-col items-center text-center gap-4">
+                                    <div className="relative">
+                                        <img 
+                                            src={incomingCall.from.avatar_url} 
+                                            alt="" 
+                                            className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                        />
+                                        <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-emerald-500">
+                                            <Phone size={12} className="text-emerald-500" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-black text-sm uppercase">{incomingCall.from.username}</h3>
+                                        <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
+                                    </div>
+                                    <div className="flex items-center gap-4 w-full">
+                                        <button 
+                                            onClick={handleReject}
+                                            className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-red-500/20"
+                                        >
+                                            Decline
+                                        </button>
+                                        <button 
+                                            onClick={handleAnswer}
+                                            className="flex-1 bg-emerald-500 hover:bg-emerald-500 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 animate-pulse"
+                                        >
+                                            Answer
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Call Controls Section */}
                         {activeCall && (
                             <div className="mb-6 pb-6 border-b border-white/5">
