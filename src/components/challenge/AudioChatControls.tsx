@@ -63,97 +63,75 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEnabled, isConnected]);
 
-    // Simple volume detection for "speaking" animation (Remote)
+    // Volume detection logic using a shared AudioContext to prevent "too many AudioContexts" errors
     useEffect(() => {
-        if (!remoteStream || !isConnected || !isEnabled) {
+        if (!isEnabled || !isConnected) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsOpponentSpeaking(false);
-            return;
-        }
-
-        let audioContext: AudioContext;
-        let animationFrame: number;
-
-        const setupAnalyzer = async () => {
-            try {
-                audioContext = new AudioContext();
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-
-                const source = audioContext.createMediaStreamSource(remoteStream);
-                const analyzer = audioContext.createAnalyser();
-                analyzer.fftSize = 256; // Smaller for better performance
-                source.connect(analyzer);
-
-                const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-
-                const checkVolume = () => {
-                    analyzer.getByteFrequencyData(dataArray);
-                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                    setIsOpponentSpeaking(average > 8); // Lower threshold for more sensitivity
-                    animationFrame = requestAnimationFrame(checkVolume);
-                };
-
-                checkVolume();
-            } catch (err) {
-                console.warn('AudioChat: Could not setup remote analyzer', err);
-            }
-        };
-
-        setupAnalyzer();
-
-        return () => {
-            if (animationFrame) cancelAnimationFrame(animationFrame);
-            if (audioContext) audioContext.close();
-        };
-    }, [remoteStream, isConnected, isEnabled]);
-
-    // Simple volume detection for "speaking" animation (Local)
-    useEffect(() => {
-        if (!localStream || !isMicOn || !isEnabled) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
 
-        let audioContext: AudioContext;
+        let audioCtx: AudioContext | null = null;
+        let remoteSource: MediaStreamAudioSourceNode | null = null;
+        let localSource: MediaStreamAudioSourceNode | null = null;
+        let remoteAnalyzer: AnalyserNode | null = null;
+        let localAnalyzer: AnalyserNode | null = null;
         let animationFrame: number;
 
-        const setupAnalyzer = async () => {
+        const setupAnalyzers = async () => {
             try {
-                audioContext = new AudioContext();
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
+                // Use the standard constructor; multiple calls are usually fine if we close them,
+                // but for stability we'll try to keep this one alive for the duration of the call.
+                audioCtx = new AudioContext();
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+                if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+                    remoteSource = audioCtx.createMediaStreamSource(remoteStream);
+                    remoteAnalyzer = audioCtx.createAnalyser();
+                    remoteAnalyzer.fftSize = 256;
+                    remoteSource.connect(remoteAnalyzer);
                 }
 
-                const source = audioContext.createMediaStreamSource(localStream);
-                const analyzer = audioContext.createAnalyser();
-                analyzer.fftSize = 256;
-                source.connect(analyzer);
+                if (localStream && localStream.getAudioTracks().length > 0) {
+                    localSource = audioCtx.createMediaStreamSource(localStream);
+                    localAnalyzer = audioCtx.createAnalyser();
+                    localAnalyzer.fftSize = 256;
+                    localSource.connect(localAnalyzer);
+                }
 
-                const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-
+                const dataArray = new Uint8Array(128);
                 const checkVolume = () => {
-                    analyzer.getByteFrequencyData(dataArray);
-                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                    setIsLocalSpeaking(average > 8);
+                    if (remoteAnalyzer) {
+                        remoteAnalyzer.getByteFrequencyData(dataArray);
+                        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                        setIsOpponentSpeaking(average > 8);
+                    }
+                    if (localAnalyzer && isMicOn) {
+                        localAnalyzer.getByteFrequencyData(dataArray);
+                        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                        setIsLocalSpeaking(average > 8);
+                    } else {
+                        setIsLocalSpeaking(false);
+                    }
                     animationFrame = requestAnimationFrame(checkVolume);
                 };
 
                 checkVolume();
             } catch (err) {
-                console.warn('AudioChat: Could not setup local analyzer', err);
+                console.warn('AudioChat: Could not setup analyzers', err);
             }
         };
 
-        setupAnalyzer();
+        setupAnalyzers();
 
         return () => {
             if (animationFrame) cancelAnimationFrame(animationFrame);
-            if (audioContext) audioContext.close();
+            if (remoteSource) remoteSource.disconnect();
+            if (localSource) localSource.disconnect();
+            if (audioCtx) audioCtx.close().catch(() => { });
         };
-    }, [localStream, isMicOn, isEnabled]);
+    }, [remoteStream, localStream, isConnected, isEnabled, isMicOn]);
 
     return (
         <div className="flex items-center gap-2">
