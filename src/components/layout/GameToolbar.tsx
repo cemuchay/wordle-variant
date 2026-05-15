@@ -1,4 +1,5 @@
 import { BarChart2, HelpCircle, Lightbulb, RotateCcw, Share, Trophy } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 interface GameToolbarProps {
     onOpenChallenge: () => void;
@@ -25,16 +26,23 @@ export const GameToolbar = ({
     usedHint,
     canShowHint
 }: GameToolbarProps) => {
+    const { challengeUnreadCount } = useApp();
+
     return (
         <div className="w-full max-w-lg mx-auto mb-4">
             <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl border border-white/10">
                 <div className="flex items-center gap-1">
                     <button
                         onClick={onOpenChallenge}
-                        className="p-2 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all"
+                        className="p-2 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl transition-all relative"
                         title="Challenges"
                     >
                         <Trophy size={ICON_SIZE} />
+                        {challengeUnreadCount > 0 && (
+                            <span className="absolute top-0.5 right-0.5 bg-correct text-black text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-black shadow-sm">
+                                {challengeUnreadCount}
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={onOpenStats}

@@ -3,23 +3,24 @@ import { Clock, Phone, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
-import { useGlobalPresence } from '../hooks/useGlobalPresence';
 import { AudioChatControls } from './challenge/AudioChatControls';
 import { supabase } from '../lib/supabaseClient';
-import { useAudioChat } from '../hooks/useAudioChat';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const { activeCall, setActiveCall, setIsChallengeOpen, triggerToast } = useApp();
-    const { onlineUsers, allProfiles, incomingCall, setIncomingCall } = useGlobalPresence(user?.id);
+    const { 
+        activeCall, 
+        setActiveCall, 
+        setIsChallengeOpen, 
+        triggerToast,
+        onlineUsers,
+        allProfiles,
+        incomingCall,
+        setIncomingCall,
+        audioChat
+    } = useApp();
+    
     const [isExpanded, setIsExpanded] = useState(false);
-
-    // PERSISTENCE: Run audio hook here so it never unmounts while a call is active
-    const audioChat = useAudioChat({
-        challengeId: activeCall?.challengeId || '',
-        userId: user?.id || '',
-        enabled: !!activeCall
-    });
 
     useEffect(() => {
         if (audioChat.error) {
@@ -220,7 +221,6 @@ export const DynamicIslandStatus = () => {
                                     <AudioChatControls
                                         challengeId={activeCall.challengeId}
                                         userId={activeCall.userId}
-                                        externalAudioChat={audioChat}
                                     />
                                 </div>
                             </div>

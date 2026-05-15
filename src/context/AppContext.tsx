@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { supabase } from '../lib/supabaseClient';
 import { getServerDate } from '../lib/time';
 import { type GameStats } from '../types/game';
+import { useGlobalPresence, type PresenceUser } from '../hooks/useGlobalPresence';
+import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
 
 interface UserPreferences {
     allowRoasts: boolean;
@@ -28,9 +30,11 @@ interface AppContextType {
         show: boolean, message: string, duration: number | undefined
     };
     triggerToast: ((msg: string, duration?: number) => any);
-    setToast: any,
+    setToast: any;
     unreadCount: number;
-    setUnreadCount: any;
+    setUnreadCount: (val: number) => void;
+    challengeUnreadCount: number;
+    setChallengeUnreadCount: (val: number) => void;
     date: string | null;
     isLoadingDate: boolean;
     setIsLoadingDate: any;
@@ -40,6 +44,13 @@ interface AppContextType {
     setActiveCall: (call: { challengeId: string, userId: string } | null) => void;
     isChallengeOpen: boolean;
     setIsChallengeOpen: (val: boolean) => void;
+
+    // Global Presence & Audio Chat
+    onlineUsers: PresenceUser[];
+    allProfiles: PresenceUser[];
+    incomingCall: { from: PresenceUser, challengeId: string } | null;
+    setIncomingCall: (call: { from: PresenceUser, challengeId: string } | null) => void;
+    audioChat: AudioChatState;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -55,6 +66,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [challengeUnreadCount, setChallengeUnreadCount] = useState(0);
     const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
     const [activeCall, setActiveCall] = useState<{ challengeId: string, userId: string } | null>(null);
     const [isChallengeOpen, setIsChallengeOpen] = useState(() => {
@@ -67,6 +79,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }>({ show: false, message: "", duration: undefined });
 
     const triggerToast = (msg: string, duration?: number) => setToast({ show: true, message: msg, duration: duration });
+
+    // Global Presence Hook
+    const { onlineUsers, allProfiles, incomingCall, setIncomingCall, sendIncomingCall } = useGlobalPresence(profile?.id);
+
+    // Global Audio Chat Hook
+    const audioChat = useAudioChat({
+        challengeId: activeCall?.challengeId || '',
+        userId: profile?.id || '',
+        enabled: !!activeCall
+    });
+
+    // Handle sending invitations when a call is started
+    useEffect(() => {
+        if (activeCall && audioChat.logs.length > 0) {
+            const hasJoined = audioChat.logs.some(l => l.message.includes('Joining audio channel'));
+            const hasNotified = audioChat.logs.some(l => l.message.includes('Notification sent'));
+
+            if (hasJoined && !hasNotified) {
+                sendIncomingCall(activeCall.challengeId);
+                audioChat.addLog('Notification sent to other party', 'success');
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeCall, audioChat.logs, sendIncomingCall, audioChat.addLog]);
 
     const fetchProfile = async () => {
         try {
@@ -84,7 +120,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             if (!error && data) {
                 setProfile(data);
-                // Merge DB preferences with defaults to handle missing keys
                 setPreferences({
                     ...defaultPreferences,
                     ...(data.preferences as object),
@@ -101,7 +136,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchProfile();
 
-        // Listen for Auth changes (Sign In / Sign Out)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
             fetchProfile();
         });
@@ -138,6 +172,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setToast,
             unreadCount,
             setUnreadCount,
+            challengeUnreadCount,
+            setChallengeUnreadCount,
             date,
             isLoadingDate,
             setIsLoadingDate,
@@ -146,15 +182,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             activeCall,
             setActiveCall,
             isChallengeOpen,
-            setIsChallengeOpen
+            setIsChallengeOpen,
+            onlineUsers,
+            allProfiles,
+            incomingCall,
+            setIncomingCall,
+            audioChat
         }}>
             {children}
         </AppContext.Provider>
     );
 };
 
-// Custom hook for easy access
-// eslint-disable-next-line react-refresh/only-export-components
 export const useApp = () => {
     const context = useContext(AppContext);
     if (context === undefined) {

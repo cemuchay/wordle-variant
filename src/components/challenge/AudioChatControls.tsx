@@ -1,18 +1,14 @@
 import { Mic, MicOff, Volume2, VolumeX, Phone, PhoneOff, AlertCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useAudioChat } from '../../hooks/useAudioChat';
 import { useApp } from '../../context/AppContext';
 
 interface AudioChatControlsProps {
     challengeId: string;
     userId: string;
-    // Pass in the hook state from top level for persistence
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    externalAudioChat?: any;
 }
 
-export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: AudioChatControlsProps) => {
-    const { triggerToast, activeCall, setActiveCall } = useApp();
+export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
+    const { triggerToast, activeCall, setActiveCall, audioChat } = useApp();
 
     // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
     const isEnabled = activeCall?.challengeId === challengeId;
@@ -32,10 +28,6 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
 
     const [callDuration, setCallDuration] = useState(0);
 
-    // Use the passed in state OR run locally if not provided (fallback)
-    const localAudioChat = useAudioChat({ challengeId, userId, enabled: isEnabled });
-    const audioChat = externalAudioChat || localAudioChat;
-
     const {
         localStream,
         remoteStream,
@@ -47,17 +39,10 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
         toggleMic,
         toggleSpeaker
     } = audioChat;
+
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
     const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
-
-    // Toast error messages
-    useEffect(() => {
-        if (error) {
-            triggerToast(error, 5000);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [error,]);
 
     // Call duration timer
     useEffect(() => {
@@ -80,7 +65,7 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
     // Attach remote stream to audio element
     useEffect(() => {
         const audio = audioRef.current;
-        if (audio && remoteStream) {
+        if (audio && remoteStream && isEnabled) {
             console.log('AudioChat: Attaching remote stream', remoteStream.id);
             audio.srcObject = remoteStream;
             audio.muted = !isSpeakerOn;
@@ -105,11 +90,14 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
                 audio.srcObject = null;
             };
         }
-    }, [remoteStream, isSpeakerOn]);
+    }, [remoteStream, isSpeakerOn, isEnabled]);
 
     // Simple volume detection for "speaking" animation (Remote)
     useEffect(() => {
-        if (!remoteStream || !isConnected) return;
+        if (!remoteStream || !isConnected || !isEnabled) {
+            setIsOpponentSpeaking(false);
+            return;
+        }
 
         let audioContext: AudioContext;
         let animationFrame: number;
@@ -143,11 +131,11 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
             if (animationFrame) cancelAnimationFrame(animationFrame);
             if (audioContext) audioContext.close();
         };
-    }, [remoteStream, isConnected]);
+    }, [remoteStream, isConnected, isEnabled]);
 
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
-        if (!localStream || !isMicOn) {
+        if (!localStream || !isMicOn || !isEnabled) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
@@ -185,7 +173,7 @@ export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: Au
             if (animationFrame) cancelAnimationFrame(animationFrame);
             if (audioContext) audioContext.close();
         };
-    }, [localStream, isMicOn]);
+    }, [localStream, isMicOn, isEnabled]);
 
     return (
         <div className="flex items-center gap-2">
