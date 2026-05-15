@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useGlobalPresence } from '../hooks/useGlobalPresence';
 import { AudioChatControls } from './challenge/AudioChatControls';
+import { supabase } from '../lib/supabaseClient';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -21,13 +22,13 @@ export const DynamicIslandStatus = () => {
         e.stopPropagation();
         if (incomingCall) {
             setActiveCall({ challengeId: incomingCall.challengeId, userId: user?.id || "" });
-            
+
             // Navigate to challenge
             const url = new URL(window.location.href);
             url.searchParams.set('challenge', incomingCall.challengeId);
             window.history.pushState({}, '', url);
             setIsChallengeOpen(true);
-            
+
             setIncomingCall(null);
             setIsExpanded(false);
         }
@@ -160,9 +161,9 @@ export const DynamicIslandStatus = () => {
                             <div className="mb-6 pb-6 border-b border-white/10">
                                 <div className="flex flex-col items-center text-center gap-4">
                                     <div className="relative">
-                                        <img 
-                                            src={incomingCall.from.avatar_url} 
-                                            alt="" 
+                                        <img
+                                            src={incomingCall.from.avatar_url}
+                                            alt=""
                                             className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                                         />
                                         <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-emerald-500">
@@ -174,13 +175,13 @@ export const DynamicIslandStatus = () => {
                                         <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
                                     </div>
                                     <div className="flex items-center gap-4 w-full">
-                                        <button 
+                                        <button
                                             onClick={handleReject}
                                             className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-red-500/20"
                                         >
                                             Decline
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={handleAnswer}
                                             className="flex-1 bg-emerald-500 hover:bg-emerald-500 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 animate-pulse"
                                         >
