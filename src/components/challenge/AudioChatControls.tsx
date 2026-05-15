@@ -22,7 +22,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                 triggerToast("You are already in a call. Leave it first to join this one.", 4000);
                 return;
             }
-            setActiveCall({ challengeId, userId });
+            setActiveCall({ challengeId, userId, isInitiator: true });
         }
     };
 
@@ -95,6 +95,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     // Simple volume detection for "speaking" animation (Remote)
     useEffect(() => {
         if (!remoteStream || !isConnected || !isEnabled) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsOpponentSpeaking(false);
             return;
         }

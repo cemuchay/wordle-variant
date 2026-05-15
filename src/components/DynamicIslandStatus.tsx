@@ -37,7 +37,7 @@ export const DynamicIslandStatus = () => {
     const handleAnswer = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (incomingCall) {
-            setActiveCall({ challengeId: incomingCall.challengeId, userId: user?.id || "" });
+            setActiveCall({ challengeId: incomingCall.challengeId, userId: user?.id || "", isInitiator: false });
 
             // Navigate to challenge
             const url = new URL(window.location.href);

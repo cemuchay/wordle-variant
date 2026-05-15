@@ -1,24 +1,24 @@
 import { MessageSquare, X } from 'lucide-react';
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
+import { DynamicIslandStatus } from './components/DynamicIslandStatus';
 import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
-import { Toast } from './components/Toast';
 import { CloudSyncMenu } from './components/SyncCloudModal';
-import { DynamicIslandStatus } from './components/DynamicIslandStatus';
-import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
-
-const ChatRoom = lazy(() => import('./components/chatRoom'));
+import { Toast } from './components/Toast';
 import { useApp } from './context/AppContext';
+import { useAppInit } from './hooks/useAppInit';
 import { useAuth } from './hooks/useAuth';
 import { useChat } from './hooks/useChat';
 import { useGameEngine } from './hooks/useGameEngine';
-import { useAppInit } from './hooks/useAppInit';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
-import { useChallenge } from './hooks/useChallenge';
 import { type AppUser } from './types/game';
+import { useChallenge } from './hooks/useChallenge';
+
+const ChatRoom = lazy(() => import('./components/chatRoom'));
 
 export default function App() {
     const { user } = useAuth();
@@ -30,19 +30,21 @@ export default function App() {
         isLoadingDate,
         unreadCount,
         setUnreadCount,
-        setChallengeUnreadCount,
         isChallengeOpen,
-        setIsChallengeOpen
+        setIsChallengeOpen,
+        setChallengeUnreadCount,
     } = useApp();
 
     // Core Game Engine
     const { state, actions, config } = useGameEngine(date as string);
+
     const { fetchMyChallenges } = useChallenge(user as AppUser);
 
     // Initial Challenges Fetch
     useEffect(() => {
         if (user) {
             fetchMyChallenges().then(data => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const count = data.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
                 setChallengeUnreadCount(count);
             });
