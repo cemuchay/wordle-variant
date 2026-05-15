@@ -37,17 +37,6 @@ export default function App() {
 
     // Core Game Engine
     const { state, actions, config } = useGameEngine(date as string);
-    const { fetchMyChallenges } = useChallenge(user as AppUser);
-
-    // Initial Challenges Fetch
-    useEffect(() => {
-        if (user) {
-            fetchMyChallenges().then(data => {
-                const count = data.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
-                setChallengeUnreadCount(count);
-            });
-        }
-    }, [user, fetchMyChallenges, setChallengeUnreadCount]);
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);

@@ -25,7 +25,7 @@ export const AudioConnectionLog = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-4 left-4 w-64 max-h-48 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-2xl z-50 pointer-events-auto"
+            className="fixed bottom-4 left-4 w-72 max-h-60 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-2xl z-50 pointer-events-auto"
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-white/5">
                 <div className="flex items-center gap-2">
@@ -48,31 +48,35 @@ export const AudioConnectionLog = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide flex flex-col-reverse">
+            {/* Latest on top, sorted by timestamp to prevent jumbled order */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-hide">
                 <AnimatePresence initial={false}>
-                    {audioChat.logs.slice().reverse().map((log) => (
+                    {audioChat.logs
+                        .slice()
+                        .sort((a, b) => b.timestamp - a.timestamp)
+                        .map((log) => (
                         <motion.div
                             key={log.timestamp + log.message}
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-start gap-2 group"
                         >
-                            <div className="mt-0.5">
+                            <div className="mt-0.5 shrink-0">
                                 {log.type === 'success' && <CheckCircle2 size={10} className="text-emerald-500" />}
                                 {log.type === 'error' && <AlertCircle size={10} className="text-red-500" />}
                                 {log.type === 'warning' && <Timer size={10} className="text-yellow-500" />}
                                 {log.type === 'info' && <Info size={10} className="text-blue-400" />}
                             </div>
-                            <div className="flex flex-col flex-1">
-                                <span className={`text-[9px] leading-tight font-medium ${
-                                    log.type === 'success' ? 'text-emerald-400/90' :
-                                    log.type === 'error' ? 'text-red-400/90' :
-                                    log.type === 'warning' ? 'text-yellow-400/90' :
-                                    'text-white/60'
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <span className={`text-[9px] leading-tight font-bold break-words ${
+                                    log.type === 'success' ? 'text-emerald-400' :
+                                    log.type === 'error' ? 'text-red-400' :
+                                    log.type === 'warning' ? 'text-yellow-400' :
+                                    'text-white/80'
                                 }`}>
                                     {log.message}
                                 </span>
-                                <span className="text-[7px] text-white/20 font-mono">
+                                <span className="text-[7px] text-white/20 font-mono mt-0.5">
                                     {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                 </span>
                             </div>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { getServerDate } from '../lib/time';
 import { type GameStats } from '../types/game';
@@ -40,8 +40,8 @@ interface AppContextType {
     setIsLoadingDate: any;
     stats: GameStats;
     setStats: (stats: GameStats) => void;
-    activeCall: { challengeId: string, userId: string } | null;
-    setActiveCall: (call: { challengeId: string, userId: string } | null) => void;
+    activeCall: { challengeId: string, userId: string, isInitiator?: boolean } | null;
+    setActiveCall: (call: { challengeId: string, userId: string, isInitiator?: boolean } | null) => void;
     isChallengeOpen: boolean;
     setIsChallengeOpen: (val: boolean) => void;
 
@@ -68,7 +68,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [challengeUnreadCount, setChallengeUnreadCount] = useState(0);
     const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
-    const [activeCall, setActiveCall] = useState<{ challengeId: string, userId: string } | null>(null);
+    const [activeCall, setActiveCall] = useState<{ challengeId: string, userId: string, isInitiator?: boolean } | null>(null);
     const [isChallengeOpen, setIsChallengeOpen] = useState(() => {
         const params = new URLSearchParams(window.location.search);
         return params.has('challenge');
@@ -92,7 +92,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Handle sending invitations when a call is started
     useEffect(() => {
-        if (activeCall && audioChat.logs.length > 0) {
+        if (activeCall?.isInitiator && audioChat.logs.length > 0) {
             const hasJoined = audioChat.logs.some(l => l.message.includes('Joining audio channel'));
             const hasNotified = audioChat.logs.some(l => l.message.includes('Notification sent'));
 
@@ -103,6 +103,52 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeCall, audioChat.logs, sendIncomingCall, audioChat.addLog]);
+
+    // Live Challenge Unread Counter
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+    const refreshChallengeUnreadCount = useCallback(async () => {
+        if (!profile?.id) return;
+        try {
+            const { data } = await supabase
+                .from('challenge_participants')
+                .select('status, challenge:challenges(expires_at)')
+                .eq('user_id', profile.id);
+
+            if (data) {
+                const count = data.filter((c: any) =>
+                    (c.status === 'pending' || c.status === 'playing') &&
+                    new Date(c.challenge.expires_at) > new Date()
+                ).length;
+                setChallengeUnreadCount(count);
+            }
+        } catch (err) {
+            console.error('Error refreshing challenge unread count:', err);
+        }
+    }, [profile?.id]);
+
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        refreshChallengeUnreadCount();
+
+        // Subscribe to participant changes for this user
+        const channel = supabase
+            .channel(`unread_challenges_${profile.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'challenge_participants',
+                filter: `user_id=eq.${profile.id}`
+            }, () => {
+                refreshChallengeUnreadCount();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [profile?.id, refreshChallengeUnreadCount]);
 
     const fetchProfile = async () => {
         try {
@@ -194,6 +240,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useApp = () => {
     const context = useContext(AppContext);
     if (context === undefined) {
