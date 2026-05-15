@@ -6,9 +6,12 @@ import { useApp } from '../../context/AppContext';
 interface AudioChatControlsProps {
     challengeId: string;
     userId: string;
+    // Pass in the hook state from top level for persistence
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    externalAudioChat?: any;
 }
 
-export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
+export const AudioChatControls = ({ challengeId, userId, externalAudioChat }: AudioChatControlsProps) => {
     const { triggerToast, activeCall, setActiveCall } = useApp();
 
     // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
@@ -28,6 +31,11 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     };
 
     const [callDuration, setCallDuration] = useState(0);
+
+    // Use the passed in state OR run locally if not provided (fallback)
+    const localAudioChat = useAudioChat({ challengeId, userId, enabled: isEnabled });
+    const audioChat = externalAudioChat || localAudioChat;
+
     const {
         localStream,
         remoteStream,
@@ -38,8 +46,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         error,
         toggleMic,
         toggleSpeaker
-    } = useAudioChat({ challengeId, userId, enabled: isEnabled });
-
+    } = audioChat;
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
     const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
@@ -77,7 +84,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
             console.log('AudioChat: Attaching remote stream', remoteStream.id);
             audio.srcObject = remoteStream;
             audio.muted = !isSpeakerOn;
-            
+
             const playAudio = () => {
                 audio.play().catch(err => {
                     console.warn('AudioChat: Playback blocked, waiting for interaction', err);
@@ -85,14 +92,14 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
             };
 
             playAudio();
-            
+
             // Re-attempt play on user interaction if blocked
             const handleInteraction = () => {
                 if (audio.paused) playAudio();
                 window.removeEventListener('click', handleInteraction);
             };
             window.addEventListener('click', handleInteraction);
-            
+
             return () => {
                 window.removeEventListener('click', handleInteraction);
                 audio.srcObject = null;
@@ -141,6 +148,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
         if (!localStream || !isMicOn) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
