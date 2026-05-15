@@ -13,9 +13,8 @@ export const DynamicIslandStatus = () => {
         triggerToast,
         onlineUsers,
         allProfiles,
-        incomingCall,
-        setIncomingCall,
-        audioChat
+        audioChat,
+        activeVoiceRooms
     } = useApp();
 
     const [isExpanded, setIsExpanded] = useState(false);
@@ -29,21 +28,20 @@ export const DynamicIslandStatus = () => {
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-    // Show island if: expanded OR online users > 0 OR active call OR incoming call
-    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !incomingCall) return null;
+    // Get the first active voice room to show in the island
+    const currentVoiceSession = activeVoiceRooms[0];
 
-    const handleGoToLobby = (e: React.MouseEvent) => {
+    // Show island if: expanded OR online users > 0 OR active call OR someone is in a voice room I'm part of
+    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !currentVoiceSession) return null;
+
+    const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
-        if (incomingCall) {
-            // Navigate to challenge
-            const url = new URL(window.location.href);
-            url.searchParams.set('challenge', incomingCall.challengeId);
-            window.history.pushState({}, '', url);
-            setIsChallengeOpen(true);
-
-            setIncomingCall(null);
-            setIsExpanded(false);
-        }
+        // Navigate to challenge
+        const url = new URL(window.location.href);
+        url.searchParams.set('challenge', challengeId);
+        window.history.pushState({}, '', url);
+        setIsChallengeOpen(true);
+        setIsExpanded(false);
     };
 
     const formatLastSeen = (dateString?: string) => {
@@ -72,6 +70,8 @@ export const DynamicIslandStatus = () => {
         return bTime - aTime;
     });
 
+    const isConnected = audioChat.isConnected;
+
     return (
         <div className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none transition-transform duration-500 ${isExpanded ? 'translate-y-2' : ''}`}>
             <motion.div
@@ -88,7 +88,7 @@ export const DynamicIslandStatus = () => {
                 `}
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
-                    width: isExpanded ? 'min(95vw, 340px)' : (activeCall ? '140px' : (otherOnlineUsers.length === 1 ? '160px' : '100px')),
+                    width: isExpanded ? 'min(95vw, 340px)' : (activeCall ? '140px' : (currentVoiceSession ? '180px' : (otherOnlineUsers.length === 1 ? '160px' : '100px'))),
                     height: isExpanded ? 'min(75vh, 450px)' : '32px',
                 }}
             >
@@ -98,18 +98,25 @@ export const DynamicIslandStatus = () => {
                         layout
                         className="flex items-center gap-3 px-3 h-full w-full justify-center"
                     >
-                        {incomingCall ? (
+                        {activeCall ? (
                             <div className="flex items-center gap-2">
-                                <Phone size={12} className="text-emerald-500 animate-bounce" />
+                                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                                <Phone size={12} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
                                 <span className="text-[10px] font-black text-white uppercase tracking-tighter">
-                                    Call from {incomingCall.from.username}
+                                    {isConnected ? 'On Call' : 'Connecting...'}
                                 </span>
                             </div>
-                        ) : activeCall ? (
+                        ) : currentVoiceSession ? (
                             <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                <Phone size={12} className="text-emerald-500 animate-bounce" />
-                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">On Call</span>
+                                <img
+                                    src={currentVoiceSession.user.avatar_url}
+                                    alt=""
+                                    className="w-4 h-4 rounded-full border border-white/20"
+                                />
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                    {currentVoiceSession.user.username} in Voice
+                                </span>
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                             </div>
                         ) : otherOnlineUsers.length === 1 ? (
                             <>
@@ -148,13 +155,13 @@ export const DynamicIslandStatus = () => {
                         transition={{ delay: 0.2 }}
                         className="w-full h-full flex flex-col p-6"
                     >
-                        {/* Incoming Call Section */}
-                        {incomingCall && (
+                        {/* Active Voice Sessions in Rooms I'm part of */}
+                        {!activeCall && currentVoiceSession && (
                             <div className="mb-6 pb-6 border-b border-white/10">
                                 <div className="flex flex-col items-center text-center gap-4">
                                     <div className="relative">
                                         <img
-                                            src={incomingCall.from.avatar_url}
+                                            src={currentVoiceSession.user.avatar_url}
                                             alt=""
                                             className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                                         />
@@ -163,15 +170,15 @@ export const DynamicIslandStatus = () => {
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 className="text-white font-black text-sm uppercase">{incomingCall.from.username}</h3>
-                                        <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Incoming Voice Call</p>
+                                        <h3 className="text-white font-black text-sm uppercase">{currentVoiceSession.user.username}</h3>
+                                        <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Active in Voice Chat</p>
                                     </div>
                                     <div className="w-full">
                                         <button
-                                            onClick={handleGoToLobby}
+                                            onClick={(e) => handleGoToLobby(e, currentVoiceSession.challengeId)}
                                             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20"
                                         >
-                                            Go to Lobby
+                                            Join Room
                                         </button>
                                     </div>
                                 </div>
@@ -183,10 +190,12 @@ export const DynamicIslandStatus = () => {
                             <div className="mb-6 pb-6 border-b border-white/5">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Active Call</span>
+                                        <div className={`w-2 h-2 ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} rounded-full animate-pulse`} />
+                                        <span className={`text-[10px] font-black ${isConnected ? 'text-emerald-400' : 'text-yellow-500'} uppercase tracking-widest`}>
+                                            {isConnected ? 'Active Call' : 'Connecting...'}
+                                        </span>
                                     </div>
-                                    <Phone size={14} className="text-emerald-500" />
+                                    <Phone size={14} className={isConnected ? 'text-emerald-500' : 'text-yellow-500'} />
                                 </div>
                                 <div className="bg-white/5 p-4 rounded-2xl flex justify-center">
                                     <AudioChatControls
@@ -214,6 +223,8 @@ export const DynamicIslandStatus = () => {
                             <div className="space-y-4">
                                 {sortedProfiles.map((p) => {
                                     const isOnline = onlineUsers.some(u => u.id === p.id);
+                                    const inVoiceRoom = onlineUsers.find(u => u.id === p.id)?.activeVoiceRoomId;
+
                                     return (
                                         <div key={p.id} className="flex items-center justify-between group">
                                             <div className="flex items-center gap-3">
@@ -232,7 +243,9 @@ export const DynamicIslandStatus = () => {
                                                         {p.username} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
                                                     </span>
                                                     <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                                                        {isOnline ? (
+                                                        {inVoiceRoom ? (
+                                                            <span className="text-emerald-500 font-bold uppercase tracking-tighter">In Voice Chat</span>
+                                                        ) : isOnline ? (
                                                             <span className="text-emerald-500 font-bold uppercase tracking-tighter">Active Now</span>
                                                         ) : (
                                                             <>
@@ -243,6 +256,15 @@ export const DynamicIslandStatus = () => {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {inVoiceRoom && inVoiceRoom !== activeCall?.challengeId && (
+                                                <button
+                                                    onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
+                                                    className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
+                                                >
+                                                    Join
+                                                </button>
+                                            )}
                                         </div>
                                     );
                                 })}
