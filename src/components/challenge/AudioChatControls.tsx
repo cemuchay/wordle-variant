@@ -9,8 +9,14 @@ interface AudioChatControlsProps {
 }
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
-    const { triggerToast } = useApp();
-    const [isEnabled, setIsEnabled] = useState(false);
+    const { triggerToast, activeCall, setActiveCall } = useApp();
+    const isEnabled = activeCall?.challengeId === challengeId;
+
+    const setIsEnabled = (val: boolean) => {
+        if (val) setActiveCall({ challengeId, userId });
+        else setActiveCall(null);
+    };
+
     const [callDuration, setCallDuration] = useState(0);
     const {
         localStream,

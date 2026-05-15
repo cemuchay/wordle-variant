@@ -36,6 +36,8 @@ interface AppContextType {
     setIsLoadingDate: any;
     stats: GameStats;
     setStats: (stats: GameStats) => void;
+    activeCall: { challengeId: string, userId: string } | null;
+    setActiveCall: (call: { challengeId: string, userId: string } | null) => void;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -52,6 +54,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
     const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
+    const [activeCall, setActiveCall] = useState<{ challengeId: string, userId: string } | null>(null);
 
     const [toast, setToast] = useState<{
         show: boolean, message: string, duration: number | undefined
@@ -133,8 +136,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             isLoadingDate,
             setIsLoadingDate,
             stats,
-            setStats
-
+            setStats,
+            activeCall,
+            setActiveCall
         }}>
             {children}
         </AppContext.Provider>

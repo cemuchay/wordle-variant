@@ -1,18 +1,21 @@
-import { motion } from 'framer-motion';
-import { Clock, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, Users, Phone } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGlobalPresence } from '../hooks/useGlobalPresence';
+import { useApp } from '../context/AppContext';
+import { AudioChatControls } from './challenge/AudioChatControls';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
+    const { activeCall } = useApp();
     const { onlineUsers, allProfiles } = useGlobalPresence(user?.id);
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-    if (otherOnlineUsers.length === 0 && !isExpanded) return null;
+    if (otherOnlineUsers.length === 0 && !isExpanded && !activeCall) return null;
 
     const formatLastSeen = (dateString?: string) => {
         if (!dateString) return 'Never';
@@ -56,17 +59,23 @@ export const DynamicIslandStatus = () => {
                 `}
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
-                    width: isExpanded ? 'min(90vw, 300px)' : (otherOnlineUsers.length === 1 ? '160px' : '100px'),
-                    height: isExpanded ? 'min(70vh, 400px)' : '32px',
+                    width: isExpanded ? 'min(95vw, 340px)' : (activeCall ? '140px' : (otherOnlineUsers.length === 1 ? '160px' : '100px')),
+                    height: isExpanded ? 'min(75vh, 450px)' : '32px',
                 }}
             >
 
                 {!isExpanded ? (
                     <motion.div
                         layout
-                        className="flex items-center gap-2 px-3 h-full w-full justify-center"
+                        className="flex items-center gap-3 px-3 h-full w-full justify-center"
                     >
-                        {otherOnlineUsers.length === 1 ? (
+                        {activeCall ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                <Phone size={12} className="text-emerald-500 animate-bounce" />
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">On Call</span>
+                            </div>
+                        ) : otherOnlineUsers.length === 1 ? (
                             <>
                                 <img
                                     src={otherOnlineUsers[0].avatar_url}
@@ -103,6 +112,22 @@ export const DynamicIslandStatus = () => {
                         transition={{ delay: 0.2 }}
                         className="w-full h-full flex flex-col p-6"
                     >
+                        {/* Call Controls Section */}
+                        {activeCall && (
+                            <div className="mb-6 pb-6 border-b border-white/5">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Active Call</span>
+                                    </div>
+                                    <Phone size={14} className="text-emerald-500" />
+                                </div>
+                                <div className="bg-white/5 p-4 rounded-2xl flex justify-center">
+                                    <AudioChatControls challengeId={activeCall.challengeId} userId={activeCall.userId} />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
                                 <Users size={16} className="text-emerald-400" />
