@@ -10,11 +10,21 @@ interface AudioChatControlsProps {
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
     const { triggerToast, activeCall, setActiveCall } = useApp();
+    
+    // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
     const isEnabled = activeCall?.challengeId === challengeId;
 
-    const setIsEnabled = (val: boolean) => {
-        if (val) setActiveCall({ challengeId, userId });
-        else setActiveCall(null);
+    const toggleCall = () => {
+        if (isEnabled) {
+            setActiveCall(null);
+        } else {
+            // PREVENTION: Check if already in a DIFFERENT call
+            if (activeCall) {
+                triggerToast("You are already in a call. Leave it first to join this one.", 4000);
+                return;
+            }
+            setActiveCall({ challengeId, userId });
+        }
     };
 
     const [callDuration, setCallDuration] = useState(0);
@@ -131,7 +141,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
             {!isEnabled ? (
                 <button
-                    onClick={() => setIsEnabled(true)}
+                    onClick={toggleCall}
                     className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-3 py-1.5 rounded-xl border border-emerald-500/20 transition-all text-xs font-bold"
                 >
                     <Phone size={14} />
@@ -180,18 +190,31 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         )}
                     </button>
 
-                    {/* Speaker Toggle */}
+                    {/* Speaker Toggle with Opponent Status & Visualizer */}
                     <button
                         onClick={toggleSpeaker}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isSpeakerOn ? 'bg-zinc-800 text-zinc-400' : 'bg-red-500/10 text-red-500'}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${isSpeakerOn ? (isOpponentSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-red-500/10 text-red-500'}`}
                         title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
                     >
-                        {isSpeakerOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                        {isSpeakerOn ? <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-zinc-400'} /> : <VolumeX size={14} />}
+                        
+                        {/* Opponent Speaker Status Indicator (Green dot if they are listening) */}
+                        {isSpeakerOn && opponentStatus.speaker && !isOpponentSpeaking && (
+                            <div className="absolute top-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border border-zinc-900" title="Opponent Listening" />
+                        )}
+                        {/* Opponent Speaker Status Indicator (Red dot if they have muted their audio) */}
+                        {isSpeakerOn && !opponentStatus.speaker && (
+                            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-zinc-900" title="Opponent Muted Audio" />
+                        )}
+
+                        {isSpeakerOn && isOpponentSpeaking && (
+                            <div className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping opacity-20" />
+                        )}
                     </button>
 
                     {/* Leave Voice */}
                     <button
-                        onClick={() => setIsEnabled(false)}
+                        onClick={toggleCall}
                         className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-all ml-1"
                         title="Leave Voice"
                     >
