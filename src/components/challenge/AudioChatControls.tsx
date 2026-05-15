@@ -37,7 +37,8 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         isConnected,
         error,
         toggleMic,
-        toggleSpeaker
+        toggleSpeaker,
+        addLog
     } = audioChat;
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -67,30 +68,36 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         const audio = audioRef.current;
         if (audio && remoteStream && isEnabled) {
             console.log('AudioChat: Attaching remote stream', remoteStream.id);
+            addLog(`Attaching remote audio stream (${remoteStream.getAudioTracks().length} tracks)`, 'info');
+
             audio.srcObject = remoteStream;
-            audio.muted = !isSpeakerOn;
+            audio.muted = false; // Never mute the element itself, use volume instead for better browser compatibility
+            audio.volume = isSpeakerOn ? 1.0 : 0.0;
 
             const playAudio = () => {
                 audio.play().catch(err => {
                     console.warn('AudioChat: Playback blocked, waiting for interaction', err);
+                    addLog('Audio playback blocked by browser - click anywhere to enable', 'warning');
                 });
             };
 
             playAudio();
 
-            // Re-attempt play on user interaction if blocked
             const handleInteraction = () => {
                 if (audio.paused) playAudio();
                 window.removeEventListener('click', handleInteraction);
+                window.removeEventListener('touchstart', handleInteraction);
             };
             window.addEventListener('click', handleInteraction);
+            window.addEventListener('touchstart', handleInteraction);
 
             return () => {
                 window.removeEventListener('click', handleInteraction);
+                window.removeEventListener('touchstart', handleInteraction);
                 audio.srcObject = null;
             };
         }
-    }, [remoteStream, isSpeakerOn, isEnabled]);
+    }, [remoteStream, isSpeakerOn, isEnabled, addLog]);
 
     // Simple volume detection for "speaking" animation (Remote)
     useEffect(() => {
@@ -104,26 +111,30 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         let animationFrame: number;
 
         const setupAnalyzer = async () => {
-            audioContext = new AudioContext();
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+            try {
+                audioContext = new AudioContext();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                const source = audioContext.createMediaStreamSource(remoteStream);
+                const analyzer = audioContext.createAnalyser();
+                analyzer.fftSize = 256; // Smaller for better performance
+                source.connect(analyzer);
+
+                const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+                const checkVolume = () => {
+                    analyzer.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                    setIsOpponentSpeaking(average > 8); // Lower threshold for more sensitivity
+                    animationFrame = requestAnimationFrame(checkVolume);
+                };
+
+                checkVolume();
+            } catch (err) {
+                console.warn('AudioChat: Could not setup remote analyzer', err);
             }
-
-            const source = audioContext.createMediaStreamSource(remoteStream);
-            const analyzer = audioContext.createAnalyser();
-            analyzer.fftSize = 512;
-            source.connect(analyzer);
-
-            const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-
-            const checkVolume = () => {
-                analyzer.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                setIsOpponentSpeaking(average > 10);
-                animationFrame = requestAnimationFrame(checkVolume);
-            };
-
-            checkVolume();
         };
 
         setupAnalyzer();
@@ -146,26 +157,30 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         let animationFrame: number;
 
         const setupAnalyzer = async () => {
-            audioContext = new AudioContext();
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+            try {
+                audioContext = new AudioContext();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                const source = audioContext.createMediaStreamSource(localStream);
+                const analyzer = audioContext.createAnalyser();
+                analyzer.fftSize = 256;
+                source.connect(analyzer);
+
+                const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+                const checkVolume = () => {
+                    analyzer.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                    setIsLocalSpeaking(average > 8);
+                    animationFrame = requestAnimationFrame(checkVolume);
+                };
+
+                checkVolume();
+            } catch (err) {
+                console.warn('AudioChat: Could not setup local analyzer', err);
             }
-
-            const source = audioContext.createMediaStreamSource(localStream);
-            const analyzer = audioContext.createAnalyser();
-            analyzer.fftSize = 512;
-            source.connect(analyzer);
-
-            const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-
-            const checkVolume = () => {
-                analyzer.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                setIsLocalSpeaking(average > 10);
-                animationFrame = requestAnimationFrame(checkVolume);
-            };
-
-            checkVolume();
         };
 
         setupAnalyzer();
@@ -179,7 +194,12 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     return (
         <div className="flex items-center gap-2">
             {/* Audio element for remote stream (hidden) */}
-            <audio ref={audioRef} autoPlay style={{ display: 'none' }} />
+            <audio
+                ref={audioRef}
+                autoPlay
+                playsInline
+                style={{ display: 'none' }}
+            />
 
             {!isEnabled ? (
                 <button
