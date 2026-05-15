@@ -7,7 +7,6 @@ import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
-import { CloudSyncMenu } from './components/SyncCloudModal';
 import { Toast } from './components/Toast';
 import { useApp } from './context/AppContext';
 import { useAppInit } from './hooks/useAppInit';
@@ -111,6 +110,7 @@ export default function App() {
                         isGameOver={state.isGameOver}
                         usedHint={state.usedHint}
                         canShowHint={state.guesses.length >= 3}
+                        syncStatus={state.syncStatus}
                     />
 
                     <GameArea
@@ -155,7 +155,7 @@ export default function App() {
                         onChallengeCreated={handleChallengeCreated}
                     />
 
-                    <CloudSyncMenu status={state.syncStatus} />
+
                 </main>
             )}
 
@@ -191,7 +191,7 @@ export default function App() {
                 </Suspense>
             )}
 
-            <a href="/privacy" className="fixed bottom-2 left-2 text-[10px] text-gray-600 hover:underline">
+            <a href="/privacy.html" className="fixed bottom-2 left-2 text-[10px] text-gray-600 hover:underline">
                 Privacy Policy
             </a>
         </div>

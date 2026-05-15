@@ -39,3 +39,5 @@ export interface LeaderboardEntry {
    days_active: number;
    user_id?: string;
 }
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
