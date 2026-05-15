@@ -15,6 +15,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
     const [opponentStatus, setOpponentStatus] = useState({ mic: false, speaker: true });
     const [isConnected, setIsConnected] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const channelRef = useRef<any>(null);
@@ -37,6 +38,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         }
         setRemoteStream(null);
         setIsConnected(false);
+        setError(null);
     }, [localStream]);
 
     const sendSignal = useCallback((data: any) => {
@@ -76,20 +78,30 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
     const startAudio = useCallback(async () => {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.error('MediaDevices API not available');
+            const msg = 'Microphone access is not available (secure connection required)';
+            setError(msg);
+            console.error(msg);
             return;
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             setLocalStream(stream);
             setIsMicOn(true);
+            setError(null);
 
-            const pc = createPeerConnection();
+            const pc = pcRef.current || createPeerConnection();
             stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
             // Signaling handles the actual connection initiation
             sendSignal({ type: 'ready' });
-        } catch (err) {
+        } catch (err: any) {
+            let msg = 'Error accessing microphone';
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                msg = 'Microphone permission denied. Please allow access in browser settings.';
+            } else if (err.name === 'NotFoundError') {
+                msg = 'No microphone found on this device.';
+            }
+            setError(msg);
             console.error('Error accessing microphone:', err);
         }
     }, [createPeerConnection, sendSignal]);
@@ -176,6 +188,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         isSpeakerOn,
         opponentStatus,
         isConnected,
+        error,
         toggleMic,
         toggleSpeaker
     };

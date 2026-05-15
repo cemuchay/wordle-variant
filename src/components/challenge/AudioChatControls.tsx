@@ -1,6 +1,7 @@
-import { Mic, MicOff, Volume2, VolumeX, Phone, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Phone, PhoneOff, AlertCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAudioChat } from '../../hooks/useAudioChat';
+import { useApp } from '../../context/AppContext';
 
 interface AudioChatControlsProps {
     challengeId: string;
@@ -8,6 +9,7 @@ interface AudioChatControlsProps {
 }
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
+    const { triggerToast } = useApp();
     const [isEnabled, setIsEnabled] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
     const {
@@ -17,6 +19,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         isSpeakerOn,
         opponentStatus,
         isConnected,
+        error,
         toggleMic,
         toggleSpeaker
     } = useAudioChat({ challengeId, userId, enabled: isEnabled });
@@ -24,6 +27,13 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
     const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+
+    // Toast error messages
+    useEffect(() => {
+        if (error) {
+            triggerToast(error, 5000);
+        }
+    }, [error, triggerToast]);
 
     // Call duration timer
     useEffect(() => {
@@ -34,13 +44,11 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                 setCallDuration(Math.floor((Date.now() - startTime) / 1000));
             }, 1000);
         } else if (!isEnabled) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCallDuration(0);
         }
         return () => {
             if (interval) clearInterval(interval);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEnabled, isConnected]);
 
     // Attach remote stream to audio element
@@ -82,7 +90,6 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     // Simple volume detection for "speaking" animation (Local)
     useEffect(() => {
         if (!localStream || !isMicOn) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsLocalSpeaking(false);
             return;
         }
@@ -140,26 +147,30 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         )}
                     </div>
 
-                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
 
                     {/* Call Timer */}
-                    <div className="px-2 min-w-12 text-center">
+                    <div className="px-2 min-w-[3rem] text-center">
                         <span className="text-[10px] font-mono font-bold text-zinc-400 tabular-nums">
                             {Math.floor(callDuration / 60)}:{String(callDuration % 60).padStart(2, '0')}
                         </span>
                     </div>
 
-                    <div className="h-4 w-px bg-zinc-800 mx-0.5" />
+                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
 
                     {/* Mic Toggle with Local Speaking Visualizer */}
                     <button
                         onClick={toggleMic}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${isMicOn ? (isLocalSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-red-500/10 text-red-500'}`}
-                        title={isMicOn ? 'Mute Mic' : 'Unmute Mic'}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${error ? 'bg-red-500/20 text-red-500' : isMicOn ? (isLocalSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-zinc-800/50 text-zinc-600'}`}
+                        title={error ? error : isMicOn ? 'Mute Mic' : 'Unmute Mic'}
                     >
-                        {isMicOn ? <Mic size={14} className={isLocalSpeaking ? 'text-white' : 'text-zinc-400'} /> : <MicOff size={14} />}
+                        {error ? <AlertCircle size={14} /> : isMicOn ? <Mic size={14} className={isLocalSpeaking ? 'text-white' : 'text-zinc-400'} /> : <MicOff size={14} />}
                         {isMicOn && isLocalSpeaking && (
                             <div className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping opacity-20" />
+                        )}
+                        {/* Mic Ready Indicator (Green dot) */}
+                        {isMicOn && !isLocalSpeaking && !error && (
+                            <div className="absolute top-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border border-zinc-900" title="Mic Ready" />
                         )}
                     </button>
 
