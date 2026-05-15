@@ -9,6 +9,7 @@ interface AudioChatControlsProps {
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
     const [isEnabled, setIsEnabled] = useState(false);
+    const [callDuration, setCallDuration] = useState(0);
     const {
         localStream,
         remoteStream,
@@ -23,6 +24,22 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isOpponentSpeaking, setIsOpponentSpeaking] = useState(false);
     const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+
+    // Call duration timer
+    useEffect(() => {
+        let interval: number;
+        if (isEnabled && isConnected) {
+            const startTime = Date.now() - (callDuration * 1000);
+            interval = window.setInterval(() => {
+                setCallDuration(Math.floor((Date.now() - startTime) / 1000));
+            }, 1000);
+        } else if (!isEnabled) {
+            setCallDuration(0);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isEnabled, isConnected]);
 
     // Attach remote stream to audio element
     useEffect(() => {
@@ -118,6 +135,15 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                         ) : (
                             <div className="animate-pulse w-2 h-2 bg-zinc-600 rounded-full" />
                         )}
+                    </div>
+
+                    <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
+
+                    {/* Call Timer */}
+                    <div className="px-2 min-w-[3rem] text-center">
+                        <span className="text-[10px] font-mono font-bold text-zinc-400 tabular-nums">
+                            {Math.floor(callDuration / 60)}:{String(callDuration % 60).padStart(2, '0')}
+                        </span>
                     </div>
 
                     <div className="h-4 w-[1px] bg-zinc-800 mx-0.5" />
