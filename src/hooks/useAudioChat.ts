@@ -8,7 +8,28 @@ interface UseAudioChatProps {
     enabled: boolean;
 }
 
-export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps) => {
+export interface AudioLog {
+    message: string;
+    type: 'info' | 'success' | 'error' | 'warning';
+    timestamp: number;
+}
+
+export interface AudioChatState {
+    localStream: MediaStream | null;
+    remoteStream: MediaStream | null;
+    isMicOn: boolean;
+    isSpeakerOn: boolean;
+    opponentStatus: { mic: boolean; speaker: boolean };
+    isConnected: boolean;
+    error: string | null;
+    toggleMic: () => void;
+    toggleSpeaker: () => void;
+    logs: AudioLog[];
+    clearLogs: () => void;
+    addLog: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
+}
+
+export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps): AudioChatState => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [isMicOn, setIsMicOn] = useState(false);
@@ -16,6 +37,14 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     const [opponentStatus, setOpponentStatus] = useState({ mic: false, speaker: true });
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [logs, setLogs] = useState<AudioLog[]>([]);
+
+    const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+        setLogs(prev => [...prev.slice(-19), { message, type, timestamp: Date.now() }]);
+        console.log(`[AudioChatLog] ${type.toUpperCase()}: ${message}`);
+    }, []);
+
+    const clearLogs = useCallback(() => setLogs([]), []);
 
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const channelRef = useRef<any>(null);
@@ -44,6 +73,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     }, [userId]);
 
     const cleanup = useCallback(async () => {
+        addLog('Cleaning up connection...', 'info');
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
@@ -59,46 +89,49 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         makingOffer.current = false;
         ignoreOffer.current = false;
         isSettingRemoteAnswerPending.current = false;
-    }, []);
+        addLog('Connection closed', 'warning');
+    }, [addLog]);
 
     const createPeerConnection = useCallback(() => {
         if (pcRef.current) return pcRef.current;
 
+        addLog('Initializing PeerConnection...', 'info');
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
         pc.onicecandidate = ({ candidate }) => {
             if (candidate) {
-                console.log('WebRTC: Sending ICE candidate');
                 sendSignal({ type: 'candidate', candidate });
             }
         };
 
         pc.ontrack = (event) => {
-            console.log('WebRTC: Received remote track', event.track.kind, event.streams);
             const stream = event.streams[0] || new MediaStream([event.track]);
             setRemoteStream(stream);
+            addLog(`Remote track received: ${event.track.kind}`, 'success');
         };
 
         pc.onconnectionstatechange = () => {
-            console.log('WebRTC: Connection state changed to:', pc.connectionState);
+            addLog(`Connection state: ${pc.connectionState}`, pc.connectionState === 'connected' ? 'success' : 'info');
             setIsConnected(pc.connectionState === 'connected');
             if (pc.connectionState === 'failed') {
                 setError('Connection failed. Please check your network.');
+                addLog('WebRTC connection failed', 'error');
             }
         };
 
         pc.onsignalingstatechange = () => {
-            console.log('WebRTC: Signaling state changed to:', pc.signalingState);
+            addLog(`Signaling state: ${pc.signalingState}`, 'info');
         };
 
         // Standard Negotiation Needed handler
         pc.onnegotiationneeded = async () => {
             try {
+                addLog('Negotiation needed, sending offer...', 'info');
                 makingOffer.current = true;
                 await pc.setLocalDescription();
                 sendSignal({ type: 'description', description: pc.localDescription });
             } catch (err) {
-                console.error('Negotiation error:', err);
+                addLog(`Negotiation error: ${err}`, 'error');
             } finally {
                 makingOffer.current = false;
             }
@@ -108,15 +141,18 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             localStreamRef.current.getTracks().forEach(track => {
                 pc.addTrack(track, localStreamRef.current!);
             });
+            addLog('Local tracks added to PeerConnection', 'info');
         }
 
         pcRef.current = pc;
         return pc;
-    }, [sendSignal]);
+    }, [sendSignal, addLog]);
 
     const startAudio = useCallback(async () => {
+        addLog('Requesting microphone access...', 'info');
         if (!navigator.mediaDevices?.getUserMedia) {
             setError('Microphone access not available');
+            addLog('Microphone API not found', 'error');
             return;
         }
         try {
@@ -125,26 +161,28 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             setLocalStream(stream);
             setIsMicOn(true);
             setError(null);
+            addLog('Microphone access granted', 'success');
 
             const pc = createPeerConnection();
-            // Tracks are added in createPeerConnection or here if pc already exists
             if (pc.getSenders().length === 0) {
                 stream.getTracks().forEach(track => pc.addTrack(track, stream));
             }
 
-            // Notify opponent we are ready
+            addLog('Sending ready signal to opponent', 'info');
             sendSignal({ type: 'ready' });
         } catch (err: any) {
             setError('Mic permission denied');
+            addLog('Microphone access denied', 'error');
         }
-    }, [sendSignal, createPeerConnection]);
+    }, [sendSignal, createPeerConnection, addLog]);
 
     useEffect(() => {
         if (!enabled) {
-            cleanup();
+            if (channelRef.current) cleanup();
             return;
         }
 
+        addLog(`Joining audio channel: ${challengeId.slice(0, 8)}...`, 'info');
         const channelId = `audio_chat_${challengeId}`;
         const channel = supabase.channel(channelId, { config: { broadcast: { ack: true } } });
 
@@ -152,23 +190,29 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             .on('broadcast', { event: 'signal' }, async ({ payload }) => {
                 if (payload.from === userId) return;
                 const { type, description, candidate } = payload;
-                const polite = userId < payload.from; // Lower ID is polite
+                const polite = userId < payload.from;
 
                 try {
                     if (type === 'description') {
+                        addLog(`Received ${description.type} from opponent`, 'info');
                         const pc = createPeerConnection();
                         const offerCollision = (description.type === 'offer') &&
                             (makingOffer.current || pc.signalingState !== 'stable');
 
                         ignoreOffer.current = !polite && offerCollision;
-                        if (ignoreOffer.current) return;
+                        if (ignoreOffer.current) {
+                            addLog('Ignoring offer (polite collision)', 'warning');
+                            return;
+                        }
 
                         if (offerCollision) {
+                            addLog('Offer collision, rolling back...', 'warning');
                             await pc.setLocalDescription({ type: 'rollback' });
                         }
 
                         await pc.setRemoteDescription(description);
                         if (description.type === 'offer') {
+                            addLog('Creating answer...', 'info');
                             await pc.setLocalDescription();
                             sendSignal({ type: 'description', description: pc.localDescription });
                         }
@@ -180,17 +224,26 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                             if (!ignoreOffer.current) throw err;
                         }
                     } else if (type === 'ready') {
-                        // Just trigger PC creation if it hasn't happened
+                        addLog('Opponent is ready', 'success');
                         createPeerConnection();
                     } else if (type === 'status') {
                         setOpponentStatus({ mic: payload.mic, speaker: payload.speaker });
+                    } else if (type === 'call_rejected') {
+                        addLog('Opponent declined the call', 'error');
+                        setError('Call was declined');
                     }
                 } catch (err) {
-                    console.error('Perfect Negotiation Error:', err);
+                    addLog(`Handshake error: ${err}`, 'error');
                 }
             })
             .subscribe((status) => {
-                if (status === 'SUBSCRIBED') startAudio();
+                if (status === 'SUBSCRIBED') {
+                    addLog('Subscribed to signaling channel', 'success');
+                    startAudio();
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    addLog('Signaling channel error', 'error');
+                }
             });
 
         channelRef.current = channel;
@@ -199,7 +252,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             channel.unsubscribe();
             cleanup();
         };
-    }, [challengeId, userId, enabled, createPeerConnection, sendSignal, cleanup, startAudio]);
+    }, [challengeId, userId, enabled, createPeerConnection, sendSignal, cleanup, startAudio, addLog]);
 
     useEffect(() => {
         if (enabled && isConnected) {
@@ -213,13 +266,17 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             if (track) {
                 track.enabled = !track.enabled;
                 setIsMicOn(track.enabled);
+                addLog(track.enabled ? 'Microphone unmuted' : 'Microphone muted', 'info');
             }
         }
-    }, []);
+    }, [addLog]);
 
     const toggleSpeaker = useCallback(() => {
-        setIsSpeakerOn(prev => !prev);
-    }, []);
+        setIsSpeakerOn(prev => {
+            addLog(!prev ? 'Speaker unmuted' : 'Speaker muted', 'info');
+            return !prev;
+        });
+    }, [addLog]);
 
     return {
         localStream,
@@ -230,6 +287,9 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         isConnected,
         error,
         toggleMic,
-        toggleSpeaker
+        toggleSpeaker,
+        logs,
+        clearLogs,
+        addLog
     };
 };

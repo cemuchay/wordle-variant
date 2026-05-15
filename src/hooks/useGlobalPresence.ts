@@ -110,5 +110,27 @@ export const useGlobalPresence = (userId: string | undefined) => {
         };
     }, [userId, fetchProfiles, updateLastSeen]);
 
-    return { onlineUsers, allProfiles, incomingCall, setIncomingCall, refreshProfiles: fetchProfiles };
+    const sendIncomingCall = useCallback((challengeId: string) => {
+        if (!userId || !allProfiles.length) return;
+        const me = allProfiles.find(p => p.id === userId);
+        if (!me) return;
+
+        // Broadcast to all online users
+        onlineUsers.forEach(u => {
+            if (u.id === userId) return;
+            const userChannel = supabase.channel(`user_signals_${u.id}`);
+            userChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    userChannel.send({
+                        type: 'broadcast',
+                        event: 'incoming_call',
+                        payload: { from: me, challengeId }
+                    });
+                    setTimeout(() => supabase.removeChannel(userChannel), 5000);
+                }
+            });
+        });
+    }, [userId, allProfiles, onlineUsers]);
+
+    return { onlineUsers, allProfiles, incomingCall, setIncomingCall, refreshProfiles: fetchProfiles, sendIncomingCall };
 };

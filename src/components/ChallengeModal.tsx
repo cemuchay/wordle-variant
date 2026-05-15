@@ -52,8 +52,65 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [invitedIds, setInvitedIds] = useState<string[]>([]);
     const [isPlaying, setIsPlaying] = useState(false);
 
+    const { setChallengeUnreadCount } = useApp();
+    const unplayedCount = myChallenges.filter(c => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
+
+    useEffect(() => {
+        setChallengeUnreadCount(unplayedCount);
+    }, [unplayedCount, setChallengeUnreadCount]);
+
     const initialProcessed = useRef(false);
     const channelRef = useRef<any>(null);
+
+    // Timer Component for challenge list
+    const ExpirationTimer = ({ expiresAt, createdAt }: { expiresAt: string, createdAt: string }) => {
+        const [timeLeft, setTimeLeft] = useState<number>(0);
+
+        useEffect(() => {
+            const calculate = () => {
+                const now = new Date().getTime();
+                const end = new Date(expiresAt).getTime();
+                setTimeLeft(Math.max(0, end - now));
+            };
+            calculate();
+            const interval = setInterval(calculate, 60000); // Update every minute
+            return () => clearInterval(interval);
+        }, [expiresAt]);
+
+        if (timeLeft <= 0) return <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>;
+
+        const totalDuration = new Date(expiresAt).getTime() - new Date(createdAt).getTime();
+        const percent = (timeLeft / totalDuration) * 100;
+
+        let colorClass = 'bg-correct'; // Green
+        let textClass = 'text-correct';
+        if (percent < 25) {
+            colorClass = 'bg-red-500';
+            textClass = 'text-red-500';
+        } else if (percent < 50) {
+            colorClass = 'bg-yellow-500';
+            textClass = 'text-yellow-500';
+        }
+
+        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+
+        return (
+            <div className="flex flex-col items-end gap-1">
+                <span className={`${textClass} text-[10px] font-black uppercase tracking-widest flex items-center gap-1`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${colorClass} animate-pulse`} />
+                    {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`} left
+                </span>
+                <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        className={`h-full ${colorClass}`} 
+                    />
+                </div>
+            </div>
+        );
+    };
 
     // Sync state from participants array
     useEffect(() => {
@@ -210,9 +267,14 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                         </button>
                                         <button
                                             onClick={() => { setActiveTab('my'); loadMyChallenges(); }}
-                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'my' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
+                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${activeTab === 'my' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
                                         >
                                             My Challenges
+                                            {unplayedCount > 0 && (
+                                                <span className="bg-correct text-black text-[9px] px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                                                    {unplayedCount}
+                                                </span>
+                                            )}
                                         </button>
                                     </div>
                                 )}
@@ -241,27 +303,37 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                             {myChallenges.length === 0 ? (
                                                 <div className="py-12 text-center text-gray-500">No challenges yet.</div>
                                             ) : (
-                                                myChallenges.map((item) => (
-                                                    <button
-                                                        key={item.id}
-                                                        onClick={() => handleViewChallenge(item.challenge_id)}
-                                                        className="w-full text-left bg-white/5 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all group"
-                                                    >
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`w-2 h-2 rounded-full ${item.status === 'completed' ? 'bg-gray-600' : 'bg-correct'}`} />
-                                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                                                    {item.challenge.mode} • {item.challenge.word_length} Letters
+                                                myChallenges.map((item) => {
+                                                    const isExpired = new Date(item.challenge.expires_at) < new Date();
+                                                    const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                                                    
+                                                    return (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => handleViewChallenge(item.challenge_id)}
+                                                            className="w-full text-left bg-white/5 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all group"
+                                                        >
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`w-2 h-2 rounded-full ${(isFinished || isExpired) ? 'bg-gray-600' : 'bg-correct pulse'}`} />
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                                                        {item.challenge.mode} • {item.challenge.word_length} Letters
+                                                                    </span>
+                                                                </div>
+                                                                <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
+                                                            </div>
+                                                            <div className="flex items-end justify-between">
+                                                                <div>
+                                                                    <p className="font-bold text-sm">Challenge by {item.challenge.profiles?.username || 'User'}</p>
+                                                                    <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
+                                                                </div>
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">
+                                                                    {new Date(item.challenge.created_at).toLocaleDateString()}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">
-                                                                {new Date(item.challenge.created_at).toLocaleDateString()}
-                                                            </span>
-                                                        </div>
-                                                        <p className="font-bold">Challenge by {item.challenge.profiles?.username || 'User'}</p>
-                                                        <p className="text-[10px] text-gray-500 uppercase font-black">{item.status}</p>
-                                                    </button>
-                                                ))
+                                                        </button>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     )}

@@ -1,5 +1,5 @@
 import { MessageSquare, X } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
@@ -7,6 +7,7 @@ import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { CloudSyncMenu } from './components/SyncCloudModal';
 import { DynamicIslandStatus } from './components/DynamicIslandStatus';
+import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
 import { useApp } from './context/AppContext';
@@ -16,6 +17,7 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { useAppInit } from './hooks/useAppInit';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
+import { useChallenge } from './hooks/useChallenge';
 import { type AppUser } from './types/game';
 
 export default function App() {
@@ -28,12 +30,24 @@ export default function App() {
         isLoadingDate,
         unreadCount,
         setUnreadCount,
+        setChallengeUnreadCount,
         isChallengeOpen,
         setIsChallengeOpen
     } = useApp();
 
     // Core Game Engine
     const { state, actions, config } = useGameEngine(date as string);
+    const { fetchMyChallenges } = useChallenge(user as AppUser);
+
+    // Initial Challenges Fetch
+    useEffect(() => {
+        if (user) {
+            fetchMyChallenges().then(data => {
+                const count = data.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
+                setChallengeUnreadCount(count);
+            });
+        }
+    }, [user, fetchMyChallenges, setChallengeUnreadCount]);
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -71,6 +85,7 @@ export default function App() {
     return (
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
             <DynamicIslandStatus />
+            <AudioConnectionLog />
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-16 sm:pt-4">
                     <Toast
