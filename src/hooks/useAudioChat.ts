@@ -77,14 +77,16 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         }
     }, [userId]);
 
-    const cleanup = useCallback(async (sendLeave = true) => {
+    const cleanup = useCallback(async () => {
         addLog('Cleaning up connection...', 'info');
-        if (sendLeave) {
-            sendSignal({ type: 'leave' });
-        }
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
+        }
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current = null;
+            setLocalStream(null);
         }
         setRemoteStream(null);
         setIsConnected(false);
@@ -93,15 +95,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         ignoreOffer.current = false;
         pendingCandidates.current = [];
         addLog('Connection closed', 'warning');
-    }, [addLog, sendSignal]);
-
-    const stopLocalStream = useCallback(() => {
-        if (localStreamRef.current) {
-            addLog('Stopping local microphone tracks', 'info');
-            localStreamRef.current.getTracks().forEach(track => track.stop());
-            localStreamRef.current = null;
-            setLocalStream(null);
-        }
     }, [addLog]);
 
     const createPeerConnection = useCallback(() => {
@@ -117,45 +110,26 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
 
         pc.ontrack = (event) => {
-            addLog(`Remote track received: ${event.track.kind}`, 'success');
-            
-            setRemoteStream(prev => {
-                if (prev) {
-                    const hasTrack = prev.getTracks().some(t => t.id === event.track.id);
-                    if (!hasTrack) {
-                        prev.addTrack(event.track);
-                    }
-                    // We return the SAME object if possible, or a new one if it's the first time
-                    // Actually, to trigger UI we often need a new reference, but let's see.
-                    return new MediaStream(prev.getTracks()); 
-                }
-                return event.streams[0] || new MediaStream([event.track]);
-            });
+            const track = event.track;
+            const streams = event.streams;
+            addLog(`Remote track received: ${track.kind} (Streams: ${streams.length})`, 'success');
+
+            // Use existing stream if available, otherwise create new one
+            const remoteStream = streams[0] || new MediaStream([track]);
+            setRemoteStream(remoteStream);
+
+            track.onunmute = () => {
+                addLog(`Remote track unmuted: ${track.kind}`, 'info');
+                setRemoteStream(new MediaStream([track])); // Refresh stream reference
+            };
         };
 
         pc.onconnectionstatechange = () => {
-            addLog(`Connection state: ${pc.connectionState}`, 
-                pc.connectionState === 'connected' ? 'success' : 
-                pc.connectionState === 'failed' ? 'error' : 'info');
-            
+            addLog(`Connection state: ${pc.connectionState}`, pc.connectionState === 'connected' ? 'success' : 'info');
             setIsConnected(pc.connectionState === 'connected');
-            
-            if (pc.connectionState === 'connected') {
-                sendSignal({ type: 'status', mic: isMicOn, speaker: isSpeakerOn });
-            }
-
             if (pc.connectionState === 'failed') {
                 setError('Connection failed. Please check your network.');
-            }
-        };
-
-        pc.oniceconnectionstatechange = () => {
-            addLog(`ICE state: ${pc.iceConnectionState}`, 
-                pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed' ? 'success' : 
-                pc.iceConnectionState === 'failed' ? 'error' : 'info');
-            
-            if (pc.iceConnectionState === 'disconnected') {
-                addLog('ICE disconnected - network may be unstable', 'warning');
+                addLog('WebRTC connection failed', 'error');
             }
         };
 
@@ -165,11 +139,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
         pc.onnegotiationneeded = async () => {
             try {
-                // Perfect Negotiation: Only start negotiation if we are stable
-                if (pc.signalingState !== 'stable') {
-                    addLog('Negotiation needed but state not stable, skipping...', 'warning');
-                    return;
-                }
                 addLog('Negotiation needed, sending offer...', 'info');
                 makingOffer.current = true;
                 await pc.setLocalDescription();
@@ -191,11 +160,10 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
         pcRef.current = pc;
         return pc;
-    }, [sendSignal, addLog, isMicOn, isSpeakerOn]);
+    }, [sendSignal, addLog]);
 
     const processPendingCandidates = useCallback(async (pc: RTCPeerConnection) => {
         if (pc.remoteDescription) {
-            addLog(`Processing ${pendingCandidates.current.length} pending candidates`, 'info');
             const candidates = [...pendingCandidates.current];
             pendingCandidates.current = [];
             for (const candidate of candidates) {
@@ -206,24 +174,9 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                 }
             }
         }
-    }, [addLog]);
+    }, []);
 
     const startAudio = useCallback(async () => {
-        // Reuse existing stream if it's still healthy
-        if (localStreamRef.current && localStreamRef.current.getAudioTracks().every(t => t.readyState === 'live')) {
-            addLog('Reusing existing microphone stream', 'info');
-            const pc = createPeerConnection();
-            const senders = pc.getSenders();
-            localStreamRef.current.getTracks().forEach(track => {
-                const alreadyAdded = senders.some(s => s.track === track);
-                if (!alreadyAdded) {
-                    pc.addTrack(track, localStreamRef.current!);
-                }
-            });
-            sendSignal({ type: 'ready' });
-            return;
-        }
-
         addLog('Requesting microphone access...', 'info');
         if (!navigator.mediaDevices?.getUserMedia) {
             setError('Microphone access not available');
@@ -267,16 +220,14 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
     useEffect(() => {
         if (!enabled) {
-            if (channelRef.current) {
-                cleanup();
-                stopLocalStream();
-            }
+            if (channelRef.current) cleanup();
             return;
         }
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         addLog(`Joining audio channel: ${challengeId.slice(0, 8)}...`, 'info');
-        const channelIdStr = `audio_chat_${challengeId}`;
-        const channel = supabase.channel(channelIdStr, { config: { broadcast: { ack: false } } });
+        const channelId = `audio_chat_${challengeId}`;
+        const channel = supabase.channel(channelId, { config: { broadcast: { ack: true } } });
 
         channel
             .on('broadcast', { event: 'signal' }, async ({ payload }) => {
@@ -328,9 +279,6 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                         createPeerConnection();
                     } else if (type === 'status') {
                         setOpponentStatus({ mic: payload.mic, speaker: payload.speaker });
-                    } else if (type === 'leave') {
-                        addLog('Opponent left the call', 'warning');
-                        cleanup(false); // Clean up without sending another leave signal
                     } else if (type === 'call_rejected') {
                         addLog('Opponent declined the call', 'error');
                         setError('Call was declined');
@@ -354,11 +302,8 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         return () => {
             channel.unsubscribe();
             cleanup();
-            // We don't stop the local stream tracks here to allow quick reconnection 
-            // if the user switches challenges or momentarily disconnects.
-            // stopLocalStream() is only called when enabled is false.
         };
-    }, [challengeId, userId, enabled, createPeerConnection, sendSignal, cleanup, stopLocalStream, startAudio, addLog, processPendingCandidates]);
+    }, [challengeId, userId, enabled, createPeerConnection, sendSignal, cleanup, startAudio, addLog, processPendingCandidates]);
 
     useEffect(() => {
         if (enabled && isConnected) {
