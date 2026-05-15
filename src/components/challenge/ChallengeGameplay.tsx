@@ -6,6 +6,7 @@ import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../
 import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
+import { AudioChatControls } from './AudioChatControls';
 
 interface ChallengeGameplayProps {
     challenge: any;
@@ -180,6 +181,7 @@ export const ChallengeGameplay = memo(({
                             </span>
                         </div>
                     )}
+                    <AudioChatControls challengeId={challenge.id} userId={participation.user_id} />
                 </div>
                 {guesses.length >= 3 && !isGameOver && (
                     <button
