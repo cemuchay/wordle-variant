@@ -126,13 +126,16 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     }, [sendSignal]);
 
     useEffect(() => {
+        if (enabled && !localStream && !error) {
+            startAudio();
+        }
+    }, [enabled, localStream, error, startAudio]);
+
+    useEffect(() => {
         if (!enabled) {
             cleanup();
             return;
         }
-
-        // Automatically start audio when enabled (Join Voice)
-        startAudio();
 
         const channelId = `audio_chat_${challengeId}`;
         const channel = supabase.channel(channelId);

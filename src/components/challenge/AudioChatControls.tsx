@@ -10,11 +10,21 @@ interface AudioChatControlsProps {
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
     const { triggerToast, activeCall, setActiveCall } = useApp();
+    
+    // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
     const isEnabled = activeCall?.challengeId === challengeId;
 
-    const setIsEnabled = (val: boolean) => {
-        if (val) setActiveCall({ challengeId, userId });
-        else setActiveCall(null);
+    const toggleCall = () => {
+        if (isEnabled) {
+            setActiveCall(null);
+        } else {
+            // PREVENTION: Check if already in a DIFFERENT call
+            if (activeCall) {
+                triggerToast("You are already in a call. Leave it first to join this one.", 4000);
+                return;
+            }
+            setActiveCall({ challengeId, userId });
+        }
     };
 
     const [callDuration, setCallDuration] = useState(0);
@@ -131,7 +141,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
             {!isEnabled ? (
                 <button
-                    onClick={() => setIsEnabled(true)}
+                    onClick={toggleCall}
                     className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-3 py-1.5 rounded-xl border border-emerald-500/20 transition-all text-xs font-bold"
                 >
                     <Phone size={14} />
@@ -204,7 +214,7 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
                     {/* Leave Voice */}
                     <button
-                        onClick={() => setIsEnabled(false)}
+                        onClick={toggleCall}
                         className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white transition-all ml-1"
                         title="Leave Voice"
                     >
