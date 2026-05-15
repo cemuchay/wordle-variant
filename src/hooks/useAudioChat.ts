@@ -51,6 +51,8 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         }
     }, [userId]);
 
+    const localStreamRef = useRef<MediaStream | null>(null);
+
     const createPeerConnection = useCallback(() => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
@@ -61,16 +63,29 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
 
         pc.ontrack = (event) => {
-            setRemoteStream(event.streams[0]);
+            console.log('WebRTC: Received remote track', event.track.kind);
+            if (event.streams && event.streams[0]) {
+                setRemoteStream(event.streams[0]);
+            } else {
+                setRemoteStream(new MediaStream([event.track]));
+            }
             setIsConnected(true);
         };
 
         pc.onconnectionstatechange = () => {
+            console.log('WebRTC: Connection state', pc.connectionState);
             if (pc.connectionState === 'connected') setIsConnected(true);
             if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
                 setIsConnected(false);
             }
         };
+
+        // Important: Add local tracks if they exist
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => {
+                pc.addTrack(track, localStreamRef.current!);
+            });
+        }
 
         pcRef.current = pc;
         return pc;
@@ -80,17 +95,21 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             const msg = 'Microphone access is not available (secure connection required)';
             setError(msg);
-            console.error(msg);
             return;
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             setLocalStream(stream);
+            localStreamRef.current = stream;
             setIsMicOn(true);
             setError(null);
 
-            const pc = pcRef.current || createPeerConnection();
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            // If a peer connection already exists, add tracks to it
+            if (pcRef.current) {
+                stream.getTracks().forEach(track => {
+                    pcRef.current!.addTrack(track, stream);
+                });
+            }
 
             // Signaling handles the actual connection initiation
             sendSignal({ type: 'ready' });
@@ -104,14 +123,16 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             setError(msg);
             console.error('Error accessing microphone:', err);
         }
-    }, [createPeerConnection, sendSignal]);
+    }, [sendSignal]);
 
     useEffect(() => {
         if (!enabled) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             cleanup();
             return;
         }
+
+        // Automatically start audio when enabled (Join Voice)
+        startAudio();
 
         const channelId = `audio_chat_${challengeId}`;
         const channel = supabase.channel(channelId);
