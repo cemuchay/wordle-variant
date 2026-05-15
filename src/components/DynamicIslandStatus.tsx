@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
-import { supabase } from '../lib/supabaseClient';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
-    const { 
-        activeCall, 
-        setActiveCall, 
-        setIsChallengeOpen, 
+    const {
+        activeCall,
+        setIsChallengeOpen,
         triggerToast,
         onlineUsers,
         allProfiles,
@@ -19,7 +17,7 @@ export const DynamicIslandStatus = () => {
         setIncomingCall,
         audioChat
     } = useApp();
-    
+
     const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
