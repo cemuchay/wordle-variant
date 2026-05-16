@@ -21,15 +21,22 @@ export const ChallengeLobby = memo(({
     copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
     loading
 }: ChallengeLobbyProps) => {
-    const isMarathon = selectedChallenge.mode === 'MARATHON';
+    const isMarathon = selectedChallenge.word_length === 1;
 
     return (
         <div className="space-y-6">
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
                 <div className="flex items-center justify-between mb-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedChallenge.mode === 'LIVE' ? 'bg-red-500/20 text-red-500' : selectedChallenge.mode === 'MARATHON' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
-                        {selectedChallenge.mode} Mode
-                    </span>
+                    <div className="flex gap-2">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedChallenge.mode === 'LIVE' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                            {selectedChallenge.mode} Mode
+                        </span>
+                        {isMarathon && (
+                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/20 text-yellow-500">
+                                Marathon
+                            </span>
+                        )}
+                    </div>
                     <button
                         onClick={() => copyLink(selectedChallenge)}
                         className="text-gray-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase"
@@ -42,7 +49,7 @@ export const ChallengeLobby = memo(({
                 </h3>
                 <p className="text-gray-400 text-sm">
                     {isMarathon 
-                        ? "Master all word lengths (3-7) in one go. Scores are summed!"
+                        ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes total!` : 'Take your time, async play.'}`
                         : selectedChallenge.mode === 'LIVE'
                             ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
                             : "Play anytime within 24 hours. Highest skill score wins!"}

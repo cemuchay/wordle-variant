@@ -176,9 +176,16 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     } = useChallenge(user);
 
     // Form/Lobby State
-    const [mode, setMode] = useState<'LIVE' | 'ANYTIME' | 'MARATHON'>('ANYTIME');
+    const [mode, setMode] = useState<'LIVE' | 'ANYTIME'>('ANYTIME');
     const [length, setLength] = useState(5);
-    const [maxTime, setMaxTime] = useState(5);
+    const [maxTime, setMaxTime] = useState<number | null>(null);
+
+    // Adjust maxTime defaults based on mode
+    useEffect(() => {
+        if (mode === 'LIVE') setMaxTime(5);
+        else setMaxTime(null);
+    }, [mode]);
+
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
     const [myChallenges, setMyChallenges] = useState<any[]>([]);

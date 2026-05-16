@@ -19,7 +19,7 @@ interface ChallengeGameplayProps {
 export const ChallengeGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: ChallengeGameplayProps) => {
-    const isMarathon = challenge.mode === 'MARATHON';
+    const isMarathon = challenge.word_length === 1;
     const marathonWords = useMemo(() => {
         if (!isMarathon) return null;
         try {
@@ -55,19 +55,39 @@ export const ChallengeGameplay = memo(({
             const lengthFinished = lengthGuesses.some((g: any) =>
                 g.every((r: any) => r.status === 'correct')) || lengthGuesses.length >= 6;
 
+            // Handle Per-Game Timer for Marathon LIVE mode
+            let subGameTimeLeft: number | null = null;
+            if (challenge.mode === 'LIVE' && challenge.max_time) {
+                const subGameStart = participation.hint_record?.[selectedLength]?.started_at;
+                if (subGameStart) {
+                    const elapsed = Math.floor((Date.now() - new Date(subGameStart).getTime()) / 1000);
+                    subGameTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
+                } else {
+                    // First time entering this length, timer starts now
+                    subGameTimeLeft = challenge.max_time * 60;
+                    // Persist start time immediately to DB
+                    const updatedHintRecord = { ...(participation.hint_record || {}) };
+                    updatedHintRecord[selectedLength] = { ...(updatedHintRecord[selectedLength] || {}), started_at: new Date().toISOString() };
+                    submitChallengeResult(participation.id, {
+                        status: 'playing',
+                        hint_record: updatedHintRecord
+                    });
+                }
+            }
+
             dispatch({
-                type: 'START_GAME', payload: {
-                    ...initialChallengeState,
+                type: 'SWITCH_LENGTH', payload: {
                     guesses: lengthGuesses,
                     letterStatuses: getLetterStatuses(lengthGuesses),
                     usedHint: lengthHintsUsed,
                     hintRecord: lengthHintRecord,
-                    isGameOver: !!lengthFinished,
+                    isGameOver: !!lengthFinished || (subGameTimeLeft !== null && subGameTimeLeft <= 0),
                     status: participation.status,
-                    timeLeft: null 
+                    timeLeft: subGameTimeLeft
                 }
             });
         } else if (!isMarathon) {
+            // ... (rest of fixed length logic)
             dispatch({
                 type: 'START_GAME', payload: {
                     ...state,
@@ -77,13 +97,13 @@ export const ChallengeGameplay = memo(({
                     hintRecord: participation.hint_record || null,
                     isGameOver: participation.status === 'completed' || participation.status === 'timed_out',
                     status: participation.status,
-                    timeLeft: null
+                    timeLeft: null // Will be set by global timer effect below
                 }
             });
         }
-    }, [selectedLength, isMarathon, participation]);
+    }, [selectedLength, isMarathon, participation.id]); // Removed participation dependency to prevent loops, using ID instead
 
-    // Initialize timer for LIVE mode
+    // Initialize timer for non-marathon LIVE mode (Global Timer)
     useEffect(() => {
         if (!isMarathon && challenge.mode === 'LIVE' && challenge.max_time) {
             const startedAt = participation.started_at ? new Date(participation.started_at).getTime() : Date.now();
@@ -92,7 +112,8 @@ export const ChallengeGameplay = memo(({
 
             dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: remaining, isGameOver: participation.status === 'completed' || participation.status === 'timed_out' || remaining <= 0 } });
         }
-    }, [challenge.mode, challenge.max_time, isMarathon, participation.started_at, participation.status]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Timer Interval Management
     useEffect(() => {
@@ -108,18 +129,35 @@ export const ChallengeGameplay = memo(({
         dispatch({ type: 'TIME_UP' });
         triggerToast("Time's up!", 3000);
         setIsSaving(true);
-        const success = await submitChallengeResult(participation.id, {
-            status: 'timed_out',
-            score: 0,
-            attempts: guesses.length,
-            guesses: guesses,
-            hints_used: usedHint,
-            hint_record: hintRecord
-        });
-        setIsSaving(false);
-        if (!success) triggerToast("Failed to save result. Please check your connection.", 4000);
-        setTimeout(onFinish, 2000);
-    }, [participation.id, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish]);
+
+        if (isMarathon) {
+            // Just fail this specific word, but keep marathon playing
+            const updatedGuesses = { ...(participation.guesses || {}) };
+            // If they haven't made any guesses, we still need to mark it as failed (empty guesses)
+            if (!updatedGuesses[selectedLength!]) updatedGuesses[selectedLength!] = [];
+
+            const success = await submitChallengeResult(participation.id, {
+                status: 'playing',
+                guesses: updatedGuesses,
+                attempts: participation.attempts || 0
+            });
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save progress.", 3000);
+            setTimeout(() => setSelectedLength(null), 2000);
+        } else {
+            const success = await submitChallengeResult(participation.id, {
+                status: 'timed_out',
+                score: 0,
+                attempts: guesses.length,
+                guesses: guesses,
+                hints_used: usedHint,
+                hint_record: hintRecord
+            });
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save result. Please check your connection.", 4000);
+            setTimeout(onFinish, 2000);
+        }
+    }, [participation, isMarathon, selectedLength, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish]);
 
     // Expiration Handler
     useEffect(() => {

@@ -8,7 +8,7 @@ export interface Challenge {
     profiles: any;
     id: string;
     creator_id: string;
-    mode: 'LIVE' | 'ANYTIME' | 'MARATHON';
+    mode: 'LIVE' | 'ANYTIME';
     word_length: number;
     target_word: string;
     salt: string;
@@ -56,7 +56,7 @@ export const useChallenge = (user: AppUser | null) => {
         }
     }, []);
 
-    const createChallenge = useCallback(async (mode: 'LIVE' | 'ANYTIME' | 'MARATHON', length: number, maxTimeMinutes: number | null, invitedUserIds: string[] = []) => {
+    const createChallenge = useCallback(async (mode: 'LIVE' | 'ANYTIME', length: number, maxTimeMinutes: number | null, invitedUserIds: string[] = []) => {
         if (!user) return null;
         setLoading(true);
         setError(null);
@@ -65,8 +65,8 @@ export const useChallenge = (user: AppUser | null) => {
             let targetWord = '';
             const salt = Math.random().toString(36).substring(2, 15);
 
-            if (mode === 'MARATHON') {
-                actualLength = 0; // Indicates Marathon
+            if (length === 1) { // Marathon
+                actualLength = 1; 
                 const marathonWords: Record<number, string> = {};
                 [3, 4, 5, 6, 7].forEach(l => {
                     const word = getRandomWord(l);

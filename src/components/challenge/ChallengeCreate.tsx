@@ -3,8 +3,8 @@ import { Clock, Play, Plus } from 'lucide-react';
 import { memo } from 'react';
 
 interface ChallengeCreateProps {
-    mode: 'LIVE' | 'ANYTIME' | 'MARATHON';
-    setMode: (mode: 'LIVE' | 'ANYTIME' | 'MARATHON') => void;
+    mode: 'LIVE' | 'ANYTIME';
+    setMode: (mode: 'LIVE' | 'ANYTIME') => void;
     length: number;
     setLength: (length: number) => void;
     maxTime: number;
@@ -28,7 +28,7 @@ export const ChallengeCreate = memo(({
         <div className="space-y-6">
             <div className="space-y-4">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-500">Mode</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                     <button
                         onClick={() => setMode('ANYTIME')}
                         className={`p-3 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
@@ -51,46 +51,41 @@ export const ChallengeCreate = memo(({
                         <p className="text-[10px] font-black uppercase">Live</p>
                         <p className="text-[8px] text-gray-500">Timed play</p>
                     </button>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Word Length</label>
+                <div className="flex gap-2 flex-wrap">
+                    {[3, 4, 5, 6, 7].map((l) => (
+                        <button
+                            key={l}
+                            onClick={() => setLength(l)}
+                            className={`w-10 h-10 rounded-xl border font-black text-xs transition-all ${length === l ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                        >
+                            {l}
+                        </button>
+                    ))}
                     <button
-                        onClick={() => { setMode('MARATHON'); setLength(0); }}
-                        className={`p-3 rounded-2xl border transition-all text-left ${mode === 'MARATHON' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                        onClick={() => setLength(0)} // 0 for random
+                        className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 0 ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
                     >
-                        <div className="flex items-center justify-between mb-2">
-                            <Plus className={mode === 'MARATHON' ? 'text-yellow-500' : 'text-gray-400'} size={18} />
-                            {mode === 'MARATHON' && <div className="w-2 h-2 bg-yellow-500 rounded-full" />}
-                        </div>
-                        <p className="text-[10px] font-black uppercase">Marathon</p>
-                        <p className="text-[8px] text-gray-500">All lengths</p>
+                        Random
+                    </button>
+                    <button
+                        onClick={() => setLength(1)} // 1 for marathon
+                        className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 1 ? 'border-yellow-500 bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                    >
+                        Marathon
                     </button>
                 </div>
             </div>
 
-            {mode !== 'MARATHON' && (
-                <div className="space-y-4">
-                    <label className="text-xs font-black uppercase tracking-widest text-gray-500">Word Length</label>
-                    <div className="flex gap-2 flex-wrap">
-                        {[3, 4, 5, 6, 7].map((l) => (
-                            <button
-                                key={l}
-                                onClick={() => setLength(l)}
-                                className={`w-10 h-10 rounded-xl border font-black text-xs transition-all ${length === l ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
-                            >
-                                {l}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => setLength(0)} // 0 for random
-                            className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 0 ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
-                        >
-                            Random
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {mode === 'LIVE' && (
                 <div className="space-y-4">
-                    <label className="text-xs font-black uppercase tracking-widest text-gray-500">Time Limit (Minutes)</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-gray-500">
+                        Time Limit (Per Game)
+                    </label>
                     <div className="flex gap-3">
                         {[3, 5, 10].map((t) => (
                             <button
