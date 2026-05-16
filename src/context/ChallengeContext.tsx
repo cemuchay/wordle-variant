@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from 'react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { useApp } from './AppContext';
-import { deobfuscateWord } from '../lib/game-logic';
+import { deobfuscateWord, calculateSkillIndex } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 
 interface ChallengeContextType {
@@ -43,6 +43,7 @@ interface ChallengeContextType {
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
     loadMyChallenges: () => Promise<void>;
+    submitResult: (result: any) => Promise<boolean>;
     
     // Helpers
     loading: boolean;
@@ -132,6 +133,78 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             return true;
         });
     }, [myChallenges, statusFilter, searchQuery, user?.id]);
+
+    const submitResult = useCallback(async (result: any) => {
+        if (!myParticipation) return false;
+
+        const isMarathon = selectedChallenge?.word_length === 1;
+        let mergedResult: any = { ...result };
+
+        // Helper to calculate totals for Marathon
+        const calculateMarathonTotals = (currentGuesses: any, currentHints: any) => {
+            let totalScore = 0;
+            let totalAttempts = 0;
+            let allCompleted = true;
+            const lengths = [3, 4, 5, 6, 7];
+
+            lengths.forEach(l => {
+                const guesses = currentGuesses[l] || [];
+                const hints = currentHints[l] || {};
+                const won = guesses.some((g: any) => g.every((r: any) => r.status === 'correct'));
+                const lost = !won && guesses.length >= 6;
+                
+                totalAttempts += guesses.length;
+                if (won || lost) {
+                    totalScore += calculateSkillIndex(guesses.length, 6, hints.used || false, guesses);
+                } else {
+                    allCompleted = false;
+                }
+            });
+
+            return { totalScore, totalAttempts, allCompleted };
+        };
+        
+        setMyParticipation(prev => {
+            if (!prev) return prev;
+            
+            if (isMarathon) {
+                const updatedGuesses = { ...(prev.guesses || {}), ...(result.guesses || {}) };
+                const updatedHints = { ...(prev.hint_record || {}), ...(result.hint_record || {}) };
+                const { totalScore, totalAttempts, allCompleted } = calculateMarathonTotals(updatedGuesses, updatedHints);
+                
+                mergedResult = {
+                    ...result,
+                    guesses: updatedGuesses,
+                    hint_record: updatedHints,
+                    score: totalScore,
+                    attempts: totalAttempts,
+                    status: allCompleted ? 'completed' : 'playing',
+                    hints_used: Object.values(updatedHints).some((h: any) => h.used)
+                };
+            }
+            
+            return { ...prev, ...mergedResult };
+        });
+
+        // Re-calculate for API call to ensure we don't use stale closure values
+        if (isMarathon) {
+            const updatedGuesses = { ...(myParticipation.guesses || {}), ...(result.guesses || {}) };
+            const updatedHints = { ...(myParticipation.hint_record || {}), ...(result.hint_record || {}) };
+            const { totalScore, totalAttempts, allCompleted } = calculateMarathonTotals(updatedGuesses, updatedHints);
+            
+            mergedResult = {
+                ...result,
+                guesses: updatedGuesses,
+                hint_record: updatedHints,
+                score: totalScore,
+                attempts: totalAttempts,
+                status: allCompleted ? 'completed' : 'playing',
+                hints_used: Object.values(updatedHints).some((h: any) => h.used)
+            };
+        }
+
+        return await submitChallengeResult(myParticipation.id, mergedResult);
+    }, [myParticipation, selectedChallenge, submitChallengeResult]);
 
     // Lifecycle: Load Data
     const loadMyChallenges = useCallback(async () => {

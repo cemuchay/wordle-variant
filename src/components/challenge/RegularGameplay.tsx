@@ -19,8 +19,14 @@ interface RegularGameplayProps {
 export const RegularGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack
 }: RegularGameplayProps) => {
-    const { state, actions, isSaving, wordLength, targetWord } = useChallengeGameEngine({
-        challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength
+    const { state, actions, isSaving, wordLength } = useChallengeGameEngine({
+        challenge, 
+        participation, 
+        triggerToast, 
+        submitChallengeResult, 
+        onFinish, 
+        selectedLength,
+        onLengthComplete: onBack 
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord, timeLeft } = state;

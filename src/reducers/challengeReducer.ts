@@ -21,7 +21,8 @@ export type ChallengeGameAction =
     | { type: 'SET_HINT'; hint: { letter: string, index: number, row?: number } }
     | { type: 'TIME_UP' }
     | { type: 'SHAKE_GUESS' }
-    | { type: 'STOP_SHAKE' };
+    | { type: 'STOP_SHAKE' }
+    | { type: 'SWITCH_LENGTH'; payload: any };
 
 export const initialChallengeState: ChallengeGameState = {
     guesses: [],
