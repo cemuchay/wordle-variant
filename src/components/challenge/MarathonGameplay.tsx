@@ -53,17 +53,21 @@ export const MarathonGameplay = memo(({
                             className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isFinished ? 'bg-white/5 border-white/5 opacity-50' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
                         >
                             <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : 'bg-white/10 text-white'}`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
                                     {l}
                                 </div>
                                 <div className="text-left">
                                     <p className="text-xs font-black uppercase">{l} Letters</p>
-                                    <p className="text-[10px] text-gray-500">{isFinished ? (isCompleted ? 'Completed' : 'Failed') : 'Not Started'}</p>
+                                    <p className="text-[10px] text-gray-500">
+                                        {isFinished 
+                                            ? (isCompleted ? 'Completed' : 'Failed') 
+                                            : (prog ? 'In Progress' : 'Not Started')}
+                                    </p>
                                 </div>
                             </div>
-                            {isFinished && (
+                            {prog && (
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">{prog?.attempts}/6 Tries</p>
+                                    <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/6 Tries</p>
                                 </div>
                             )}
                         </button>

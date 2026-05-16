@@ -297,6 +297,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 .filter(p => invitedIds.includes(p.id))
                 .map(p => p.username);
             if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
+            
+            // Reset Form Defaults
+            setMode('ANYTIME');
+            setLength(5);
+            setMaxTime(null);
+            setInvitedIds([]);
+            
             handleViewChallenge(challenge.id);
         }
     }, [mode, length, maxTime, invitedIds, availableProfiles, createChallenge, onChallengeCreated, handleViewChallenge]);
