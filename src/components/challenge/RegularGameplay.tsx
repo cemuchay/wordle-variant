@@ -19,7 +19,7 @@ interface RegularGameplayProps {
 export const RegularGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack
 }: RegularGameplayProps) => {
-    const { state, actions, isSaving, wordLength } = useChallengeGameEngine({
+    const { state, actions, isSaving, retryCount, wordLength } = useChallengeGameEngine({
         challenge, 
         participation, 
         triggerToast, 
@@ -35,8 +35,10 @@ export const RegularGameplay = memo(({
         <div className="flex-1 flex flex-col p-4 gap-6 relative">
             {isSaving && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
-                    <RefreshCw size={10} className="animate-spin text-correct" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/70">Syncing...</span>
+                    <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
+                        {retryCount > 0 ? `Retrying ${retryCount}/3...` : 'Syncing...'}
+                    </span>
                 </div>
             )}
 

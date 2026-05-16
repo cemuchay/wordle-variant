@@ -39,6 +39,7 @@ export const useChallengeGameEngine = ({
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
 
     // Word Length & Target Word Resolution
@@ -206,12 +207,12 @@ export const useChallengeGameEngine = ({
         const won = upperGuess === targetWord;
         const lost = newGuesses.length === 6;
 
-        dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
-
         setIsSaving(true);
-        if (won || lost) {
-            let resultPayload: any;
-            if (isMarathon) {
+        setRetryCount(0);
+        
+        let resultPayload: any;
+        if (isMarathon) {
+            if (won || lost) {
                 const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
                 resultPayload = {
                     status: 'completed',
@@ -222,6 +223,14 @@ export const useChallengeGameEngine = ({
                     hint_record: hintRecord
                 };
             } else {
+                resultPayload = {
+                    status: 'playing',
+                    guesses: newGuesses,
+                    attempts: newGuesses.length
+                };
+            }
+        } else {
+            if (won || lost) {
                 const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
                 resultPayload = {
                     status: 'completed',
@@ -230,26 +239,6 @@ export const useChallengeGameEngine = ({
                     guesses: newGuesses,
                     hints_used: usedHint,
                     hint_record: hintRecord
-                };
-            }
-            const success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
-            setIsSaving(false);
-            if (!success) triggerToast("Failed to save result.", 4000);
-            setTimeout(() => {
-                triggerToast(won ? "Completed! 🎉" : `The word was ${targetWord}`, 5000);
-                if (isMarathon) {
-                    if (onLengthComplete) onLengthComplete();
-                } else {
-                    onFinish();
-                }
-            }, 2000);
-        } else {
-            let resultPayload: any;
-            if (isMarathon) {
-                resultPayload = {
-                    status: 'playing',
-                    guesses: newGuesses,
-                    attempts: newGuesses.length
                 };
             } else {
                 resultPayload = {
@@ -261,9 +250,44 @@ export const useChallengeGameEngine = ({
                     hint_record: hintRecord
                 };
             }
-            const success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
-            setIsSaving(false);
-            if (!success) triggerToast("Progress not saved.", 3000);
+        }
+
+        // Retry logic: 3 attempts
+        let success = false;
+        let attempt = 0;
+        const maxAttempts = 3;
+
+        while (attempt < maxAttempts && !success) {
+            if (attempt > 0) {
+                setRetryCount(attempt);
+                // Wait 1.5s before retry
+                await new Promise(r => setTimeout(r, 1500));
+            }
+            
+            success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
+            attempt++;
+        }
+
+        setIsSaving(false);
+        setRetryCount(0);
+
+        if (!success) {
+            triggerToast("Sync failed after multiple retries. Check connection.", 5000);
+            return;
+        }
+
+        // ONLY NOW we update the UI, triggering the reveal animation
+        dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
+
+        if (won || lost) {
+            setTimeout(() => {
+                triggerToast(won ? "Completed! 🎉" : `The word was ${targetWord}`, 5000);
+                if (isMarathon) {
+                    if (onLengthComplete) onLengthComplete();
+                } else {
+                    onFinish();
+                }
+            }, 2000);
         }
     }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, isMarathon, onLengthComplete]);
 
@@ -312,6 +336,7 @@ export const useChallengeGameEngine = ({
         state,
         actions: { onChar, onDelete, onEnter, handleHint },
         isSaving,
+        retryCount,
         wordLength,
         targetWord
     };
