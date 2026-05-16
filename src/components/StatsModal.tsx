@@ -212,16 +212,31 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {leaderboard.length > 0 ? leaderboard.map((entry, i) => (
-                    <LeaderboardRow
-                      key={`${entry.username}-${i}`}
-                      entry={entry}
-                      index={i}
-                      isCurrentUser={entry.user_id === user?.id}
-                      canViewGuesses={canViewGuess}
-                      onShowGuesses={(e) => setSelectedEntry(e)}
-                    />
-                  )) : (
+                  {(() => {
+                    let currentRank = 1;
+                    return leaderboard.map((entry, i, arr) => {
+                      if (i > 0 && entry.total_score < arr[i - 1].total_score) {
+                        currentRank = i + 1;
+                      }
+
+                      const tieCount = arr.filter(e => e.total_score === entry.total_score).length;
+                      const tieIndex = arr.slice(0, i + 1).filter(e => e.total_score === entry.total_score).length - 1;
+
+                      return (
+                        <LeaderboardRow
+                          key={`${entry.username}-${i}`}
+                          entry={entry}
+                          rank={currentRank}
+                          tieIndex={tieIndex}
+                          tieCount={tieCount}
+                          isCurrentUser={entry.user_id === user?.id}
+                          canViewGuesses={canViewGuess}
+                          onShowGuesses={(e) => setSelectedEntry(e)}
+                        />
+                      );
+                    });
+                  })()}
+                  {leaderboard.length === 0 && (
                     <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
                   )}
                 </div>
@@ -262,7 +277,7 @@ const pluralCheck = (num: number) => {
   return num > 1 ? "s" : ""
 }
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; }> = ({ entry, index, isCurrentUser, canViewGuesses, onShowGuesses }) => {
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex: number; tieCount: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; }> = ({ entry, rank, tieIndex, tieCount, isCurrentUser, canViewGuesses, onShowGuesses }) => {
   let attempts = entry.attempts
   const wordLength = entry.word_length
   const status = entry.status
@@ -270,7 +285,10 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
   if (status === "lost") attempts = "X"
 
   const formattedGameScore = attempts && wordLength ? ` (${attempts}/${6})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
-  const isFirst = index === 0;
+  const isFirst = rank === 1;
+  const isTopThree = rank <= 3;
+  const pieceWidth = 100 / tieCount;
+
   return (
     <div
       onClick={() => canViewGuesses && onShowGuesses(entry)}
@@ -285,11 +303,19 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; index: number; isCurre
     >
       <div className="flex items-center gap-3">
         <div className="relative">
-          <span className={`text-xs font-black w-4 flex justify-center ${isFirst ? 'text-yellow-400' : index < 3 ? 'text-yellow-500' : 'text-gray-500'}`}>
-            {index + 1}
+          <span className={`text-xs font-black w-4 flex justify-center ${isFirst ? 'text-yellow-400' : isTopThree ? 'text-yellow-500' : 'text-gray-500'}`}>
+            {rank}
           </span>
           {isFirst && (
-            <div className="absolute -top-6 left-7.5 text-[18px]">👑</div>
+            <div className="absolute -top-6 left-7.5 text-[18px] w-[18px] flex justify-center select-none">
+              <div style={tieCount > 1 ? {
+                clipPath: `inset(0 ${100 - pieceWidth * (tieIndex + 1)}% 0 ${pieceWidth * tieIndex}%)`,
+                transform: `translateX(${50 - (pieceWidth * tieIndex + pieceWidth / 2)}%)`,
+                display: 'inline-block'
+              } : {}}>
+                👑
+              </div>
+            </div>
           )}
         </div>
 
