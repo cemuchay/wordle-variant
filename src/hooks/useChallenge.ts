@@ -18,6 +18,20 @@ export interface Challenge {
     creator_profile?: { username: string, avatar_url: string };
 }
 
+export interface MarathonProgress {
+    id: string;
+    participation_id: string;
+    word_length: number;
+    status: 'playing' | 'completed' | 'timed_out';
+    score: number;
+    attempts: number;
+    guesses: any[];
+    hints_used: boolean;
+    hint_record: any | null;
+    started_at: string;
+    completed_at: string | null;
+}
+
 export interface ChallengeParticipant {
     id: string;
     challenge_id: string;
@@ -25,12 +39,13 @@ export interface ChallengeParticipant {
     status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
     score: number;
     attempts: number;
-    guesses: any; // Can be array or object for Marathon
+    guesses: any; // Legacy or for non-marathon
     hints_used: boolean;
     hint_record: any | null;
     started_at: string | null;
     completed_at: string | null;
     profiles?: { username: string, avatar_url: string };
+    marathon_progress?: MarathonProgress[];
 }
 
 export const useChallenge = (user: AppUser | null) => {
@@ -152,7 +167,7 @@ export const useChallenge = (user: AppUser | null) => {
             // First check if already participating
             const { data: existing, error: fetchError } = await supabase
                 .from('challenge_participants')
-                .select('*')
+                .select('*, marathon_progress:challenge_participants_marathon(*)')
                 .eq('challenge_id', challengeId)
                 .eq('user_id', user.id)
                 .maybeSingle();
@@ -168,7 +183,7 @@ export const useChallenge = (user: AppUser | null) => {
                     user_id: user.id,
                     status: 'pending'
                 }])
-                .select()
+                .select('*, marathon_progress:challenge_participants_marathon(*)')
                 .single();
 
             if (error) throw error;
@@ -209,7 +224,7 @@ export const useChallenge = (user: AppUser | null) => {
         status: 'completed' | 'timed_out' | 'playing',
         score: number,
         attempts: number,
-        guesses: any[],
+        guesses: any,
         hints_used?: boolean,
         hint_record?: any | null
     }) => {
@@ -232,6 +247,46 @@ export const useChallenge = (user: AppUser | null) => {
         }
     }, []);
 
+    const submitMarathonResult = useCallback(async (participationId: string, wordLength: number, result: Partial<MarathonProgress>) => {
+        try {
+            const { data: existing } = await supabase
+                .from('challenge_participants_marathon')
+                .select('id')
+                .eq('participation_id', participationId)
+                .eq('word_length', wordLength)
+                .maybeSingle();
+
+            if (existing) {
+                const updateData: any = { ...result };
+                if (result.status && result.status !== 'playing') {
+                    updateData.completed_at = new Date().toISOString();
+                }
+                const { error } = await supabase
+                    .from('challenge_participants_marathon')
+                    .update(updateData)
+                    .eq('id', existing.id);
+                if (error) throw error;
+            } else {
+                const insertData: any = {
+                    participation_id: participationId,
+                    word_length: wordLength,
+                    ...result
+                };
+                if (result.status && result.status !== 'playing') {
+                    insertData.completed_at = new Date().toISOString();
+                }
+                const { error } = await supabase
+                    .from('challenge_participants_marathon')
+                    .insert([insertData]);
+                if (error) throw error;
+            }
+            return true;
+        } catch (err) {
+            console.error('Error submitting marathon result:', err);
+            return false;
+        }
+    }, []);
+
     const subscribeToParticipants = useCallback((challengeId: string) => {
         const channelName = `challenge_participants_${challengeId}`;
 
@@ -249,10 +304,26 @@ export const useChallenge = (user: AppUser | null) => {
                 table: 'challenge_participants',
                 filter: `challenge_id=eq.${challengeId}`
             }, async () => {
-                // Refresh all participants to get profiles too
+                // Refresh all participants to get profiles and marathon progress
                 const { data } = await supabase
                     .from('challenge_participants')
-                    .select('*, profiles(username, avatar_url)')
+                    .select('*, profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
+                    .eq('challenge_id', challengeId)
+                    .order('score', { ascending: false });
+
+                if (data) setParticipants(data as ChallengeParticipant[]);
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'challenge_participants_marathon'
+            }, async (payload) => {
+                // If a marathon progress row changes, we need to know if it belongs to this challenge
+                // Easiest is to just refresh if any marathon row changes for now, 
+                // but we could optimize by checking participation_id if we had it in a map.
+                const { data } = await supabase
+                    .from('challenge_participants')
+                    .select('*, profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
                     .eq('challenge_id', challengeId)
                     .order('score', { ascending: false });
 
@@ -266,7 +337,7 @@ export const useChallenge = (user: AppUser | null) => {
             try {
                 const { data } = await supabase
                     .from('challenge_participants')
-                    .select('*, profiles(username, avatar_url)')
+                    .select('*, profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
                     .eq('challenge_id', challengeId)
                     .order('score', { ascending: false });
 
@@ -290,12 +361,14 @@ export const useChallenge = (user: AppUser | null) => {
                 .from('challenge_participants')
                 .select(`
                     *,
+                    marathon_progress:challenge_participants_marathon(*),
                     challenge:challenges(
                         *,
                         creator:profiles!creator_id(username, avatar_url),
                         participants:challenge_participants(
                             *,
-                            profiles(username, avatar_url)
+                            profiles(username, avatar_url),
+                            marathon_progress:challenge_participants_marathon(*)
                         )
                     )
                 `)
@@ -321,6 +394,7 @@ export const useChallenge = (user: AppUser | null) => {
         joinChallenge,
         startChallenge,
         submitChallengeResult,
+        submitMarathonResult,
         subscribeToParticipants,
         participants,
         fetchMyChallenges,

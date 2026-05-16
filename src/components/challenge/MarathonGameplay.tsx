@@ -6,7 +6,7 @@ interface MarathonGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (id: string, result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any) => Promise<boolean>;
     onFinish: () => void;
 }
 
@@ -40,9 +40,9 @@ export const MarathonGameplay = memo(({
 
             <div className="grid grid-cols-1 gap-3">
                 {allLengths.map(l => {
-                    const lengthGuesses = participation.guesses?.[l] || [];
-                    const isCompleted = lengthGuesses.some((g: any) => g.every((r: any) => r.status === 'correct'));
-                    const isFailed = !isCompleted && lengthGuesses.length >= 6;
+                    const prog = participation.marathon_progress?.find((p: any) => p.word_length === l);
+                    const isCompleted = prog?.status === 'completed';
+                    const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= 6 && !isCompleted);
                     const isFinished = isCompleted || isFailed;
 
                     return (
@@ -63,7 +63,7 @@ export const MarathonGameplay = memo(({
                             </div>
                             {isFinished && (
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">{lengthGuesses.length}/6 Tries</p>
+                                    <p className="text-[10px] font-black uppercase text-gray-400">{prog?.attempts}/6 Tries</p>
                                 </div>
                             )}
                         </button>

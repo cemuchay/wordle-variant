@@ -10,7 +10,7 @@ interface RegularGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (id: string, result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any) => Promise<boolean>;
     onFinish: () => void;
     selectedLength?: number; // Optional override for Marathon mode
     onBack?: () => void; // Optional back handler

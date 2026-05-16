@@ -8,7 +8,7 @@ interface UseChallengeGameEngineProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (id: string, result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any) => Promise<boolean>;
     onFinish: () => void;
     selectedLength?: number | null; // For Marathon mode
     onLengthComplete?: () => void; // Callback for Marathon mode
@@ -45,71 +45,86 @@ export const useChallengeGameEngine = ({
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;
     const targetWord = isMarathon ? marathonWords[selectedLength!] : challenge.target_word;
 
+    // Helper to extract guesses for current word with extreme defensiveness
+    const getIncomingGuesses = useCallback(() => {
+        if (!participation) return [];
+        
+        if (isMarathon) {
+            if (!selectedLength) return [];
+            const progress = participation.marathon_progress?.find((p: any) => p.word_length === selectedLength);
+            return Array.isArray(progress?.guesses) ? progress.guesses : [];
+        }
+        
+        let g = participation.guesses;
+        // Handle potential stringified JSON from some DB responses
+        if (typeof g === 'string') {
+            try { g = JSON.parse(g); } catch (e) { return []; }
+        }
+        return Array.isArray(g) ? g : [];
+    }, [participation, isMarathon, selectedLength]);
+
     // Initialization & State Sync
     useEffect(() => {
-        if (isMarathon) {
-            if (selectedLength) {
-                const lengthGuesses = participation.guesses?.[selectedLength] || [];
-                const lengthHintsUsed = participation.hint_record?.[selectedLength]?.used || false;
-                const lengthHintRecord = participation.hint_record?.[selectedLength]?.record || null;
-                const lengthFinished = lengthGuesses.some((g: any) =>
-                    g.every((r: any) => r.status === 'correct')) || lengthGuesses.length >= 6;
+        if (isMarathon && !selectedLength) return;
 
-                let subGameTimeLeft: number | null = null;
-                if (challenge.mode === 'LIVE' && challenge.max_time) {
-                    const subGameStart = participation.hint_record?.[selectedLength]?.started_at;
-                    if (subGameStart) {
-                        const elapsed = Math.floor((Date.now() - new Date(subGameStart).getTime()) / 1000);
-                        subGameTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
-                    } else {
-                        subGameTimeLeft = challenge.max_time * 60;
-                        const updatedHintRecord = { ...(participation.hint_record || {}) };
-                        updatedHintRecord[selectedLength] = { ...(updatedHintRecord[selectedLength] || {}), started_at: new Date().toISOString() };
-                        submitChallengeResult(participation.id, {
-                            status: 'playing',
-                            hint_record: updatedHintRecord
-                        });
-                    }
-                }
-
-                dispatch({
-                    type: 'SWITCH_LENGTH', payload: {
-                        guesses: lengthGuesses,
-                        letterStatuses: getLetterStatuses(lengthGuesses),
-                        usedHint: lengthHintsUsed,
-                        hintRecord: lengthHintRecord,
-                        isGameOver: !!lengthFinished || (subGameTimeLeft !== null && subGameTimeLeft <= 0),
-                        status: participation.status,
-                        timeLeft: subGameTimeLeft
-                    }
-                });
+        const incoming = getIncomingGuesses();
+        const progress = isMarathon ? participation.marathon_progress?.find((p: any) => p.word_length === selectedLength) : null;
+        
+        console.log(`[Engine] Initializing length ${wordLength}. Found ${incoming.length} incoming guesses.`);
+        
+        dispatch({
+            type: 'START_GAME', payload: {
+                guesses: incoming,
+                letterStatuses: getLetterStatuses(incoming),
+                usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
+                hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
+                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                status: isMarathon ? (progress?.status || 'playing') : participation.status,
+                timeLeft: timeLeft
             }
-        } else {
-            const currentGuesses = participation.guesses || [];
-            const hasFinished = currentGuesses.some((g: any) =>
-                g.every((r: any) => r.status === 'correct')) || currentGuesses.length >= 6;
-
-            let initialTimeLeft: number | null = null;
-            if (challenge.mode === 'LIVE' && challenge.max_time) {
-                const startedAt = participation.started_at ? new Date(participation.started_at).getTime() : Date.now();
-                const endTime = startedAt + challenge.max_time * 60 * 1000;
-                initialTimeLeft = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+        });
+        
+        // Handle Per-Game Timer for Marathon LIVE mode
+        if (isMarathon && selectedLength && challenge.mode === 'LIVE' && challenge.max_time) {
+            const subGameStart = progress?.started_at;
+            if (subGameStart) {
+                const elapsed = Math.floor((Date.now() - new Date(subGameStart).getTime()) / 1000);
+                const remaining = Math.max(0, (challenge.max_time * 60) - elapsed);
+                dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: remaining, isGameOver: state.isGameOver || remaining <= 0 } as any });
+            } else if (!isSaving) {
+                // First time entry timer start
+                submitChallengeResult({
+                    status: 'playing',
+                    started_at: new Date().toISOString()
+                }, selectedLength);
             }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedLength, participation.id]); 
 
-            dispatch({
-                type: 'START_GAME', payload: {
-                    guesses: currentGuesses,
-                    letterStatuses: getLetterStatuses(currentGuesses),
-                    usedHint: participation.hints_used || false,
-                    hintRecord: participation.hint_record || null,
-                    isGameOver: hasFinished || participation.status === 'completed' || participation.status === 'timed_out' || (initialTimeLeft !== null && initialTimeLeft <= 0),
-                    status: participation.status,
-                    timeLeft: initialTimeLeft
+    // Sync guesses if they update in props while engine is mounted
+    useEffect(() => {
+        if (isSaving || (isMarathon && !selectedLength)) return;
+
+        const incoming = getIncomingGuesses();
+        
+        // Robust Sync Strategy:
+        // Only sync from props if:
+        // 1. We have no local guesses yet (first fetch arrived after mount)
+        // 2. The incoming data is MORE complete than our local state (sync from another device)
+        const shouldSync = (guesses.length === 0 && incoming.length > 0) || incoming.length > guesses.length;
+
+        if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
+             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
+             dispatch({
+                type: 'SWITCH_LENGTH', payload: {
+                    guesses: incoming,
+                    letterStatuses: getLetterStatuses(incoming),
+                    isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
                 }
             });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedLength, isMarathon, participation.id]);
+    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength]);
 
     // Timer Interval Management
     useEffect(() => {
@@ -129,15 +144,19 @@ export const useChallengeGameEngine = ({
 
         if (isMarathon) {
             // Just fail this specific word, but keep marathon playing
-            const success = await submitChallengeResult(participation.id, {
-                status: 'playing',
-                guesses: { [selectedLength!]: guesses }
-            });
+            const success = await submitChallengeResult({
+                status: 'timed_out',
+                attempts: guesses.length,
+                guesses: guesses,
+                score: 0,
+                hints_used: usedHint,
+                hint_record: hintRecord
+            }, selectedLength!);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save progress.", 3000);
             if (onLengthComplete) onLengthComplete();
         } else {
-            const success = await submitChallengeResult(participation.id, {
+            const success = await submitChallengeResult({
                 status: 'timed_out',
                 score: 0,
                 attempts: guesses.length,
@@ -149,7 +168,7 @@ export const useChallengeGameEngine = ({
             if (!success) triggerToast("Failed to save result.", 4000);
             onFinish();
         }
-    }, [participation.id, isMarathon, selectedLength, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, onLengthComplete, isSaving]);
+    }, [isMarathon, selectedLength, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, onLengthComplete, isSaving]);
 
     useEffect(() => {
         if (timeLeft === 0 && !isGameOver) {
@@ -193,9 +212,14 @@ export const useChallengeGameEngine = ({
         if (won || lost) {
             let resultPayload: any;
             if (isMarathon) {
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
                 resultPayload = {
-                    guesses: { [wordLength]: newGuesses },
-                    hint_record: { [wordLength]: { used: usedHint, record: hintRecord } }
+                    status: 'completed',
+                    score: skillScore,
+                    attempts: newGuesses.length,
+                    guesses: newGuesses,
+                    hints_used: usedHint,
+                    hint_record: hintRecord
                 };
             } else {
                 const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
@@ -208,7 +232,7 @@ export const useChallengeGameEngine = ({
                     hint_record: hintRecord
                 };
             }
-            const success = await submitChallengeResult(participation.id, resultPayload);
+            const success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save result.", 4000);
             setTimeout(() => {
@@ -224,7 +248,8 @@ export const useChallengeGameEngine = ({
             if (isMarathon) {
                 resultPayload = {
                     status: 'playing',
-                    guesses: { [wordLength]: newGuesses }
+                    guesses: newGuesses,
+                    attempts: newGuesses.length
                 };
             } else {
                 resultPayload = {
@@ -236,11 +261,11 @@ export const useChallengeGameEngine = ({
                     hint_record: hintRecord
                 };
             }
-            const success = await submitChallengeResult(participation.id, resultPayload);
+            const success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
             setIsSaving(false);
             if (!success) triggerToast("Progress not saved.", 3000);
         }
-    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, usedHint, hintRecord, participation.id, submitChallengeResult, triggerToast, onFinish, isMarathon, onLengthComplete]);
+    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, isMarathon, onLengthComplete]);
 
     const handleHint = async () => {
         if (isGameOver || isSaving) return;
@@ -264,8 +289,8 @@ export const useChallengeGameEngine = ({
             if (isMarathon) {
                 resultPayload = {
                     status: 'playing',
-                    hint_record: { [selectedLength!]: { used: true, record: hintWithRow } },
-                    hints_used: true
+                    hints_used: true,
+                    hint_record: hintWithRow
                 };
             } else {
                 resultPayload = {
@@ -277,7 +302,7 @@ export const useChallengeGameEngine = ({
                     hint_record: hintWithRow
                 };
             }
-            const success = await submitChallengeResult(participation.id, resultPayload);
+            const success = await submitChallengeResult(resultPayload, isMarathon ? selectedLength! : undefined);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save hint usage.", 3000);
         }

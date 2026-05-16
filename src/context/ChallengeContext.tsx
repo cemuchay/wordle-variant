@@ -43,7 +43,7 @@ interface ChallengeContextType {
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
     loadMyChallenges: () => Promise<void>;
-    submitResult: (result: any) => Promise<boolean>;
+    submitResult: (result: any, wordLength?: number) => Promise<boolean>;
     
     // Helpers
     loading: boolean;
@@ -51,6 +51,7 @@ interface ChallengeContextType {
     joinId: string;
     setJoinId: (id: string) => void;
     submitChallengeResult: any;
+    submitMarathonResult: any;
     startChallenge: any;
     previewParticipant: ChallengeParticipant | null;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
@@ -70,7 +71,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const { 
         createChallenge, fetchChallenge, joinChallenge, subscribeToParticipants, 
         participants, fetchMyChallenges, fetchProfiles, loading, error, 
-        startChallenge, submitChallengeResult 
+        startChallenge, submitChallengeResult, submitMarathonResult 
     } = challengeApi;
 
     // UI & Navigation
@@ -87,6 +88,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // Selection State
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
     const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
+    const latestParticipationRef = useRef<ChallengeParticipant | null>(null);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        latestParticipationRef.current = myParticipation;
+    }, [myParticipation]);
+
     const [myChallenges, setMyChallenges] = useState<any[]>([]);
     const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
     const [invitedIds, setInvitedIds] = useState<string[]>([]);
@@ -134,77 +142,59 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         });
     }, [myChallenges, statusFilter, searchQuery, user?.id]);
 
-    const submitResult = useCallback(async (result: any) => {
+    const submitResult = useCallback(async (result: any, wordLength?: number) => {
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
-        let mergedResult: any = { ...result };
 
-        // Helper to calculate totals for Marathon
-        const calculateMarathonTotals = (currentGuesses: any, currentHints: any) => {
+        if (isMarathon && wordLength) {
+            // 1. Update the sub-game progress in the new table
+            const success = await submitMarathonResult(myParticipation.id, wordLength, result);
+            if (!success) return false;
+
+            // 2. Recalculate totals for the main participation record
+            // We use the latest state and merge the new result for calculation
+            const currentMarathon = myParticipation.marathon_progress || [];
+            const updatedMarathon = [...currentMarathon];
+            const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
+            
+            if (idx > -1) {
+                updatedMarathon[idx] = { ...updatedMarathon[idx], ...result };
+            } else {
+                updatedMarathon.push({ word_length: wordLength, ...result } as any);
+            }
+
             let totalScore = 0;
             let totalAttempts = 0;
-            let allCompleted = true;
+            let completedCount = 0;
             const lengths = [3, 4, 5, 6, 7];
 
             lengths.forEach(l => {
-                const guesses = currentGuesses[l] || [];
-                const hints = currentHints[l] || {};
-                const won = guesses.some((g: any) => g.every((r: any) => r.status === 'correct'));
-                const lost = !won && guesses.length >= 6;
-                
-                totalAttempts += guesses.length;
-                if (won || lost) {
-                    totalScore += calculateSkillIndex(guesses.length, 6, hints.used || false, guesses);
-                } else {
-                    allCompleted = false;
+                const prog = updatedMarathon.find(p => p.word_length === l);
+                if (prog) {
+                    totalAttempts += prog.attempts || 0;
+                    if (prog.status === 'completed' || prog.status === 'timed_out') {
+                        totalScore += prog.score || 0;
+                        completedCount++;
+                    }
                 }
             });
 
-            return { totalScore, totalAttempts, allCompleted };
-        };
-        
-        setMyParticipation(prev => {
-            if (!prev) return prev;
-            
-            if (isMarathon) {
-                const updatedGuesses = { ...(prev.guesses || {}), ...(result.guesses || {}) };
-                const updatedHints = { ...(prev.hint_record || {}), ...(result.hint_record || {}) };
-                const { totalScore, totalAttempts, allCompleted } = calculateMarathonTotals(updatedGuesses, updatedHints);
-                
-                mergedResult = {
-                    ...result,
-                    guesses: updatedGuesses,
-                    hint_record: updatedHints,
-                    score: totalScore,
-                    attempts: totalAttempts,
-                    status: allCompleted ? 'completed' : 'playing',
-                    hints_used: Object.values(updatedHints).some((h: any) => h.used)
-                };
-            }
-            
-            return { ...prev, ...mergedResult };
-        });
-
-        // Re-calculate for API call to ensure we don't use stale closure values
-        if (isMarathon) {
-            const updatedGuesses = { ...(myParticipation.guesses || {}), ...(result.guesses || {}) };
-            const updatedHints = { ...(myParticipation.hint_record || {}), ...(result.hint_record || {}) };
-            const { totalScore, totalAttempts, allCompleted } = calculateMarathonTotals(updatedGuesses, updatedHints);
-            
-            mergedResult = {
-                ...result,
-                guesses: updatedGuesses,
-                hint_record: updatedHints,
+            const allCompleted = completedCount === 5;
+            const finalUpdateData = {
                 score: totalScore,
                 attempts: totalAttempts,
                 status: allCompleted ? 'completed' : 'playing',
-                hints_used: Object.values(updatedHints).some((h: any) => h.used)
+                hints_used: updatedMarathon.some(p => p.hints_used)
             };
-        }
 
-        return await submitChallengeResult(myParticipation.id, mergedResult);
-    }, [myParticipation, selectedChallenge, submitChallengeResult]);
+            // 3. Update the main participation record with totals
+            return await submitChallengeResult(myParticipation.id, finalUpdateData);
+        } else {
+            // Regular challenge or legacy marathon logic (fallback)
+            return await submitChallengeResult(myParticipation.id, result);
+        }
+    }, [myParticipation, selectedChallenge?.word_length, submitChallengeResult, submitMarathonResult]);
 
     // Lifecycle: Load Data
     const loadMyChallenges = useCallback(async () => {
@@ -230,15 +220,47 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // Sync myParticipation and previewParticipant from the participants array (real-time updates)
     useEffect(() => {
         if (participants.length > 0 && user) {
-            const current = participants.find(p => p.user_id === user.id);
-            if (current) setMyParticipation(current);
+            const currentFromServer = participants.find(p => p.user_id === user.id);
+            const isMarathon = selectedChallenge?.word_length === 1;
+            
+            if (currentFromServer) {
+                // Determine if server data is different from local state
+                const isDifferent = 
+                    JSON.stringify(currentFromServer.guesses) !== JSON.stringify(myParticipation?.guesses) ||
+                    JSON.stringify(currentFromServer.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
+                    currentFromServer.status !== myParticipation?.status ||
+                    currentFromServer.score !== myParticipation?.score;
+
+                if (!isPlaying || isDifferent) {
+                    // If we are playing, we only sync if the server has MORE progress
+                    if (isPlaying) {
+                        let shouldSync = false;
+                        if (isMarathon) {
+                            const serverSubCount = currentFromServer.marathon_progress?.length || 0;
+                            const localSubCount = myParticipation?.marathon_progress?.length || 0;
+                            const serverGuessCount = currentFromServer.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
+                            const localGuessCount = myParticipation?.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
+                            
+                            shouldSync = serverSubCount > localSubCount || serverGuessCount > localGuessCount;
+                        } else {
+                            const serverGuessCount = currentFromServer.guesses?.length || 0;
+                            const localGuessCount = myParticipation?.guesses?.length || 0;
+                            shouldSync = serverGuessCount > localGuessCount;
+                        }
+
+                        if (shouldSync) setMyParticipation(currentFromServer);
+                    } else {
+                        setMyParticipation(currentFromServer);
+                    }
+                }
+            }
             
             if (previewParticipant) {
                 const updated = participants.find(p => p.id === previewParticipant.id);
                 if (updated) setPreviewParticipant(updated);
             }
         }
-    }, [participants, user?.id, previewParticipant?.id]);
+    }, [participants, user?.id, isPlaying, selectedChallenge?.word_length]);
 
     const cleanupSubscription = useCallback(() => {
         if (channelRef.current) {
@@ -337,6 +359,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             toggleInvite,
             copyLink,
             loadMyChallenges,
+            submitResult,
             loading,
             error,
             joinId, setJoinId,
