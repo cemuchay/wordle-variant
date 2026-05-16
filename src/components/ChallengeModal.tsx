@@ -1,19 +1,18 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
-import { X, Trophy, Search, } from 'lucide-react';
-import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
+import { memo } from 'react';
+import { X, Trophy, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { deobfuscateWord } from '../lib/game-logic';
-import { useApp } from '../context/AppContext';
-import { supabase } from '../lib/supabaseClient';
+import { type Challenge } from '../hooks/useChallenge';
+import { ChallengeProvider, useChallengeContext } from '../context/ChallengeContext';
 import GuessPreviewModal from './GuessPreviewModal';
 
 // Sub-components
 import { ChallengeCreate } from './challenge/ChallengeCreate';
 import { ChallengeLobby } from './challenge/ChallengeLobby';
-import { ChallengeGameplay } from './challenge/ChallengeGameplay';
+import { ChallengeGameplayContainer } from './challenge/ChallengeGameplayContainer';
+import { ChallengeSkeleton, ErrorFallback, ChallengeItem } from './challenge/ChallengeUIElements';
 
 interface ChallengeModalProps {
     isOpen: boolean;
@@ -23,492 +22,123 @@ interface ChallengeModalProps {
     initialChallengeId?: string | null;
 }
 
-// Optimized Sub-components moved outside to prevent re-creation on every render
-const ChallengeSkeleton = memo(() => (
-    <div className="space-y-4 animate-pulse">
-        {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-2xl h-24" />
-        ))}
-    </div>
-));
-
-const ErrorFallback = memo(({ message, onRetry }: { message: string, onRetry: () => void }) => (
-    <div className="py-12 text-center">
-        <div className="bg-red-500/10 text-red-500 p-4 rounded-2xl border border-red-500/20 mb-4 mx-6">
-            <p className="text-sm font-bold">{message}</p>
-        </div>
-        <button
-            onClick={onRetry}
-            className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
-        >
-            Try Again
-        </button>
-    </div>
-));
-
-const ExpirationTimer = memo(({ expiresAt, createdAt }: { expiresAt: string, createdAt: string }) => {
-    const [timeLeft, setTimeLeft] = useState<number>(0);
-
-    useEffect(() => {
-        const calculate = () => {
-            const now = new Date().getTime();
-            const end = new Date(expiresAt).getTime();
-            setTimeLeft(Math.max(0, end - now));
-        };
-        calculate();
-        const interval = setInterval(calculate, 60000); // Update every minute
-        return () => clearInterval(interval);
-    }, [expiresAt]);
-
-    if (timeLeft <= 0) return <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>;
-
-    const totalDuration = new Date(expiresAt).getTime() - new Date(createdAt).getTime();
-    const percent = (timeLeft / totalDuration) * 100;
-
-    let colorClass = 'bg-correct'; // Green
-    let textClass = 'text-correct';
-    if (percent < 25) {
-        colorClass = 'bg-red-500';
-        textClass = 'text-red-500';
-    } else if (percent < 50) {
-        colorClass = 'bg-yellow-500';
-        textClass = 'text-yellow-500';
-    }
-
-    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-
-    return (
-        <div className="flex flex-col items-end gap-1">
-            <span className={`${textClass} text-[10px] font-black uppercase tracking-widest flex items-center gap-1`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${colorClass} animate-pulse`} />
-                {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`} left
-            </span>
-            <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percent}%` }}
-                    className={`h-full ${colorClass}`}
-                />
-            </div>
-        </div>
-    );
-});
-
-const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: any, onSelect: (id: string) => void }) => {
-    const isExpired = useMemo(() => new Date(item.challenge.expires_at) < new Date(), [item.challenge.expires_at]);
-    const isFinished = useMemo(() => item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined', [item.status]);
-    const hasActiveParticipants = useMemo(() =>
-        item.challenge.participants?.some((p: any) => p.status === 'pending' || p.status === 'playing'),
-        [item.challenge.participants]
-    );
-
-    return (
-        <button
-            onClick={() => onSelect(item.challenge_id)}
-            className="w-full text-left bg-white/5 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all group"
-        >
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${(isFinished || isExpired) ? 'bg-gray-600' : 'bg-correct pulse'}`} />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        {item.challenge.mode} • {item.challenge.word_length} Letters
-                    </span>
-                </div>
-                {!isExpired && hasActiveParticipants && (
-                    <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
-                )}
-                {isExpired && <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>}
-            </div>
-            <div className="flex items-end justify-between">
-                <div>
-                    <div className="font-bold text-sm flex flex-wrap items-center gap-1.5">
-                        <div className="flex items-center gap-1">
-                            <span>Me</span>
-                            {item.status !== 'pending' && <span className="text-correct text-[10px] font-black">({item.score})</span>}
-                        </div>
-                        <span className="text-[10px] text-gray-500 uppercase font-black">vs</span>
-                        <div className="flex flex-wrap items-center gap-1">
-                            {item.challenge.participants?.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
-                                item.challenge.participants
-                                    .filter((p: any) => p.user_id !== user?.id)
-                                    .map((p: any, idx: number, arr: any[]) => {
-                                        const isCreator = p.user_id === item.challenge.creator_id;
-                                        const hasScore = p.status !== 'pending';
-                                        return (
-                                            <span key={p.id} className={`${isCreator ? "text-correct" : "text-white"} flex items-center gap-1`}>
-                                                {p.profiles?.username || 'Unknown'}
-                                                {hasScore && <span className="text-[10px] opacity-70 font-black">({p.score})</span>}
-                                                {idx < arr.length - 1 ? ', ' : ''}
-                                            </span>
-                                        );
-                                    })
-                            ) : (
-                                <span className="text-white">Waiting for players...</span>
-                            )}
-                        </div>
-                    </div>
-                    <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
-                </div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">
-                    {new Date(item.challenge.created_at).toLocaleDateString()}
-                </span>
-            </div>
-        </button>
-    );
-});
-
-export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
-    const { triggerToast } = useApp();
-    const [activeTab, setActiveTab] = useState<'create' | 'my' | 'join'>('my');
+const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
     const {
-        createChallenge,
-        fetchChallenge,
-        joinChallenge,
-        subscribeToParticipants,
+        activeTab, setActiveTab,
+        isPlaying,
+        selectedChallenge, setSelectedChallenge,
+        myParticipation,
         participants,
-        fetchMyChallenges,
-        fetchProfiles,
+        filteredChallenges,
+        handleViewChallenge,
+        copyLink,
+        loadMyChallenges,
         loading,
         error,
-        startChallenge,
-        submitChallengeResult
-    } = useChallenge(user);
+        searchQuery, setSearchQuery,
+        statusFilter, setStatusFilter,
+        previewParticipant, setPreviewParticipant,
+        unplayedCount
+    } = useChallengeContext();
 
-    // Form/Lobby State
-    const [mode, setMode] = useState<'LIVE' | 'ANYTIME'>('ANYTIME');
-    const [length, setLength] = useState(5);
-    const [maxTime, setMaxTime] = useState<number | null>(null);
-
-    // Adjust maxTime defaults based on mode
-    useEffect(() => {
-        if (mode === 'LIVE') setMaxTime(5);
-        else setMaxTime(null);
-    }, [mode]);
-
-    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
-    const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
-    const [myChallenges, setMyChallenges] = useState<any[]>([]);
-
-    const [joinId, setJoinId] = useState('');
-    const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
-    const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
-    const [invitedIds, setInvitedIds] = useState<string[]>([]);
-    const [isPlaying, setIsPlaying] = useState(false);
-
-    // Search and Filter State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
-
-    const { setChallengeUnreadCount } = useApp();
-
-    // Memoized unplayed count
-    const unplayedCount = useMemo(() =>
-        myChallenges.filter(c => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length,
-        [myChallenges]
-    );
-
-    useEffect(() => {
-        setChallengeUnreadCount(unplayedCount);
-    }, [unplayedCount, setChallengeUnreadCount]);
-
-    const initialProcessed = useRef(false);
-    const channelRef = useRef<any>(null);
-
-    // Optimized filtered challenges using useMemo
-    const filteredChallenges = useMemo(() => {
-        return myChallenges.filter(item => {
-            const isExpired = new Date(item.challenge.expires_at) < new Date();
-            const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-
-            // Filter by Status
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
-
-            // Filter by Search Query (opponent names)
-            if (searchQuery) {
-                const opponentNames = item.challenge.participants
-                    ?.filter((p: any) => p.user_id !== user?.id)
-                    .map((p: any) => p.profiles?.username?.toLowerCase() || '')
-                    .join(' ');
-                if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
-            }
-
-            return true;
-        });
-    }, [myChallenges, statusFilter, searchQuery, user?.id]);
-
-    // Sync state from participants array
-    useEffect(() => {
-        if (participants.length > 0) {
-            if (user) {
-                const current = participants.find(p => p.user_id === user.id);
-                if (current) setMyParticipation(current);
-            }
-            if (previewParticipant) {
-                const updated = participants.find(p => p.id === previewParticipant.id);
-                if (updated) setPreviewParticipant(updated);
-            }
-        }
-    }, [participants]);
-
-    const cleanupSubscription = useCallback(() => {
-        if (channelRef.current) {
-            supabase.removeChannel(channelRef.current);
-            channelRef.current = null;
-        }
-    }, []);
-
-
-    const loadProfiles = useCallback(async () => {
-        const profiles = await fetchProfiles();
-        setAvailableProfiles(profiles.filter((p: any) => p.id !== user?.id));
-    }, [fetchProfiles, user?.id]);
-
-    const loadMyChallenges = useCallback(async () => {
-        const data = await fetchMyChallenges();
-        setMyChallenges(data);
-    }, [fetchMyChallenges]);
-
-    const handleViewChallenge = useCallback(async (id: string) => {
-        const challenge = await fetchChallenge(id);
-        if (challenge) {
-            if (new Date(challenge.expires_at) < new Date()) {
-                triggerToast("This challenge has expired.", 4000);
-                return;
-            }
-            cleanupSubscription();
-            setSelectedChallenge(challenge);
-            const participation = await joinChallenge(challenge.id);
-            setMyParticipation(participation);
-            setActiveTab('join');
-            channelRef.current = subscribeToParticipants(challenge.id);
-        } else {
-            triggerToast("Invalid challenge link or code.", 4000);
-        }
-    }, [cleanupSubscription, triggerToast, fetchChallenge, joinChallenge, subscribeToParticipants]);
-
-    const toggleInvite = useCallback((id: string) => {
-        setInvitedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    }, []);
-
-    const handleCreate = useCallback(async () => {
-        const challenge = await createChallenge(mode, length, mode === 'LIVE' ? maxTime : null, invitedIds);
-        if (challenge) {
-            const invitedUsernames = availableProfiles
-                .filter(p => invitedIds.includes(p.id))
-                .map(p => p.username);
-            if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
-            handleViewChallenge(challenge.id);
-        }
-    }, [mode, length, maxTime, invitedIds, availableProfiles, createChallenge, onChallengeCreated, handleViewChallenge]);
-
-    const handleStartGame = useCallback(async () => {
-        if (!selectedChallenge || !myParticipation) return;
-        if (new Date(selectedChallenge.expires_at) < new Date()) {
-            triggerToast("This challenge has expired.", 4000);
-            return;
-        }
-
-        if (selectedChallenge.word_length === 1) {
-            try {
-                const obfuscatedWords = JSON.parse(selectedChallenge.target_word);
-                const plainWords: Record<number, string> = {};
-                Object.entries(obfuscatedWords).forEach(([len, word]) => {
-                    plainWords[Number(len)] = deobfuscateWord(word as string, selectedChallenge.salt);
-                });
-                setSelectedChallenge({ ...selectedChallenge, target_word: JSON.stringify(plainWords) });
-            } catch (e) {
-                console.error("Failed to parse marathon words", e);
-            }
-        } else {
-            const plainWord = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
-            setSelectedChallenge({ ...selectedChallenge, target_word: plainWord });
-        }
-
-        if (myParticipation.status === 'pending') await startChallenge(myParticipation.id);
-        setIsPlaying(true);
-    }, [selectedChallenge, myParticipation, triggerToast, startChallenge]);
-
-    useEffect(() => {
-        if (initialChallengeId && !initialProcessed.current) {
-            initialProcessed.current = true;
-            handleViewChallenge(initialChallengeId);
-        } else if (isOpen) {
-            loadMyChallenges();
-            loadProfiles();
-        }
-    }, [isOpen, initialChallengeId, loadMyChallenges, loadProfiles, handleViewChallenge]);
-
-    useEffect(() => { return () => cleanupSubscription(); }, [cleanupSubscription]);
-
-    const copyLink = useCallback((challenge: Challenge) => {
-        const url = `${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
-        const text = `Hey! I challenge you to a ${challenge.word_length}-letter Wordle match (${challenge.mode} mode)! 🏆\n\nJoin here: ${url}`;
-        navigator.clipboard.writeText(text);
-        triggerToast('Challenge link copied to clipboard!', 2000);
-    }, [triggerToast]);
-
-    if (!isOpen) return null;
+    if (isPlaying) {
+        return <ChallengeGameplayContainer />;
+    }
 
     const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
 
     return (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-            >
-                {/* Header */}
-                <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-correct/20 p-2 rounded-xl">
-                            <Trophy className="text-correct w-6 h-6" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black uppercase tracking-tighter">
-                                {isPlaying ? 'Challenge Gameplay' : 'Challenges'}
-                            </h2>
-                            <p className="text-gray-400 text-xs">
-                                {isPlaying ? `vs ${selectedChallenge?.profiles?.username || 'Opponent'}` : 'Compete with friends'}
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                        <X size={20} />
+        <motion.div
+            key="lobby"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="flex flex-col h-full"
+        >
+            {selectedChallenge ? null : (
+                <div className="flex border-b border-white/5 shrink-0">
+                    <button
+                        onClick={() => { setActiveTab('my'); loadMyChallenges(); }}
+                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${activeTab === 'my' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
+                    >
+                        My Challenges
+                        {unplayedCount > 0 && (
+                            <span className="bg-correct text-black text-[9px] px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                                {unplayedCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('create')}
+                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'create' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
+                    >
+                        Create
                     </button>
                 </div>
+            )}
 
-                <div className="flex-1 overflow-y-auto min-h-0 flex flex-col scrollbar-thin scrollbar-thumb-white/10">
-                    <AnimatePresence mode="wait">
-                        {isPlaying ? (
-                            <ChallengeGameplay
-                                key="gameplay"
-                                challenge={selectedChallenge}
-                                participation={myParticipation}
-                                triggerToast={triggerToast}
-                                submitChallengeResult={submitChallengeResult}
-                                onFinish={() => setIsPlaying(false)}
-                            />
-                        ) : (
-                            <motion.div
-                                key="lobby"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                className="flex flex-col h-full"
-                            >
-                                {selectedChallenge ? null : (
-                                    <div className="flex border-b border-white/5 shrink-0">
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10">
+                {error ? (
+                    <ErrorFallback
+                        message={error}
+                        onRetry={() => {
+                            if (selectedChallenge) handleViewChallenge(selectedChallenge.id);
+                            else if (activeTab === 'my') loadMyChallenges();
+                        }}
+                    />
+                ) : selectedChallenge ? (
+                    <ChallengeLobby />
+                ) : activeTab === 'create' ? (
+                    <ChallengeCreate />
+                ) : (
+                    <div className="space-y-6">
+                        {/* Search and Filters */}
+                        <div className="space-y-4">
+                            <div className="relative group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-correct transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search by opponent name..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-correct/50 focus:bg-white/10 transition-all"
+                                />
+                            </div>
 
-                                        <button
-                                            onClick={() => { setActiveTab('my'); loadMyChallenges(); }}
-                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${activeTab === 'my' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
-                                        >
-                                            My Challenges
-                                            {unplayedCount > 0 && (
-                                                <span className="bg-correct text-black text-[9px] px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
-                                                    {unplayedCount}
-                                                </span>
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('create')}
-                                            className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'create' ? 'text-correct border-b-2 border-correct' : 'text-gray-500 hover:text-white'}`}
-                                        >
-                                            Create
-                                        </button>
-                                    </div>
-                                )}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setStatusFilter(f)}
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${statusFilter === f ? 'bg-correct text-black shadow-lg shadow-correct/20' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                                <div className="p-6">
-                                    {error ? (
-                                        <ErrorFallback
-                                            message={error}
-                                            onRetry={() => {
-                                                if (selectedChallenge) {
-                                                    handleViewChallenge(selectedChallenge.id);
-                                                } else if (activeTab === 'my') {
-                                                    loadMyChallenges();
-                                                } else {
-                                                    loadProfiles();
-                                                }
-                                            }}
-                                        />
-                                    ) : selectedChallenge ? (
-                                        <ChallengeLobby
-                                            selectedChallenge={selectedChallenge}
-                                            myParticipation={myParticipation}
-                                            participants={participants}
-                                            myHasFinished={myHasFinished}
-                                            user={user}
-                                            copyLink={copyLink}
-                                            setPreviewParticipant={setPreviewParticipant}
-                                            handleStartGame={handleStartGame}
-                                            setSelectedChallenge={setSelectedChallenge}
-                                            loading={loading}
-                                        />
-                                    ) : activeTab === 'create' ? (
-                                        <ChallengeCreate
-                                            mode={mode} setMode={setMode} length={length} setLength={setLength} maxTime={maxTime} setMaxTime={setMaxTime}
-                                            availableProfiles={availableProfiles} invitedIds={invitedIds} toggleInvite={toggleInvite}
-                                            joinId={joinId} setJoinId={setJoinId} handleViewChallenge={handleViewChallenge} handleCreate={handleCreate} loading={loading}
-                                        />
-                                    ) : (
-                                        <div className="space-y-6">
-                                            {/* Search and Filters */}
-                                            <div className="space-y-4">
-                                                <div className="relative group">
-                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-correct transition-colors" size={18} />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search by opponent name..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-correct/50 focus:bg-white/10 transition-all"
-                                                    />
-                                                </div>
-
-                                                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                                    {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
-                                                        <button
-                                                            key={f}
-                                                            onClick={() => setStatusFilter(f)}
-                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${statusFilter === f ? 'bg-correct text-black shadow-lg shadow-correct/20' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
-                                                        >
-                                                            {f}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                {loading ? (
-                                                    <ChallengeSkeleton />
-                                                ) : filteredChallenges.length === 0 ? (
-                                                    <div className="py-12 text-center text-gray-500">
-                                                        {myChallenges.length === 0 ? "No challenges yet." : "No matching challenges found."}
-                                                    </div>
-                                                ) : (
-                                                    filteredChallenges.map((item) => (
-                                                        <ChallengeItem
-                                                            key={item.id}
-                                                            item={item}
-                                                            user={user}
-                                                            onSelect={handleViewChallenge}
-                                                        />
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
+                        <div className="space-y-4">
+                            {loading ? (
+                                <ChallengeSkeleton />
+                            ) : filteredChallenges.length === 0 ? (
+                                <div className="py-12 text-center text-gray-500">
+                                    {myChallenges.length === 0 ? "No challenges yet." : "No matching challenges found."}
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </motion.div>
+                            ) : (
+                                filteredChallenges.map((item) => (
+                                    <ChallengeItem
+                                        key={item.id}
+                                        item={item}
+                                        user={user}
+                                        onSelect={handleViewChallenge}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {previewParticipant && (
                 <GuessPreviewModal
@@ -522,6 +152,49 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                     }}
                 />
             )}
-        </div>
+        </motion.div>
+    );
+});
+
+export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
+    if (!isOpen) return null;
+
+    return (
+        <ChallengeProvider user={user} onChallengeCreated={onChallengeCreated} initialChallengeId={initialChallengeId}>
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                >
+                    {/* Header */}
+                    <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-correct/20 p-2 rounded-xl">
+                                <Trophy className="text-correct w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black uppercase tracking-tighter">
+                                    Challenges
+                                </h2>
+                                <p className="text-gray-400 text-xs">
+                                    Compete with friends
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                        <AnimatePresence mode="wait">
+                            <ChallengeModalContent onClose={onClose} user={user} />
+                        </AnimatePresence>
+                    </div>
+                </motion.div>
+            </div>
+        </ChallengeProvider>
     );
 };
+

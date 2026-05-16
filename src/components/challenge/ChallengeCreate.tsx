@@ -1,29 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Clock, Play, Plus } from 'lucide-react';
 import { memo } from 'react';
+import { useChallengeContext } from '../../context/ChallengeContext';
 
-interface ChallengeCreateProps {
-    mode: 'LIVE' | 'ANYTIME';
-    setMode: (mode: 'LIVE' | 'ANYTIME') => void;
-    length: number;
-    setLength: (length: number) => void;
-    maxTime: number;
-    setMaxTime: (time: number) => void;
-    availableProfiles: any[];
-    invitedIds: string[];
-    toggleInvite: (id: string) => void;
-    joinId: string;
-    setJoinId: (id: string) => void;
-    handleViewChallenge: (id: string) => void;
-    handleCreate: () => void;
-    loading: boolean;
-}
+export const ChallengeCreate = memo(() => {
+    const {
+        mode, setMode, length, setLength, maxTime, setMaxTime,
+        availableProfiles, invitedIds, toggleInvite,
+        joinId, setJoinId, handleViewChallenge, handleCreate, loading
+    } = useChallengeContext();
 
-export const ChallengeCreate = memo(({
-    mode, setMode, length, setLength, maxTime, setMaxTime,
-    availableProfiles, invitedIds, toggleInvite,
-    joinId, setJoinId, handleViewChallenge, handleCreate, loading
-}: ChallengeCreateProps) => {
     return (
         <div className="space-y-6">
             <div className="space-y-4">
@@ -101,10 +87,10 @@ export const ChallengeCreate = memo(({
             )}
 
             <div className="space-y-4">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Challenge Friends</label>
+                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Invite Friends</label>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {loading && availableProfiles.length === 0 ? (
-                        [1, 2, 3, 4].map(i => (
+                        [1, 2, 3].map(i => (
                             <div key={i} className="shrink-0 w-20 h-24 bg-white/5 rounded-2xl animate-pulse" />
                         ))
                     ) : availableProfiles.length === 0 ? (

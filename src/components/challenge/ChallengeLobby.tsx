@@ -1,27 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Play, Share2 } from 'lucide-react';
 import { memo } from 'react';
-import type { Challenge, ChallengeParticipant } from '../../hooks/useChallenge';
+import { useChallengeContext } from '../../context/ChallengeContext';
 
-interface ChallengeLobbyProps {
-    selectedChallenge: Challenge;
-    myParticipation: ChallengeParticipant | null;
-    participants: ChallengeParticipant[];
-    myHasFinished: boolean;
-    user: any;
-    copyLink: (challenge: Challenge) => void;
-    setPreviewParticipant: (p: ChallengeParticipant) => void;
-    handleStartGame: () => void;
-    setSelectedChallenge: (c: Challenge | null) => void;
-    loading?: boolean;
-}
+export const ChallengeLobby = memo(() => {
+    const {
+        selectedChallenge, myParticipation, participants, 
+        copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
+        loading
+    } = useChallengeContext();
 
-export const ChallengeLobby = memo(({
-    selectedChallenge, myParticipation, participants, myHasFinished,
-    copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
-    loading
-}: ChallengeLobbyProps) => {
+    if (!selectedChallenge) return null;
+
     const isMarathon = selectedChallenge.word_length === 1;
+    const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
 
     return (
         <div className="space-y-6">
@@ -111,25 +103,27 @@ export const ChallengeLobby = memo(({
                 </div>
             </div>
 
-            <div className="pt-4 flex gap-3">
-                <button
-                    onClick={() => setSelectedChallenge(null)}
-                    className="flex-1 py-4 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-colors"
-                >
-                    Back
-                </button>
-                {myParticipation?.status === 'pending' || myParticipation?.status === 'playing' ? (
+            <div className="pt-6 flex flex-col gap-3">
+                {!myHasFinished ? (
                     <button
                         onClick={handleStartGame}
-                        className="flex-2 bg-correct text-black py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                        disabled={loading}
+                        className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                        <Play size={16} fill="currentColor" /> {myParticipation.status === 'playing' ? 'Continue' : 'Start Now'}
+                        <Play size={18} /> {myParticipation?.status === 'playing' ? 'Continue Challenge' : 'Start Challenge'}
                     </button>
                 ) : (
-                    <div className="flex-2 bg-white/5 text-gray-500 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
+                    <div className="w-full bg-white/5 text-gray-500 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
                         Challenge Completed
                     </div>
                 )}
+                
+                <button
+                    onClick={() => setSelectedChallenge(null)}
+                    className="w-full bg-white/5 border border-white/10 text-white/50 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
+                >
+                    Back to List
+                </button>
             </div>
         </div>
     );
