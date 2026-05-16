@@ -310,7 +310,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             return;
         }
 
-        if (selectedChallenge.mode === 'MARATHON') {
+        if (selectedChallenge.word_length === 1) {
             try {
                 const obfuscatedWords = JSON.parse(selectedChallenge.target_word);
                 const plainWords: Record<number, string> = {};
