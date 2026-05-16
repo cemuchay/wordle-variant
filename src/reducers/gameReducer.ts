@@ -10,6 +10,7 @@ export interface GameState {
     gameMessage: string;
     isGameOver: boolean;
     isGameOverModalOpen: boolean;
+    isShake: boolean;
     syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
 }
 
@@ -21,7 +22,9 @@ export type GameAction =
     | { type: 'LOAD_STATE'; payload: Partial<GameState> }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
     | { type: 'RESET_CURRENT_GUESS' }
-    | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error' };
+    | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error' }
+    | { type: 'SHAKE_GUESS' }
+    | { type: 'STOP_SHAKE' };
 
 export const initialState: GameState = {
     guesses: [],
@@ -33,6 +36,7 @@ export const initialState: GameState = {
     gameMessage: '',
     isGameOver: false,
     isGameOverModalOpen: false,
+    isShake: false,
     syncStatus: 'idle',
 };
 
@@ -68,7 +72,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 currentGuess: '',
                 status: newStatus,
                 isGameOver: isFinished,
-                isGameOverModalOpen: isFinished,
+                isGameOverModalOpen: false, // Delay modal until animation finishes
                 gameMessage: action.message,
             };
         }
@@ -97,6 +101,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             return {
                 ...state,
                 currentGuess: '',
+            };
+
+        case 'SHAKE_GUESS':
+            return {
+                ...state,
+                isShake: true,
+            };
+
+        case 'STOP_SHAKE':
+            return {
+                ...state,
+                isShake: false,
             };
 
         default:

@@ -10,6 +10,7 @@ interface GameAreaProps {
     letterStatuses: Record<string, LetterStatus>;
     hintRecord: { letter: string; index: number; row?: number } | null;
     isGameOver: boolean;
+    isShake?: boolean;
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
@@ -23,6 +24,7 @@ export const GameArea = ({
     letterStatuses,
     hintRecord,
     isGameOver,
+    isShake,
     onChar,
     onDelete,
     onEnter
@@ -43,6 +45,7 @@ export const GameArea = ({
                     guesses={guesses}
                     currentGuess={currentGuess}
                     hintRecord={hintRecord}
+                    isShake={isShake}
                 />
             </div>
 

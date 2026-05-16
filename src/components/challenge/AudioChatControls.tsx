@@ -8,10 +8,14 @@ interface AudioChatControlsProps {
 }
 
 export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
-    const { triggerToast, activeCall, setActiveCall, audioChat } = useApp();
+    const { triggerToast, activeCall, setActiveCall, audioChat, onlineUsers } = useApp();
 
     // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
     const isEnabled = activeCall?.challengeId === challengeId;
+
+    // Count participants in this specific room
+    const participantsInCall = onlineUsers.filter(u => u.activeVoiceRoomId === challengeId);
+    const participantCount = participantsInCall.length;
 
     const toggleCall = () => {
         if (isEnabled) {
@@ -140,8 +144,18 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                     onClick={toggleCall}
                     className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-3 py-1.5 rounded-xl border border-emerald-500/20 transition-all text-xs font-bold"
                 >
-                    <Phone size={14} />
+                    <div className="relative">
+                        <Phone size={14} />
+                        {participantCount > 0 && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                        )}
+                    </div>
                     <span>Join Voice</span>
+                    {participantCount > 0 && (
+                        <span className="bg-emerald-500 text-black text-[9px] px-1.5 py-0.5 rounded-full font-black min-w-[18px] text-center ml-0.5">
+                            {participantCount}
+                        </span>
+                    )}
                 </button>
             ) : (
                 <div className="flex items-center gap-1.5 bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800">

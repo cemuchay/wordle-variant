@@ -10,6 +10,7 @@ export const DynamicIslandStatus = () => {
     const {
         activeCall,
         setIsChallengeOpen,
+        setIsChatOpen,
         triggerToast,
         onlineUsers,
         allProfiles,
@@ -36,6 +37,11 @@ export const DynamicIslandStatus = () => {
 
     const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
+        if (challengeId === 'global') {
+            setIsChatOpen(true);
+            setIsExpanded(false);
+            return;
+        }
         // Navigate to challenge
         const url = new URL(window.location.href);
         url.searchParams.set('challenge', challengeId);
@@ -176,9 +182,14 @@ export const DynamicIslandStatus = () => {
                                     <div className="w-full">
                                         <button
                                             onClick={(e) => handleGoToLobby(e, currentVoiceSession.challengeId)}
-                                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20"
+                                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                                         >
-                                            Join Room
+                                            <span>Join Room</span>
+                                            {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length > 0 && (
+                                                <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[8px]">
+                                                    {onlineUsers.filter(u => u.activeVoiceRoomId === currentVoiceSession.challengeId).length}
+                                                </span>
+                                            )}
                                         </button>
                                     </div>
                                 </div>

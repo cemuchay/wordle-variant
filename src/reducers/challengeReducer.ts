@@ -5,6 +5,7 @@ export interface ChallengeGameState {
     currentGuess: string;
     letterStatuses: Record<string, any>;
     isGameOver: boolean;
+    isShake: boolean;
     usedHint: boolean;
     hintRecord: { letter: string; index: number; row?: number } | null;
     timeLeft: number | null;
@@ -18,13 +19,16 @@ export type ChallengeGameAction =
     | { type: 'DELETE_CHAR' }
     | { type: 'SUBMIT_GUESS'; newGuesses: any[]; newStatuses: any; isWon: boolean; isLost: boolean }
     | { type: 'SET_HINT'; hint: { letter: string, index: number, row?: number } }
-    | { type: 'TIME_UP' };
+    | { type: 'TIME_UP' }
+    | { type: 'SHAKE_GUESS' }
+    | { type: 'STOP_SHAKE' };
 
 export const initialChallengeState: ChallengeGameState = {
     guesses: [],
     currentGuess: '',
     letterStatuses: {},
     isGameOver: false,
+    isShake: false,
     usedHint: false,
     hintRecord: null,
     timeLeft: null,
@@ -85,6 +89,18 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
                 isGameOver: true,
                 status: 'timed_out',
                 timeLeft: 0
+            };
+
+        case 'SHAKE_GUESS':
+            return {
+                ...state,
+                isShake: true,
+            };
+
+        case 'STOP_SHAKE':
+            return {
+                ...state,
+                isShake: false,
             };
 
         default:

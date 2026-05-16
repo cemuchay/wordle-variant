@@ -44,6 +44,8 @@ interface AppContextType {
     setActiveCall: (call: { challengeId: string, userId: string, isInitiator?: boolean } | null) => void;
     isChallengeOpen: boolean;
     setIsChallengeOpen: (val: boolean) => void;
+    isChatOpen: boolean;
+    setIsChatOpen: (val: boolean) => void;
 
     // Global Presence & Audio Chat
     onlineUsers: PresenceUser[];
@@ -72,6 +74,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const params = new URLSearchParams(window.location.search);
         return params.has('challenge');
     });
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const [myParticipations, setMyParticipations] = useState<string[]>([]);
 
@@ -91,9 +94,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         enabled: !!activeCall
     });
 
-    // Compute Active Voice Rooms (filtered by my participations)
+    // Compute Active Voice Rooms (filtered by my participations OR global room)
     const activeVoiceRooms = onlineUsers
-        .filter(u => u.id !== profile?.id && u.activeVoiceRoomId && myParticipations.includes(u.activeVoiceRoomId))
+        .filter(u => u.id !== profile?.id && u.activeVoiceRoomId && (u.activeVoiceRoomId === 'global' || myParticipations.includes(u.activeVoiceRoomId)))
         .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
 
     // Fetch my participations to filter active voice rooms
@@ -234,6 +237,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setActiveCall,
             isChallengeOpen,
             setIsChallengeOpen,
+            isChatOpen,
+            setIsChatOpen,
             onlineUsers,
             allProfiles,
             audioChat,

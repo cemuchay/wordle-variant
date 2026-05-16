@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useReducer, useCallback, useMemo } from 'react';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/gameLogic';
@@ -30,6 +31,8 @@ export const useGameEngine = (date: string) => {
 
         if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
+            dispatch({ type: 'SHAKE_GUESS' });
+            setTimeout(() => dispatch({ type: 'STOP_SHAKE' }), 500);
             return;
         }
 
@@ -37,14 +40,6 @@ export const useGameEngine = (date: string) => {
         const won = upperGuess === config.word;
         const lost = (state.guesses.length + 1) === config.maxAttempts;
         const message = preferences.allowRoasts ? (won ? getWinMessage(state.guesses.length + 1) : lost ? getLossMessage() : "") : "";
-
-        dispatch({
-            type: 'SUBMIT_GUESS',
-            result,
-            isWon: won,
-            isLost: lost,
-            message
-        });
 
         const newGuesses = [...state.guesses, result];
         const newStatus = won ? 'won' : (lost ? 'lost' : 'playing');
@@ -59,7 +54,17 @@ export const useGameEngine = (date: string) => {
             gameMessage: message
         };
 
+        // 1. Save locally FIRST to ensure data integrity
         localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+
+        // 2. Update UI (flips row)
+        dispatch({
+            type: 'SUBMIT_GUESS',
+            result,
+            isWon: won,
+            isLost: lost,
+            message
+        });
 
         if (user) {
             dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
@@ -69,7 +74,7 @@ export const useGameEngine = (date: string) => {
                 setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
             } catch (error) {
                 dispatch({ type: 'SET_SYNC_STATUS', status: 'error' });
-                triggerToast("Connection lost. Retrying in background...", 5000);
+                triggerToast("Connection lost. Progress saved locally.", 5000);
             }
         }
 
@@ -77,10 +82,17 @@ export const useGameEngine = (date: string) => {
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
             await refresh();
+
+            // Only show reveal after sync attempt (successful or failed-but-locally-saved)
             if (lost) triggerToast(`The word is: ${config.word}`, 5000);
+
+            // Calculate delay: wordLength * 150ms + 600ms (last tile flip) + padding
+            const revealDelay = (config.length - 1) * 150 + 600 + 500;
+            
             setTimeout(() => {
+                dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen: true });
                 triggerToast(message || state.gameMessage, 8500);
-            }, 500);
+            }, revealDelay);
         }
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
 
@@ -93,7 +105,6 @@ export const useGameEngine = (date: string) => {
         const hint = getHint(config.word, state.guesses);
         if (hint) {
             const hintWithRow = { ...hint, row: state.guesses.length };
-            dispatch({ type: 'SET_HINT', hint: hintWithRow });
 
             const payload = {
                 date,
@@ -104,7 +115,13 @@ export const useGameEngine = (date: string) => {
                 hintRecord: hintWithRow,
                 config
             };
+
+            // 1. Save locally FIRST
             localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+
+            // 2. Update UI
+            dispatch({ type: 'SET_HINT', hint: hintWithRow });
+
             if (user) {
                 dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
                 try {

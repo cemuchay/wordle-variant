@@ -1,4 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { AudioChatControls } from "../challenge/AudioChatControls";
+import { useApp } from "../../context/AppContext";
 
 interface ChatHeaderProps {
     typingUsers: string[];
@@ -6,6 +8,7 @@ interface ChatHeaderProps {
 }
 
 const ChatHeader = ({ typingUsers, currentUserName }: ChatHeaderProps) => {
+    const { profile } = useApp();
     // Filter out the current user from typing indicators
     const otherTypingUsers = typingUsers.filter(name => name !== currentUserName);
 
@@ -56,6 +59,13 @@ const ChatHeader = ({ typingUsers, currentUserName }: ChatHeaderProps) => {
                     </div>
                 </div>
             </div>
+
+            {profile && (
+                <AudioChatControls
+                    challengeId="global"
+                    userId={profile.id}
+                />
+            )}
         </div>
     );
 };

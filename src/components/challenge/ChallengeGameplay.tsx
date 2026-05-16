@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb, RefreshCw, ArrowLeft } from 'lucide-react';
-import { memo, useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { ArrowLeft, Lightbulb, RefreshCw } from 'lucide-react';
+import { memo, useCallback, useEffect, useReducer, useState } from 'react';
 import { getWordLists } from '../../data/words';
 import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../../lib/gameLogic';
 import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
@@ -30,8 +30,7 @@ export const ChallengeGameplay = memo(({
 
     const [isSaving, setIsSaving] = useState(false);
 
-    const { guesses, currentGuess, letterStatuses, isGameOver, usedHint, hintRecord, timeLeft } = state;
-    const timerRef = useRef<number | null>(null);
+    const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord, timeLeft } = state;
 
     // Initialize timer
     useEffect(() => {
@@ -47,18 +46,17 @@ export const ChallengeGameplay = memo(({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Timer Tick
+    // Timer Interval Management
     useEffect(() => {
         if (timeLeft !== null && timeLeft > 0 && !isGameOver) {
-            timerRef.current = window.setInterval(() => {
+            const interval = window.setInterval(() => {
                 dispatch({ type: 'TICK_TIMER' });
             }, 1000);
-        } else if (timeLeft === 0 && !isGameOver) {
-            handleTimeExpired();
+            return () => clearInterval(interval);
         }
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [timeLeft, isGameOver]);
+    }, [isGameOver, timeLeft]);
+
+
 
     const handleTimeExpired = useCallback(async () => {
         dispatch({ type: 'TIME_UP' });
@@ -76,6 +74,13 @@ export const ChallengeGameplay = memo(({
         if (!success) triggerToast("Failed to save result. Please check your connection.", 4000);
         setTimeout(onFinish, 2000);
     }, [participation.id, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish]);
+
+    // Expiration Handler
+    useEffect(() => {
+        if (timeLeft === 0 && !isGameOver) {
+            handleTimeExpired();
+        }
+    }, [timeLeft, isGameOver, handleTimeExpired]);
 
     const handleHint = async () => {
         if (isGameOver) return;
@@ -126,6 +131,8 @@ export const ChallengeGameplay = memo(({
 
         if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
+            dispatch({ type: 'SHAKE_GUESS' });
+            setTimeout(() => dispatch({ type: 'STOP_SHAKE' }), 500);
             return;
         }
 
@@ -231,6 +238,7 @@ export const ChallengeGameplay = memo(({
                         currentGuess={currentGuess}
                         hintRecord={hintRecord}
                         isChallengeMode={true}
+                        isShake={isShake}
                     />
                 </div>
             </div>

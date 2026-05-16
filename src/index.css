@@ -114,35 +114,65 @@ code {
   --color-dark: #121213;
   --color-default: #818384;
 
-  /* Custom Animations for tile flips */
+  /* Custom Animations */
   @keyframes flip {
     0% { transform: rotateX(0); }
-    50% { transform: rotateX(90deg); }
+    45% { transform: rotateX(90deg); }
     100% { transform: rotateX(0); }
   }
+
+  @keyframes reveal-correct {
+    0% { transform: rotateX(0); background-color: transparent; border-color: #52525b; }
+    45% { transform: rotateX(90deg); background-color: transparent; border-color: #52525b; }
+    46% { transform: rotateX(90deg); background-color: var(--color-correct); border-color: var(--color-correct); }
+    100% { transform: rotateX(0); background-color: var(--color-correct); border-color: var(--color-correct); }
+  }
+
+  @keyframes reveal-present {
+    0% { transform: rotateX(0); background-color: transparent; border-color: #52525b; }
+    45% { transform: rotateX(90deg); background-color: transparent; border-color: #52525b; }
+    46% { transform: rotateX(90deg); background-color: var(--color-present); border-color: var(--color-present); }
+    100% { transform: rotateX(0); background-color: var(--color-present); border-color: var(--color-present); }
+  }
+
+  @keyframes reveal-absent {
+    0% { transform: rotateX(0); background-color: transparent; border-color: #52525b; }
+    45% { transform: rotateX(90deg); background-color: transparent; border-color: #52525b; }
+    46% { transform: rotateX(90deg); background-color: var(--color-absent); border-color: var(--color-absent); }
+    100% { transform: rotateX(0); background-color: var(--color-absent); border-color: var(--color-absent); }
+  }
+
+  @keyframes shake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    40% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   
-  --animate-flip: flip 0.5s ease-in-out;
+  --animate-flip: flip 0.6s ease-in-out;
+  --animate-reveal-correct: reveal-correct 0.6s ease-in-out forwards;
+  --animate-reveal-present: reveal-present 0.6s ease-in-out forwards;
+  --animate-reveal-absent: reveal-absent 0.6s ease-in-out forwards;
+  --animate-shake: shake 0.5s ease-in-out;
+  --animate-pop: pop 0.1s ease-in-out;
+  --animate-toast-in: toast-in 0.3s ease-out;
 }
 
 /* Base styles for the board */
 @layer base {
   body {
     @apply bg-dark text-white antialiased overflow-hidden;
-  }
-}
-
-@theme {
-  --animate-toast-in: toast-in 0.3s ease-out;
-
-  @keyframes toast-in {
-    from {
-      opacity: 0;
-      transform: translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 }
 

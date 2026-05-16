@@ -32,6 +32,8 @@ export default function App() {
         setUnreadCount,
         isChallengeOpen,
         setIsChallengeOpen,
+        isChatOpen,
+        setIsChatOpen,
         setChallengeUnreadCount,
     } = useApp();
 
@@ -53,7 +55,6 @@ export default function App() {
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
-    const [isChatOpen, setIsChatOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
 
@@ -125,11 +126,11 @@ export default function App() {
                         letterStatuses={state.letterStatuses}
                         hintRecord={state.hintRecord}
                         isGameOver={state.isGameOver}
+                        isShake={state.isShake}
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                     />
-
                     <ModalsManager
                         modals={{
                             isSettingsOpen,
