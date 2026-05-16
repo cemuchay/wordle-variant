@@ -368,7 +368,26 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                             </div>
                                                             <div className="flex items-end justify-between">
                                                                 <div>
-                                                                    <p className="font-bold text-sm">Me <span className="text-gray-500">vs</span> {item.challenge.profiles?.username || 'User'}</p>
+                                                                    <div className="font-bold text-sm flex flex-wrap items-center gap-1.5">
+                                                                        <span>Me</span>
+                                                                        <span className="text-[10px] text-gray-500 uppercase font-black">vs</span>
+                                                                        <div className="flex flex-wrap items-center gap-1">
+                                                                            {item.challenge.participants?.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
+                                                                                item.challenge.participants
+                                                                                    .filter((p: any) => p.user_id !== user?.id)
+                                                                                    .map((p: any, idx: number, arr: any[]) => {
+                                                                                        const isCreator = p.user_id === item.challenge.creator_id;
+                                                                                        return (
+                                                                                            <span key={p.id} className={isCreator ? "text-correct" : "text-white"}>
+                                                                                                {p.profiles?.username || 'Unknown'}{idx < arr.length - 1 ? ', ' : ''}
+                                                                                            </span>
+                                                                                        );
+                                                                                    })
+                                                                            ) : (
+                                                                                <span className="text-white">Waiting for players...</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
                                                                     <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
                                                                 </div>
                                                                 <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">

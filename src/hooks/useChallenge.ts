@@ -269,7 +269,18 @@ export const useChallenge = (user: AppUser | null) => {
         try {
             const { data, error } = await supabase
                 .from('challenge_participants')
-                .select('*, challenge:challenges(*, profiles!creator_id(username, avatar_url))')
+                .select(`
+                    *,
+                    challenge:challenges(
+                        *,
+                        creator:profiles!creator_id(username, avatar_url),
+                        participants:challenge_participants(
+                            id,
+                            user_id,
+                            profiles(username, avatar_url)
+                        )
+                    )
+                `)
                 .eq('user_id', user.id)
                 .order('started_at', { ascending: false, nullsFirst: true });
 
