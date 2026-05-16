@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Trophy } from 'lucide-react';
+import { X, Trophy, Search, Filter } from 'lucide-react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { deobfuscateWord } from '../lib/gameLogic';
@@ -54,6 +54,10 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     const [invitedIds, setInvitedIds] = useState<string[]>([]);
     const [isPlaying, setIsPlaying] = useState(false);
 
+    // Search and Filter State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
+
     const { setChallengeUnreadCount } = useApp();
     const unplayedCount = myChallenges.filter(c => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
 
@@ -63,6 +67,27 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     const initialProcessed = useRef(false);
     const channelRef = useRef<any>(null);
+
+    // Derived filtered challenges
+    const filteredChallenges = myChallenges.filter(item => {
+        const isExpired = new Date(item.challenge.expires_at) < new Date();
+        const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+
+        // Filter by Status
+        if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
+        if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+
+        // Filter by Search Query (opponent names)
+        if (searchQuery) {
+            const opponentNames = item.challenge.participants
+                ?.filter((p: any) => p.user_id !== user?.id)
+                .map((p: any) => p.profiles?.username?.toLowerCase() || '')
+                .join(' ');
+            if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
+        }
+
+        return true;
+    });
 
     // Loading Skeleton Component
     const ChallengeSkeleton = () => (
@@ -341,72 +366,102 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                             joinId={joinId} setJoinId={setJoinId} handleViewChallenge={handleViewChallenge} handleCreate={handleCreate} loading={loading}
                                         />
                                     ) : (
-                                        <div className="space-y-4">
-                                            {loading ? (
-                                                <ChallengeSkeleton />
-                                            ) : myChallenges.length === 0 ? (
-                                                <div className="py-12 text-center text-gray-500">No challenges yet.</div>
-                                            ) : (
-                                                myChallenges.map((item) => {
-                                                    const isExpired = new Date(item.challenge.expires_at) < new Date();
-                                                    const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                                        <div className="space-y-6">
+                                            {/* Search and Filters */}
+                                            <div className="space-y-4">
+                                                <div className="relative group">
+                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-correct transition-colors" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search by opponent name..."
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-correct/50 focus:bg-white/10 transition-all"
+                                                    />
+                                                </div>
 
-                                                    return (
+                                                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                                    {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
                                                         <button
-                                                            key={item.id}
-                                                            onClick={() => handleViewChallenge(item.challenge_id)}
-                                                            className="w-full text-left bg-white/5 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all group"
+                                                            key={f}
+                                                            onClick={() => setStatusFilter(f)}
+                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${statusFilter === f ? 'bg-correct text-black shadow-lg shadow-correct/20' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
                                                         >
-                                                            <div className="flex items-center justify-between mb-3">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className={`w-2 h-2 rounded-full ${(isFinished || isExpired) ? 'bg-gray-600' : 'bg-correct pulse'}`} />
-                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                                                        {item.challenge.mode} • {item.challenge.word_length} Letters
+                                                            {f}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {loading ? (
+                                                    <ChallengeSkeleton />
+                                                ) : filteredChallenges.length === 0 ? (
+                                                    <div className="py-12 text-center text-gray-500">
+                                                        {myChallenges.length === 0 ? "No challenges yet." : "No matching challenges found."}
+                                                    </div>
+                                                ) : (
+                                                    filteredChallenges.map((item) => {
+                                                        const isExpired = new Date(item.challenge.expires_at) < new Date();
+                                                        const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+
+                                                        return (
+                                                            <button
+                                                                key={item.id}
+                                                                onClick={() => handleViewChallenge(item.challenge_id)}
+                                                                className="w-full text-left bg-white/5 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all group"
+                                                            >
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`w-2 h-2 rounded-full ${(isFinished || isExpired) ? 'bg-gray-600' : 'bg-correct pulse'}`} />
+                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                                                            {item.challenge.mode} • {item.challenge.word_length} Letters
+                                                                        </span>
+                                                                    </div>
+                                                                    {!isExpired && item.challenge.participants?.some((p: any) => p.status === 'pending' || p.status === 'playing') && (
+                                                                        <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
+                                                                    )}
+                                                                    {isExpired && <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>}
+                                                                </div>
+                                                                <div className="flex items-end justify-between">
+                                                                    <div>
+                                                                        <div className="font-bold text-sm flex flex-wrap items-center gap-1.5">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span>Me</span>
+                                                                                {item.status !== 'pending' && <span className="text-correct text-[10px] font-black">({item.score})</span>}
+                                                                            </div>
+                                                                            <span className="text-[10px] text-gray-500 uppercase font-black">vs</span>
+                                                                            <div className="flex flex-wrap items-center gap-1">
+                                                                                {item.challenge.participants?.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
+                                                                                    item.challenge.participants
+                                                                                        .filter((p: any) => p.user_id !== user?.id)
+                                                                                        .map((p: any, idx: number, arr: any[]) => {
+                                                                                            const isCreator = p.user_id === item.challenge.creator_id;
+                                                                                            const hasScore = p.status !== 'pending';
+                                                                                            return (
+                                                                                                <span key={p.id} className={`${isCreator ? "text-correct" : "text-white"} flex items-center gap-1`}>
+                                                                                                    {p.profiles?.username || 'Unknown'}
+                                                                                                    {hasScore && <span className="text-[10px] opacity-70 font-black">({p.score})</span>}
+                                                                                                    {idx < arr.length - 1 ? ', ' : ''}
+                                                                                                </span>
+                                                                                            );
+                                                                                        })
+                                                                                ) : (
+                                                                                    <span className="text-white">Waiting for players...</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
+                                                                    </div>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">
+                                                                        {new Date(item.challenge.created_at).toLocaleDateString()}
                                                                     </span>
                                                                 </div>
-                                                                {!isExpired && item.challenge.participants?.some((p: any) => p.status === 'pending' || p.status === 'playing') && (
-                                                                    <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
-                                                                )}
-                                                                {isExpired && <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>}
-                                                            </div>
-                                                            <div className="flex items-end justify-between">
-                                                                <div>
-                                                                    <div className="font-bold text-sm flex flex-wrap items-center gap-1.5">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span>Me</span>
-                                                                            {item.status !== 'pending' && <span className="text-correct text-[10px] font-black">({item.score})</span>}
-                                                                        </div>
-                                                                        <span className="text-[10px] text-gray-500 uppercase font-black">vs</span>
-                                                                        <div className="flex flex-wrap items-center gap-1">
-                                                                            {item.challenge.participants?.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
-                                                                                item.challenge.participants
-                                                                                    .filter((p: any) => p.user_id !== user?.id)
-                                                                                    .map((p: any, idx: number, arr: any[]) => {
-                                                                                        const isCreator = p.user_id === item.challenge.creator_id;
-                                                                                        const hasScore = p.status !== 'pending';
-                                                                                        return (
-                                                                                            <span key={p.id} className={`${isCreator ? "text-correct" : "text-white"} flex items-center gap-1`}>
-                                                                                                {p.profiles?.username || 'Unknown'}
-                                                                                                {hasScore && <span className="text-[10px] opacity-70 font-black">({p.score})</span>}
-                                                                                                {idx < arr.length - 1 ? ', ' : ''}
-                                                                                            </span>
-                                                                                        );
-                                                                                    })
-                                                                            ) : (
-                                                                                <span className="text-white">Waiting for players...</span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <p className="text-[10px] text-gray-500 uppercase font-black mt-0.5">{item.status}</p>
-                                                                </div>
-                                                                <span className="text-[9px] font-black uppercase tracking-widest text-gray-700">
-                                                                    {new Date(item.challenge.created_at).toLocaleDateString()}
-                                                                </span>
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })
-                                            )}
+                                                            </button>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
