@@ -57,28 +57,16 @@ export default defineConfig({
          output: {
             manualChunks(id) {
                if (id.includes('node_modules')) {
-                  // Extract top-level package name from node_modules path
-                  const match = id.match(/node_modules\/([^/]+)/);
-                  if (match) {
-                     const packageName = match[1];
-                     // Group common packages
-                     if (['react', 'react-dom'].includes(packageName)) {
-                        return 'vendor-react';
-                     }
-                     if (packageName === '@supabase/supabase-js') {
-                        return 'vendor-supabase';
-                     }
-                     if (['lucide-react', 'framer-motion'].includes(packageName)) {
-                        return 'vendor-ui';
-                     }
-                     // For other packages, create a vendor chunk based on the package name
-                     return `vendor-${packageName}`;
-                  }
+                  if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+                  if (id.includes('@supabase')) return 'vendor-supabase';
+                  if (id.includes('framer-motion') || id.includes('lucide-react')) return 'vendor-ui';
+                  if (id.includes('agora-rtc-sdk-ng')) return 'vendor-agora';
+                  return 'vendor-libs';
                }
                return null;
             },
          },
       },
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
    },
 });
