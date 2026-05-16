@@ -248,16 +248,22 @@ export const useChallenge = (user: AppUser | null) => {
             .subscribe();
 
         // Initial fetch
-        setLoading(true);
-        supabase
-            .from('challenge_participants')
-            .select('*, profiles(username, avatar_url)')
-            .eq('challenge_id', challengeId)
-            .order('score', { ascending: false })
-            .then(({ data }) => {
+        const fetchInitialParticipants = async () => {
+            setLoading(true);
+            try {
+                const { data } = await supabase
+                    .from('challenge_participants')
+                    .select('*, profiles(username, avatar_url)')
+                    .eq('challenge_id', challengeId)
+                    .order('score', { ascending: false });
+
                 if (data) setParticipants(data as ChallengeParticipant[]);
-            })
-            .finally(() => setLoading(false));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInitialParticipants();
 
         return channel;
     }, []);
