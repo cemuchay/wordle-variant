@@ -35,10 +35,10 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
         isSpeakerOn,
         opponentStatus,
         isConnected,
+        activeEngine,
         error,
         toggleMic,
         toggleSpeaker,
-
     } = audioChat;
 
 
@@ -216,6 +216,15 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
                     >
                         <PhoneOff size={14} />
                     </button>
+
+                    {/* Active Engine Badge */}
+                    {activeEngine && (
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-zinc-800/80 rounded-full border border-zinc-700/50 backdrop-blur-sm pointer-events-none">
+                            <span className="text-[8px] font-black uppercase tracking-tighter text-zinc-500 whitespace-nowrap">
+                                Engine: <span className={activeEngine === 'agora' ? 'text-emerald-500' : 'text-amber-500'}>{activeEngine}</span>
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
