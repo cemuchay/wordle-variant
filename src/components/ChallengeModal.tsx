@@ -364,7 +364,10 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                                         {item.challenge.mode} • {item.challenge.word_length} Letters
                                                                     </span>
                                                                 </div>
-                                                                <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
+                                                                {!isExpired && item.challenge.participants?.some((p: any) => p.status === 'pending' || p.status === 'playing') && (
+                                                                    <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
+                                                                )}
+                                                                {isExpired && <span className="text-red-500 text-[10px] font-black uppercase">Expired</span>}
                                                             </div>
                                                             <div className="flex items-end justify-between">
                                                                 <div>

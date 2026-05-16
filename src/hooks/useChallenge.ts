@@ -277,6 +277,7 @@ export const useChallenge = (user: AppUser | null) => {
                         participants:challenge_participants(
                             id,
                             user_id,
+                            status,
                             profiles(username, avatar_url)
                         )
                     )
