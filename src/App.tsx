@@ -126,11 +126,11 @@ export default function App() {
                         letterStatuses={state.letterStatuses}
                         hintRecord={state.hintRecord}
                         isGameOver={state.isGameOver}
+                        isShake={state.isShake}
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                     />
-
                     <ModalsManager
                         modals={{
                             isSettingsOpen,

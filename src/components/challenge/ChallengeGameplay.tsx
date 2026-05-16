@@ -30,7 +30,7 @@ export const ChallengeGameplay = memo(({
 
     const [isSaving, setIsSaving] = useState(false);
 
-    const { guesses, currentGuess, letterStatuses, isGameOver, usedHint, hintRecord, timeLeft } = state;
+    const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord, timeLeft } = state;
     const timerRef = useRef<number | null>(null);
 
     // Initialize timer
@@ -126,6 +126,8 @@ export const ChallengeGameplay = memo(({
 
         if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
+            dispatch({ type: 'SHAKE_GUESS' });
+            setTimeout(() => dispatch({ type: 'STOP_SHAKE' }), 500);
             return;
         }
 
@@ -231,6 +233,7 @@ export const ChallengeGameplay = memo(({
                         currentGuess={currentGuess}
                         hintRecord={hintRecord}
                         isChallengeMode={true}
+                        isShake={isShake}
                     />
                 </div>
             </div>

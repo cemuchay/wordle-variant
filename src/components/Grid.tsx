@@ -8,14 +8,13 @@ interface GridProps {
   currentGuess: string;
   hintRecord?: { letter: string, index: number } | null;
   isChallengeMode?: boolean;
+  isShake?: boolean;
 }
 
-export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode }) => {
+export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake }) => {
   const empties = Math.max(0, maxAttempts - guesses.length - 1);
 
-  // Responsive Tile Size logic:
-  // We use vh (viewport height) so it shrinks on shorter screens
-  // and max-width/height so it doesn't get huge on ultra-wide monitors.
+  // Responsive Tile Size logic
   const tileClass = `
     w-[11vw] h-[11vw] 
     max-w-[55px] max-h-[55px] 
@@ -30,41 +29,47 @@ export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, cu
       className={`grid gap-1.5 sm:gap-2 mx-auto h-full items-center content-center transition-all duration-500 p-4 rounded-3xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_40px_rgba(0,255,0,0.1)] border border-correct/20' : ''}`} 
       style={{ 
         gridTemplateColumns: `repeat(${wordLength}, minmax(0, 1fr))`,
-        // We remove the hardcoded width and use a max-content constraint
         width: 'max-content'
       }}
     >
       {/* Past Guesses */}
-      {guesses.map((guess, i) => (
-        guess.map((res, j) => (
+      {guesses.map((guess, i) => {
+        const isLastRow = i === guesses.length - 1;
+        return guess.map((res, j) => (
           <div 
             key={`past-${i}-${j}`} 
             className={`${tileClass} border-2 
               ${res.status === 'correct' ? 'bg-correct border-correct text-white' : 
                 res.status === 'present' ? 'bg-present border-present text-white' : 
-                'bg-absent border-absent text-white'}`}
+                'bg-absent border-absent text-white'}
+              ${isLastRow ? 'animate-flip' : ''}`}
+            style={isLastRow ? { animationDelay: `${j * 150}ms`, animationFillMode: 'backwards' } : {}}
           >
             {res.letter}
           </div>
-        ))
-      ))}
+        ));
+      })}
 
       {/* Current Guess Row */}
       {guesses.length < maxAttempts && (
-        Array.from({ length: wordLength }).map((_, i) => {
-          const isHinted = hintRecord?.index === i;
-          const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
-          
-          return (
-            <div 
-              key={`current-${i}`} 
-              className={`${tileClass} border-2 text-white animate-pulse
-                ${currentGuess[i] ? 'border-gray-500' : isHinted ? 'border-yellow-600/50 text-yellow-500/50' : 'border-gray-500'}`}
-            >
-              {letter}
-            </div>
-          );
-        })
+        <div 
+          className={`contents ${isShake ? 'animate-shake' : ''}`}
+        >
+          {Array.from({ length: wordLength }).map((_, i) => {
+            const isHinted = hintRecord?.index === i;
+            const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+            
+            return (
+              <div 
+                key={`current-${i}`} 
+                className={`${tileClass} border-2 text-white 
+                  ${currentGuess[i] ? 'border-gray-500 animate-pop' : isHinted ? 'border-yellow-600/50 text-yellow-500/50 animate-pulse' : 'border-gray-500'}`}
+              >
+                {letter}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Empty Rows */}
