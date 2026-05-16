@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb, RefreshCw } from 'lucide-react';
+import { Lightbulb, RefreshCw, ArrowLeft } from 'lucide-react';
 import { memo, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { getWordLists } from '../../data/words';
 import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../../lib/gameLogic';
@@ -196,6 +196,13 @@ export const ChallengeGameplay = memo(({
             {/* Gameplay Header (Timer & Hint) */}
             <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={onFinish}
+                        className="p-2 hover:bg-white/5 rounded-xl transition-colors text-gray-400 hover:text-white"
+                        title="Back to Lobby"
+                    >
+                        <ArrowLeft size={20} />
+                    </button>
                     {timeLeft !== null && (
                         <div className="flex items-center gap-2 bg-red-500/10 px-3 py-1.5 rounded-xl border border-red-500/20">
                             <span className="text-xs font-black text-red-500 tabular-nums">
