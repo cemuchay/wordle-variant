@@ -10,7 +10,6 @@ export const DynamicIslandStatus = () => {
     const {
         activeCall,
         setIsChallengeOpen,
-        isChatOpen,
         setIsChatOpen,
         triggerToast,
         onlineUsers,
