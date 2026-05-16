@@ -32,6 +32,8 @@ export default function App() {
         setUnreadCount,
         isChallengeOpen,
         setIsChallengeOpen,
+        isChatOpen,
+        setIsChatOpen,
         setChallengeUnreadCount,
     } = useApp();
 
@@ -53,7 +55,6 @@ export default function App() {
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
-    const [isChatOpen, setIsChatOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
 
