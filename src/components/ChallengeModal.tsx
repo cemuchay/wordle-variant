@@ -372,7 +372,10 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                             <div className="flex items-end justify-between">
                                                                 <div>
                                                                     <div className="font-bold text-sm flex flex-wrap items-center gap-1.5">
-                                                                        <span>Me</span>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span>Me</span>
+                                                                            {item.status !== 'pending' && <span className="text-correct text-[10px] font-black">({item.score})</span>}
+                                                                        </div>
                                                                         <span className="text-[10px] text-gray-500 uppercase font-black">vs</span>
                                                                         <div className="flex flex-wrap items-center gap-1">
                                                                             {item.challenge.participants?.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
@@ -380,9 +383,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                                                                     .filter((p: any) => p.user_id !== user?.id)
                                                                                     .map((p: any, idx: number, arr: any[]) => {
                                                                                         const isCreator = p.user_id === item.challenge.creator_id;
+                                                                                        const hasScore = p.status !== 'pending';
                                                                                         return (
-                                                                                            <span key={p.id} className={isCreator ? "text-correct" : "text-white"}>
-                                                                                                {p.profiles?.username || 'Unknown'}{idx < arr.length - 1 ? ', ' : ''}
+                                                                                            <span key={p.id} className={`${isCreator ? "text-correct" : "text-white"} flex items-center gap-1`}>
+                                                                                                {p.profiles?.username || 'Unknown'}
+                                                                                                {hasScore && <span className="text-[10px] opacity-70 font-black">({p.score})</span>}
+                                                                                                {idx < arr.length - 1 ? ', ' : ''}
                                                                                             </span>
                                                                                         );
                                                                                     })
