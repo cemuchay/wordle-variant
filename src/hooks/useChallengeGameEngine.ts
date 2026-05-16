@@ -12,10 +12,11 @@ interface UseChallengeGameEngineProps {
     onFinish: () => void;
     selectedLength?: number | null; // For Marathon mode
     onLengthComplete?: () => void; // Callback for Marathon mode
+    setTimeLeftGlobal?: (t: number | null) => void; // From context
 }
 
 export const useChallengeGameEngine = ({
-    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete
+    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete, setTimeLeftGlobal
 }: UseChallengeGameEngineProps) => {
     const isMarathon = challenge.word_length === 1;
     const marathonWords = useMemo(() => {
@@ -41,6 +42,16 @@ export const useChallengeGameEngine = ({
     const [isSaving, setIsSaving] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
+
+    // Sync timeLeft with Global Context
+    useEffect(() => {
+        if (setTimeLeftGlobal) {
+            setTimeLeftGlobal(timeLeft);
+        }
+        return () => {
+            if (setTimeLeftGlobal) setTimeLeftGlobal(null);
+        };
+    }, [timeLeft, setTimeLeftGlobal]);
 
     // Word Length & Target Word Resolution
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;
@@ -73,31 +84,42 @@ export const useChallengeGameEngine = ({
         
         console.log(`[Engine] Initializing length ${wordLength}. Found ${incoming.length} incoming guesses.`);
         
+        const isFinishedStatus = isMarathon 
+            ? (progress?.status === 'completed' || progress?.status === 'timed_out')
+            : (participation.status === 'completed' || participation.status === 'timed_out');
+
+        let initialTimeLeft = null;
+        if (challenge.mode === 'LIVE' && challenge.max_time) {
+            const startTime = isMarathon ? progress?.started_at : participation.started_at;
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
+                initialTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
+            } else {
+                initialTimeLeft = challenge.max_time * 60;
+            }
+        }
+
         dispatch({
             type: 'START_GAME', payload: {
                 guesses: incoming,
                 letterStatuses: getLetterStatuses(incoming),
                 usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
                 hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
-                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
                 status: isMarathon ? (progress?.status || 'playing') : participation.status,
-                timeLeft: timeLeft
+                timeLeft: initialTimeLeft
             }
         });
         
-        // Handle Per-Game Timer for Marathon LIVE mode
-        if (isMarathon && selectedLength && challenge.mode === 'LIVE' && challenge.max_time) {
-            const subGameStart = progress?.started_at;
-            if (subGameStart) {
-                const elapsed = Math.floor((Date.now() - new Date(subGameStart).getTime()) / 1000);
-                const remaining = Math.max(0, (challenge.max_time * 60) - elapsed);
-                dispatch({ type: 'START_GAME', payload: { ...state, timeLeft: remaining, isGameOver: state.isGameOver || remaining <= 0 } as any });
-            } else if (!isSaving) {
+        // Handle Per-Game Timer Start for LIVE mode
+        if (challenge.mode === 'LIVE' && challenge.max_time && !isSaving) {
+            const startTime = isMarathon ? progress?.started_at : participation.started_at;
+            if (!startTime) {
                 // First time entry timer start
                 submitChallengeResult({
                     status: 'playing',
                     started_at: new Date().toISOString()
-                }, selectedLength);
+                }, isMarathon ? selectedLength! : undefined);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -338,6 +360,7 @@ export const useChallengeGameEngine = ({
         isSaving,
         retryCount,
         wordLength,
-        targetWord
+        targetWord,
+        timeLeft
     };
 };

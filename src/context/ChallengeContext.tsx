@@ -34,6 +34,11 @@ interface ChallengeContextType {
     setSearchQuery: (q: string) => void;
     statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
     setStatusFilter: (f: 'ALL' | 'ACTIVE' | 'COMPLETED') => void;
+    modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
+    setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
+    lengthFilter: 'ALL' | number; // number 3-7 or 1 for marathon
+    setLengthFilter: (l: 'ALL' | number) => void;
+    clearFilters: () => void;
     filteredChallenges: any[];
     
     // Actions
@@ -56,6 +61,10 @@ interface ChallengeContextType {
     previewParticipant: ChallengeParticipant | null;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     unplayedCount: number;
+    timeLeft: number | null;
+    setTimeLeft: (t: number | null) => void;
+    backAction: (() => void) | null;
+    setBackAction: (fn: (() => void) | null) => void;
 }
 
 const ChallengeContext = createContext<ChallengeContextType | undefined>(undefined);
@@ -102,6 +111,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
+    const [modeFilter, setModeFilter] = useState<'ALL' | 'LIVE' | 'ANYTIME'>('ALL');
+    const [lengthFilter, setLengthFilter] = useState<'ALL' | number>('ALL');
+
+    const clearFilters = useCallback(() => {
+        setSearchQuery('');
+        setStatusFilter('ALL');
+        setModeFilter('ALL');
+        setLengthFilter('ALL');
+    }, []);
+
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [backAction, setBackAction] = useState<(() => void) | null>(null);
 
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
@@ -125,14 +146,23 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // Derived State: Filtered Challenges
     const filteredChallenges = useMemo(() => {
         return myChallenges.filter(item => {
-            const isExpired = new Date(item.challenge.expires_at) < new Date();
+            const challenge = item.challenge;
+            const isExpired = new Date(challenge.expires_at) < new Date();
             const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
 
+            // Status Filter
             if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
             if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
 
+            // Mode Filter
+            if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
+
+            // Length Filter
+            if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
+
+            // Search Filter
             if (searchQuery) {
-                const opponentNames = item.challenge.participants
+                const opponentNames = challenge.participants
                     ?.filter((p: any) => p.user_id !== user?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
                     .join(' ');
@@ -140,12 +170,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
             return true;
         });
-    }, [myChallenges, statusFilter, searchQuery, user?.id]);
+    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, user?.id]);
 
     const submitResult = useCallback(async (result: any, wordLength?: number) => {
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
+        let finalUpdateData: any;
 
         if (isMarathon && wordLength) {
             // 1. Update the sub-game progress in the new table
@@ -153,7 +184,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             if (!success) return false;
 
             // 2. Recalculate totals for the main participation record
-            // We use the latest state and merge the new result for calculation
             const currentMarathon = myParticipation.marathon_progress || [];
             const updatedMarathon = [...currentMarathon];
             const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
@@ -181,19 +211,22 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             });
 
             const allCompleted = completedCount === 5;
-            const finalUpdateData = {
+            finalUpdateData = {
                 score: totalScore,
                 attempts: totalAttempts,
                 status: allCompleted ? 'completed' : 'playing',
-                hints_used: updatedMarathon.some(p => p.hints_used)
+                hints_used: updatedMarathon.some(p => p.hints_used),
+                marathon_progress: updatedMarathon // Optimistic sync
             };
-
-            // 3. Update the main participation record with totals
-            return await submitChallengeResult(myParticipation.id, finalUpdateData);
         } else {
-            // Regular challenge or legacy marathon logic (fallback)
-            return await submitChallengeResult(myParticipation.id, result);
+            finalUpdateData = { ...result };
         }
+
+        // OPTIMISTIC UPDATE: Update local state immediately
+        setMyParticipation(prev => prev ? { ...prev, ...finalUpdateData } : prev);
+
+        // 3. Update the main participation record in DB
+        return await submitChallengeResult(myParticipation.id, finalUpdateData);
     }, [myParticipation, selectedChallenge?.word_length, submitChallengeResult, submitMarathonResult]);
 
     // Lifecycle: Load Data
@@ -359,6 +392,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             invitedIds,
             searchQuery, setSearchQuery,
             statusFilter, setStatusFilter,
+            modeFilter, setModeFilter,
+            lengthFilter, setLengthFilter,
+            clearFilters,
             filteredChallenges,
             handleViewChallenge,
             handleCreate,
@@ -374,7 +410,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             startChallenge,
             previewParticipant,
             setPreviewParticipant,
-            unplayedCount
+            unplayedCount,
+            timeLeft,
+            setTimeLeft,
+            backAction,
+            setBackAction
         }}>
             {children}
         </ChallengeContext.Provider>

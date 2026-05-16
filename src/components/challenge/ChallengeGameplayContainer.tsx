@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 
 export const ChallengeGameplayContainer = memo(() => {
     const { 
-        selectedChallenge, myParticipation, setIsPlaying, submitResult 
+        selectedChallenge, myParticipation, setIsPlaying, submitResult, setTimeLeft
     } = useChallengeContext();
     const { triggerToast } = useApp();
 
@@ -36,6 +36,7 @@ export const ChallengeGameplayContainer = memo(() => {
             triggerToast={triggerToast}
             submitChallengeResult={submitResult}
             onFinish={onFinish}
+            setTimeLeftGlobal={setTimeLeft}
         />
     );
 });
