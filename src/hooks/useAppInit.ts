@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './useAuth';
-import { fetchAndSyncCloudStats, syncGameState, syncStatsFromLocalStorage, getLetterStatuses } from '../lib/gameLogic';
+import { fetchAndSyncCloudStats, syncGameState, syncStatsFromLocalStorage, getLetterStatuses } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 
 const APP_VERSION = "1.0.4";

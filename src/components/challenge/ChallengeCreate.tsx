@@ -3,8 +3,8 @@ import { Clock, Play, Plus } from 'lucide-react';
 import { memo } from 'react';
 
 interface ChallengeCreateProps {
-    mode: 'LIVE' | 'ANYTIME';
-    setMode: (mode: 'LIVE' | 'ANYTIME') => void;
+    mode: 'LIVE' | 'ANYTIME' | 'MARATHON';
+    setMode: (mode: 'LIVE' | 'ANYTIME' | 'MARATHON') => void;
     length: number;
     setLength: (length: number) => void;
     maxTime: number;
@@ -28,52 +28,65 @@ export const ChallengeCreate = memo(({
         <div className="space-y-6">
             <div className="space-y-4">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-500">Mode</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                     <button
                         onClick={() => setMode('ANYTIME')}
-                        className={`p-4 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                        className={`p-3 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
                     >
                         <div className="flex items-center justify-between mb-2">
-                            <Clock className={mode === 'ANYTIME' ? 'text-correct' : 'text-gray-400'} size={20} />
+                            <Clock className={mode === 'ANYTIME' ? 'text-correct' : 'text-gray-400'} size={18} />
                             {mode === 'ANYTIME' && <div className="w-2 h-2 bg-correct rounded-full" />}
                         </div>
-                        <p className="text-sm font-black uppercase">Anytime</p>
-                        <p className="text-[10px] text-gray-500">24h asynchronous play</p>
+                        <p className="text-[10px] font-black uppercase">Anytime</p>
+                        <p className="text-[8px] text-gray-500">24h async</p>
                     </button>
                     <button
                         onClick={() => setMode('LIVE')}
-                        className={`p-4 rounded-2xl border transition-all text-left ${mode === 'LIVE' ? 'border-red-500 bg-red-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                        className={`p-3 rounded-2xl border transition-all text-left ${mode === 'LIVE' ? 'border-red-500 bg-red-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
                     >
                         <div className="flex items-center justify-between mb-2">
-                            <Play className={mode === 'LIVE' ? 'text-red-500' : 'text-gray-400'} size={20} />
+                            <Play className={mode === 'LIVE' ? 'text-red-500' : 'text-gray-400'} size={18} />
                             {mode === 'LIVE' && <div className="w-2 h-2 bg-red-500 rounded-full" />}
                         </div>
-                        <p className="text-sm font-black uppercase">Live</p>
-                        <p className="text-[10px] text-gray-500">Fast-paced timed play</p>
+                        <p className="text-[10px] font-black uppercase">Live</p>
+                        <p className="text-[8px] text-gray-500">Timed play</p>
+                    </button>
+                    <button
+                        onClick={() => { setMode('MARATHON'); setLength(0); }}
+                        className={`p-3 rounded-2xl border transition-all text-left ${mode === 'MARATHON' ? 'border-yellow-500 bg-yellow-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <Plus className={mode === 'MARATHON' ? 'text-yellow-500' : 'text-gray-400'} size={18} />
+                            {mode === 'MARATHON' && <div className="w-2 h-2 bg-yellow-500 rounded-full" />}
+                        </div>
+                        <p className="text-[10px] font-black uppercase">Marathon</p>
+                        <p className="text-[8px] text-gray-500">All lengths</p>
                     </button>
                 </div>
             </div>
 
-            <div className="space-y-4">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Word Length</label>
-                <div className="flex gap-2 flex-wrap">
-                    {[3, 4, 5, 6, 7].map((l) => (
+            {mode !== 'MARATHON' && (
+                <div className="space-y-4">
+                    <label className="text-xs font-black uppercase tracking-widest text-gray-500">Word Length</label>
+                    <div className="flex gap-2 flex-wrap">
+                        {[3, 4, 5, 6, 7].map((l) => (
+                            <button
+                                key={l}
+                                onClick={() => setLength(l)}
+                                className={`w-10 h-10 rounded-xl border font-black text-xs transition-all ${length === l ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                            >
+                                {l}
+                            </button>
+                        ))}
                         <button
-                            key={l}
-                            onClick={() => setLength(l)}
-                            className={`w-12 h-12 rounded-xl border font-black transition-all ${length === l ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                            onClick={() => setLength(0)} // 0 for random
+                            className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 0 ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
                         >
-                            {l}
+                            Random
                         </button>
-                    ))}
-                    <button
-                        onClick={() => setLength(0)} // 0 for random
-                        className={`px-4 h-12 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all ${length === 0 ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
-                    >
-                        Random
-                    </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {mode === 'LIVE' && (
                 <div className="space-y-4">

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { X, Trophy, Search, } from 'lucide-react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { motion, AnimatePresence } from 'framer-motion';
-import { deobfuscateWord } from '../lib/gameLogic';
+import { deobfuscateWord } from '../lib/game-logic';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import GuessPreviewModal from './GuessPreviewModal';
@@ -176,7 +176,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     } = useChallenge(user);
 
     // Form/Lobby State
-    const [mode, setMode] = useState<'LIVE' | 'ANYTIME'>('ANYTIME');
+    const [mode, setMode] = useState<'LIVE' | 'ANYTIME' | 'MARATHON'>('ANYTIME');
     const [length, setLength] = useState(5);
     const [maxTime, setMaxTime] = useState(5);
     const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -302,8 +302,23 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
             triggerToast("This challenge has expired.", 4000);
             return;
         }
-        const plainWord = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
-        setSelectedChallenge({ ...selectedChallenge, target_word: plainWord });
+
+        if (selectedChallenge.mode === 'MARATHON') {
+            try {
+                const obfuscatedWords = JSON.parse(selectedChallenge.target_word);
+                const plainWords: Record<number, string> = {};
+                Object.entries(obfuscatedWords).forEach(([len, word]) => {
+                    plainWords[Number(len)] = deobfuscateWord(word as string, selectedChallenge.salt);
+                });
+                setSelectedChallenge({ ...selectedChallenge, target_word: JSON.stringify(plainWords) });
+            } catch (e) {
+                console.error("Failed to parse marathon words", e);
+            }
+        } else {
+            const plainWord = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
+            setSelectedChallenge({ ...selectedChallenge, target_word: plainWord });
+        }
+
         if (myParticipation.status === 'pending') await startChallenge(myParticipation.id);
         setIsPlaying(true);
     }, [selectedChallenge, myParticipation, triggerToast, startChallenge]);

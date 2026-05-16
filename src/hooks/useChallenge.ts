@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { getRandomWord, obfuscateWord } from '../lib/gameLogic';
+import { getRandomWord, obfuscateWord } from '../lib/game-logic';
 import type { AppUser } from '../types/game';
 
 export interface Challenge {
     profiles: any;
     id: string;
     creator_id: string;
-    mode: 'LIVE' | 'ANYTIME';
+    mode: 'LIVE' | 'ANYTIME' | 'MARATHON';
     word_length: number;
     target_word: string;
     salt: string;
@@ -25,7 +25,7 @@ export interface ChallengeParticipant {
     status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
     score: number;
     attempts: number;
-    guesses: any[];
+    guesses: any; // Can be array or object for Marathon
     hints_used: boolean;
     hint_record: any | null;
     started_at: string | null;
@@ -56,16 +56,29 @@ export const useChallenge = (user: AppUser | null) => {
         }
     }, []);
 
-    const createChallenge = useCallback(async (mode: 'LIVE' | 'ANYTIME', length: number, maxTimeMinutes: number | null, invitedUserIds: string[] = []) => {
+    const createChallenge = useCallback(async (mode: 'LIVE' | 'ANYTIME' | 'MARATHON', length: number, maxTimeMinutes: number | null, invitedUserIds: string[] = []) => {
         if (!user) return null;
         setLoading(true);
         setError(null);
         try {
-            // If length is 0 (Random), pick a random length between 3 and 7
-            const actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
-            const plainWord = getRandomWord(actualLength);
+            let actualLength = length;
+            let targetWord = '';
             const salt = Math.random().toString(36).substring(2, 15);
-            const obfuscatedWord = obfuscateWord(plainWord, salt);
+
+            if (mode === 'MARATHON') {
+                actualLength = 0; // Indicates Marathon
+                const marathonWords: Record<number, string> = {};
+                [3, 4, 5, 6, 7].forEach(l => {
+                    const word = getRandomWord(l);
+                    marathonWords[l] = obfuscateWord(word, salt);
+                });
+                targetWord = JSON.stringify(marathonWords);
+            } else {
+                // If length is 0 (Random), pick a random length between 3 and 7
+                actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
+                const plainWord = getRandomWord(actualLength);
+                targetWord = obfuscateWord(plainWord, salt);
+            }
 
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
@@ -76,7 +89,7 @@ export const useChallenge = (user: AppUser | null) => {
                     creator_id: user.id,
                     mode,
                     word_length: actualLength,
-                    target_word: obfuscatedWord,
+                    target_word: targetWord,
                     salt: salt,
                     max_time: maxTimeMinutes,
                     expires_at: expiresAt.toISOString()

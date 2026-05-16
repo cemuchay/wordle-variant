@@ -21,11 +21,13 @@ export const ChallengeLobby = memo(({
     copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
     loading
 }: ChallengeLobbyProps) => {
+    const isMarathon = selectedChallenge.mode === 'MARATHON';
+
     return (
         <div className="space-y-6">
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
                 <div className="flex items-center justify-between mb-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedChallenge.mode === 'LIVE' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedChallenge.mode === 'LIVE' ? 'bg-red-500/20 text-red-500' : selectedChallenge.mode === 'MARATHON' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}>
                         {selectedChallenge.mode} Mode
                     </span>
                     <button
@@ -35,11 +37,15 @@ export const ChallengeLobby = memo(({
                         <Share2 size={14} /> Share Link
                     </button>
                 </div>
-                <h3 className="text-2xl font-black mb-1">{selectedChallenge.word_length} Letter Word</h3>
+                <h3 className="text-2xl font-black mb-1">
+                    {isMarathon ? 'The Marathon' : `${selectedChallenge.word_length} Letter Word`}
+                </h3>
                 <p className="text-gray-400 text-sm">
-                    {selectedChallenge.mode === 'LIVE'
-                        ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
-                        : "Play anytime within 24 hours. Highest skill score wins!"}
+                    {isMarathon 
+                        ? "Master all word lengths (3-7) in one go. Scores are summed!"
+                        : selectedChallenge.mode === 'LIVE'
+                            ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
+                            : "Play anytime within 24 hours. Highest skill score wins!"}
                 </p>
             </div>
 
@@ -53,38 +59,47 @@ export const ChallengeLobby = memo(({
                             <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse border border-white/5" />
                         ))
                     ) : (
-                        participants.map((p) => (
-                            <div
-                                key={p.id}
-                                onClick={() => {
-                                    if (myHasFinished) {
-                                        setPreviewParticipant(p);
-                                    }
-                                }}
-                                className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
-                                    <div>
-                                        <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
-                                        <p className="text-[10px] text-gray-500 uppercase font-black">{p.status}</p>
+                        participants.map((p) => {
+                            const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
+                            const completedCount = isMarathon ? (p.guesses ? Object.keys(p.guesses).filter(l => 
+                                p.guesses[l]?.some((g: any) => g.every((r: any) => r.status === 'correct'))
+                            ).length : 0) : 0;
+
+                            return (
+                                <div
+                                    key={p.id}
+                                    onClick={() => {
+                                        if (myHasFinished && !isMarathon) {
+                                            setPreviewParticipant(p);
+                                        }
+                                    }}
+                                    className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${(myHasFinished && !isMarathon) ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
+                                        <div>
+                                            <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase font-black">
+                                                {isMarathon && p.status === 'playing' ? `${completedCount}/5 Lengths` : p.status}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        {(pIsFinished || (isMarathon && p.score > 0)) && (
+                                            <div className="text-right">
+                                                <p className="text-correct font-black">{p.score}</p>
+                                                {!isMarathon && <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>}
+                                            </div>
+                                        )}
+                                        {myHasFinished && !isMarathon && (
+                                            <div className="text-gray-500 group-hover:text-white transition-colors">
+                                                <Eye size={16} />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    {p.status === 'completed' && (
-                                        <div className="text-right">
-                                            <p className="text-correct font-black">{p.score}</p>
-                                            <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
-                                        </div>
-                                    )}
-                                    {myHasFinished && (
-                                        <div className="text-gray-500 group-hover:text-white transition-colors">
-                                            <Eye size={16} />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
