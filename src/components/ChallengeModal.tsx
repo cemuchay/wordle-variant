@@ -35,6 +35,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
         fetchMyChallenges,
         fetchProfiles,
         loading,
+        error,
         startChallenge,
         submitChallengeResult
     } = useChallenge(user);
@@ -62,6 +63,30 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     const initialProcessed = useRef(false);
     const channelRef = useRef<any>(null);
+
+    // Loading Skeleton Component
+    const ChallengeSkeleton = () => (
+        <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-2xl h-24" />
+            ))}
+        </div>
+    );
+
+    // Error Fallback Component
+    const ErrorFallback = ({ message, onRetry }: { message: string, onRetry: () => void }) => (
+        <div className="py-12 text-center">
+            <div className="bg-red-500/10 text-red-500 p-4 rounded-2xl border border-red-500/20 mb-4 mx-6">
+                <p className="text-sm font-bold">{message}</p>
+            </div>
+            <button
+                onClick={onRetry}
+                className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
+            >
+                Try Again
+            </button>
+        </div>
+    );
 
     // Timer Component for challenge list
     const ExpirationTimer = ({ expiresAt, createdAt }: { expiresAt: string, createdAt: string }) => {
@@ -283,7 +308,20 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                 )}
 
                                 <div className="p-6">
-                                    {selectedChallenge ? (
+                                    {error ? (
+                                        <ErrorFallback
+                                            message={error}
+                                            onRetry={() => {
+                                                if (selectedChallenge) {
+                                                    handleViewChallenge(selectedChallenge.id);
+                                                } else if (activeTab === 'my') {
+                                                    loadMyChallenges();
+                                                } else {
+                                                    loadProfiles();
+                                                }
+                                            }}
+                                        />
+                                    ) : selectedChallenge ? (
                                         <ChallengeLobby
                                             selectedChallenge={selectedChallenge}
                                             myParticipation={myParticipation}
@@ -294,6 +332,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                             setPreviewParticipant={setPreviewParticipant}
                                             handleStartGame={handleStartGame}
                                             setSelectedChallenge={setSelectedChallenge}
+                                            loading={loading}
                                         />
                                     ) : activeTab === 'create' ? (
                                         <ChallengeCreate
@@ -303,7 +342,9 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                                         />
                                     ) : (
                                         <div className="space-y-4">
-                                            {myChallenges.length === 0 ? (
+                                            {loading ? (
+                                                <ChallengeSkeleton />
+                                            ) : myChallenges.length === 0 ? (
                                                 <div className="py-12 text-center text-gray-500">No challenges yet.</div>
                                             ) : (
                                                 myChallenges.map((item) => {

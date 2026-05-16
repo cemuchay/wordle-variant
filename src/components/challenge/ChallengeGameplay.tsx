@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb } from 'lucide-react';
-import { memo, useCallback, useEffect, useReducer, useRef } from 'react';
+import { Lightbulb, RefreshCw } from 'lucide-react';
+import { memo, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { getWordLists } from '../../data/words';
 import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../../lib/gameLogic';
 import { challengeGameReducer, initialChallengeState } from '../../reducers/challengeReducer';
@@ -27,6 +27,8 @@ export const ChallengeGameplay = memo(({
         hintRecord: participation.hint_record || null,
         status: participation.status
     });
+
+    const [isSaving, setIsSaving] = useState(false);
 
     const { guesses, currentGuess, letterStatuses, isGameOver, usedHint, hintRecord, timeLeft } = state;
     const timerRef = useRef<number | null>(null);
@@ -61,7 +63,8 @@ export const ChallengeGameplay = memo(({
     const handleTimeExpired = useCallback(async () => {
         dispatch({ type: 'TIME_UP' });
         triggerToast("Time's up!", 3000);
-        await submitChallengeResult(participation.id, {
+        setIsSaving(true);
+        const success = await submitChallengeResult(participation.id, {
             status: 'timed_out',
             score: 0,
             attempts: guesses.length,
@@ -69,6 +72,8 @@ export const ChallengeGameplay = memo(({
             hints_used: usedHint,
             hint_record: hintRecord
         });
+        setIsSaving(false);
+        if (!success) triggerToast("Failed to save result. Please check your connection.", 4000);
         setTimeout(onFinish, 2000);
     }, [participation.id, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish]);
 
@@ -91,7 +96,8 @@ export const ChallengeGameplay = memo(({
             dispatch({ type: 'SET_HINT', hint: hintWithRow });
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`, 5000);
 
-            await submitChallengeResult(participation.id, {
+            setIsSaving(true);
+            const success = await submitChallengeResult(participation.id, {
                 status: 'playing',
                 score: 0,
                 attempts: guesses.length,
@@ -99,6 +105,8 @@ export const ChallengeGameplay = memo(({
                 hints_used: true,
                 hint_record: hintWithRow
             });
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save hint usage.", 3000);
         }
     };
 
@@ -129,9 +137,10 @@ export const ChallengeGameplay = memo(({
 
         dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
 
+        setIsSaving(true);
         if (won || lost) {
             const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
-            await submitChallengeResult(participation.id, {
+            const success = await submitChallengeResult(participation.id, {
                 status: 'completed',
                 score: skillScore,
                 attempts: newGuesses.length,
@@ -139,12 +148,15 @@ export const ChallengeGameplay = memo(({
                 hints_used: usedHint,
                 hint_record: hintRecord
             });
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save final result.", 4000);
+
             setTimeout(() => {
                 triggerToast(won ? "Challenge Completed! 🎉" : `The word was ${challenge.target_word}`, 5000);
                 onFinish();
             }, 2000);
         } else {
-            await submitChallengeResult(participation.id, {
+            const success = await submitChallengeResult(participation.id, {
                 status: 'playing',
                 score: 0,
                 attempts: newGuesses.length,
@@ -152,6 +164,8 @@ export const ChallengeGameplay = memo(({
                 hints_used: usedHint,
                 hint_record: hintRecord
             });
+            setIsSaving(false);
+            if (!success) triggerToast("Progress not saved. Check connection.", 3000);
         }
     }, [isGameOver, currentGuess, challenge, guesses, usedHint, hintRecord, participation.id, submitChallengeResult, triggerToast, onFinish]);
 
@@ -170,7 +184,15 @@ export const ChallengeGameplay = memo(({
     }, [isGameOver, onEnter, onDelete, onChar]);
 
     return (
-        <div className="flex-1 flex flex-col p-4 gap-6">
+        <div className="flex-1 flex flex-col p-4 gap-6 relative">
+            {/* Saving Indicator */}
+            {isSaving && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
+                    <RefreshCw size={10} className="animate-spin text-correct" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/70">Syncing...</span>
+                </div>
+            )}
+
             {/* Gameplay Header (Timer & Hint) */}
             <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-4">
