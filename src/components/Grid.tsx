@@ -56,24 +56,21 @@ export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, cu
 
       {/* Current Guess Row */}
       {guesses.length < maxAttempts && (
-        <div 
-          className={`contents ${isShake ? 'animate-shake' : ''}`}
-        >
-          {Array.from({ length: wordLength }).map((_, i) => {
-            const isHinted = hintRecord?.index === i;
-            const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
-            
-            return (
-              <div 
-                key={`current-${i}`} 
-                className={`${tileClass} border-2 text-white 
-                  ${currentGuess[i] ? 'border-gray-500 animate-pop' : isHinted ? 'border-yellow-600/50 text-yellow-500/50 animate-pulse' : 'border-gray-500'}`}
-              >
-                {letter}
-              </div>
-            );
-          })}
-        </div>
+        Array.from({ length: wordLength }).map((_, i) => {
+          const isHinted = hintRecord?.index === i;
+          const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+          
+          return (
+            <div 
+              key={`current-${i}`} 
+              className={`${tileClass} border-2 text-white 
+                ${isShake ? 'animate-shake' : ''}
+                ${currentGuess[i] ? 'border-gray-500 animate-pop' : isHinted ? 'border-yellow-600/50 text-yellow-500/50 animate-pulse' : 'border-gray-500'}`}
+            >
+              {letter}
+            </div>
+          );
+        })
       )}
 
       {/* Empty Rows */}
