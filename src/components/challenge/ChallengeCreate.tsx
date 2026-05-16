@@ -95,7 +95,11 @@ export const ChallengeCreate = memo(({
             <div className="space-y-4">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-500">Challenge Friends</label>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {availableProfiles.length === 0 ? (
+                    {loading && availableProfiles.length === 0 ? (
+                        [1, 2, 3, 4].map(i => (
+                            <div key={i} className="shrink-0 w-20 h-24 bg-white/5 rounded-2xl animate-pulse" />
+                        ))
+                    ) : availableProfiles.length === 0 ? (
                         <p className="text-[10px] text-gray-600 uppercase font-black">No other users found</p>
                     ) : (
                         availableProfiles.map((p) => (

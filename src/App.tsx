@@ -11,7 +11,7 @@ import { Toast } from './components/Toast';
 import { useApp } from './context/AppContext';
 import { useAppInit } from './hooks/useAppInit';
 import { useAuth } from './hooks/useAuth';
-import { useChat } from './hooks/useChat';
+// import { useChat } from './hooks/useChat';
 import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
@@ -67,14 +67,18 @@ export default function App() {
     useKeyboard(actions, isChatOpen || isInitializing);
 
     // Chat & Social
-    const { sendMessage } = useChat(user?.id || "");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleChallengeCreated = (challenge: any, invitedUsernames: string[], invitedIds: string[]) => {
-        const mentions = invitedUsernames.map(name => `@${name}`).join(' ');
-        const message = `${mentions} I challenge you to a ${challenge.mode} ${challenge.word_length}-letter Wordle! 🏆 \n\n Join here: ${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
-        sendMessage(message, undefined, invitedIds);
-        triggerToast(`Challenge created and shared in chat!`, 3000);
-    };
+    // const { sendMessage } = useChat(user?.id || "");
+
+    // const handleChallengeCreated = (challenge: any, invitedUsernames: string[], invitedIds: string[]) => {
+    //     const mentions = invitedUsernames.map(name => `@${name}`).join(' ');
+    //     const message = `${mentions} I challenge you to a ${challenge.mode} ${challenge.word_length}-letter Wordle! 🏆 \n\n Join here: ${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
+    //     sendMessage(message, undefined, invitedIds);
+    //     triggerToast(`Challenge created and shared in chat!`, 3000);
+    // };
+
+    const handleChallengeCreated = () => {
+        triggerToast(`Challenge created successfully`, 3000)
+    }
 
     if (isLoadingDate || isInitializing) {
         return (

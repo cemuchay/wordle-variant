@@ -35,24 +35,31 @@ export interface ChallengeParticipant {
 
 export const useChallenge = (user: AppUser | null) => {
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [participants, setParticipants] = useState<ChallengeParticipant[]>([]);
 
     const fetchProfiles = useCallback(async () => {
+        setLoading(true);
+        setError(null);
         try {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, username, avatar_url');
             if (error) throw error;
             return data;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error fetching profiles:', err);
+            setError(err.message || 'Failed to fetch profiles');
             return [];
+        } finally {
+            setLoading(false);
         }
     }, []);
 
     const createChallenge = useCallback(async (mode: 'LIVE' | 'ANYTIME', length: number, maxTimeMinutes: number | null, invitedUserIds: string[] = []) => {
         if (!user) return null;
         setLoading(true);
+        setError(null);
         try {
             // If length is 0 (Random), pick a random length between 3 and 7
             const actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
@@ -94,8 +101,9 @@ export const useChallenge = (user: AppUser | null) => {
             if (partError) throw partError;
 
             return challenge as Challenge;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error creating challenge:', err);
+            setError(err.message || 'Failed to create challenge');
             return null;
         } finally {
             setLoading(false);
@@ -104,6 +112,7 @@ export const useChallenge = (user: AppUser | null) => {
 
     const fetchChallenge = useCallback(async (id: string) => {
         setLoading(true);
+        setError(null);
         try {
             const { data, error } = await supabase
                 .from('challenges')
@@ -113,8 +122,9 @@ export const useChallenge = (user: AppUser | null) => {
 
             if (error) throw error;
             return data as Challenge;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error fetching challenge:', err);
+            setError(err.message || 'Failed to fetch challenge');
             return null;
         } finally {
             setLoading(false);
@@ -123,6 +133,8 @@ export const useChallenge = (user: AppUser | null) => {
 
     const joinChallenge = useCallback(async (challengeId: string) => {
         if (!user) return null;
+        setLoading(true);
+        setError(null);
         try {
             // First check if already participating
             const { data: existing, error: fetchError } = await supabase
@@ -148,13 +160,18 @@ export const useChallenge = (user: AppUser | null) => {
 
             if (error) throw error;
             return data as ChallengeParticipant;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error joining challenge:', err);
+            setError(err.message || 'Failed to join challenge');
             return null;
+        } finally {
+            setLoading(false);
         }
     }, [user]);
 
     const startChallenge = useCallback(async (participationId: string) => {
+        setLoading(true);
+        setError(null);
         try {
             const { error } = await supabase
                 .from('challenge_participants')
@@ -166,9 +183,12 @@ export const useChallenge = (user: AppUser | null) => {
 
             if (error) throw error;
             return true;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error starting challenge:', err);
+            setError(err.message || 'Failed to start challenge');
             return false;
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -228,37 +248,61 @@ export const useChallenge = (user: AppUser | null) => {
             .subscribe();
 
         // Initial fetch
-        supabase
-            .from('challenge_participants')
-            .select('*, profiles(username, avatar_url)')
-            .eq('challenge_id', challengeId)
-            .order('score', { ascending: false })
-            .then(({ data }) => {
+        const fetchInitialParticipants = async () => {
+            setLoading(true);
+            try {
+                const { data } = await supabase
+                    .from('challenge_participants')
+                    .select('*, profiles(username, avatar_url)')
+                    .eq('challenge_id', challengeId)
+                    .order('score', { ascending: false });
+
                 if (data) setParticipants(data as ChallengeParticipant[]);
-            });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInitialParticipants();
 
         return channel;
     }, []);
 
     const fetchMyChallenges = useCallback(async () => {
         if (!user) return [];
+        setLoading(true);
+        setError(null);
         try {
             const { data, error } = await supabase
                 .from('challenge_participants')
-                .select('*, challenge:challenges(*, profiles!creator_id(username, avatar_url))')
+                .select(`
+                    *,
+                    challenge:challenges(
+                        *,
+                        creator:profiles!creator_id(username, avatar_url),
+                        participants:challenge_participants(
+                            *,
+                            profiles(username, avatar_url)
+                        )
+                    )
+                `)
                 .eq('user_id', user.id)
                 .order('started_at', { ascending: false, nullsFirst: true });
 
             if (error) throw error;
             return data;
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error fetching my challenges:', err);
+            setError(err.message || 'Failed to fetch challenges');
             return [];
+        } finally {
+            setLoading(false);
         }
     }, [user]);
 
     return {
         loading,
+        error,
         createChallenge,
         fetchChallenge,
         joinChallenge,

@@ -13,11 +13,13 @@ interface ChallengeLobbyProps {
     setPreviewParticipant: (p: ChallengeParticipant) => void;
     handleStartGame: () => void;
     setSelectedChallenge: (c: Challenge | null) => void;
+    loading?: boolean;
 }
 
 export const ChallengeLobby = memo(({
     selectedChallenge, myParticipation, participants, myHasFinished,
-    copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge
+    copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
+    loading
 }: ChallengeLobbyProps) => {
     return (
         <div className="space-y-6">
@@ -46,38 +48,44 @@ export const ChallengeLobby = memo(({
                     <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">Participants ({participants.length})</h4>
                 </div>
                 <div className="space-y-2">
-                    {participants.map((p) => (
-                        <div
-                            key={p.id}
-                            onClick={() => {
-                                if (myHasFinished) {
-                                    setPreviewParticipant(p);
-                                }
-                            }}
-                            className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
-                                <div>
-                                    <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
-                                    <p className="text-[10px] text-gray-500 uppercase font-black">{p.status}</p>
+                    {loading ? (
+                        [1, 2].map(i => (
+                            <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse border border-white/5" />
+                        ))
+                    ) : (
+                        participants.map((p) => (
+                            <div
+                                key={p.id}
+                                onClick={() => {
+                                    if (myHasFinished) {
+                                        setPreviewParticipant(p);
+                                    }
+                                }}
+                                className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${myHasFinished ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <img src={p.profiles?.avatar_url || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full border border-white/10" alt="" />
+                                    <div>
+                                        <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
+                                        <p className="text-[10px] text-gray-500 uppercase font-black">{p.status}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {p.status === 'completed' && (
+                                        <div className="text-right">
+                                            <p className="text-correct font-black">{p.score}</p>
+                                            <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
+                                        </div>
+                                    )}
+                                    {myHasFinished && (
+                                        <div className="text-gray-500 group-hover:text-white transition-colors">
+                                            <Eye size={16} />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                {p.status === 'completed' && (
-                                    <div className="text-right">
-                                        <p className="text-correct font-black">{p.score}</p>
-                                        <p className="text-[10px] text-gray-500">{p.attempts} attempts</p>
-                                    </div>
-                                )}
-                                {myHasFinished && (
-                                    <div className="text-gray-500 group-hover:text-white transition-colors">
-                                        <Eye size={16} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
 
