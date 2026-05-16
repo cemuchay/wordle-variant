@@ -210,25 +210,46 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     // Optimized filtered challenges using useMemo
     const filteredChallenges = useMemo(() => {
-        return myChallenges.filter(item => {
-            const isExpired = new Date(item.challenge.expires_at) < new Date();
-            const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+        return myChallenges
+            .filter(item => {
+                const isExpired = new Date(item.challenge.expires_at) < new Date();
+                const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
 
-            // Filter by Status
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+                // Filter by Status
+                if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
+                if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
 
-            // Filter by Search Query (opponent names)
-            if (searchQuery) {
-                const opponentNames = item.challenge.participants
-                    ?.filter((p: any) => p.user_id !== user?.id)
-                    .map((p: any) => p.profiles?.username?.toLowerCase() || '')
-                    .join(' ');
-                if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
-            }
+                // Filter by Search Query (opponent names)
+                if (searchQuery) {
+                    const opponentNames = item.challenge.participants
+                        ?.filter((p: any) => p.user_id !== user?.id)
+                        .map((p: any) => p.profiles?.username?.toLowerCase() || '')
+                        .join(' ');
+                    if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
+                }
 
-            return true;
-        });
+                return true;
+            })
+            .sort((a, b) => {
+                const isExpiredA = new Date(a.challenge.expires_at) < new Date();
+                const isExpiredB = new Date(b.challenge.expires_at) < new Date();
+
+                const isMeFinishedA = a.status === 'completed' || a.status === 'timed_out' || a.status === 'declined';
+                const isMeFinishedB = b.status === 'completed' || b.status === 'timed_out' || b.status === 'declined';
+
+                const isEveryoneFinishedA = a.challenge.participants?.every((p: any) => p.status === 'completed' || p.status === 'timed_out' || p.status === 'declined');
+                const isEveryoneFinishedB = b.challenge.participants?.every((p: any) => p.status === 'completed' || p.status === 'timed_out' || p.status === 'declined');
+
+                // Priority: (Not Expired) AND (Me not finished OR someone not finished)
+                const isPriorityA = !isExpiredA && (!isMeFinishedA || !isEveryoneFinishedA);
+                const isPriorityB = !isExpiredB && (!isMeFinishedB || !isEveryoneFinishedB);
+
+                if (isPriorityA && !isPriorityB) return -1;
+                if (!isPriorityA && isPriorityB) return 1;
+
+                // Within same priority group, sort by creation date (newest first)
+                return new Date(b.challenge.created_at).getTime() - new Date(a.challenge.created_at).getTime();
+            });
     }, [myChallenges, statusFilter, searchQuery, user?.id]);
 
     // Sync state from participants array
