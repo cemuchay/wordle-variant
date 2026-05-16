@@ -1,5 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo } from 'react';
 import { X, Trophy, Search } from 'lucide-react';
@@ -22,16 +20,14 @@ interface ChallengeModalProps {
     initialChallengeId?: string | null;
 }
 
-const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
+const ChallengeModalContent = memo(({ user }: { onClose: () => void, user: any }) => {
     const {
         activeTab, setActiveTab,
         isPlaying,
-        selectedChallenge, setSelectedChallenge,
-        myParticipation,
-        participants,
+        selectedChallenge,
         filteredChallenges,
+        myChallenges,
         handleViewChallenge,
-        copyLink,
         loadMyChallenges,
         loading,
         error,
@@ -44,8 +40,6 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
     if (isPlaying) {
         return <ChallengeGameplayContainer />;
     }
-
-    const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
 
     return (
         <motion.div
