@@ -85,9 +85,14 @@ export const useGameEngine = (date: string) => {
 
             // Only show reveal after sync attempt (successful or failed-but-locally-saved)
             if (lost) triggerToast(`The word is: ${config.word}`, 5000);
+
+            // Calculate delay: wordLength * 150ms + 600ms (last tile flip) + padding
+            const revealDelay = (config.length - 1) * 150 + 600 + 500;
+            
             setTimeout(() => {
+                dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen: true });
                 triggerToast(message || state.gameMessage, 8500);
-            }, 500);
+            }, revealDelay);
         }
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
 

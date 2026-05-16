@@ -38,12 +38,16 @@ export const Grid: React.FC<GridProps> = ({ wordLength, maxAttempts, guesses, cu
         return guess.map((res, j) => (
           <div 
             key={`past-${i}-${j}`} 
-            className={`${tileClass} border-2 
-              ${res.status === 'correct' ? 'bg-correct border-correct text-white' : 
-                res.status === 'present' ? 'bg-present border-present text-white' : 
-                'bg-absent border-absent text-white'}
-              ${isLastRow ? 'animate-flip' : ''}`}
-            style={isLastRow ? { animationDelay: `${j * 150}ms`, animationFillMode: 'backwards' } : {}}
+            className={`${tileClass} border-2 text-white
+              ${res.status === 'correct' ? 'bg-correct border-correct' : 
+                res.status === 'present' ? 'bg-present border-present' : 
+                'bg-absent border-absent'}
+              ${isLastRow ? (
+                res.status === 'correct' ? 'animate-reveal-correct' : 
+                res.status === 'present' ? 'animate-reveal-present' : 
+                'animate-reveal-absent'
+              ) : ''}`}
+            style={isLastRow ? { animationDelay: `${j * 150}ms`, animationFillMode: 'both' } : {}}
           >
             {res.letter}
           </div>

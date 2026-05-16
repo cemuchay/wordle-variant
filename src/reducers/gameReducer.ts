@@ -72,7 +72,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 currentGuess: '',
                 status: newStatus,
                 isGameOver: isFinished,
-                isGameOverModalOpen: isFinished,
+                isGameOverModalOpen: false, // Delay modal until animation finishes
                 gameMessage: action.message,
             };
         }
