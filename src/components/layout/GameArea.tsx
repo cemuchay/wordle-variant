@@ -50,7 +50,7 @@ export const GameArea = ({
             </div>
 
             {!isGameOver && (
-                <div className="w-full max-w-125 mx-auto pt-2 pb-2 shrink-0">
+                <div className="w-full max-w-125 mx-auto pb-8 shrink-0">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}
