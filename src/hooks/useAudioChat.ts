@@ -1,10 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { IAgoraRTCClient, ILocalAudioTrack, IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
 
 const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID;
 
+// Helper to convert UUID to 32-bit numeric UID for Agora (preferred over strings)
+const getNumericUid = (uuid: string): number => {
+    if (!uuid) return 0;
+    let hash = 0;
+    for (let i = 0; i < uuid.length; i++) {
+        hash = ((hash << 5) - hash) + uuid.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+};
 
 interface UseAudioChatProps {
     challengeId: string;
@@ -49,12 +59,23 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     // --- Refs ---
     const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
     const agoraLocalTrackRef = useRef<ILocalAudioTrack | null>(null);
+    const isJoiningRef = useRef(false);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const channelRef = useRef<any>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
     const makingOffer = useRef(false);
     const ignoreOffer = useRef(false);
+
+    // Refs for stable access in event handlers
+    const activeEngineRef = useRef(activeEngine);
+    useEffect(() => { activeEngineRef.current = activeEngine; }, [activeEngine]);
+
+    const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
 
     // Status refs for event handlers
     const micStatusRef = useRef(isMicOn);
@@ -64,6 +85,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
     // --- Helpers ---
     const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+        if (!isMounted.current) return;
         setLogs(prev => [...prev.slice(-19), { message, type, timestamp: Date.now() }]);
         console.log(`[AudioChat] [${type.toUpperCase()}] ${message}`);
     }, []);
@@ -81,9 +103,9 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     }, [userId]);
 
     // --- P2P Engine Specifics ---
-    const ICE_SERVERS: RTCConfiguration = {
+    const ICE_SERVERS = useMemo(() => ({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }],
-    };
+    }), []);
 
     const cleanupP2P = useCallback(() => {
         if (pcRef.current) {
@@ -105,11 +127,13 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         };
 
         pc.ontrack = (event) => {
+            if (!isMounted.current) return;
             addLog('P2P Remote track received', 'success');
             setRemoteStream(event.streams[0] || new MediaStream([event.track]));
         };
 
         pc.onconnectionstatechange = () => {
+            if (!isMounted.current) return;
             setIsConnected(pc.connectionState === 'connected');
             if (pc.connectionState === 'connected') {
                 sendSignal({ type: 'status', mic: micStatusRef.current, speaker: speakerStatusRef.current });
@@ -122,8 +146,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
         pcRef.current = pc;
         return pc;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sendSignal, addLog]);
+    }, [sendSignal, addLog, ICE_SERVERS]);
 
     // --- Agora Engine Specifics ---
     const setupAgora = useCallback(async () => {
@@ -132,22 +155,26 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             return false;
         }
 
+        if (isJoiningRef.current || agoraClientRef.current) {
+            return true;
+        }
+
         try {
-            addLog('Connecting via Agora (Loading SDK)...', 'info');
-            // Dynamically import Agora SDK
+            isJoiningRef.current = true;
+            addLog('Connecting via Agora...', 'info');
+            const numericUid = getNumericUid(userId);
+
             const { default: AgoraRTC } = await import('agora-rtc-sdk-ng');
-            
             const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
             agoraClientRef.current = client;
 
             client.on('user-published', async (user, mediaType) => {
-                if (mediaType === 'audio') {
+                if (mediaType === 'audio' && isMounted.current) {
                     addLog('Agora opponent audio published', 'success');
                     await client.subscribe(user, mediaType);
                     const remoteTrack = user.audioTrack as IRemoteAudioTrack;
                     remoteTrack.play();
 
-                    // Create standard MediaStream for volume analysis
                     const ms = new MediaStream();
                     ms.addTrack(remoteTrack.getMediaStreamTrack());
                     setRemoteStream(ms);
@@ -155,78 +182,80 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             });
 
             client.on('user-unpublished', () => {
-                addLog('Agora opponent audio unpublished', 'info');
-                setRemoteStream(null);
-            });
-
-            client.on('connection-state-change', (cur, _prev, reason) => {
-                addLog(`Agora state: ${cur} (${reason || 'no reason'})`, 'info');
-                setIsConnected(cur === 'CONNECTED');
-                if (cur === 'CONNECTED') {
-                    sendSignal({ type: 'status', mic: micStatusRef.current, speaker: speakerStatusRef.current });
+                if (isMounted.current) {
+                    addLog('Agora opponent audio unpublished', 'info');
+                    setRemoteStream(null);
                 }
             });
 
-            // 1. Get Secure Token from Supabase Edge Function
-            addLog('Fetching secure access token...', 'info');
+            client.on('connection-state-change', (cur, _prev, reason) => {
+                if (isMounted.current) {
+                    addLog(`Agora state: ${cur} (${reason || 'no reason'})`, 'info');
+                    setIsConnected(cur === 'CONNECTED');
+                    if (cur === 'CONNECTED') {
+                        sendSignal({ type: 'status', mic: micStatusRef.current, speaker: speakerStatusRef.current });
+                    }
+                }
+            });
+
+            addLog(`Fetching access token for UID: ${numericUid}...`, 'info');
             const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-agora-token', {
-                body: { channelName: challengeId, uid: userId }
+                body: { channelName: challengeId, uid: numericUid }
             });
 
             if (tokenError || !tokenData?.token) {
                 throw new Error(tokenError?.message || 'Failed to retrieve access token');
             }
 
-            // 2. Join Channel with Token
-            await client.join(AGORA_APP_ID, challengeId, tokenData.token, userId);
+            await client.join(AGORA_APP_ID, challengeId, tokenData.token, numericUid);
 
-            // Create and publish local track
             const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
                 encoderConfig: 'speech_standard',
-                AEC: true,
-                ANS: true,
-                AGC: true
+                AEC: true, ANS: true, AGC: true
             });
 
             agoraLocalTrackRef.current = audioTrack;
             await client.publish(audioTrack);
 
-            // Sync with localStream for UI
-            const ms = new MediaStream();
-            ms.addTrack(audioTrack.getMediaStreamTrack());
-            localStreamRef.current = ms;
-            setLocalStream(ms);
-            setIsMicOn(true);
-
-            setActiveEngine('agora');
-            addLog('Agora connected successfully', 'success');
+            if (isMounted.current) {
+                const ms = new MediaStream();
+                ms.addTrack(audioTrack.getMediaStreamTrack());
+                localStreamRef.current = ms;
+                setLocalStream(ms);
+                setIsMicOn(true);
+                setActiveEngine('agora');
+                addLog('Agora connected successfully', 'success');
+            }
             return true;
         } catch (err: any) {
             addLog(`Agora error: ${err.message || err}`, 'error');
             return false;
+        } finally {
+            isJoiningRef.current = false;
         }
     }, [challengeId, userId, addLog, sendSignal]);
 
     // --- Orchestration ---
     const startAudio = useCallback(async () => {
+        if (!isMounted.current) return;
         setError(null);
 
-        // Try Agora first
         const agoraSuccess = await setupAgora();
-        if (agoraSuccess) return;
+        if (agoraSuccess || !isMounted.current) return;
 
-        // Fallback to P2P
         addLog('Switching to P2P fallback...', 'warning');
         setActiveEngine('p2p');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
             });
-            localStreamRef.current = stream;
-            setLocalStream(stream);
-            setIsMicOn(true);
-            createPeerConnection();
-            sendSignal({ type: 'ready' });
+            if (isMounted.current) {
+                localStreamRef.current = stream;
+                setLocalStream(stream);
+                setIsMicOn(true);
+                createPeerConnection();
+                sendSignal({ type: 'ready' });
+            }
         } catch (err: any) {
             setError('Mic permission denied');
             addLog(`P2P error: ${err.message}`, 'error');
@@ -236,36 +265,37 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     const stopAudio = useCallback(async () => {
         addLog('Stopping audio...', 'info');
 
-        // Cleanup Agora
         if (agoraLocalTrackRef.current) {
             agoraLocalTrackRef.current.stop();
             agoraLocalTrackRef.current.close();
             agoraLocalTrackRef.current = null;
         }
         if (agoraClientRef.current) {
-            await agoraClientRef.current.leave();
+            try {
+                await agoraClientRef.current.leave();
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (e) { /* ignore leave errors during abort */ }
             agoraClientRef.current = null;
         }
 
-        // Cleanup P2P
         cleanupP2P();
 
-        // Cleanup Tracks
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(t => t.stop());
             localStreamRef.current = null;
         }
 
-        setLocalStream(null);
-        setRemoteStream(null);
-        setIsConnected(false);
-        setActiveEngine(null);
+        if (isMounted.current) {
+            setLocalStream(null);
+            setRemoteStream(null);
+            setIsConnected(false);
+            setActiveEngine(null);
+        }
     }, [addLog, cleanupP2P]);
 
     // --- Lifecycle ---
     useEffect(() => {
         if (!enabled) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             stopAudio();
             return;
         }
@@ -277,20 +307,19 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             .on('broadcast', { event: 'signal' }, async ({ payload }) => {
                 if (payload.from === userId) return;
                 const { type, description, candidate } = payload;
+                const currentEngine = activeEngineRef.current;
 
-                // Handle shared signals (status, leave, ready)
                 if (type === 'status') {
                     setOpponentStatus({ mic: payload.mic, speaker: payload.speaker });
                 } else if (type === 'leave') {
                     addLog('Opponent left the call', 'warning');
                     setIsConnected(false);
                     setRemoteStream(null);
-                } else if (type === 'ready' && activeEngine === 'p2p') {
+                } else if (type === 'ready' && currentEngine === 'p2p') {
                     createPeerConnection();
                 }
 
-                // Handle P2P specific signals if in P2P mode
-                if (activeEngine === 'p2p') {
+                if (currentEngine === 'p2p') {
                     const polite = userId < payload.from;
                     try {
                         if (type === 'description') {
@@ -323,7 +352,9 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             channel.unsubscribe();
             stopAudio();
         };
-    }, [challengeId, userId, enabled, activeEngine, startAudio, stopAudio, createPeerConnection, sendSignal, addLog]);
+        // We exclude startAudio/stopAudio/activeEngine to avoid the restart loop
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [challengeId, userId, enabled]);
 
     const toggleMic = useCallback(() => {
         if (activeEngine === 'agora' && agoraLocalTrackRef.current) {
