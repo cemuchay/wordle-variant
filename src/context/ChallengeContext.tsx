@@ -6,6 +6,7 @@ import { deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useMyChallenges, useAvailableProfiles, useChallengeMutations } from '../hooks/queries/useChallengeQueries';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChallengeContextType {
     // UI State
@@ -63,8 +64,6 @@ interface ChallengeContextType {
     previewParticipant: ChallengeParticipant | null;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     unplayedCount: number;
-    timeLeft: number | null;
-    setTimeLeft: (t: number | null) => void;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
 }
@@ -78,7 +77,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     initialChallengeId?: string | null
 }) => {
     const { triggerToast, setChallengeUnreadCount } = useApp();
-    const store = useChallengeStore();
+
+    // Select stable properties and exclude timeLeft to avoid frequent re-renders
+    const store = useChallengeStore(useShallow(state => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { timeLeft, ...rest } = state;
+        return rest;
+    }));
 
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(user?.id);
@@ -318,8 +323,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         previewParticipant: store.previewParticipant,
         setPreviewParticipant: store.setPreviewParticipant,
         unplayedCount,
-        timeLeft: store.timeLeft,
-        setTimeLeft: store.setTimeLeft,
         backAction: store.backAction,
         setBackAction: store.setBackAction
     }), [store, participants, myChallenges, availableProfiles, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, submitChallengeResult, submitMarathonResult, startChallenge, unplayedCount]);

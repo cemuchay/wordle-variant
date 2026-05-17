@@ -3,6 +3,7 @@ import { useCallback, useEffect, useReducer, useState, useMemo } from 'react';
 import { getWordLists } from '../data/words';
 import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../lib/game-logic';
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
+import { useChallengeStore } from '../store/useChallengeStore';
 
 interface UseChallengeGameEngineProps {
     challenge: any;
@@ -12,12 +13,12 @@ interface UseChallengeGameEngineProps {
     onFinish: () => void;
     selectedLength?: number | null; // For Marathon mode
     onLengthComplete?: () => void; // Callback for Marathon mode
-    setTimeLeftGlobal?: (t: number | null) => void; // From context
 }
 
 export const useChallengeGameEngine = ({
-    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete, setTimeLeftGlobal
+    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete
 }: UseChallengeGameEngineProps) => {
+    const setTimeLeftStore = useChallengeStore(state => state.setTimeLeft);
     const isMarathon = challenge.word_length === 1;
     const marathonWords = useMemo(() => {
         if (!isMarathon) return null;
@@ -84,15 +85,11 @@ export const useChallengeGameEngine = ({
         }
     }, [isSaving, challenge.mode, challenge.max_time, isMarathon, submitChallengeResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
 
-    // Sync timeLeft with Global Context
+    // Sync timeLeft with Global Store
     useEffect(() => {
-        if (setTimeLeftGlobal) {
-            setTimeLeftGlobal(timeLeft);
-        }
-        return () => {
-            if (setTimeLeftGlobal) setTimeLeftGlobal(null);
-        };
-    }, [timeLeft, setTimeLeftGlobal]);
+        setTimeLeftStore(timeLeft);
+        return () => setTimeLeftStore(null);
+    }, [timeLeft, setTimeLeftStore]);
 
     // Word Length & Target Word Resolution
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;

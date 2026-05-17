@@ -7,6 +7,8 @@ import { ChallengeProvider, useChallengeContext } from '../context/ChallengeCont
 import GuessPreviewModal from './GuessPreviewModal';
 import { AudioChatControls } from './challenge/AudioChatControls';
 
+import { useChallengeStore } from '../store/useChallengeStore';
+
 // Sub-components
 import { ChallengeCreate } from './challenge/ChallengeCreate';
 import { ChallengeLobby } from './challenge/ChallengeLobby';
@@ -20,6 +22,18 @@ interface ChallengeModalProps {
     onChallengeCreated?: (challenge: Challenge, invitedUsernames: string[], invitedIds: string[]) => void;
     initialChallengeId?: string | null;
 }
+
+const GameplayTimer = memo(() => {
+    const timeLeft = useChallengeStore(s => s.timeLeft);
+    if (timeLeft === null) return null;
+    return (
+        <div className="flex items-center gap-2 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
+            <span className="text-[10px] font-black text-red-500 tabular-nums">
+                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+            </span>
+        </div>
+    );
+});
 
 const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
     const [showFilters, setShowFilters] = useState(false);
@@ -41,7 +55,6 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
         clearFilters,
         previewParticipant, setPreviewParticipant,
         unplayedCount,
-        timeLeft,
         backAction
     } = useChallengeContext();
 
@@ -71,13 +84,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                     >
                                         <ArrowLeft size={16} />
                                     </button>
-                                    {timeLeft !== null && (
-                                        <div className="flex items-center gap-2 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
-                                            <span className="text-[10px] font-black text-red-500 tabular-nums">
-                                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <GameplayTimer />
                                     {selectedChallenge && myParticipation && (
                                         <AudioChatControls
                                             challengeId={selectedChallenge.id}
