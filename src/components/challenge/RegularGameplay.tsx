@@ -73,7 +73,7 @@ export const RegularGameplay = memo(({
                     )}
                 </div>
 
-                {guesses.length >= 3 && !isGameOver && (
+                {guesses.length >= 2 && !isGameOver && (
                     <button
                         onClick={actions.handleHint}
                         disabled={guesses.length >= 5 && !usedHint}

@@ -109,7 +109,7 @@ export default function App() {
                         onShare={() => actions.setGameOverModalOpen(true)}
                         isGameOver={state.isGameOver}
                         usedHint={state.usedHint}
-                        canShowHint={state.guesses.length >= 3}
+                        canShowHint={state.guesses.length >= 2}
                         isHintLocked={state.guesses.length >= (config.maxAttempts - 1) && !state.usedHint}
                         syncStatus={state.syncStatus}
                     />

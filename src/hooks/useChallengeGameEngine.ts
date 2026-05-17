@@ -260,7 +260,7 @@ export const useChallengeGameEngine = ({
         let resultPayload: any;
         if (isMarathon) {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0]);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -279,7 +279,7 @@ export const useChallengeGameEngine = ({
             }
         } else {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0]);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -350,8 +350,8 @@ export const useChallengeGameEngine = ({
             triggerToast("Hint locked on last available guess.");
             return;
         }
-        if (guesses.length < 3) {
-            triggerToast("Hint unlocks after 3 attempts.", 3000);
+        if (guesses.length < 2) {
+            triggerToast("Hint unlocks after 2 attempts.", 3000);
             return;
         }
 

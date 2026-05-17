@@ -393,7 +393,8 @@ export const calculateSkillIndex = (
    maxAttempts: number,
    usedHint: boolean,
    guesses: GuessResult[][],
-   gameDate?: string
+   gameDate?: string,
+   hintRecord?: { index: number; letter: string } | null
 ) => {
    // New scoring system logic starting May 18, 2026
    const targetDate = new Date('2026-05-18');
@@ -434,6 +435,11 @@ export const calculateSkillIndex = (
    let bonus = 0;
    const scoredIndices = new Set<number>(); // Track which placements have been awarded a discovery bonus
    const knownBlacks = new Set<string>(); // letter
+
+   // Pre-populate scoredIndices with hinted placement to avoid double scoring
+   if (usedHint && hintRecord) {
+      scoredIndices.add(hintRecord.index);
+   }
 
    guesses.forEach((row) => {
       const newBlacksThisRow = new Set<string>();
@@ -485,7 +491,8 @@ export const syncGameState = async (
          payload.config.maxAttempts,
          payload.usedHint,
          payload.guesses,
-         date
+         date,
+         payload.hintRecord
       )
       : 0;
 

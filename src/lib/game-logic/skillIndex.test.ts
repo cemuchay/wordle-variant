@@ -1,7 +1,8 @@
 import { calculateSkillIndex } from './index';
+import type { GuessResult } from '../../types/game';
 
 // Mock GuessResult for testing
-const g = (letter: string, status: 'correct' | 'present' | 'absent'): any => ({ letter, status });
+const g = (letter: string, status: 'correct' | 'present' | 'absent'): GuessResult => ({ letter, status });
 
 console.log("Running Skill Index Tests...");
 
@@ -42,10 +43,10 @@ const failGuesses = [
 runTest("New System (Fail - Black Letter Penalties)", calculateSkillIndex(6, 6, false, failGuesses, '2026-05-18'), -120);
 
 // 4. New system: Yellow to Green placement test
-const yellowToGreen = [
-    [g('S', 'present'), g('T', 'absent'), g('A', 'absent'), g('R', 'absent'), g('E', 'absent')], // S yellow at 0 (+25), others black (-20) -> bonus +5
-    [g('S', 'correct'), g('L', 'absent'), g('E', 'absent'), g('E', 'absent'), g('P', 'absent')]  // S green at 0 (+0, already scored as yellow), others black (-10, L -5, E -5, E -20, P -5) wait...
-];
+// const yellowToGreen = [
+//     [g('S', 'present'), g('T', 'absent'), g('A', 'absent'), g('R', 'absent'), g('E', 'absent')], // S yellow at 0 (+25), others black (-20) -> bonus +5
+//     [g('S', 'correct'), g('L', 'absent'), g('E', 'absent'), g('E', 'absent'), g('P', 'absent')]  // S green at 0 (+0, already scored as yellow), others black (-10, L -5, E -5, E -20, P -5) wait...
+// ];
 // Wait, let's trace Row 2:
 // cell 0 (S): correct. index 0 already in scoredIndices. bonus +0.
 // cell 1 (L): absent. new black. bonus -5.
@@ -71,6 +72,18 @@ const winIn2YellowToGreen = [
 // Total: 833 + 165 = 998.
 runTest("New System (Yellow to Green Placement)", calculateSkillIndex(2, 6, false, winIn2YellowToGreen, '2026-05-18'), 998);
 
-// 5. Hint penalty
-runTest("New System (Win in 1 with Hint)", calculateSkillIndex(1, 6, true, oldGuesses, '2026-05-18'), 1100); 
+// 5. Hint penalty & No discovery bonus for hinted letter
+const hintRecord = { index: 2, letter: 'P' }; // Hint revealed 'P' at index 2
+const winWithHint = [
+    [g('A', 'correct'), g('P', 'correct'), g('P', 'correct'), g('L', 'correct'), g('E', 'correct')]
+];
+// Base: 1000
+// Hint: -100
+// Bonus: 4 Green discoveries at indices 0, 1, 3, 4. Index 2 is ignored due to hintRecord.
+// 4 * 40 = 160
+// Total: 1000 - 100 + 160 = 1060
+runTest("New System (Win in 1 with Hint & No Double Score)", calculateSkillIndex(1, 6, true, winWithHint, '2026-05-18', hintRecord), 1060);
+
+// 6. Existing Hint penalty test (without hintRecord passed, it would still award points - this verifies fallback/backwards compat if needed, but we should always pass it now)
+runTest("New System (Win in 1 with Hint - Legacy call)", calculateSkillIndex(1, 6, true, oldGuesses, '2026-05-18'), 1100);
 // Base: 1000, Hint: -100, Bonus: 5*40=200. Total: 1100.

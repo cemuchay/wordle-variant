@@ -103,7 +103,7 @@ export const useGameEngine = (date: string) => {
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
 
     const handleHint = useCallback(async () => {
-        if (state.guesses.length < 3 || state.isGameOver) return;
+        if (state.guesses.length < 2 || state.isGameOver) return;
         if (state.guesses.length >= (config.maxAttempts - 1) && !state.usedHint) {
             triggerToast("Hint locked on last available guess.");
             return;
