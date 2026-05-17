@@ -62,17 +62,18 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <p className="font-bold text-white mb-1 uppercase tracking-wide">Skill Index</p>
               <div className="text-gray-400 text-sm space-y-2">
                 <p className="leading-relaxed mb-1">
-                  Base score: 1000 for 1st try, 800 for 2nd, etc.
+                  Base score: 1000-0 based on attempts. Discoveries earn bonuses:
                 </p>
 
                 <ul className="grid grid-cols-2 gap-y-1 text-[12px] font-mono uppercase tracking-tighter">
-                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Each Green: +15 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Each Yellow: +2 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-black">●</span>Each Black: -10 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-red-500">●</span> Hints: -100 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Green Discovery: +40 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Yellow Discovery: +25 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-gray-500">●</span>New Black: -5 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-red-500">●</span>Repeated Black: -20 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-red-600">●</span> Hints Used: -100 pts</li>
+                  <li className="flex items-center gap-2"><span className="text-blue-400">●</span> Loss: 0 Base Score</li>
                 </ul>
-                <p className="text-[10px] italic">Maximum precision earns the highest rank.</p>
-
+                <p className="text-[10px] italic">Placements are only scored once per game.</p>
               </div>
             </div>
           </div>
