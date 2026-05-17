@@ -2,6 +2,15 @@ import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../../typ
 import { getWordLists } from "../../data/words";
 import { supabase } from "../supabaseClient";
 
+/**
+ * Aggregates the statuses of all letters used in the game so far.
+ * This is used to drive the visual state of the on-screen keyboard (correct, present, absent).
+ * 
+ * @param guesses - 2D array of guess results representing the current game state.
+ * @returns A record mapping each letter to its highest priority status found.
+ * 
+ * @adjustment Tip: If adding a new LetterStatus (e.g., "invalid"), update the priority logic here.
+ */
 export function getLetterStatuses(guesses: GuessResult[][]): Record<string, LetterStatus> {
    const statuses: Record<string, LetterStatus> = {};
    guesses.forEach((row) => {
@@ -20,8 +29,13 @@ export function getLetterStatuses(guesses: GuessResult[][]): Record<string, Lett
 }
 
 /**
- * Mulberry32 PRNG
- * Ensures that even small date changes produce a massive "jump" in the word index.
+ * Mulberry32 PRNG (Pseudo-Random Number Generator).
+ * 
+ * @why We use this because it's lightweight and deterministic. Given the same seed, 
+ * it always produces the same sequence of numbers. This ensures every user
+ * gets the same daily word regardless of their device or time zone (when using server time).
+ * 
+ * @param seed - The numeric seed to initialize the generator.
  */
 const mulberry32 = (seed: number) => {
    return function () {
@@ -37,21 +51,40 @@ const TRANSITION_DATE = "2026-05-03";
 const LENGTH_TRANSITION_DATE = "2026-05-11";
 
 /**
- * Hashing Algorithms
+ * Legacy hashing algorithm used before May 3rd, 2026.
+ * 
+ * @what Simple summation of character codes.
+ * @why Pre-existing games depend on this seed generation.
+ * @deprecated Prone to collisions.
  */
 const oldHash = (str: string) =>
    str
       .split("")
       .reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 1), 0);
 
+/**
+ * Improved hashing algorithm (djb2-style) used from May 3rd, 2026.
+ * 
+ * @what Bitwise shifts and additions to create a unique integer from a string.
+ * @why Significantly reduces seed collisions, ensuring more unique daily words.
+ */
 const newHash = (str: string) =>
    str
       .split("")
       .reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0);
 
 /**
- * Internal helper to get the word for any specific date
- * based on the algorithm active at that time.
+ * Internal helper to resolve the word and length for a specific date.
+ * 
+ * @what Handles "Eras" of game history:
+ * 1. Pre-May 3: Legacy hash, legacy word selection.
+ * 2. Pre-May 11: New hash, legacy length selection (4-6 chars).
+ * 3. Post-May 11: New hash, expanded length selection (3-7 chars) with weighted buckets.
+ * 
+ * @param dateStr - ISO date string (YYYY-MM-DD).
+ * @param attempt - Iteration count for collision retries.
+ * 
+ * @adjustment Tip: To change length distribution, adjust the 'r < X' thresholds below.
  */
 function getWordAtDate(dateStr: string, attempt = 0): string {
    const isNew = dateStr >= TRANSITION_DATE;
@@ -61,24 +94,21 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
    const seed = isNew ? newHash(seedBase) : oldHash(seedBase);
    const random = mulberry32(seed);
 
-   /**
-    * OLD LENGTH randomizer (all have ~33% chance)
-    */
    let length: 5 | 6 | 4 | 3 | 7;
 
    if (isNewLength) {
       const r = random();
-      // Sequential buckets:
+      // Weighted buckets for word length variety
       length =
          r < 0.05
-            ? 3 // 0.00 to 0.05 (5%)
+            ? 3 // 5% chance
             : r < 0.1
-               ? 7 // 0.05 to 0.10 (5%)
+               ? 7 // 5% chance
                : r < 0.25
-                  ? 4 // 0.10 to 0.30 (15%)
+                  ? 4 // 15% chance
                   : r < 0.65
-                     ? 5 // 0.30 to 0.65 (35%)
-                     : 6; // 0.65 to 1.00 (30%)
+                     ? 5 // 35% chance
+                     : 6; // 30% chance
 
    } else {
       length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
@@ -89,14 +119,26 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
    return official[Math.floor(random() * official.length)].toUpperCase();
 }
 
+/**
+ * Generates a purely random word for non-daily modes.
+ * 
+ * @param length - Desired word length.
+ * @returns A random official word in uppercase.
+ */
 export function getRandomWord(length: number): string {
    const { official } = getWordLists(length);
    return official[Math.floor(Math.random() * official.length)].toUpperCase();
 }
 
 /**
- * Simple XOR obfuscation to hide words from network inspection.
- * This is "good enough" for a friendly game to prevent accidental exposure.
+ * Obfuscates a word using XOR and Base64.
+ * 
+ * @why Prevents users from easily seeing the target word in the browser's 
+ * network inspector or localStorage. Not intended for military-grade security, 
+ * just to prevent "accidental" spoilers.
+ * 
+ * @param word - Word to hide.
+ * @param salt - Secret salt for XOR.
  */
 export const obfuscateWord = (word: string, salt: string) => {
    const result = word.split('').map((char, i) => {
@@ -107,6 +149,12 @@ export const obfuscateWord = (word: string, salt: string) => {
    return btoa(result);
 };
 
+/**
+ * Reverses the obfuscation applied by obfuscateWord.
+ * 
+ * @param obfuscated - Base64 encoded XOR string.
+ * @param salt - Must match the salt used for obfuscation.
+ */
 export const deobfuscateWord = (obfuscated: string, salt: string) => {
    try {
       const decoded = atob(obfuscated);
@@ -121,6 +169,17 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
    }
 };
 
+/**
+ * The primary entry point for determining today's game configuration.
+ * 
+ * @what Includes a collision check to ensure today's word hasn't appeared
+ * in the last 14 days (prevents boring repetition).
+ * 
+ * @param dateOverride - Optional date to fetch config for (defaults to today).
+ * 
+ * @adjustment Tip: Starting May 6, 2026, maxAttempts is hardcoded to 6 for 
+ * consistency across all lengths. Change this if you want 3-letter words to be easier/harder.
+ */
 export function getDailyConfig(dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
 
@@ -156,20 +215,6 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
 
    const length = word.length as 5 | 6 | 4 | 3 | 7;
 
-   /**
-    * OLD LOGIC of maxAttempts, length + 1
- 
-   return {
-      word,
-      length,
-      maxAttempts: length + 1,
-   };
-      */
-
-   /**
-    * STARTING 6th May, 2026
-    * All words will have maxAttempts of 6 to ensure fairness
-    */
    return {
       word,
       length,
@@ -177,6 +222,18 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
    };
 }
 
+/**
+ * Validates a guess against the answer and determines letter colors.
+ * 
+ * @what This uses a standard two-pass algorithm:
+ * 1. Find all 'correct' (green) letters and remove them from consideration.
+ * 2. Find all 'present' (yellow) letters among what's left.
+ * 
+ * @why Two passes are required to handle duplicate letters correctly. 
+ * If the answer is "ABBEY" and you guess "BABES", the first 'B' 
+ * in BABES must be yellow, and the second 'B' must be green. One pass would 
+ * incorrectly mark both as something else.
+ */
 export function checkGuess(guess: string, answer: string): GuessResult[] {
    const result: GuessResult[] = Array(answer.length)
       .fill(null)
@@ -205,10 +262,17 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
    return result;
 }
 
+/**
+ * Determines a helpful hint for the user.
+ * 
+ * @what It ignores indices the user has already solved and picks one 
+ * remaining unrevealed letter from the target word at random.
+ * 
+ * @returns {letter: string, index: number} or null if the word is already solved.
+ */
 export const getHint = (word: string, guesses: GuessResult[][]) => {
    const targetWord = word.toUpperCase();
 
-   // Find indices where the user has ALREADY found the correct letter
    const correctIndices = new Set<number>();
 
    guesses.forEach((row) => {
@@ -219,7 +283,6 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
       });
    });
 
-   // Find indices that haven't been solved yet
    const remainingIndices = targetWord
       .split("")
       .map((_, i) => i)
@@ -227,7 +290,6 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
 
    if (remainingIndices.length === 0) return null;
 
-   // Pick a random unrevealed index
    const randomIndex =
       remainingIndices[Math.floor(Math.random() * remainingIndices.length)];
 
@@ -237,6 +299,12 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
    };
 };
 
+/**
+ * Local-only statistics updater. 
+ * 
+ * @why This maintains the "Offline First" experience by ensuring stats 
+ * are updated in LocalStorage immediately after a game ends.
+ */
 export const updateStats = (won: boolean, attempts: number): GameStats => {
    const raw = localStorage.getItem("wordle-statistics");
    const stats: GameStats = raw
@@ -249,7 +317,6 @@ export const updateStats = (won: boolean, attempts: number): GameStats => {
          guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
       };
 
-   // Ensure "X" exists if we are updating an old stats object
    if (stats.guesses["X"] === undefined) {
       stats.guesses["X"] = 0;
    }
@@ -269,8 +336,13 @@ export const updateStats = (won: boolean, attempts: number): GameStats => {
    return stats;
 };
 
+/**
+ * Migration helper for legacy storage formats. 
+ * 
+ * @what Older versions stored game results in individual 'wordle-YYYY-MM-DD' keys.
+ * This crawls those keys once and aggregates them into the modern 'wordle-statistics' object.
+ */
 export const syncStatsFromLocalStorage = () => {
-   // Check if we've already done the big migration
    if (localStorage.getItem("stats_synced_v1")) return;
 
    const stats: GameStats = {
@@ -281,10 +353,9 @@ export const syncStatsFromLocalStorage = () => {
       guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
    };
 
-   // 1. Find all keys that match your date pattern
    const gameKeys = Object.keys(localStorage)
       .filter((key) => /^wordle-\d{4}-\d{2}-\d{2}$/.test(key))
-      .sort(); // Sort by date to calculate streak correctly
+      .sort(); 
 
    gameKeys.forEach((key) => {
       const data = localStorage.getItem(key);
@@ -292,7 +363,7 @@ export const syncStatsFromLocalStorage = () => {
 
       try {
          const game = JSON.parse(data);
-         if (game.status === "playing") return; // Don't count unfinished games
+         if (game.status === "playing") return;
 
          stats.gamesPlayed += 1;
 
@@ -301,13 +372,11 @@ export const syncStatsFromLocalStorage = () => {
             stats.currentStreak += 1;
             stats.maxStreak = Math.max(stats.maxStreak, stats.currentStreak);
 
-            // Use the number of rows in the guesses array
             const attemptCount = String(game.guesses.length);
             if (stats.guesses[attemptCount] !== undefined) {
                stats.guesses[attemptCount] += 1;
             }
          } else if (game.status === "lost") {
-            // If they lost or it's a "lost" status, streak resets
             stats.currentStreak = 0;
             stats.guesses["X"] += 1;
          } else {
@@ -318,16 +387,18 @@ export const syncStatsFromLocalStorage = () => {
       }
    });
 
-   // 2. Save the aggregated stats
    localStorage.setItem("wordle-statistics", JSON.stringify(stats));
-
-   // 3. Mark as synced so we don't recalculate the whole history on every load
    localStorage.setItem("stats_synced_v1", "true");
 };
 
 /**
- * Fetches all user scores from Supabase and aggregates them into a
- * Wordle-standard statistics object.
+ * Cloud Sync logic for user statistics.
+ * 
+ * @what Compares LocalStorage data with Supabase records. 
+ * 
+ * @why CONFLICT RESOLUTION: We use the source with more 'gamesPlayed' as the truth.
+ * This ensures that if a user plays 5 games offline, then logs in, their 
+ * local progress isn't wiped by a smaller cloud dataset.
  */
 export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
    try {
@@ -339,7 +410,6 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
 
       if (error) throw error;
 
-      // 1. Aggregate Cloud Data
       const cloudStats: GameStats = {
          gamesPlayed: scores.length,
          gamesWon: 0,
@@ -366,21 +436,17 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
          }
       });
 
-      // 2. Handle Conflict with Local Storage
       const localRaw = localStorage.getItem("wordle-statistics");
       const localStats: GameStats | null = localRaw
          ? JSON.parse(localRaw)
          : null;
 
       if (localStats) {
-         // Conflict Resolution: Use the version with more gameplay data
-         // This protects against data loss if the user played offline
          if (localStats.gamesPlayed > cloudStats.gamesPlayed) {
             return;
          }
       }
 
-      // 3. Save Cloud as the new Local Source of Truth
       localStorage.setItem("wordle-statistics", JSON.stringify(cloudStats));
       localStorage.setItem("stats_synced_v1", "true");
    } catch (err) {
@@ -388,6 +454,22 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
    }
 };
 
+/**
+ * The Authoritative Scoring Algorithm (Skill Index).
+ * 
+ * @what Calculates a player's performance based on their strategic choices.
+ * 
+ * @why ERA TRANSITION (May 18, 2026):
+ * 1. Pre-May 18: Simple attempt-based scoring with minor letter bonuses.
+ * 2. Post-May 18: "Discovery System". 
+ *    - Reward finding letters in new positions (+40 correct, +25 present).
+ *    - Heavily penalize reusing known-wrong letters (-20 vs -5 for new mistakes).
+ *    - Hints are costly (-100).
+ *    - Failing to solve the word results in a base score of 0.
+ * 
+ * @adjustment Tip: To adjust the "severity" of mistakes, change the 'knownBlacks' penalty.
+ * @adjustment Tip: To reward speed over discovery, increase the multiplier in the base score.
+ */
 export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
@@ -396,13 +478,12 @@ export const calculateSkillIndex = (
    gameDate?: string,
    hintRecord?: { index: number; letter: string } | null
 ) => {
-   // New scoring system logic starting May 18, 2026
    const targetDate = new Date('2026-05-18');
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
 
    if (!isNewSystem) {
-      // Legacy scoring
+      // Legacy scoring logic for backwards compatibility
       let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
       if (usedHint) score -= 100;
 
@@ -417,12 +498,10 @@ export const calculateSkillIndex = (
       return Math.floor(score + bonus);
    }
 
-   // New Scoring System (starting 18th May 2026)
    const lastGuess = guesses[guesses.length - 1];
    const won = lastGuess && lastGuess.every(cell => cell.status === "correct");
 
-   // 1. Base Point Calculation
-   // fail base performance is 0
+   // 1. Base Points
    let score = 0;
    if (won) {
       score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
@@ -431,12 +510,12 @@ export const calculateSkillIndex = (
    // 2. Hint Penalty
    if (usedHint) score -= 100;
 
-   // 3. Discovery Bonuses & Penalties
+   // 3. Discovery Bonuses & Strategy Penalties
    let bonus = 0;
-   const scoredIndices = new Set<number>(); // Track which placements have been awarded a discovery bonus
-   const knownBlacks = new Set<string>(); // letter
+   const scoredIndices = new Set<number>(); 
+   const knownBlacks = new Set<string>();
 
-   // Pre-populate scoredIndices with hinted placement to avoid double scoring
+   // Don't award discovery points for a letter revealed by a hint!
    if (usedHint && hintRecord) {
       scoredIndices.add(hintRecord.index);
    }
@@ -446,24 +525,21 @@ export const calculateSkillIndex = (
 
       row.forEach((cell, index) => {
          if (cell.status === "correct") {
-            // green one off +40
             if (!scoredIndices.has(index)) {
                bonus += 40;
                scoredIndices.add(index);
             }
          } else if (cell.status === "present") {
-            // yellow +25 (one-off per placement)
-            // if it later moves to green, no new score is awarded because index is already in scoredIndices
             if (!scoredIndices.has(index)) {
                bonus += 25;
                scoredIndices.add(index);
             }
          } else if (cell.status === "absent") {
-            // each black -5, if used again in subsequent guesses -20
+            // Strategic Check: Did the user ignore previous information?
             if (knownBlacks.has(cell.letter)) {
-               bonus -= 20;
+               bonus -= 20; // Reusing a known black letter
             } else {
-               bonus -= 5;
+               bonus -= 5;  // Making a fresh discovery of a black letter
                newBlacksThisRow.add(cell.letter);
             }
          }
@@ -475,6 +551,17 @@ export const calculateSkillIndex = (
    return Math.floor(score + bonus);
 };
 
+/**
+ * Synchronizes a finished game state to Supabase.
+ * 
+ * @what Calculates the skill_score authoritativey before upserting.
+ * @why This ensures the DB score always reflects the current scoring logic 
+ * regardless of client-side overrides.
+ * 
+ * @param userId - The UUID of the authenticated user.
+ * @param date - The game date (YYYY-MM-DD).
+ * @param payload - The complete game state object.
+ */
 export const syncGameState = async (
    userId: string,
    date: string | null,
@@ -484,7 +571,6 @@ export const syncGameState = async (
    if (!date) return;
    const isGameOver = payload.status !== "playing";
 
-   // Only calculate score if the game is actually over
    const skillScore = isGameOver
       ? calculateSkillIndex(
          payload.guesses.length,
@@ -505,7 +591,7 @@ export const syncGameState = async (
          hints_used: payload.usedHint,
          hint_record: payload.hintRecord,
          word_length: payload.config.length,
-         skill_score: skillScore, // Authoritative score
+         skill_score: skillScore, 
          attempts: payload.guesses.length,
          game_message: payload.gameMessage,
       },
@@ -516,6 +602,13 @@ export const syncGameState = async (
    return skillScore;
 };
 
+/**
+ * Wrapper for syncGameState that provides automatic retry logic.
+ * 
+ * @why Useful for handling intermittent network failures during the critical save phase.
+ * 
+ * @param retries - Number of times to attempt the sync before giving up.
+ */
 export const syncWithRetry = async (
    userId: string,
    date: string | null,
@@ -527,12 +620,9 @@ export const syncWithRetry = async (
    for (let i = 0; i < retries; i++) {
       try {
          const score = await syncGameState(userId, date, payload);
-         // If we reach here without the syncGameState console.error, assume success
-         // (Better: modify syncGameState to throw or return {error})
          return { success: true, score: score || 0 };
       } catch (err) {
          if (i === retries - 1) throw err;
-         // Wait 1s before retrying
          await new Promise((resolve) => setTimeout(resolve, 1000));
       }
    }

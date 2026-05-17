@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
@@ -9,10 +9,27 @@ import { useWordleStats } from './useStats';
 
 export const useGameEngine = (date: string) => {
     const [state, dispatch] = useReducer(gameReducer, initialState);
+    const [isHydrated, setIsHydrated] = useState(false);
     const { user } = useAuth();
     const { triggerToast, preferences } = useApp();
     const config = useMemo(() => getDailyConfig(date), [date]);
     const { refresh, updateOptimistically } = useWordleStats(user, false, date);
+
+    // Hydration logic: Load saved game for this date
+    useEffect(() => {
+        if (!date) return;
+        const saved = localStorage.getItem(`wordle-${date}`);
+        if (saved) {
+            try {
+                const payload = JSON.parse(saved);
+                dispatch({ type: 'LOAD_STATE', payload });
+            } catch (e) {
+                console.error("Failed to hydrate game state:", e);
+            }
+        }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsHydrated(true);
+    }, [date]);
 
     const onChar = useCallback((char: string) => {
         dispatch({ type: 'ADD_LETTER', char, maxLength: config.length });
@@ -166,6 +183,7 @@ export const useGameEngine = (date: string) => {
             setGameOverModalOpen,
             loadState
         },
-        config
+        config,
+        isHydrated
     };
 };

@@ -9,7 +9,6 @@ import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { useApp } from './context/AppContext';
-import { useAppInit } from './hooks/useAppInit';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
@@ -37,7 +36,7 @@ export default function App() {
     } = useApp();
 
     // Core Game Engine
-    const { state, actions, config } = useGameEngine(date as string);
+    const { state, actions, config, isHydrated } = useGameEngine(date as string);
 
     const { fetchMyChallenges } = useChallenge(user as AppUser);
 
@@ -65,18 +64,15 @@ export default function App() {
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
-    // Initialization & Hydration
-    const { isInitializing } = useAppInit(date as string, actions.loadState);
-
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || isInitializing);
+    useKeyboard(actions, isChatOpen || !isHydrated);
 
 
     const handleChallengeCreated = () => {
         triggerToast(`Challenge created successfully`, 3000)
     }
 
-    if (isLoadingDate || isInitializing) {
+    if (isLoadingDate || !isHydrated) {
         return (
             <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
                 loading game ...
