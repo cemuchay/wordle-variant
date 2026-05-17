@@ -13,7 +13,7 @@ import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
-import { type AppUser } from './types/game';
+import { type AppUser, type Challenge } from './types/game';
 import { useMyChallenges } from './hooks/queries/useChallengeQueries';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
@@ -43,8 +43,8 @@ export default function App() {
 
     useEffect(() => {
         if (myChallenges) {
-            const count = myChallenges.filter((c: any) => 
-                (c.status === 'pending' || c.status === 'playing') && 
+            const count = myChallenges.filter((c: Challenge) =>
+                (c.status === 'pending' || c.status === 'playing') &&
                 new Date(c.challenge.expires_at) > new Date()
             ).length;
             setChallengeUnreadCount(count);

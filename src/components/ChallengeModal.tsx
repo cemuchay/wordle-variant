@@ -186,7 +186,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                                             exit={{ height: 0, opacity: 0 }}
                                                             className="overflow-hidden space-y-4 pt-1"
                                                         >
-                                                            <div className="space-y-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5 relative">
+                                                            <div className="space-y-4 bg-white/2 p-4 rounded-2xl border border-white/5 relative">
                                                                 <button
                                                                     onClick={clearFilters}
                                                                     className="absolute top-4 right-4 text-[9px] font-black uppercase text-correct hover:text-white transition-colors"
