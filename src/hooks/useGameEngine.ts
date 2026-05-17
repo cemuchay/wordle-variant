@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useReducer, useCallback, useMemo } from 'react';
 import { gameReducer, initialState } from '../reducers/gameReducer';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/gameLogic';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
 import { getWordLists } from '../data/words';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { useApp } from '../context/AppContext';
@@ -88,7 +88,7 @@ export const useGameEngine = (date: string) => {
 
             // Calculate delay: wordLength * 150ms + 600ms (last tile flip) + padding
             const revealDelay = (config.length - 1) * 150 + 600 + 500;
-            
+
             setTimeout(() => {
                 dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen: true });
                 triggerToast(message || state.gameMessage, 8500);

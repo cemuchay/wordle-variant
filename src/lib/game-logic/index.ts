@@ -1,6 +1,6 @@
-import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../types/game";
-import { getWordLists } from "../data/words";
-import { supabase } from "./supabaseClient";
+import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../../types/game";
+import { getWordLists } from "../../data/words";
+import { supabase } from "../supabaseClient";
 
 export function getLetterStatuses(guesses: GuessResult[][]): Record<string, LetterStatus> {
    const statuses: Record<string, LetterStatus> = {};
@@ -73,12 +73,12 @@ function getWordAtDate(dateStr: string, attempt = 0): string {
          r < 0.05
             ? 3 // 0.00 to 0.05 (5%)
             : r < 0.1
-            ? 7 // 0.05 to 0.10 (5%)
-            : r < 0.25
-            ? 4 // 0.10 to 0.30 (15%)
-            : r < 0.65
-            ? 5 // 0.30 to 0.65 (35%)
-            : 6; // 0.65 to 1.00 (30%)
+               ? 7 // 0.05 to 0.10 (5%)
+               : r < 0.25
+                  ? 4 // 0.10 to 0.30 (15%)
+                  : r < 0.65
+                     ? 5 // 0.30 to 0.65 (35%)
+                     : 6; // 0.65 to 1.00 (30%)
 
    } else {
       length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
@@ -242,12 +242,12 @@ export const updateStats = (won: boolean, attempts: number): GameStats => {
    const stats: GameStats = raw
       ? JSON.parse(raw)
       : {
-           gamesPlayed: 0,
-           gamesWon: 0,
-           currentStreak: 0,
-           maxStreak: 0,
-           guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
-        };
+         gamesPlayed: 0,
+         gamesWon: 0,
+         currentStreak: 0,
+         maxStreak: 0,
+         guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "X": 0 },
+      };
 
    // Ensure "X" exists if we are updating an old stats object
    if (stats.guesses["X"] === undefined) {
@@ -426,11 +426,11 @@ export const syncGameState = async (
    // Only calculate score if the game is actually over
    const skillScore = isGameOver
       ? calculateSkillIndex(
-           payload.guesses.length,
-           payload.config.maxAttempts,
-           payload.usedHint,
-           payload.guesses
-        )
+         payload.guesses.length,
+         payload.config.maxAttempts,
+         payload.usedHint,
+         payload.guesses
+      )
       : 0;
 
    const { error } = await supabase.from("scores").upsert(

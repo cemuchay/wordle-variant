@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 
+const formatTime = (seconds: number | null) => {
+    if (seconds === null || seconds === undefined) return null;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+};
+
 const GuessPreviewModal: React.FC<{
     entry: any; // More flexible for challenge participants
     onClose: () => void;
@@ -12,6 +19,7 @@ const GuessPreviewModal: React.FC<{
         hints_used?: boolean;
         skill_score?: number;
         hint_record?: any | null;
+        time_taken?: number | null;
     }
 }> = ({ entry, onClose, initialData }) => {
     const [gameData, setGameData] = useState<{
@@ -19,11 +27,13 @@ const GuessPreviewModal: React.FC<{
         hints_used: boolean;
         skill_score: number;
         hint_record: { letter: string; index: number; row?: number } | null;
+        time_taken?: number | null;
     } | null>(initialData ? {
         guesses: initialData.guesses,
         hints_used: initialData.hints_used || false,
         skill_score: initialData.skill_score || 0,
-        hint_record: initialData.hint_record || null
+        hint_record: initialData.hint_record || null,
+        time_taken: initialData.time_taken
     } : null);
     const [loading, setLoading] = useState(!initialData);
     const { date } = useApp();
@@ -35,7 +45,8 @@ const GuessPreviewModal: React.FC<{
                 guesses: initialData.guesses,
                 hints_used: initialData.hints_used || false,
                 skill_score: initialData.skill_score || 0,
-                hint_record: initialData.hint_record || null
+                hint_record: initialData.hint_record || null,
+                time_taken: initialData.time_taken
             });
             return;
         }
@@ -56,7 +67,7 @@ const GuessPreviewModal: React.FC<{
 
         fetchGuesses();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [date, entry.user_id, initialData?.guesses, initialData?.hints_used, initialData?.skill_score, initialData?.hint_record]);
+    }, [date, entry.user_id, initialData?.guesses, initialData?.hints_used, initialData?.skill_score, initialData?.hint_record, initialData?.time_taken]);
 
     const calculateRowScore = (row: any[]) => {
         return row.reduce((acc, cell) => {
@@ -122,6 +133,13 @@ const GuessPreviewModal: React.FC<{
                                     {totalRowBonuses > 0 ? `+${totalRowBonuses}` : totalRowBonuses}
                                 </span>
                             </div>
+
+                            {gameData?.time_taken && (
+                                <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+                                    <span>Time Taken:</span>
+                                    <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
+                                </div>
+                            )}
 
                             {/* Hint Info */}
                             {gameData?.hint_record && (
