@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useCallback } from 'react';
 import { RegularGameplay } from './RegularGameplay';
-import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
 
 interface MarathonGameplayProps {
@@ -16,7 +15,6 @@ interface MarathonGameplayProps {
 export const MarathonGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: MarathonGameplayProps) => {
-    const { setTimeLeft } = useChallengeContext();
     const [selectedLength, setSelectedLength] = useState<number | null>(null);
 
     const onBack = useCallback(() => setSelectedLength(null), []);
@@ -31,7 +29,6 @@ export const MarathonGameplay = memo(({
                 onFinish={onFinish}
                 selectedLength={selectedLength}
                 onBack={onBack}
-                setTimeLeftGlobal={setTimeLeft}
             />
         );
     }

@@ -7,6 +7,8 @@ import { ChallengeProvider, useChallengeContext } from '../context/ChallengeCont
 import GuessPreviewModal from './GuessPreviewModal';
 import { AudioChatControls } from './challenge/AudioChatControls';
 
+import { useChallengeStore } from '../store/useChallengeStore';
+
 // Sub-components
 import { ChallengeCreate } from './challenge/ChallengeCreate';
 import { ChallengeLobby } from './challenge/ChallengeLobby';
@@ -21,7 +23,103 @@ interface ChallengeModalProps {
     initialChallengeId?: string | null;
 }
 
-const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
+const GameplayTimer = memo(() => {
+    const timeLeft = useChallengeStore(s => s.timeLeft);
+    if (timeLeft === null) return null;
+    return (
+        <div className="flex items-center gap-2 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
+            <span className="text-[10px] font-black text-red-500 tabular-nums">
+                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+            </span>
+        </div>
+    );
+});
+
+const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
+    return (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+            <div className="flex flex-col h-full w-full overflow-hidden bg-background">
+                <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-correct/20 p-2 rounded-xl">
+                            <Trophy className="text-correct w-6 h-6" />
+                        </div>
+                        <h2 className="text-xl font-black uppercase tracking-tighter">
+                            Challenges
+                        </h2>
+                    </div>
+
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6 overflow-y-auto">
+                    <div className="bg-correct/10 p-6 rounded-3xl border border-correct/20">
+                        <Trophy className="w-12 h-12 text-correct mx-auto" />
+                    </div>
+
+                    <div className="space-y-2 max-w-xs">
+                        <h3 className="text-xl font-black uppercase tracking-tighter">
+                            Authentication Required
+                        </h3>
+
+                        <p className="text-gray-400 text-xs leading-relaxed">
+                            Sign in to challenge friends, track your global ranking,
+                            and sync your progress across all your devices.
+                        </p>
+                    </div>
+
+                    <div className="w-full max-w-sm space-y-3">
+                        <button
+                            onClick={() => {
+                                onClose();
+                                window.dispatchEvent(
+                                    new CustomEvent('open-auth-modal')
+                                );
+                            }}
+                            className="w-full bg-correct text-black font-black uppercase py-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-correct/20"
+                        >
+                            Sign In to Play
+                        </button>
+
+                        <button
+                            onClick={onClose}
+                            className="w-full bg-white/5 text-gray-400 font-black uppercase py-4 rounded-2xl hover:bg-white/10 transition-all"
+                        >
+                            Maybe Later
+                        </button>
+                    </div>
+
+                    <div className="pt-4 grid grid-cols-2 gap-4 w-full max-w-sm">
+                        <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <p className="text-[10px] font-black uppercase text-correct">
+                                Social
+                            </p>
+                            <p className="text-[9px] text-gray-500">
+                                Play with friends
+                            </p>
+                        </div>
+
+                        <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <p className="text-[10px] font-black uppercase text-correct">
+                                Global
+                            </p>
+                            <p className="text-[9px] text-gray-500">
+                                Ranked Matchmaking
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
     const [showFilters, setShowFilters] = useState(false);
     const {
         activeTab, setActiveTab,
@@ -41,7 +139,6 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
         clearFilters,
         previewParticipant, setPreviewParticipant,
         unplayedCount,
-        timeLeft,
         backAction
     } = useChallengeContext();
 
@@ -52,7 +149,6 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            {/* Header - Now inside context to access game state */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="bg-correct/20 p-2 rounded-xl">
@@ -62,7 +158,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                         <h2 className="text-xl font-black uppercase tracking-tighter">
                             Challenges
                         </h2>
-                        <div className="flex items-center gap-2 min-h-[1.25rem]">
+                        <div className="flex items-center gap-2 min-h-5">
                             {isPlaying ? (
                                 <>
                                     <button
@@ -71,13 +167,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                     >
                                         <ArrowLeft size={16} />
                                     </button>
-                                    {timeLeft !== null && (
-                                        <div className="flex items-center gap-2 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
-                                            <span className="text-[10px] font-black text-red-500 tabular-nums">
-                                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <GameplayTimer />
                                     {selectedChallenge && myParticipation && (
                                         <AudioChatControls
                                             challengeId={selectedChallenge.id}
@@ -179,7 +269,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                                             exit={{ height: 0, opacity: 0 }}
                                                             className="overflow-hidden space-y-4 pt-1"
                                                         >
-                                                            <div className="space-y-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5 relative">
+                                                            <div className="space-y-4 bg-white/2 p-4 rounded-2xl border border-white/5 relative">
                                                                 <button
                                                                     onClick={clearFilters}
                                                                     className="absolute top-4 right-4 text-[9px] font-black uppercase text-correct hover:text-white transition-colors"
@@ -287,8 +377,19 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
     );
 });
 
+const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
+    if (!user) {
+        return <GuestChallengeView onClose={onClose} />;
+    }
+    return <AuthenticatedChallengeContent onClose={onClose} user={user} />;
+});
+
 export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
     if (!isOpen) return null;
+
+    if (!user) {
+        return <GuestChallengeView onClose={onClose} />;
+    }
 
     return (
         <ChallengeProvider user={user} onChallengeCreated={onChallengeCreated} initialChallengeId={initialChallengeId}>

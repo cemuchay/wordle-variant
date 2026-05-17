@@ -14,11 +14,10 @@ interface RegularGameplayProps {
     onFinish: () => void;
     selectedLength?: number; // Optional override for Marathon mode
     onBack?: () => void; // Optional back handler
-    setTimeLeftGlobal?: (t: number | null) => void;
 }
 
 export const RegularGameplay = memo(({
-    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack, setTimeLeftGlobal
+    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack
 }: RegularGameplayProps) => {
     const { setBackAction } = useChallengeContext();
 
@@ -39,8 +38,7 @@ export const RegularGameplay = memo(({
         submitChallengeResult,
         onFinish,
         selectedLength,
-        onLengthComplete: onBack,
-        setTimeLeftGlobal
+        onLengthComplete: onBack
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
@@ -99,6 +97,7 @@ export const RegularGameplay = memo(({
                         hintRecord={hintRecord}
                         isChallengeMode={true}
                         isShake={isShake}
+                        isSaving={isSaving}
                     />
                 </div>
             </div>

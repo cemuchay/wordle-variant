@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import type { GuessResult } from '../types/game';
 
 interface GridProps {
@@ -9,10 +9,25 @@ interface GridProps {
   hintRecord?: { letter: string, index: number } | null;
   isChallengeMode?: boolean;
   isShake?: boolean;
+  isSaving?: boolean;
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake }) => {
-  const empties = Math.max(0, maxAttempts - guesses.length - 1);
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving }) => {
+  const [revealingRowIndex, setRevealingRowIndex] = useState<number | null>(null);
+  const prevGuessesLength = useRef(guesses.length);
+
+  useEffect(() => {
+    if (guesses.length > prevGuessesLength.current) {
+      setRevealingRowIndex(guesses.length - 1);
+      const timer = setTimeout(() => {
+        setRevealingRowIndex(null);
+      }, wordLength * 150 + 400); // Wait for reveal animation to finish
+      return () => clearTimeout(timer);
+    }
+    prevGuessesLength.current = guesses.length;
+  }, [guesses.length, wordLength]);
+
+  const empties = Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
 
   // Responsive Tile Size logic
   const tileClass = `
@@ -54,10 +69,10 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
         ));
       })}
 
-      {/* Current Guess Row */}
-      {guesses.length < maxAttempts && (
+      {/* Current Guess Row - Only show if not currently revealing a submission */}
+      {guesses.length < maxAttempts && revealingRowIndex === null && (
         Array.from({ length: wordLength }).map((_, i) => {
-          const isHinted = hintRecord?.index === i;
+          const isHinted = !isSaving && hintRecord?.index === i;
           const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
           return (
@@ -77,7 +92,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       {Array.from({ length: empties }).map((_, i) => (
         <React.Fragment key={`empty-row-${i}`}>
           {Array.from({ length: wordLength }).map((_, j) => {
-            const isHinted = hintRecord?.index === j;
+            const isHinted = !isSaving && hintRecord?.index === j;
             return (
               <div
                 key={`empty-${i}-${j}`}

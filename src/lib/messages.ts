@@ -1,3 +1,13 @@
+/**
+ * Resolves a randomly selected winning message based on the number of attempts.
+ * 
+ * @what Provides flavor text to congratulate (or roast) the player.
+ * @why Higher attempts (5, 6) trigger more "miracle" or "barely passed" messages, 
+ * while low attempts (1, 2) trigger "cheater" or "luck" messages.
+ * 
+ * @param attempts - How many guesses were used (1-7).
+ * @returns A randomly selected string from the appropriate pool.
+ */
 export const getWinMessage = (attempts: number): string => {
    const variations: Record<number, string[]> = {
       1: [
@@ -79,6 +89,9 @@ export const getWinMessage = (attempts: number): string => {
    return pool[Math.floor(Math.random() * pool.length)];
 };
 
+/**
+ * Message pool for winning on the very last attempt.
+ */
 const lastGuess = [
    "Yikes. 6/6 isn't a win, it's a miracle",
    "That was painful to witness.",
@@ -101,6 +114,13 @@ const lastGuess = [
    "6/6. A win with heavy apologies attached.",
 ];
 
+/**
+ * Resolves a randomly selected loss message.
+ * 
+ * @what Provides discouraging (but funny) text when the game is lost.
+ * 
+ * @returns A randomly selected string from the loss pool.
+ */
 export const getLossMessage = (): string => {
    const losses = [
       `Ouch. The word was easy sha.`,

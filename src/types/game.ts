@@ -41,3 +41,8 @@ export interface LeaderboardEntry {
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+
+export interface Challenge {
+   status: string;
+   challenge: { expires_at: Date };
+}

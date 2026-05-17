@@ -11,6 +11,7 @@ interface GameAreaProps {
     hintRecord: { letter: string; index: number; row?: number } | null;
     isGameOver: boolean;
     isShake?: boolean;
+    isSaving?: boolean;
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
@@ -25,6 +26,7 @@ export const GameArea = ({
     hintRecord,
     isGameOver,
     isShake,
+    isSaving,
     onChar,
     onDelete,
     onEnter
@@ -46,6 +48,7 @@ export const GameArea = ({
                     currentGuess={currentGuess}
                     hintRecord={hintRecord}
                     isShake={isShake}
+                    isSaving={isSaving}
                 />
             </div>
 

@@ -9,13 +9,12 @@ import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { useApp } from './context/AppContext';
-import { useAppInit } from './hooks/useAppInit';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
-import { type AppUser } from './types/game';
-import { useChallenge } from './hooks/useChallenge';
+import { type AppUser, type Challenge } from './types/game';
+import { useMyChallenges } from './hooks/queries/useChallengeQueries';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
 
@@ -37,25 +36,20 @@ export default function App() {
     } = useApp();
 
     // Core Game Engine
-    const { state, actions, config } = useGameEngine(date as string);
+    const { state, actions, config, isHydrated } = useGameEngine(date as string);
 
-    const { fetchMyChallenges } = useChallenge(user as AppUser);
+    // Initial Challenges Fetch using TanStack Query
+    const { data: myChallenges } = useMyChallenges(user?.id);
 
-    // Initial Challenges Fetch
     useEffect(() => {
-        if (user) {
-            fetchMyChallenges().then(data => {
-
-                const count = data.filter((c: {
-                    status: string,
-                    challenge: {
-                        expires_at: string
-                    }
-                }) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
-                setChallengeUnreadCount(count);
-            });
+        if (myChallenges) {
+            const count = myChallenges.filter((c: Challenge) =>
+                (c.status === 'pending' || c.status === 'playing') &&
+                new Date(c.challenge.expires_at) > new Date()
+            ).length;
+            setChallengeUnreadCount(count);
         }
-    }, [user, fetchMyChallenges, setChallengeUnreadCount]);
+    }, [myChallenges, setChallengeUnreadCount]);
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -65,18 +59,15 @@ export default function App() {
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
-    // Initialization & Hydration
-    const { isInitializing } = useAppInit(date as string, actions.loadState);
-
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || isInitializing);
+    useKeyboard(actions, isChatOpen || !isHydrated);
 
 
     const handleChallengeCreated = () => {
         triggerToast(`Challenge created successfully`, 3000)
     }
 
-    if (isLoadingDate || isInitializing) {
+    if (isLoadingDate || !isHydrated) {
         return (
             <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
                 loading game ...

@@ -1,9 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode, useRef } from 'react';
+import { createContext, useContext, useEffect, useCallback, useMemo, type ReactNode, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { useApp } from './AppContext';
 import { deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
+import { useChallengeStore } from '../store/useChallengeStore';
+import { useMyChallenges, useAvailableProfiles, useChallengeMutations } from '../hooks/queries/useChallengeQueries';
+import { useShallow } from 'zustand/react/shallow';
 
 interface ChallengeContextType {
     // UI State
@@ -36,7 +40,7 @@ interface ChallengeContextType {
     setStatusFilter: (f: 'ALL' | 'ACTIVE' | 'COMPLETED') => void;
     modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
-    lengthFilter: 'ALL' | number; // number 3-7 or 1 for marathon
+    lengthFilter: 'ALL' | number;
     setLengthFilter: (l: 'ALL' | number) => void;
     clearFilters: () => void;
     filteredChallenges: any[];
@@ -55,14 +59,9 @@ interface ChallengeContextType {
     error: string | null;
     joinId: string;
     setJoinId: (id: string) => void;
-    submitChallengeResult: any;
-    submitMarathonResult: any;
-    startChallenge: any;
     previewParticipant: ChallengeParticipant | null;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     unplayedCount: number;
-    timeLeft: number | null;
-    setTimeLeft: (t: number | null) => void;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
 }
@@ -76,67 +75,39 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     initialChallengeId?: string | null
 }) => {
     const { triggerToast, setChallengeUnreadCount } = useApp();
-    const challengeApi = useChallenge(user);
+    const queryClient = useQueryClient();
+
+    // Select stable properties and exclude timeLeft to avoid frequent re-renders
+    const store = useChallengeStore(useShallow(state => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { timeLeft, ...rest } = state;
+        return rest;
+    }));
+
+    // 1. Server Data (TanStack Query)
+    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(user?.id);
+    const { data: profilesData } = useAvailableProfiles(user?.id);
     const {
-        createChallenge, fetchChallenge, joinChallenge, subscribeToParticipants,
-        participants, fetchMyChallenges, fetchProfiles, loading, error,
-        startChallenge, submitChallengeResult, submitMarathonResult
-    } = challengeApi;
+        createChallenge: createMutation,
+        submitResult: submitMutation,
+        joinChallenge: joinMutation,
+        startChallenge: startMutation,
+        submitMarathonResult: marathonMutation
+    } = useChallengeMutations();
 
-    // UI & Navigation
-    const [activeTab, setActiveTab] = useState<'my' | 'create' | 'join'>('my');
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [joinId, setJoinId] = useState('');
-    const [previewParticipant, setPreviewParticipant] = useState<ChallengeParticipant | null>(null);
-
-    // Form State
-    const [mode, setMode] = useState<'LIVE' | 'ANYTIME'>('ANYTIME');
-    const [length, setLength] = useState(5);
-    const [maxTime, setMaxTime] = useState<number | null>(null);
-
-    // Selection State
-    const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
-    const [myParticipation, setMyParticipation] = useState<ChallengeParticipant | null>(null);
-    const latestParticipationRef = useRef<ChallengeParticipant | null>(null);
-
-    // Keep ref in sync with state
-    useEffect(() => {
-        latestParticipationRef.current = myParticipation;
-    }, [myParticipation]);
-
-    const [myChallenges, setMyChallenges] = useState<any[]>([]);
-    const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
-    const [invitedIds, setInvitedIds] = useState<string[]>([]);
-
-    // Search & Filter State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
-    const [modeFilter, setModeFilter] = useState<'ALL' | 'LIVE' | 'ANYTIME'>('ALL');
-    const [lengthFilter, setLengthFilter] = useState<'ALL' | number>('ALL');
-
-    const clearFilters = useCallback(() => {
-        setSearchQuery('');
-        setStatusFilter('ALL');
-        setModeFilter('ALL');
-        setLengthFilter('ALL');
-    }, []);
-
-    const [timeLeft, setTimeLeft] = useState<number | null>(null);
-    const [backAction, setBackAction] = useState<(() => void) | null>(null);
+    // 2. Legacy Hook (Keep for real-time logic only)
+    const challengeApi = useChallenge(user);
+    const { subscribeToParticipants, participants } = challengeApi;
 
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
 
-    // Adjust maxTime defaults based on mode
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (mode === 'LIVE') setMaxTime(5);
-        else setMaxTime(null);
-    }, [mode]);
+    // 3. Computed State
+    const myChallenges = useMemo(() => myChallengesData || [], [myChallengesData]);
+    const availableProfiles = useMemo(() => profilesData || [], [profilesData]);
 
-    // Sync status with AppContext unread count
     const unplayedCount = useMemo(() =>
-        myChallenges.filter(c => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length,
+        myChallenges.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length,
         [myChallenges]
     );
 
@@ -144,48 +115,163 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setChallengeUnreadCount(unplayedCount);
     }, [unplayedCount, setChallengeUnreadCount]);
 
-    // Derived State: Filtered Challenges
     const filteredChallenges = useMemo(() => {
-        return myChallenges.filter(item => {
+        return myChallenges.filter((item: any) => {
             const challenge = item.challenge;
             const isExpired = new Date(challenge.expires_at) < new Date();
             const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
 
-            // Status Filter
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+            if (store.statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
+            if (store.statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+            if (store.modeFilter !== 'ALL' && challenge.mode !== store.modeFilter) return false;
+            if (store.lengthFilter !== 'ALL' && challenge.word_length !== store.lengthFilter) return false;
 
-            // Mode Filter
-            if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
-
-            // Length Filter
-            if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
-
-            // Search Filter
-            if (searchQuery) {
+            if (store.searchQuery) {
                 const opponentNames = challenge.participants
                     ?.filter((p: any) => p.user_id !== user?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
                     .join(' ');
-                if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
+                if (!opponentNames.includes(store.searchQuery.toLowerCase())) return false;
             }
             return true;
         });
-    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, user?.id]);
+    }, [myChallenges, store.statusFilter, store.modeFilter, store.lengthFilter, store.searchQuery, user?.id]);
+
+    // 4. Action Wrappers
+    const cleanupSubscription = useCallback(() => {
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => cleanupSubscription, [cleanupSubscription]);
+
+    const normalizeParticipation = useCallback((p: any, challenge: any) => {
+        if (!p || !challenge) return p;
+        if (challenge.mode !== 'LIVE' || !challenge.max_time || p.status !== 'playing' || !p.started_at) return p;
+
+        const start = new Date(p.started_at).getTime();
+        const now = Date.now();
+        const limitMs = (challenge.max_time * 60 * 1000) + (2 * 60 * 1000); // 2 min buffer
+
+        if (now - start > limitMs) {
+            return { ...p, status: 'timed_out' as const };
+        }
+        return p;
+    }, []);
+
+    const handleViewChallenge = useCallback(async (id: string) => {
+        // Manual fetch using TanStack Query's queryClient to maintain cache and consistency
+        const challenge = await queryClient.fetchQuery({
+            queryKey: ['challenge', id],
+            queryFn: async () => {
+                const { data, error } = await supabase
+                    .from('challenges')
+                    .select(`
+                        *, 
+                        profiles!creator_id(username, avatar_url),
+                        participants:challenge_participants(
+                            *,
+                            profiles(username, avatar_url),
+                            marathon_progress:challenge_participants_marathon(*)
+                        )
+                    `)
+                    .eq('id', id)
+                    .maybeSingle();
+
+                if (error) throw error;
+                if (data) {
+                    const c = data as any;
+                    c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
+                    return c as Challenge;
+                }
+                return null;
+            }
+        });
+
+        if (challenge) {
+            if (new Date(challenge.expires_at) < new Date()) {
+                triggerToast("This challenge has expired.", 4000);
+                return;
+            }
+            cleanupSubscription();
+            store.setSelectedChallenge(challenge);
+
+            const participation = await joinMutation.mutateAsync({ challengeId: challenge.id, userId: user.id });
+            const normalizedPart = normalizeParticipation(participation, challenge);
+
+            store.setMyParticipation(normalizedPart);
+            store.setActiveTab('join');
+            channelRef.current = subscribeToParticipants(challenge.id);
+        } else {
+            triggerToast("Invalid challenge link or code.", 4000);
+        }
+    }, [queryClient, normalizeParticipation, triggerToast, cleanupSubscription, store, joinMutation, user.id, subscribeToParticipants]);
+
+    const handleCreate = useCallback(async () => {
+        const challenge = await createMutation.mutateAsync({
+            creatorId: user.id,
+            mode: store.mode,
+            length: store.length,
+            maxTime: store.mode === 'LIVE' ? store.maxTime : null,
+            invitedIds: store.invitedIds
+        });
+
+        if (challenge) {
+            const invitedUsernames = availableProfiles
+                .filter(p => store.invitedIds.includes(p.id))
+                .map(p => p.username);
+
+            if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, store.invitedIds);
+
+            store.resetForm();
+            handleViewChallenge(challenge.id);
+        }
+    }, [store, user, availableProfiles, createMutation, onChallengeCreated, handleViewChallenge]);
+
+    const handleStartGame = useCallback(async () => {
+        if (!store.selectedChallenge || !store.myParticipation) return;
+
+        const updatedChallenge = { ...store.selectedChallenge };
+
+        if (store.selectedChallenge.word_length === 1) {
+            try {
+                const obfuscatedWords = JSON.parse(store.selectedChallenge.target_word);
+                const plainWords: Record<number, string> = {};
+                Object.entries(obfuscatedWords).forEach(([len, word]) => {
+                    plainWords[Number(len)] = deobfuscateWord(word as string, store.selectedChallenge!.salt);
+                });
+                updatedChallenge.target_word = JSON.stringify(plainWords);
+            } catch (e) {
+                console.error("Failed to parse marathon words", e);
+            }
+        } else {
+            updatedChallenge.target_word = deobfuscateWord(store.selectedChallenge.target_word, store.selectedChallenge.salt);
+        }
+
+        store.setSelectedChallenge(updatedChallenge);
+        if (store.myParticipation.status === 'pending') {
+            await startMutation.mutateAsync(store.myParticipation.id);
+        }
+        store.setIsPlaying(true);
+    }, [store, startMutation]);
 
     const submitResult = useCallback(async (result: any, wordLength?: number) => {
-        if (!myParticipation) return false;
+        if (!store.myParticipation) return false;
 
-        const isMarathon = selectedChallenge?.word_length === 1;
+        const isMarathon = store.selectedChallenge?.word_length === 1;
         let finalUpdateData: any;
 
         if (isMarathon && wordLength) {
-            // 1. Update the sub-game progress in the new table
-            const success = await submitMarathonResult(myParticipation.id, wordLength, result);
+            const success = await marathonMutation.mutateAsync({
+                participationId: store.myParticipation.id,
+                wordLength,
+                result
+            });
             if (!success) return false;
 
-            // 2. Recalculate totals for the main participation record
-            const currentMarathon = myParticipation.marathon_progress || [];
+            const currentMarathon = store.myParticipation.marathon_progress || [];
             const updatedMarathon = [...currentMarathon];
             const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
 
@@ -220,229 +306,78 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 time_taken: totalTimeTaken,
                 status: allCompleted ? 'completed' : 'playing',
                 hints_used: updatedMarathon.some(p => p.hints_used),
-                marathon_progress: updatedMarathon // Optimistic sync
+                marathon_progress: updatedMarathon
             };
         } else {
             finalUpdateData = { ...result };
         }
 
-        // OPTIMISTIC UPDATE: Update local state immediately
-        setMyParticipation(prev => prev ? { ...prev, ...finalUpdateData } : prev);
+        store.setMyParticipation(store.myParticipation ? { ...store.myParticipation, ...finalUpdateData } : null);
+        return await submitMutation.mutateAsync({ participationId: store.myParticipation.id, result: finalUpdateData });
+    }, [store, marathonMutation, submitMutation]);
 
-        // 3. Update the main participation record in DB
-        return await submitChallengeResult(myParticipation.id, finalUpdateData);
-    }, [myParticipation, selectedChallenge?.word_length, submitChallengeResult, submitMarathonResult]);
-
-    // Lifecycle: Load Data
-    const loadMyChallenges = useCallback(async () => {
-        const data = await fetchMyChallenges();
-        setMyChallenges(data);
-    }, [fetchMyChallenges]);
-
-    const cleanupSubscription = useCallback(() => {
-        if (channelRef.current) {
-            supabase.removeChannel(channelRef.current);
-            channelRef.current = null;
-        }
-    }, []);
-
-    useEffect(() => cleanupSubscription, [cleanupSubscription]);
-
-    const loadProfiles = useCallback(async () => {
-        const profiles = await fetchProfiles();
-        setAvailableProfiles(profiles.filter((p: any) => p.id !== user?.id));
-    }, [fetchProfiles, user?.id]);
-    // Action Handlers
-
-    const handleViewChallenge = useCallback(async (id: string) => {
-        const challenge = await fetchChallenge(id);
-        if (challenge) {
-            if (new Date(challenge.expires_at) < new Date()) {
-                triggerToast("This challenge has expired.", 4000);
-                return;
-            }
-            cleanupSubscription();
-            setSelectedChallenge(challenge);
-            const participation = await joinChallenge(challenge.id);
-            setMyParticipation(participation);
-            setActiveTab('join');
-            channelRef.current = subscribeToParticipants(challenge.id);
-        } else {
-            triggerToast("Invalid challenge link or code.", 4000);
-        }
-    }, [cleanupSubscription, triggerToast, fetchChallenge, joinChallenge, subscribeToParticipants]);
-
+    // Initial Load Logic
     useEffect(() => {
         if (initialChallengeId && !initialProcessed.current) {
             initialProcessed.current = true;
             handleViewChallenge(initialChallengeId);
-        } else {
-            loadMyChallenges();
-            loadProfiles();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id]); // Re-load when user changes
+    }, [initialChallengeId, handleViewChallenge]);
 
-    const normalizeParticipation = useCallback((p: any, challenge: any) => {
-        if (!p || !challenge) return p;
-        if (challenge.mode !== 'LIVE' || !challenge.max_time || p.status !== 'playing' || !p.started_at) return p;
-
-        const start = new Date(p.started_at).getTime();
-        const now = Date.now();
-        const limitMs = (challenge.max_time * 60 * 1000) + (2 * 60 * 1000); // 2 min buffer
-
-        if (now - start > limitMs) {
-            return { ...p, status: 'timed_out' as const };
-        }
-        return p;
-    }, []);
-
-    // Sync myParticipation and previewParticipant from the participants array (real-time updates)
-    useEffect(() => {
-        if (participants.length > 0 && user) {
-            const currentFromServer = participants.find(p => p.user_id === user.id);
-            const isMarathon = selectedChallenge?.word_length === 1;
-
-            if (currentFromServer) {
-                const normalized = normalizeParticipation(currentFromServer, selectedChallenge);
-
-                // Determine if server data is different from local state
-                const isDifferent =
-                    JSON.stringify(normalized.guesses) !== JSON.stringify(myParticipation?.guesses) ||
-                    JSON.stringify(normalized.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
-                    normalized.status !== myParticipation?.status ||
-                    normalized.score !== myParticipation?.score;
-
-                if (!isPlaying || isDifferent) {
-                    // If we are playing, we only sync if the server has MORE progress
-                    if (isPlaying) {
-                        // eslint-disable-next-line no-useless-assignment
-                        let shouldSync = false;
-                        if (isMarathon) {
-                            const serverSubCount = normalized.marathon_progress?.length || 0;
-                            const localSubCount = myParticipation?.marathon_progress?.length || 0;
-                            const serverGuessCount = normalized.marathon_progress?.reduce((acc: any, p: { guesses: string | any[]; }) => acc + (p.guesses?.length || 0), 0) || 0;
-                            const localGuessCount = myParticipation?.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
-
-                            shouldSync = serverSubCount > localSubCount || serverGuessCount > localGuessCount;
-                        } else {
-                            const serverGuessCount = normalized.guesses?.length || 0;
-                            const localGuessCount = myParticipation?.guesses?.length || 0;
-                            shouldSync = serverGuessCount > localGuessCount;
-                        }
-
-                        // eslint-disable-next-line react-hooks/set-state-in-effect
-                        if (shouldSync) setMyParticipation(normalized);
-                    } else {
-                        setMyParticipation(normalized);
-                    }
-                }
-            }
-
-            if (previewParticipant) {
-                const updated = participants.find(p => p.id === previewParticipant.id);
-                if (updated) setPreviewParticipant(updated);
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [participants, user?.id, isPlaying, selectedChallenge, normalizeParticipation]);
-
-
-
-    const handleCreate = useCallback(async () => {
-        const challenge = await createChallenge(mode, length, mode === 'LIVE' ? maxTime : null, invitedIds);
-        if (challenge) {
-            const invitedUsernames = availableProfiles
-                .filter(p => invitedIds.includes(p.id))
-                .map(p => p.username);
-            if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
-
-            // Reset Form Defaults
-            setMode('ANYTIME');
-            setLength(5);
-            setMaxTime(null);
-            setInvitedIds([]);
-
-            handleViewChallenge(challenge.id);
-        }
-    }, [mode, length, maxTime, invitedIds, availableProfiles, createChallenge, onChallengeCreated, handleViewChallenge]);
-
-    const handleStartGame = useCallback(async () => {
-        if (!selectedChallenge || !myParticipation) return;
-
-        const updatedChallenge = { ...selectedChallenge };
-
-        if (selectedChallenge.word_length === 1) {
-            try {
-                const obfuscatedWords = JSON.parse(selectedChallenge.target_word);
-                const plainWords: Record<number, string> = {};
-                Object.entries(obfuscatedWords).forEach(([len, word]) => {
-                    plainWords[Number(len)] = deobfuscateWord(word as string, selectedChallenge.salt);
-                });
-                updatedChallenge.target_word = JSON.stringify(plainWords);
-            } catch (e) {
-                console.error("Failed to parse marathon words", e);
-            }
-        } else {
-            updatedChallenge.target_word = deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt);
-        }
-
-        setSelectedChallenge(updatedChallenge);
-        if (myParticipation.status === 'pending') await startChallenge(myParticipation.id);
-        setIsPlaying(true);
-    }, [selectedChallenge, myParticipation, startChallenge]);
-
-    const toggleInvite = useCallback((id: string) => {
-        setInvitedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    }, []);
-
-    const copyLink = useCallback((challenge: Challenge) => {
-        const url = `${window.location.origin}${window.location.pathname}?challenge=${challenge.id}`;
-        const text = `Hey! I challenge you to a ${challenge.word_length === 1 ? 'Marathon' : challenge.word_length + '-letter Wordle'} match (${challenge.mode} mode)! 🏆\n\nJoin here: ${url}`;
-        navigator.clipboard.writeText(text);
-        triggerToast('Challenge link copied to clipboard!', 2000);
-    }, [triggerToast]);
+    // Context Value (Bridge)
+    const contextValue: ChallengeContextType = useMemo(() => ({
+        activeTab: store.activeTab,
+        setActiveTab: store.setActiveTab,
+        isPlaying: store.isPlaying,
+        setIsPlaying: store.setIsPlaying,
+        mode: store.mode,
+        setMode: store.setMode,
+        length: store.length,
+        setLength: store.setLength,
+        maxTime: store.maxTime,
+        setMaxTime: store.setMaxTime,
+        selectedChallenge: store.selectedChallenge,
+        setSelectedChallenge: store.setSelectedChallenge,
+        myParticipation: store.myParticipation,
+        participants,
+        myChallenges,
+        availableProfiles,
+        invitedIds: store.invitedIds,
+        searchQuery: store.searchQuery,
+        setSearchQuery: store.setSearchQuery,
+        statusFilter: store.statusFilter,
+        setStatusFilter: store.setStatusFilter,
+        modeFilter: store.modeFilter,
+        setModeFilter: store.setModeFilter,
+        lengthFilter: store.lengthFilter,
+        setLengthFilter: store.setLengthFilter,
+        clearFilters: store.clearFilters,
+        filteredChallenges,
+        handleViewChallenge,
+        handleCreate,
+        handleStartGame,
+        toggleInvite: store.toggleInvite,
+        copyLink: (c: Challenge) => {
+            const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
+            navigator.clipboard.writeText(text);
+            triggerToast('Challenge link copied to clipboard!', 2000);
+        },
+        loadMyChallenges: async () => { await refetchChallenges(); },
+        submitResult,
+        loading: isChallengesLoading || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending,
+        error: null,
+        joinId: store.joinId,
+        setJoinId: store.setJoinId,
+        previewParticipant: store.previewParticipant,
+        setPreviewParticipant: store.setPreviewParticipant,
+        unplayedCount,
+        backAction: store.backAction,
+        setBackAction: store.setBackAction
+    }), [store, participants, myChallenges, availableProfiles, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, unplayedCount]);
 
     return (
-        <ChallengeContext.Provider value={{
-            activeTab, setActiveTab,
-            isPlaying, setIsPlaying,
-            mode, setMode,
-            length, setLength,
-            maxTime, setMaxTime,
-            selectedChallenge, setSelectedChallenge,
-            myParticipation,
-            participants,
-            myChallenges,
-            availableProfiles,
-            invitedIds,
-            searchQuery, setSearchQuery,
-            statusFilter, setStatusFilter,
-            modeFilter, setModeFilter,
-            lengthFilter, setLengthFilter,
-            clearFilters,
-            filteredChallenges,
-            handleViewChallenge,
-            handleCreate,
-            handleStartGame,
-            toggleInvite,
-            copyLink,
-            loadMyChallenges,
-            submitResult,
-            loading,
-            error,
-            joinId, setJoinId,
-            submitChallengeResult,
-            submitMarathonResult,
-            startChallenge,
-            previewParticipant,
-            setPreviewParticipant,
-            unplayedCount,
-            timeLeft,
-            setTimeLeft,
-            backAction,
-            setBackAction
-        }}>
+        <ChallengeContext.Provider value={contextValue}>
             {children}
         </ChallengeContext.Provider>
     );
