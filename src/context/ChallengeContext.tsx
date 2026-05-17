@@ -305,14 +305,20 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 attempts: totalAttempts,
                 time_taken: totalTimeTaken,
                 status: allCompleted ? 'completed' : 'playing',
-                hints_used: updatedMarathon.some(p => p.hints_used),
-                marathon_progress: updatedMarathon
+                hints_used: updatedMarathon.some(p => p.hints_used)
             };
+
+            // Update local state with the full progress object for UI consistency
+            store.setMyParticipation(store.myParticipation ? { 
+                ...store.myParticipation, 
+                ...finalUpdateData,
+                marathon_progress: updatedMarathon 
+            } : null);
         } else {
             finalUpdateData = { ...result };
+            store.setMyParticipation(store.myParticipation ? { ...store.myParticipation, ...finalUpdateData } : null);
         }
 
-        store.setMyParticipation(store.myParticipation ? { ...store.myParticipation, ...finalUpdateData } : null);
         return await submitMutation.mutateAsync({ participationId: store.myParticipation.id, result: finalUpdateData });
     }, [store, marathonMutation, submitMutation]);
 
