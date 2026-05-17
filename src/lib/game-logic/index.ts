@@ -392,23 +392,84 @@ export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
-   guesses: GuessResult[][]
+   guesses: GuessResult[][],
+   gameDate?: string,
+   hintRecord?: { index: number; letter: string } | null
 ) => {
-   // Base score: 1000 for 1st try, 800 for 2nd, etc.
-   let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+   // New scoring system logic starting May 18, 2026
+   const targetDate = new Date('2026-05-18');
+   const currentDate = gameDate ? new Date(gameDate) : new Date();
+   const isNewSystem = currentDate >= targetDate;
 
-   // Penalty for being a scrub
+   if (!isNewSystem) {
+      // Legacy scoring
+      let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+      if (usedHint) score -= 100;
+
+      let bonus = 0;
+      guesses.forEach((row) => {
+         row.forEach((cell) => {
+            if (cell.status === "correct") bonus += 15;
+            if (cell.status === "present") bonus += 2;
+            if (cell.status === "absent") bonus -= 10;
+         });
+      });
+      return Math.floor(score + bonus);
+   }
+
+   // New Scoring System (starting 18th May 2026)
+   const lastGuess = guesses[guesses.length - 1];
+   const won = lastGuess && lastGuess.every(cell => cell.status === "correct");
+
+   // 1. Base Point Calculation
+   // fail base performance is 0
+   let score = 0;
+   if (won) {
+      score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+   }
+
+   // 2. Hint Penalty
    if (usedHint) score -= 100;
 
-   // Precision weights
+   // 3. Discovery Bonuses & Penalties
    let bonus = 0;
+   const scoredIndices = new Set<number>(); // Track which placements have been awarded a discovery bonus
+   const knownBlacks = new Set<string>(); // letter
+
+   // Pre-populate scoredIndices with hinted placement to avoid double scoring
+   if (usedHint && hintRecord) {
+      scoredIndices.add(hintRecord.index);
+   }
 
    guesses.forEach((row) => {
-      row.forEach((cell) => {
-         if (cell.status === "correct") bonus += 15;
-         if (cell.status === "present") bonus += 2;
-         if (cell.status === "absent") bonus -= 10;
+      const newBlacksThisRow = new Set<string>();
+
+      row.forEach((cell, index) => {
+         if (cell.status === "correct") {
+            // green one off +40
+            if (!scoredIndices.has(index)) {
+               bonus += 40;
+               scoredIndices.add(index);
+            }
+         } else if (cell.status === "present") {
+            // yellow +25 (one-off per placement)
+            // if it later moves to green, no new score is awarded because index is already in scoredIndices
+            if (!scoredIndices.has(index)) {
+               bonus += 25;
+               scoredIndices.add(index);
+            }
+         } else if (cell.status === "absent") {
+            // each black -5, if used again in subsequent guesses -20
+            if (knownBlacks.has(cell.letter)) {
+               bonus -= 20;
+            } else {
+               bonus -= 5;
+               newBlacksThisRow.add(cell.letter);
+            }
+         }
       });
+
+      newBlacksThisRow.forEach(letter => knownBlacks.add(letter));
    });
 
    return Math.floor(score + bonus);
@@ -429,7 +490,9 @@ export const syncGameState = async (
          payload.guesses.length,
          payload.config.maxAttempts,
          payload.usedHint,
-         payload.guesses
+         payload.guesses,
+         date,
+         payload.hintRecord
       )
       : 0;
 

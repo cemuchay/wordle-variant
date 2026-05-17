@@ -151,7 +151,7 @@ export const useChallengeGameEngine = ({
                 letterStatuses: getLetterStatuses(incoming),
                 usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
                 hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
-                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 5,
                 status: serverStatus,
                 timeLeft: initialTimeLeft
             }
@@ -193,13 +193,12 @@ export const useChallengeGameEngine = ({
         if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
             dispatch({
-                type: 'SWITCH_LENGTH', payload: {
-                    guesses: incoming,
-                    letterStatuses: getLetterStatuses(incoming),
-                    isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
-                }
-            });
-        }
+            type: 'SWITCH_LENGTH', payload: {
+                guesses: incoming,
+                letterStatuses: getLetterStatuses(incoming),
+                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 5,
+            }
+            });        }
     }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses]);
 
     // Timer Interval Management
@@ -248,7 +247,7 @@ export const useChallengeGameEngine = ({
         const newGuesses = [...guesses, result];
         const newStatuses = getLetterStatuses(newGuesses);
         const won = upperGuess === targetWord;
-        const lost = newGuesses.length === 6;
+        const lost = newGuesses.length === 6; // Restore 6th attempt
 
         setIsSaving(true);
         setRetryCount(0);
@@ -261,7 +260,7 @@ export const useChallengeGameEngine = ({
         let resultPayload: any;
         if (isMarathon) {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -280,7 +279,7 @@ export const useChallengeGameEngine = ({
             }
         } else {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -347,8 +346,12 @@ export const useChallengeGameEngine = ({
             triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
             return;
         }
-        if (guesses.length < 3) {
-            triggerToast("Hint unlocks after 3 attempts.", 3000);
+        if (guesses.length >= 5 && !usedHint) {
+            triggerToast("Hint locked on last available guess.");
+            return;
+        }
+        if (guesses.length < 2) {
+            triggerToast("Hint unlocks after 2 attempts.", 3000);
             return;
         }
 

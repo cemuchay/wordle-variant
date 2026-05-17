@@ -7,6 +7,9 @@ const GameOverModal = lazy(() => import('../GameOverModal').then(m => ({ default
 const InfoModal = lazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
 const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
 const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
+const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
+
+import { useAnnouncements } from '../../hooks/useAnnouncements';
 
 interface ModalsManagerProps {
     modals: {
@@ -43,8 +46,17 @@ export const ModalsManager = ({
     gameContext,
     onChallengeCreated
 }: ModalsManagerProps) => {
+    const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
+
     return (
         <Suspense fallback={null}>
+            {currentAnnouncement && (
+                <AnnouncementModal
+                    isOpen={isAnnouncementOpen}
+                    announcement={currentAnnouncement}
+                    onClose={markAsRead}
+                />
+            )}
             {gameContext.user && modals.isSettingsOpen && (
                 <SettingsModal
                     isOpen={modals.isSettingsOpen}

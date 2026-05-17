@@ -22,7 +22,7 @@ export type GameAction =
     | { type: 'LOAD_STATE'; payload: Partial<GameState> }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
     | { type: 'RESET_CURRENT_GUESS' }
-    | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error' }
+    | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error'; error?: unknown }
     | { type: 'SHAKE_GUESS' }
     | { type: 'STOP_SHAKE' };
 
