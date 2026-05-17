@@ -148,7 +148,7 @@ export const useChallengeGameEngine = ({
                 letterStatuses: getLetterStatuses(incoming),
                 usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
                 hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
-                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 5,
+                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
                 status: serverStatus,
                 timeLeft: initialTimeLeft
             }
@@ -193,7 +193,7 @@ export const useChallengeGameEngine = ({
             type: 'SWITCH_LENGTH', payload: {
                 guesses: incoming,
                 letterStatuses: getLetterStatuses(incoming),
-                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 5,
+                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
             }
             });        }
     }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses]);

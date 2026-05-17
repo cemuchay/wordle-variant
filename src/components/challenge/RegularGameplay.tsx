@@ -97,6 +97,7 @@ export const RegularGameplay = memo(({
                         hintRecord={hintRecord}
                         isChallengeMode={true}
                         isShake={isShake}
+                        isSaving={isSaving}
                     />
                 </div>
             </div>
