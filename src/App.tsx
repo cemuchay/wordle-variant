@@ -101,7 +101,7 @@ export default function App() {
                         isGameOver={state.isGameOver}
                         usedHint={state.usedHint}
                         canShowHint={state.guesses.length >= 2}
-                        isHintLocked={state.guesses.length >= (config.maxAttempts - 1) && !state.usedHint}
+                        isHintLocked={(state.guesses.length >= (config.maxAttempts - 1) || state.isHintDisabled) && !state.usedHint}
                         syncStatus={state.syncStatus}
                     />
 

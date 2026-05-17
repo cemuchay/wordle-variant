@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useReducer, useState, useMemo } from 'react';
 import { getWordLists } from '../data/words';
-import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses } from '../lib/game-logic';
+import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses, isHintDisabled } from '../lib/game-logic';
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
 import { useChallengeStore } from '../store/useChallengeStore';
 
@@ -351,6 +351,10 @@ export const useChallengeGameEngine = ({
             triggerToast("Hint locked on last available guess.");
             return;
         }
+        if (isHintDisabled(targetWord, guesses) && !usedHint) {
+            triggerToast("Hint disabled: Only one letter remains!");
+            return;
+        }
         if (guesses.length < 2) {
             triggerToast("Hint unlocks after 2 attempts.", 3000);
             return;
@@ -393,8 +397,10 @@ export const useChallengeGameEngine = ({
         handleHint
     }), [onChar, onDelete, onEnter, handleHint]);
 
+    const isHintBar1Restricted = useMemo(() => isHintDisabled(targetWord, guesses), [targetWord, guesses]);
+
     return {
-        state,
+        state: { ...state, isHintDisabled: isHintBar1Restricted },
         actions,
         isSaving,
         retryCount,

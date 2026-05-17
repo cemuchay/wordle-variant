@@ -263,6 +263,27 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
 }
 
 /**
+ * Determines if the hint feature should be disabled based on the "Bar 1" rule:
+ * If only one letter remains to be correctly placed, hints are disabled to prevent
+ * an automatic win.
+ */
+export const isHintDisabled = (word: string, guesses: GuessResult[][]) => {
+   const targetWord = word.toUpperCase();
+   const correctIndices = new Set<number>();
+
+   guesses.forEach((row) => {
+      row.forEach((cell, index) => {
+         if (cell.status === "correct") {
+            correctIndices.add(index);
+         }
+      });
+   });
+
+   const remainingCount = targetWord.length - correctIndices.size;
+   return remainingCount <= 1;
+};
+
+/**
  * Determines a helpful hint for the user.
  * 
  * @what It ignores indices the user has already solved and picks one 
@@ -271,8 +292,9 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
  * @returns {letter: string, index: number} or null if the word is already solved.
  */
 export const getHint = (word: string, guesses: GuessResult[][]) => {
-   const targetWord = word.toUpperCase();
+   if (isHintDisabled(word, guesses)) return null;
 
+   const targetWord = word.toUpperCase();
    const correctIndices = new Set<number>();
 
    guesses.forEach((row) => {
@@ -287,8 +309,6 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
       .split("")
       .map((_, i) => i)
       .filter((i) => !correctIndices.has(i));
-
-   if (remainingIndices.length === 0) return null;
 
    const randomIndex =
       remainingIndices[Math.floor(Math.random() * remainingIndices.length)];

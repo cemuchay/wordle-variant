@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
@@ -125,6 +125,10 @@ export const useGameEngine = (date: string) => {
             triggerToast("Hint locked on last available guess.");
             return;
         }
+        if (isHintDisabled(config.word, state.guesses) && !state.usedHint) {
+            triggerToast("Hint disabled: Only one letter remains!");
+            return;
+        }
         if (state.usedHint && state.hintRecord) {
             triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, 3000);
             return;
@@ -172,9 +176,10 @@ export const useGameEngine = (date: string) => {
     }, []);
 
     const letterStatuses = useMemo(() => getLetterStatuses(state.guesses), [state.guesses]);
+    const isHintBar1Restricted = useMemo(() => isHintDisabled(config.word, state.guesses), [config.word, state.guesses]);
 
     return {
-        state: { ...state, letterStatuses },
+        state: { ...state, letterStatuses, isHintDisabled: isHintBar1Restricted },
         actions: {
             onChar,
             onDelete,
