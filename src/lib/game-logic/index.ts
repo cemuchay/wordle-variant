@@ -432,35 +432,38 @@ export const calculateSkillIndex = (
 
    // 3. Discovery Bonuses & Penalties
    let bonus = 0;
-   const discoveredGreens = new Set<number>(); // index
-   const discoveredYellows = new Set<string>(); // index-letter
-   const usedBlacks = new Set<string>(); // letter
+   const scoredIndices = new Set<number>(); // Track which placements have been awarded a discovery bonus
+   const knownBlacks = new Set<string>(); // letter
 
    guesses.forEach((row) => {
+      const newBlacksThisRow = new Set<string>();
+
       row.forEach((cell, index) => {
          if (cell.status === "correct") {
             // green one off +40
-            if (!discoveredGreens.has(index)) {
+            if (!scoredIndices.has(index)) {
                bonus += 40;
-               discoveredGreens.add(index);
+               scoredIndices.add(index);
             }
          } else if (cell.status === "present") {
-            // yellow +25 (one-off per placement+letter)
-            const yellowKey = `${index}-${cell.letter}`;
-            if (!discoveredYellows.has(yellowKey)) {
+            // yellow +25 (one-off per placement)
+            // if it later moves to green, no new score is awarded because index is already in scoredIndices
+            if (!scoredIndices.has(index)) {
                bonus += 25;
-               discoveredYellows.add(yellowKey);
+               scoredIndices.add(index);
             }
          } else if (cell.status === "absent") {
-            // each black -5, if used again -20
-            if (usedBlacks.has(cell.letter)) {
+            // each black -5, if used again in subsequent guesses -20
+            if (knownBlacks.has(cell.letter)) {
                bonus -= 20;
             } else {
                bonus -= 5;
-               usedBlacks.add(cell.letter);
+               newBlacksThisRow.add(cell.letter);
             }
          }
       });
+
+      newBlacksThisRow.forEach(letter => knownBlacks.add(letter));
    });
 
    return Math.floor(score + bonus);

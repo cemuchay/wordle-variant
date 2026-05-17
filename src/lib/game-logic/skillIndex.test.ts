@@ -31,19 +31,46 @@ const newGuesses = [
 // Total: 666 + 140 = 806
 runTest("New System (Win in 3)", calculateSkillIndex(3, 6, false, newGuesses, '2026-05-18'), 806);
 
-// 3. New system: Fail test
+// 3. New system: Fail test (with repeated blacks across rows vs same row)
 const failGuesses = [
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')], // -25
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')], // -100 (repeated)
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')], // -100
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')], // -100
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')], // -100
-    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('E', 'absent')]  // -100
+    [g('E', 'absent'), g('E', 'absent'), g('R', 'absent'), g('I', 'absent'), g('E', 'absent')], // First row: E is new. All 3 Es are new black. 5 * (-5) = -25.
+    [g('E', 'absent'), g('A', 'absent'), g('G', 'absent'), g('L', 'absent'), g('E', 'absent')], // Second row: E is known black! 2 Es = 2 * (-20) = -40. A,G,L new = -15. Total = -55.
+    [g('A', 'absent'), g('B', 'absent'), g('C', 'absent'), g('D', 'absent'), g('F', 'absent')], // Third row: A is known black = -20. B,C,D,F new = -20. Total = -40.
 ];
 // Base score: 0 (lost)
-// Bonus: -25 - 100*5 = -525
-runTest("New System (Fail)", calculateSkillIndex(6, 6, false, failGuesses, '2026-05-18'), -525);
+// Bonus: -25 - 55 - 40 = -120
+runTest("New System (Fail - Black Letter Penalties)", calculateSkillIndex(6, 6, false, failGuesses, '2026-05-18'), -120);
 
-// 4. Hint penalty
+// 4. New system: Yellow to Green placement test
+const yellowToGreen = [
+    [g('S', 'present'), g('T', 'absent'), g('A', 'absent'), g('R', 'absent'), g('E', 'absent')], // S yellow at 0 (+25), others black (-20) -> bonus +5
+    [g('S', 'correct'), g('L', 'absent'), g('E', 'absent'), g('E', 'absent'), g('P', 'absent')]  // S green at 0 (+0, already scored as yellow), others black (-10, L -5, E -5, E -20, P -5) wait...
+];
+// Wait, let's trace Row 2:
+// cell 0 (S): correct. index 0 already in scoredIndices. bonus +0.
+// cell 1 (L): absent. new black. bonus -5.
+// cell 2 (E): absent. new black. bonus -5.
+// cell 3 (E): absent. repeated black. bonus -20.
+// cell 4 (P): absent. new black. bonus -5.
+// Row 2 bonus: -35.
+// Total bonus: 5 - 35 = -30.
+// If this was Row 2 win (unrealistic but for score testing): (6-2+1)/6*1000 = 833.
+// Total: 833 - 30 = 803.
+// Let's make it win in 2 for simplicity.
+const winIn2YellowToGreen = [
+    [g('S', 'present'), g('O', 'absent'), g('U', 'absent'), g('N', 'absent'), g('D', 'absent')], // S yellow at 0 (+25), O,U,N,D black (-20) -> bonus +5
+    [g('S', 'correct'), g('A', 'correct'), g('R', 'correct'), g('E', 'correct'), g('D', 'correct')] // S green at 0 (+0), A,R,E green at 1,2,3 (+120), D green at 4 (+0, D was black before!)
+];
+// Wait, D was black in Row 1. Now it's Green in Row 2.
+// cell 4 (D): correct. index 4 already in scoredIndices? No, Row 1 index 4 was Black.
+// Wait, my code only adds to scoredIndices for Green/Yellow.
+// cell 4 (D) in Row 2: index 4 not in scoredIndices. bonus +40.
+// Row 2 bonus: 120 + 40 = 160.
+// Total bonus: 5 + 160 = 165.
+// Base score (win in 2): 833.
+// Total: 833 + 165 = 998.
+runTest("New System (Yellow to Green Placement)", calculateSkillIndex(2, 6, false, winIn2YellowToGreen, '2026-05-18'), 998);
+
+// 5. Hint penalty
 runTest("New System (Win in 1 with Hint)", calculateSkillIndex(1, 6, true, oldGuesses, '2026-05-18'), 1100); 
 // Base: 1000, Hint: -100, Bonus: 5*40=200. Total: 1100.

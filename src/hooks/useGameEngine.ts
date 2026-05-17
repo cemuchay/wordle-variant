@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useReducer, useCallback, useMemo } from 'react';
 import { gameReducer, initialState } from '../reducers/gameReducer';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { calculateSkillIndex, checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
 import { getWordLists } from '../data/words';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { useApp } from '../context/AppContext';
@@ -82,6 +82,13 @@ export const useGameEngine = (date: string) => {
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
             await refresh();
+
+            // TEMP: Skill index reveal for testing
+            if (!user) {
+                const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, date);
+                console.log(score);
+                setTimeout(() => triggerToast(`Skill Score: ${score} (Testing Note)`, 10000), 1000);
+            }
 
             // Only show reveal after sync attempt (successful or failed-but-locally-saved)
             if (lost) triggerToast(`The word is: ${config.word}`, 5000);
