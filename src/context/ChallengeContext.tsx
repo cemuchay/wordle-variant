@@ -283,6 +283,20 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id]); // Re-load when user changes
 
+    const normalizeParticipation = useCallback((p: any, challenge: any) => {
+        if (!p || !challenge) return p;
+        if (challenge.mode !== 'LIVE' || !challenge.max_time || p.status !== 'playing' || !p.started_at) return p;
+
+        const start = new Date(p.started_at).getTime();
+        const now = Date.now();
+        const limitMs = (challenge.max_time * 60 * 1000) + (2 * 60 * 1000); // 2 min buffer
+
+        if (now - start > limitMs) {
+            return { ...p, status: 'timed_out' as const };
+        }
+        return p;
+    }, []);
+
     // Sync myParticipation and previewParticipant from the participants array (real-time updates)
     useEffect(() => {
         if (participants.length > 0 && user) {
@@ -290,12 +304,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const isMarathon = selectedChallenge?.word_length === 1;
 
             if (currentFromServer) {
+                const normalized = normalizeParticipation(currentFromServer, selectedChallenge);
+
                 // Determine if server data is different from local state
                 const isDifferent =
-                    JSON.stringify(currentFromServer.guesses) !== JSON.stringify(myParticipation?.guesses) ||
-                    JSON.stringify(currentFromServer.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
-                    currentFromServer.status !== myParticipation?.status ||
-                    currentFromServer.score !== myParticipation?.score;
+                    JSON.stringify(normalized.guesses) !== JSON.stringify(myParticipation?.guesses) ||
+                    JSON.stringify(normalized.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
+                    normalized.status !== myParticipation?.status ||
+                    normalized.score !== myParticipation?.score;
 
                 if (!isPlaying || isDifferent) {
                     // If we are playing, we only sync if the server has MORE progress
@@ -303,22 +319,22 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                         // eslint-disable-next-line no-useless-assignment
                         let shouldSync = false;
                         if (isMarathon) {
-                            const serverSubCount = currentFromServer.marathon_progress?.length || 0;
+                            const serverSubCount = normalized.marathon_progress?.length || 0;
                             const localSubCount = myParticipation?.marathon_progress?.length || 0;
-                            const serverGuessCount = currentFromServer.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
+                            const serverGuessCount = normalized.marathon_progress?.reduce((acc: any, p: { guesses: string | any[]; }) => acc + (p.guesses?.length || 0), 0) || 0;
                             const localGuessCount = myParticipation?.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
 
                             shouldSync = serverSubCount > localSubCount || serverGuessCount > localGuessCount;
                         } else {
-                            const serverGuessCount = currentFromServer.guesses?.length || 0;
+                            const serverGuessCount = normalized.guesses?.length || 0;
                             const localGuessCount = myParticipation?.guesses?.length || 0;
                             shouldSync = serverGuessCount > localGuessCount;
                         }
 
                         // eslint-disable-next-line react-hooks/set-state-in-effect
-                        if (shouldSync) setMyParticipation(currentFromServer);
+                        if (shouldSync) setMyParticipation(normalized);
                     } else {
-                        setMyParticipation(currentFromServer);
+                        setMyParticipation(normalized);
                     }
                 }
             }
@@ -329,7 +345,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [participants, user?.id, isPlaying, selectedChallenge?.word_length]);
+    }, [participants, user?.id, isPlaying, selectedChallenge, normalizeParticipation]);
 
 
 
