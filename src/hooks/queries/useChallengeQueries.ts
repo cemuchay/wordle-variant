@@ -163,5 +163,97 @@ export const useChallengeMutations = () => {
         }
     });
 
-    return { createChallenge, submitResult };
+    const joinChallenge = useMutation({
+        mutationFn: async ({ challengeId, userId }: { challengeId: string, userId: string }) => {
+            // First check if already participating
+            const { data: existing, error: fetchError } = await supabase
+                .from('challenge_participants')
+                .select('*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)')
+                .eq('challenge_id', challengeId)
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (fetchError) throw fetchError;
+            if (existing) return existing;
+
+            // If not, then join as pending
+            const { data, error } = await supabase
+                .from('challenge_participants')
+                .insert([{
+                    challenge_id: challengeId,
+                    user_id: userId,
+                    status: 'pending'
+                }])
+                .select('*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)')
+                .single();
+
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+        }
+    });
+
+    const startChallenge = useMutation({
+        mutationFn: async (participationId: string) => {
+            const { error } = await supabase
+                .from('challenge_participants')
+                .update({
+                    status: 'playing',
+                    started_at: new Date().toISOString()
+                })
+                .eq('id', participationId);
+
+            if (error) throw error;
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+            queryClient.invalidateQueries({ queryKey: ['challenge'] });
+        }
+    });
+
+    const submitMarathonResult = useMutation({
+        mutationFn: async ({ participationId, wordLength, result }: { participationId: string, wordLength: number, result: any }) => {
+            const { data: existing } = await supabase
+                .from('challenge_participants_marathon')
+                .select('id')
+                .eq('participation_id', participationId)
+                .eq('word_length', wordLength)
+                .maybeSingle();
+
+            if (existing) {
+                const updateData: any = { ...result };
+                if (result.status && result.status !== 'playing') {
+                    updateData.completed_at = new Date().toISOString();
+                }
+                const { error } = await supabase
+                    .from('challenge_participants_marathon')
+                    .update(updateData)
+                    .eq('id', existing.id);
+                if (error) throw error;
+            } else {
+                const insertData: any = {
+                    participation_id: participationId,
+                    word_length: wordLength,
+                    ...result
+                };
+                if (result.status && result.status !== 'playing') {
+                    insertData.completed_at = new Date().toISOString();
+                }
+                const { error } = await supabase
+                    .from('challenge_participants_marathon')
+                    .insert([insertData]);
+                if (error) throw error;
+            }
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+            queryClient.invalidateQueries({ queryKey: ['challenge'] });
+        }
+    });
+
+    return { createChallenge, submitResult, joinChallenge, startChallenge, submitMarathonResult };
 };

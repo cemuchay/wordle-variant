@@ -14,7 +14,7 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
 import { type AppUser } from './types/game';
-import { useChallenge } from './hooks/useChallenge';
+import { useMyChallenges } from './hooks/queries/useChallengeQueries';
 
 const ChatRoom = lazy(() => import('./components/chatRoom'));
 
@@ -38,23 +38,18 @@ export default function App() {
     // Core Game Engine
     const { state, actions, config, isHydrated } = useGameEngine(date as string);
 
-    const { fetchMyChallenges } = useChallenge(user as AppUser);
+    // Initial Challenges Fetch using TanStack Query
+    const { data: myChallenges } = useMyChallenges(user?.id);
 
-    // Initial Challenges Fetch
     useEffect(() => {
-        if (user) {
-            fetchMyChallenges().then(data => {
-
-                const count = data.filter((c: {
-                    status: string,
-                    challenge: {
-                        expires_at: string
-                    }
-                }) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length;
-                setChallengeUnreadCount(count);
-            });
+        if (myChallenges) {
+            const count = myChallenges.filter((c: any) => 
+                (c.status === 'pending' || c.status === 'playing') && 
+                new Date(c.challenge.expires_at) > new Date()
+            ).length;
+            setChallengeUnreadCount(count);
         }
-    }, [user, fetchMyChallenges, setChallengeUnreadCount]);
+    }, [myChallenges, setChallengeUnreadCount]);
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
