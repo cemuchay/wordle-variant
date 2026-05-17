@@ -13,6 +13,7 @@ interface GameToolbarProps {
     isGameOver: boolean;
     usedHint: boolean;
     canShowHint: boolean;
+    isHintLocked?: boolean;
     syncStatus: SyncStatus;
 }
 
@@ -28,6 +29,7 @@ export const GameToolbar = ({
     isGameOver,
     usedHint,
     canShowHint,
+    isHintLocked,
     syncStatus
 }: GameToolbarProps) => {
     const { challengeUnreadCount } = useApp();
@@ -70,10 +72,16 @@ export const GameToolbar = ({
                         {canShowHint && !isGameOver && (
                             <button
                                 onClick={onHint}
-                                className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
-                                title={usedHint ? "Hint Used" : "Get Hint"}
+                                disabled={isHintLocked && !usedHint}
+                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : isHintLocked ? "Hint Locked on Last Guess" : "Get Hint"}
                             >
                                 <Lightbulb size={ICON_SIZE} />
+                                {isHintLocked && !usedHint && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
+                                    </div>
+                                )}
                             </button>
                         )}
                         <button

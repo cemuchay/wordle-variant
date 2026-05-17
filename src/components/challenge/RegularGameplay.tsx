@@ -76,9 +76,15 @@ export const RegularGameplay = memo(({
                 {guesses.length >= 3 && !isGameOver && (
                     <button
                         onClick={actions.handleHint}
-                        className={`p-2 transition-all rounded-xl ${usedHint ? 'text-yellow-500/30' : 'text-yellow-500 bg-yellow-500/10 animate-pulse'}`}
+                        disabled={guesses.length >= 5 && !usedHint}
+                        className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : (guesses.length >= 5 ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
                     >
                         <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                        {guesses.length >= 5 && !usedHint && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
+                            </div>
+                        )}
                     </button>
                 )}
             </div>

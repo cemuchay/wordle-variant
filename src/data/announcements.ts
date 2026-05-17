@@ -15,22 +15,15 @@ export const ANNOUNCEMENTS: Announcement[] = [
         content: `
             <h3>STARTING 18th May, 2026.</h3>
     
-            <p>We've revamped our scoring system to reward discovery and punish repetitive mistakes. The "Skill Index" is now more dynamic and reflective of your strategic play.</p>
+            <p>We've revamped our scoring system to reward discovery and punish repetitive mistakes.</p>
             
             <h3>The New Rules:</h3>
             <ul>
-                <li><strong>Discovery Bonus:</strong> Finding a letter in the correct spot (Green) now gives <strong>+40</strong> points. Finding a letter in the word but wrong spot (Yellow) gives <strong>+25</strong>. These are one-off bonuses per placement!</li>
+                <li><strong>Discovery Bonus:</strong> Finding a new letter in the correct spot (Green) now gives <strong>+40</strong> points. Finding a letter in the word but wrong spot (Yellow) gives <strong>+25</strong>. These are one-off bonuses per placement!</li>
                 <li><strong>Smart Penalties:</strong> Each new incorrect letter (Black) is only <strong>-5</strong>. However, reusing a letter you already know is incorrect costs a hefty <strong>-20</strong>.</li>
                 <li><strong>Hint Penalty:</strong> Using a hint now costs <strong>-100</strong> points.</li>
-                <li><strong>Fail Protection:</strong> Base performance for a lost game is now <strong>0</strong> points.</li>
+                <li><strong>Hint Lock:</strong> Hints are now <strong>DISABLED</strong> on your last guess! (will only work on guesses 2-5)</li>
             </ul>
-
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin: 12px 0; border-left: 4px solid var(--primary);">
-                <h4>Sample Comparison:</h4>
-                <p>Imagine you win in 3 tries, discovering 5 letters and making 4 new mistakes.</p>
-                <p><strong>Old System:</strong> ~750 points</p>
-                <p><strong>New System:</strong> ~800+ points (Higher rewards for discovery!)</p>
-            </div>
             
             <p>Enjoy!</p>
         `

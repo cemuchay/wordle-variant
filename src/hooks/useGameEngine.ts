@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useReducer, useCallback, useMemo } from 'react';
-import { gameReducer, initialState } from '../reducers/gameReducer';
-import { calculateSkillIndex, checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
-import { getWordLists } from '../data/words';
-import { getLossMessage, getWinMessage } from '../lib/messages';
+import { useCallback, useMemo, useReducer } from 'react';
 import { useApp } from '../context/AppContext';
+import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { getLossMessage, getWinMessage } from '../lib/messages';
+import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
 
 export const useGameEngine = (date: string) => {
@@ -73,7 +72,7 @@ export const useGameEngine = (date: string) => {
                 dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
                 setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
             } catch (error) {
-                dispatch({ type: 'SET_SYNC_STATUS', status: 'error' });
+                dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
                 triggerToast("Connection lost. Progress saved locally.", 5000);
             }
         }
@@ -84,11 +83,11 @@ export const useGameEngine = (date: string) => {
             await refresh();
 
             // TEMP: Skill index reveal for testing
-            if (!user) {
-                const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, date);
-                console.log(score);
-                setTimeout(() => triggerToast(`Skill Score: ${score} (Testing Note)`, 10000), 1000);
-            }
+            // if (!user) {
+            //     const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, date);
+            //     console.log(score);
+            //     setTimeout(() => triggerToast(`Skill Score: ${score} (Testing Note)`, 10000), 1000);
+            // }
 
             // Only show reveal after sync attempt (successful or failed-but-locally-saved)
             if (lost) triggerToast(`The word is: ${config.word}`, 5000);
@@ -105,6 +104,10 @@ export const useGameEngine = (date: string) => {
 
     const handleHint = useCallback(async () => {
         if (state.guesses.length < 3 || state.isGameOver) return;
+        if (state.guesses.length >= (config.maxAttempts - 1) && !state.usedHint) {
+            triggerToast("Hint locked on last available guess.");
+            return;
+        }
         if (state.usedHint && state.hintRecord) {
             triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, 3000);
             return;
@@ -136,7 +139,7 @@ export const useGameEngine = (date: string) => {
                     dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
                     setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
                 } catch (error) {
-                    dispatch({ type: 'SET_SYNC_STATUS', status: 'error' });
+                    dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
                 }
             }
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
