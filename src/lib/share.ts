@@ -19,7 +19,12 @@ export const generateShareText = ({
 }) => {
    const score = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
-   const header = `Wordle Variant - ${date} \n
+   const localDate = new Date(date).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+   });
+   const header = `Wordle Variant - ${localDate} \n
   ${score}/${maxAttempts}${` (${wordLength}L)`}${hintMarker}\n`;
 
    const grid = guesses
