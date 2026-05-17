@@ -43,7 +43,7 @@ export const useChallengeStatus = (userId: string | undefined) => {
         queryKey: ['challenge-unread', userId],
         queryFn: async () => {
             if (!userId) return { unreadCount: 0, participations: [] };
-            
+
             const { data, error } = await supabase
                 .from('challenge_participants')
                 .select('challenge_id, status, challenge:challenges(expires_at)')
@@ -51,6 +51,7 @@ export const useChallengeStatus = (userId: string | undefined) => {
 
             if (error) throw error;
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const unread = data.filter((c: any) =>
                 (c.status === 'pending' || c.status === 'playing') &&
                 new Date(c.challenge.expires_at) > new Date()
