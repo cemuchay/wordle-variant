@@ -60,7 +60,7 @@ export default function App() {
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || !isHydrated);
+    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen);
 
 
     const handleChallengeCreated = () => {

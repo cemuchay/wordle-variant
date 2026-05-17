@@ -2,6 +2,7 @@
 import { Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect } from 'react';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
+import { useKeyboard } from '../../hooks/useKeyboard';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import { useChallengeContext } from '../../context/ChallengeContext';
@@ -21,16 +22,6 @@ export const RegularGameplay = memo(({
 }: RegularGameplayProps) => {
     const { setBackAction } = useChallengeContext();
 
-    useEffect(() => {
-        const back = onBack || onFinish;
-        setBackAction(() => back);
-        return () => {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            //@ts-expect-error
-            setBackAction((prev: any) => prev === back ? null : prev);
-        };
-    }, [onBack, onFinish, setBackAction]);
-
     const { state, actions, isSaving, retryCount, wordLength } = useChallengeGameEngine({
         challenge,
         participation,
@@ -42,6 +33,22 @@ export const RegularGameplay = memo(({
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
+
+    // Physical Keyboard Support
+    useKeyboard(actions, isGameOver || isSaving);
+
+    useEffect(() => {
+        // Ensure window has focus to capture keyboard events when game starts
+        window.focus();
+        
+        const back = onBack || onFinish;
+        setBackAction(() => back);
+        return () => {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            //@ts-expect-error
+            setBackAction((prev: any) => prev === back ? null : prev);
+        };
+    }, [onBack, onFinish, setBackAction]);
 
     return (
         <div className="flex-1 flex flex-col p-4 gap-6 relative">

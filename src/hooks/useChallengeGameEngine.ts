@@ -322,6 +322,10 @@ export const useChallengeGameEngine = ({
             return;
         }
 
+        // Stabilization Delay: Wait 300ms after sync succeeds before triggering reveal
+        // This prevents the browser from being overwhelmed by simultaneous re-renders and animations
+        await new Promise(r => setTimeout(r, 300));
+
         // ONLY NOW we update the UI, triggering the reveal animation
         dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
 
@@ -382,9 +386,16 @@ export const useChallengeGameEngine = ({
         }
     };
 
+    const actions = useMemo(() => ({
+        onChar,
+        onDelete,
+        onEnter,
+        handleHint
+    }), [onChar, onDelete, onEnter, handleHint]);
+
     return {
         state,
-        actions: { onChar, onDelete, onEnter, handleHint },
+        actions,
         isSaving,
         retryCount,
         wordLength,
