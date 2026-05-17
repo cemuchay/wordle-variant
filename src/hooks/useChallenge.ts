@@ -28,6 +28,7 @@ export interface MarathonProgress {
     guesses: any[];
     hints_used: boolean;
     hint_record: any | null;
+    time_taken: number | null;
     started_at: string;
     completed_at: string | null;
 }
@@ -42,6 +43,7 @@ export interface ChallengeParticipant {
     guesses: any; // Legacy or for non-marathon
     hints_used: boolean;
     hint_record: any | null;
+    time_taken: number | null;
     started_at: string | null;
     completed_at: string | null;
     profiles?: { username: string, avatar_url: string };
@@ -317,7 +319,7 @@ export const useChallenge = (user: AppUser | null) => {
                 event: '*',
                 schema: 'public',
                 table: 'challenge_participants_marathon'
-            }, async (payload) => {
+            }, async () => {
                 // If a marathon progress row changes, we need to know if it belongs to this challenge
                 // Easiest is to just refresh if any marathon row changes for now, 
                 // but we could optimize by checking participation_id if we had it in a map.

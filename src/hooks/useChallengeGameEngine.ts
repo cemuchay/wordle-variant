@@ -8,7 +8,7 @@ interface UseChallengeGameEngineProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
     onFinish: () => void;
     selectedLength?: number | null; // For Marathon mode
     onLengthComplete?: () => void; // Callback for Marathon mode
@@ -43,6 +43,47 @@ export const useChallengeGameEngine = ({
     const [retryCount, setRetryCount] = useState(0);
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
 
+    const handleTimeExpired = useCallback(async () => {
+        if (isSaving) return;
+        dispatch({ type: 'TIME_UP' });
+        triggerToast("Time's up!", 3000);
+        setIsSaving(true);
+
+        let timeTaken: number | null = null;
+        if (challenge.mode === 'LIVE' && challenge.max_time) {
+            timeTaken = challenge.max_time * 60; // Max time used if expired
+        }
+
+        if (isMarathon) {
+            // Just fail this specific word, but keep marathon playing
+            const success = await submitChallengeResult({
+                status: 'timed_out',
+                attempts: guesses.length,
+                guesses: guesses,
+                score: 0,
+                hints_used: usedHint,
+                hint_record: hintRecord,
+                time_taken: timeTaken
+            }, selectedLength!);
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save progress.", 3000);
+            if (onLengthComplete) onLengthComplete();
+        } else {
+            const success = await submitChallengeResult({
+                status: 'timed_out',
+                score: 0,
+                attempts: guesses.length,
+                guesses: guesses,
+                hints_used: usedHint,
+                hint_record: hintRecord,
+                time_taken: timeTaken
+            });
+            setIsSaving(false);
+            if (!success) triggerToast("Failed to save result.", 4000);
+            onFinish();
+        }
+    }, [isSaving, challenge.mode, challenge.max_time, isMarathon, submitChallengeResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
+
     // Sync timeLeft with Global Context
     useEffect(() => {
         if (setTimeLeftGlobal) {
@@ -60,16 +101,17 @@ export const useChallengeGameEngine = ({
     // Helper to extract guesses for current word with extreme defensiveness
     const getIncomingGuesses = useCallback(() => {
         if (!participation) return [];
-        
+
         if (isMarathon) {
             if (!selectedLength) return [];
             const progress = participation.marathon_progress?.find((p: any) => p.word_length === selectedLength);
             return Array.isArray(progress?.guesses) ? progress.guesses : [];
         }
-        
+
         let g = participation.guesses;
         // Handle potential stringified JSON from some DB responses
         if (typeof g === 'string') {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             try { g = JSON.parse(g); } catch (e) { return []; }
         }
         return Array.isArray(g) ? g : [];
@@ -81,19 +123,23 @@ export const useChallengeGameEngine = ({
 
         const incoming = getIncomingGuesses();
         const progress = isMarathon ? participation.marathon_progress?.find((p: any) => p.word_length === selectedLength) : null;
-        
+
         console.log(`[Engine] Initializing length ${wordLength}. Found ${incoming.length} incoming guesses.`);
-        
-        const isFinishedStatus = isMarathon 
-            ? (progress?.status === 'completed' || progress?.status === 'timed_out')
-            : (participation.status === 'completed' || participation.status === 'timed_out');
+
+        const serverStatus = isMarathon ? (progress?.status || 'playing') : participation.status;
+        const isFinishedStatus = serverStatus === 'completed' || serverStatus === 'timed_out';
 
         let initialTimeLeft = null;
+        let hasTimedOutOffline = false;
+
         if (challenge.mode === 'LIVE' && challenge.max_time) {
             const startTime = isMarathon ? progress?.started_at : participation.started_at;
             if (startTime) {
                 const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
                 initialTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
+                if (initialTimeLeft <= 0 && !isFinishedStatus) {
+                    hasTimedOutOffline = true;
+                }
             } else {
                 initialTimeLeft = challenge.max_time * 60;
             }
@@ -106,13 +152,20 @@ export const useChallengeGameEngine = ({
                 usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
                 hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
                 isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
-                status: isMarathon ? (progress?.status || 'playing') : participation.status,
+                status: serverStatus,
                 timeLeft: initialTimeLeft
             }
         });
-        
+
+        // Handle Offline Timeout Sync
+        if (hasTimedOutOffline && !isSaving) {
+            console.log("[Engine] Offline timeout detected, syncing with server...");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            handleTimeExpired();
+        }
+
         // Handle Per-Game Timer Start for LIVE mode
-        if (challenge.mode === 'LIVE' && challenge.max_time && !isSaving) {
+        if (challenge.mode === 'LIVE' && challenge.max_time && !isSaving && !hasTimedOutOffline) {
             const startTime = isMarathon ? progress?.started_at : participation.started_at;
             if (!startTime) {
                 // First time entry timer start
@@ -123,14 +176,14 @@ export const useChallengeGameEngine = ({
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedLength, participation.id]); 
+    }, [selectedLength, participation, challenge, isMarathon, isSaving, getIncomingGuesses, submitChallengeResult, handleTimeExpired]);
 
     // Sync guesses if they update in props while engine is mounted
     useEffect(() => {
         if (isSaving || (isMarathon && !selectedLength)) return;
 
         const incoming = getIncomingGuesses();
-        
+
         // Robust Sync Strategy:
         // Only sync from props if:
         // 1. We have no local guesses yet (first fetch arrived after mount)
@@ -138,8 +191,8 @@ export const useChallengeGameEngine = ({
         const shouldSync = (guesses.length === 0 && incoming.length > 0) || incoming.length > guesses.length;
 
         if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
-             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
-             dispatch({
+            console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
+            dispatch({
                 type: 'SWITCH_LENGTH', payload: {
                     guesses: incoming,
                     letterStatuses: getLetterStatuses(incoming),
@@ -147,7 +200,7 @@ export const useChallengeGameEngine = ({
                 }
             });
         }
-    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength]);
+    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses]);
 
     // Timer Interval Management
     useEffect(() => {
@@ -159,39 +212,7 @@ export const useChallengeGameEngine = ({
         }
     }, [isGameOver, timeLeft]);
 
-    const handleTimeExpired = useCallback(async () => {
-        if (isSaving) return;
-        dispatch({ type: 'TIME_UP' });
-        triggerToast("Time's up!", 3000);
-        setIsSaving(true);
 
-        if (isMarathon) {
-            // Just fail this specific word, but keep marathon playing
-            const success = await submitChallengeResult({
-                status: 'timed_out',
-                attempts: guesses.length,
-                guesses: guesses,
-                score: 0,
-                hints_used: usedHint,
-                hint_record: hintRecord
-            }, selectedLength!);
-            setIsSaving(false);
-            if (!success) triggerToast("Failed to save progress.", 3000);
-            if (onLengthComplete) onLengthComplete();
-        } else {
-            const success = await submitChallengeResult({
-                status: 'timed_out',
-                score: 0,
-                attempts: guesses.length,
-                guesses: guesses,
-                hints_used: usedHint,
-                hint_record: hintRecord
-            });
-            setIsSaving(false);
-            if (!success) triggerToast("Failed to save result.", 4000);
-            onFinish();
-        }
-    }, [isMarathon, selectedLength, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, onLengthComplete, isSaving]);
 
     useEffect(() => {
         if (timeLeft === 0 && !isGameOver) {
@@ -231,7 +252,12 @@ export const useChallengeGameEngine = ({
 
         setIsSaving(true);
         setRetryCount(0);
-        
+
+        let timeTaken: number | null = null;
+        if (challenge.mode === 'LIVE' && challenge.max_time && timeLeft !== null) {
+            timeTaken = (challenge.max_time * 60) - timeLeft;
+        }
+
         let resultPayload: any;
         if (isMarathon) {
             if (won || lost) {
@@ -242,7 +268,8 @@ export const useChallengeGameEngine = ({
                     attempts: newGuesses.length,
                     guesses: newGuesses,
                     hints_used: usedHint,
-                    hint_record: hintRecord
+                    hint_record: hintRecord,
+                    time_taken: timeTaken
                 };
             } else {
                 resultPayload = {
@@ -260,7 +287,8 @@ export const useChallengeGameEngine = ({
                     attempts: newGuesses.length,
                     guesses: newGuesses,
                     hints_used: usedHint,
-                    hint_record: hintRecord
+                    hint_record: hintRecord,
+                    time_taken: timeTaken
                 };
             } else {
                 resultPayload = {
@@ -285,7 +313,7 @@ export const useChallengeGameEngine = ({
                 // Wait 1.5s before retry
                 await new Promise(r => setTimeout(r, 1500));
             }
-            
+
             success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
             attempt++;
         }
@@ -311,7 +339,7 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, usedHint, hintRecord, submitChallengeResult, triggerToast, onFinish, isMarathon, onLengthComplete]);
+    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, submitChallengeResult, onLengthComplete, onFinish]);
 
     const handleHint = async () => {
         if (isGameOver || isSaving) return;

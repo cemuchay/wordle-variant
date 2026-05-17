@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Clock, Play, Plus } from 'lucide-react';
-import { memo } from 'react';
+import { Clock, Play, Plus, Search, X, UserPlus } from 'lucide-react';
+import { memo, useState, useMemo } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 
 export const ChallengeCreate = memo(() => {
@@ -9,6 +9,20 @@ export const ChallengeCreate = memo(() => {
         availableProfiles, invitedIds, toggleInvite,
         joinId, setJoinId, handleViewChallenge, handleCreate, loading
     } = useChallengeContext();
+
+    const [profileSearch, setProfileSearch] = useState('');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+    const filteredProfiles = useMemo(() => {
+        return availableProfiles.filter(p => 
+            !invitedIds.includes(p.id) && 
+            p.username.toLowerCase().includes(profileSearch.toLowerCase())
+        );
+    }, [availableProfiles, invitedIds, profileSearch]);
+
+    const invitedProfiles = useMemo(() => {
+        return availableProfiles.filter(p => invitedIds.includes(p.id));
+    }, [availableProfiles, invitedIds]);
 
     return (
         <div className="space-y-6">
@@ -86,35 +100,92 @@ export const ChallengeCreate = memo(() => {
                 </div>
             )}
 
-            <div className="space-y-4">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Invite Friends</label>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {loading && availableProfiles.length === 0 ? (
-                        [1, 2, 3].map(i => (
-                            <div key={i} className="shrink-0 w-20 h-24 bg-white/5 rounded-2xl animate-pulse" />
-                        ))
-                    ) : availableProfiles.length === 0 ? (
-                        <p className="text-[10px] text-gray-600 uppercase font-black">No other users found</p>
-                    ) : (
-                        availableProfiles.map((p) => (
-                            <button
-                                key={p.id}
-                                onClick={() => toggleInvite(p.id)}
-                                className={`shrink-0 flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${invitedIds.includes(p.id) ? 'border-correct bg-correct/10' : 'border-white/5 bg-white/5 hover:border-white/10'}`}
-                            >
-                                <div className="relative">
-                                    <img src={p.avatar_url || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded-full border border-white/10" alt="" />
-                                    {invitedIds.includes(p.id) && (
-                                        <div className="absolute -top-1 -right-1 bg-correct text-black rounded-full p-0.5 border-2 border-gray-900">
-                                            <Plus size={8} className="rotate-45" />
-                                        </div>
-                                    )}
+            {/* Redesigned Invite System */}
+            <div className="space-y-4 relative">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                    <UserPlus size={14} /> Invite Friends
+                </label>
+                
+                <div className="space-y-3">
+                    {/* Selected Users Chips */}
+                    {invitedProfiles.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {invitedProfiles.map(p => (
+                                <div key={p.id} className="bg-correct/20 border border-correct/30 px-3 py-1.5 rounded-full flex items-center gap-2 animate-in fade-in zoom-in duration-200">
+                                    <img src={p.avatar_url || `https://ui-avatars.com/api/?name=${p.username}`} className="w-4 h-4 rounded-full" alt="" />
+                                    <span className="text-[10px] font-black uppercase text-correct">{p.username}</span>
+                                    <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors">
+                                        <X size={12} />
+                                    </button>
                                 </div>
-                                <span className="text-[10px] font-bold max-w-[60px] truncate">{p.username}</span>
-                            </button>
-                        ))
+                            ))}
+                        </div>
                     )}
+
+                    {/* Search Input & Dropdown */}
+                    <div className="relative">
+                        <div className="relative group">
+                            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isDropdownOpen ? 'text-correct' : 'text-gray-500'}`} size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search by username..."
+                                value={profileSearch}
+                                onFocus={() => setIsDropdownOpen(true)}
+                                onChange={(e) => {
+                                    setProfileSearch(e.target.value);
+                                    setIsDropdownOpen(true);
+                                }}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/50 focus:bg-white/10 transition-all"
+                            />
+                            {profileSearch && (
+                                <button 
+                                    onClick={() => setProfileSearch('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Dropdown Menu */}
+                        {isDropdownOpen && (
+                            <div className="absolute z-50 w-full mt-2 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                                {filteredProfiles.length > 0 ? (
+                                    filteredProfiles.map(p => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => {
+                                                toggleInvite(p.id);
+                                                setProfileSearch('');
+                                                setIsDropdownOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left"
+                                        >
+                                            <img src={p.avatar_url || `https://ui-avatars.com/api/?name=${p.username}`} className="w-8 h-8 rounded-full border border-white/10" alt="" />
+                                            <div>
+                                                <p className="text-xs font-black text-white">{p.username}</p>
+                                                <p className="text-[9px] text-gray-500 uppercase font-bold">Available</p>
+                                            </div>
+                                            <Plus size={14} className="ml-auto text-gray-500 group-hover:text-correct" />
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="p-8 text-center">
+                                        <p className="text-[10px] text-gray-500 uppercase font-black">No users found</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* Click outside to close dropdown backdrop */}
+                {isDropdownOpen && (
+                    <div 
+                        className="fixed inset-0 z-40 pointer-events-auto" 
+                        onClick={() => setIsDropdownOpen(false)}
+                    />
+                )}
             </div>
 
             <div className="pt-4 border-t border-white/5 space-y-4">

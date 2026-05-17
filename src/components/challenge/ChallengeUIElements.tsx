@@ -1,14 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { Clock } from 'lucide-react';
+import { formatTime } from './lib';
 
 export const ChallengeSkeleton = memo(() => (
     <div className="space-y-4 animate-pulse">
         {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-2xl h-24" />
+            <div key={i} className="h-40 bg-white/5 rounded-4xl" />
         ))}
     </div>
 ));
+
 
 export const ErrorFallback = memo(({ message, onRetry }: { message: string, onRetry: () => void }) => (
     <div className="py-12 text-center">
@@ -78,7 +81,7 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
     const isFinished = useMemo(() => item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined', [item.status]);
 
     // Find the current high score among participants who have actually finished/played
-    const participants = item.challenge.participants || [];
+    const participants = useMemo(() => item.challenge.participants || [], [item.challenge.participants]);
     const maxScore = useMemo(() => {
         const scores = participants
             .filter((p: any) => p.status !== 'pending')
@@ -93,11 +96,11 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
     return (
         <button
             onClick={() => onSelect(item.challenge_id)}
-            className={`w-full text-left bg-gradient-to-br from-white/[0.03] to-transparent border ${isLeader && !isExpired ? 'border-correct/20' : 'border-white/5'} p-5 rounded-[2rem] hover:border-white/20 transition-all group relative overflow-hidden`}
+            className={`w-full text-left bg-linear-to-br from-white/3 to-transparent border ${isLeader && !isExpired ? 'border-correct/20' : 'border-white/5'} p-5 rounded-4xl hover:border-white/20 transition-all group relative overflow-hidden`}
         >
             {/* Background Glow for Leader */}
             {isLeader && !isExpired && (
-                <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-[40px] -mr-16 -mt-16 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-2xl -mr-16 -mt-16 pointer-events-none" />
             )}
 
             <div className="flex items-center justify-between mb-4">
@@ -133,9 +136,17 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] font-black uppercase text-gray-500">Score</p>
-                        <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
-                            {hasStarted ? myScore : '--'}
-                        </p>
+                        <div className="flex flex-col items-end">
+                            <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
+                                {hasStarted ? myScore : '--'}
+                            </p>
+                            {hasStarted && item.challenge.mode === 'LIVE' && item.time_taken && (
+                                <div className="flex items-center gap-1 text-[9px] font-bold text-white/40">
+                                    <Clock size={8} />
+                                    <span>{formatTime(item.time_taken)}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -171,9 +182,17 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className={`text-base font-black ${isPLeader ? 'text-correct' : pStarted ? 'text-red-500' : 'text-white/20'}`}>
-                                            {pStarted ? pScore : '--'}
-                                        </p>
+                                        <div className="flex flex-col items-end">
+                                            <p className={`text-base font-black ${isPLeader ? 'text-correct' : pStarted ? 'text-red-500' : 'text-white/20'}`}>
+                                                {pStarted ? pScore : '--'}
+                                            </p>
+                                            {pStarted && item.challenge.mode === 'LIVE' && p.time_taken && (
+                                                <div className="flex items-center gap-1 text-[8px] font-bold text-white/30">
+                                                    <Clock size={7} />
+                                                    <span>{formatTime(p.time_taken)}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );

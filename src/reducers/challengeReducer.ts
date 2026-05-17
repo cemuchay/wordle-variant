@@ -10,6 +10,8 @@ export interface ChallengeGameState {
     hintRecord: { letter: string; index: number; row?: number } | null;
     timeLeft: number | null;
     status: 'pending' | 'playing' | 'completed' | 'timed_out';
+    isSaving: boolean;
+    retryCount: number;
 }
 
 export type ChallengeGameAction =
@@ -22,7 +24,9 @@ export type ChallengeGameAction =
     | { type: 'TIME_UP' }
     | { type: 'SHAKE_GUESS' }
     | { type: 'STOP_SHAKE' }
-    | { type: 'SWITCH_LENGTH'; payload: any };
+    | { type: 'SWITCH_LENGTH'; payload: any }
+    | { type: 'SET_SAVING'; isSaving: boolean }
+    | { type: 'SET_RETRY'; count: number };
 
 export const initialChallengeState: ChallengeGameState = {
     guesses: [],
@@ -33,7 +37,9 @@ export const initialChallengeState: ChallengeGameState = {
     usedHint: false,
     hintRecord: null,
     timeLeft: null,
-    status: 'pending'
+    status: 'pending',
+    isSaving: false,
+    retryCount: 0
 };
 
 export function challengeGameReducer(state: ChallengeGameState, action: ChallengeGameAction): ChallengeGameState {
@@ -102,6 +108,18 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
             return {
                 ...state,
                 isShake: false,
+            };
+
+        case 'SET_SAVING':
+            return {
+                ...state,
+                isSaving: action.isSaving
+            };
+
+        case 'SET_RETRY':
+            return {
+                ...state,
+                retryCount: action.count
             };
 
         default:

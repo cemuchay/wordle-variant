@@ -65,8 +65,8 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                         <div className="flex items-center gap-2 min-h-[1.25rem]">
                             {isPlaying ? (
                                 <>
-                                    <button 
-                                        onClick={() => backAction ? backAction() : setIsPlaying(false)} 
+                                    <button
+                                        onClick={() => backAction ? backAction() : setIsPlaying(false)}
                                         className="p-1 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
                                     >
                                         <ArrowLeft size={16} />
@@ -78,10 +78,12 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                             </span>
                                         </div>
                                     )}
-                                    <AudioChatControls 
-                                        challengeId={selectedChallenge?.id} 
-                                        userId={myParticipation?.user_id} 
-                                    />
+                                    {selectedChallenge && myParticipation && (
+                                        <AudioChatControls
+                                            challengeId={selectedChallenge.id}
+                                            userId={myParticipation.user_id}
+                                        />
+                                    )}
                                 </>
                             ) : (
                                 <p className="text-gray-400 text-xs">
@@ -178,13 +180,13 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                                                             className="overflow-hidden space-y-4 pt-1"
                                                         >
                                                             <div className="space-y-4 bg-white/[0.02] p-4 rounded-2xl border border-white/5 relative">
-                                                                <button 
+                                                                <button
                                                                     onClick={clearFilters}
                                                                     className="absolute top-4 right-4 text-[9px] font-black uppercase text-correct hover:text-white transition-colors"
                                                                 >
                                                                     Clear All
                                                                 </button>
-                                                                
+
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Status</span>
                                                                     {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
@@ -276,7 +278,8 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,
                         hints_used: previewParticipant.hints_used,
-                        hint_record: previewParticipant.hint_record
+                        hint_record: previewParticipant.hint_record,
+                        time_taken: previewParticipant.time_taken
                     }}
                 />
             )}

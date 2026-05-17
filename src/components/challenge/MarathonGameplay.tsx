@@ -1,21 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { RegularGameplay } from './RegularGameplay';
 import { useChallengeContext } from '../../context/ChallengeContext';
+import { formatTime } from './lib';
 
 interface MarathonGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
     onFinish: () => void;
 }
+
 
 export const MarathonGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: MarathonGameplayProps) => {
     const { setTimeLeft } = useChallengeContext();
     const [selectedLength, setSelectedLength] = useState<number | null>(null);
+
+    const onBack = useCallback(() => setSelectedLength(null), []);
 
     if (selectedLength) {
         return (
@@ -26,7 +30,7 @@ export const MarathonGameplay = memo(({
                 submitChallengeResult={submitChallengeResult}
                 onFinish={onFinish}
                 selectedLength={selectedLength}
-                onBack={() => setSelectedLength(null)}
+                onBack={onBack}
                 setTimeLeftGlobal={setTimeLeft}
             />
         );
@@ -62,8 +66,8 @@ export const MarathonGameplay = memo(({
                                 <div className="text-left">
                                     <p className="text-xs font-black uppercase">{l} Letters</p>
                                     <p className="text-[10px] text-gray-500">
-                                        {isFinished 
-                                            ? (isCompleted ? 'Completed' : 'Failed') 
+                                        {isFinished
+                                            ? (isCompleted ? 'Completed' : 'Failed')
                                             : (prog ? 'In Progress' : 'Not Started')}
                                     </p>
                                 </div>
@@ -71,6 +75,9 @@ export const MarathonGameplay = memo(({
                             {prog && (
                                 <div className="text-right">
                                     <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/6 Tries</p>
+                                    {challenge.mode === 'LIVE' && prog.time_taken && (
+                                        <p className="text-[9px] font-black text-white/30">{formatTime(prog.time_taken)}</p>
+                                    )}
                                 </div>
                             )}
                         </button>

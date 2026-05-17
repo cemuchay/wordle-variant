@@ -10,7 +10,7 @@ interface RegularGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
     onFinish: () => void;
     selectedLength?: number; // Optional override for Marathon mode
     onBack?: () => void; // Optional back handler
@@ -25,7 +25,11 @@ export const RegularGameplay = memo(({
     useEffect(() => {
         const back = onBack || onFinish;
         setBackAction(() => back);
-        return () => setBackAction(null);
+        return () => {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            //@ts-expect-error
+            setBackAction((prev: any) => prev === back ? null : prev);
+        };
     }, [onBack, onFinish, setBackAction]);
 
     const { state, actions, isSaving, retryCount, wordLength } = useChallengeGameEngine({

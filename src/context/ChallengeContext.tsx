@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode, useRef } from 'react';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { useApp } from './AppContext';
-import { deobfuscateWord, calculateSkillIndex } from '../lib/game-logic';
+import { deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 
 interface ChallengeContextType {
@@ -11,7 +11,7 @@ interface ChallengeContextType {
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
-    
+
     // Form State
     mode: 'LIVE' | 'ANYTIME';
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
@@ -19,7 +19,7 @@ interface ChallengeContextType {
     setLength: (length: number) => void;
     maxTime: number | null;
     setMaxTime: (time: number | null) => void;
-    
+
     // Data State
     selectedChallenge: Challenge | null;
     setSelectedChallenge: (c: Challenge | null) => void;
@@ -28,7 +28,7 @@ interface ChallengeContextType {
     myChallenges: any[];
     availableProfiles: any[];
     invitedIds: string[];
-    
+
     // Filter State
     searchQuery: string;
     setSearchQuery: (q: string) => void;
@@ -40,7 +40,7 @@ interface ChallengeContextType {
     setLengthFilter: (l: 'ALL' | number) => void;
     clearFilters: () => void;
     filteredChallenges: any[];
-    
+
     // Actions
     handleViewChallenge: (id: string) => Promise<void>;
     handleCreate: () => Promise<void>;
@@ -49,7 +49,7 @@ interface ChallengeContextType {
     copyLink: (challenge: Challenge) => void;
     loadMyChallenges: () => Promise<void>;
     submitResult: (result: any, wordLength?: number) => Promise<boolean>;
-    
+
     // Helpers
     loading: boolean;
     error: string | null;
@@ -69,18 +69,18 @@ interface ChallengeContextType {
 
 const ChallengeContext = createContext<ChallengeContextType | undefined>(undefined);
 
-export const ChallengeProvider = ({ children, user, onChallengeCreated, initialChallengeId }: { 
-    children: ReactNode, 
-    user: any, 
+export const ChallengeProvider = ({ children, user, onChallengeCreated, initialChallengeId }: {
+    children: ReactNode,
+    user: any,
     onChallengeCreated?: (challenge: Challenge, invitedUsernames: string[], invitedIds: string[]) => void,
     initialChallengeId?: string | null
 }) => {
     const { triggerToast, setChallengeUnreadCount } = useApp();
     const challengeApi = useChallenge(user);
-    const { 
-        createChallenge, fetchChallenge, joinChallenge, subscribeToParticipants, 
-        participants, fetchMyChallenges, fetchProfiles, loading, error, 
-        startChallenge, submitChallengeResult, submitMarathonResult 
+    const {
+        createChallenge, fetchChallenge, joinChallenge, subscribeToParticipants,
+        participants, fetchMyChallenges, fetchProfiles, loading, error,
+        startChallenge, submitChallengeResult, submitMarathonResult
     } = challengeApi;
 
     // UI & Navigation
@@ -129,6 +129,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Adjust maxTime defaults based on mode
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (mode === 'LIVE') setMaxTime(5);
         else setMaxTime(null);
     }, [mode]);
@@ -187,7 +188,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const currentMarathon = myParticipation.marathon_progress || [];
             const updatedMarathon = [...currentMarathon];
             const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
-            
+
             if (idx > -1) {
                 updatedMarathon[idx] = { ...updatedMarathon[idx], ...result };
             } else {
@@ -196,6 +197,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
             let totalScore = 0;
             let totalAttempts = 0;
+            let totalTimeTaken = 0;
             let completedCount = 0;
             const lengths = [3, 4, 5, 6, 7];
 
@@ -203,6 +205,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 const prog = updatedMarathon.find(p => p.word_length === l);
                 if (prog) {
                     totalAttempts += prog.attempts || 0;
+                    totalTimeTaken += prog.time_taken || 0;
                     if (prog.status === 'completed' || prog.status === 'timed_out') {
                         totalScore += prog.score || 0;
                         completedCount++;
@@ -214,6 +217,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             finalUpdateData = {
                 score: totalScore,
                 attempts: totalAttempts,
+                time_taken: totalTimeTaken,
                 status: allCompleted ? 'completed' : 'playing',
                 hints_used: updatedMarathon.some(p => p.hints_used),
                 marathon_progress: updatedMarathon // Optimistic sync
@@ -235,66 +239,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setMyChallenges(data);
     }, [fetchMyChallenges]);
 
-    const loadProfiles = useCallback(async () => {
-        const profiles = await fetchProfiles();
-        setAvailableProfiles(profiles.filter((p: any) => p.id !== user?.id));
-    }, [fetchProfiles, user?.id]);
-
-    useEffect(() => {
-        if (initialChallengeId && !initialProcessed.current) {
-            initialProcessed.current = true;
-            handleViewChallenge(initialChallengeId);
-        } else {
-            loadMyChallenges();
-            loadProfiles();
-        }
-    }, [user?.id]); // Re-load when user changes
-
-    // Sync myParticipation and previewParticipant from the participants array (real-time updates)
-    useEffect(() => {
-        if (participants.length > 0 && user) {
-            const currentFromServer = participants.find(p => p.user_id === user.id);
-            const isMarathon = selectedChallenge?.word_length === 1;
-            
-            if (currentFromServer) {
-                // Determine if server data is different from local state
-                const isDifferent = 
-                    JSON.stringify(currentFromServer.guesses) !== JSON.stringify(myParticipation?.guesses) ||
-                    JSON.stringify(currentFromServer.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
-                    currentFromServer.status !== myParticipation?.status ||
-                    currentFromServer.score !== myParticipation?.score;
-
-                if (!isPlaying || isDifferent) {
-                    // If we are playing, we only sync if the server has MORE progress
-                    if (isPlaying) {
-                        let shouldSync = false;
-                        if (isMarathon) {
-                            const serverSubCount = currentFromServer.marathon_progress?.length || 0;
-                            const localSubCount = myParticipation?.marathon_progress?.length || 0;
-                            const serverGuessCount = currentFromServer.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
-                            const localGuessCount = myParticipation?.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
-                            
-                            shouldSync = serverSubCount > localSubCount || serverGuessCount > localGuessCount;
-                        } else {
-                            const serverGuessCount = currentFromServer.guesses?.length || 0;
-                            const localGuessCount = myParticipation?.guesses?.length || 0;
-                            shouldSync = serverGuessCount > localGuessCount;
-                        }
-
-                        if (shouldSync) setMyParticipation(currentFromServer);
-                    } else {
-                        setMyParticipation(currentFromServer);
-                    }
-                }
-            }
-            
-            if (previewParticipant) {
-                const updated = participants.find(p => p.id === previewParticipant.id);
-                if (updated) setPreviewParticipant(updated);
-            }
-        }
-    }, [participants, user?.id, isPlaying, selectedChallenge?.word_length]);
-
     const cleanupSubscription = useCallback(() => {
         if (channelRef.current) {
             supabase.removeChannel(channelRef.current);
@@ -304,7 +248,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     useEffect(() => cleanupSubscription, [cleanupSubscription]);
 
+    const loadProfiles = useCallback(async () => {
+        const profiles = await fetchProfiles();
+        setAvailableProfiles(profiles.filter((p: any) => p.id !== user?.id));
+    }, [fetchProfiles, user?.id]);
     // Action Handlers
+
     const handleViewChallenge = useCallback(async (id: string) => {
         const challenge = await fetchChallenge(id);
         if (challenge) {
@@ -323,6 +272,67 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [cleanupSubscription, triggerToast, fetchChallenge, joinChallenge, subscribeToParticipants]);
 
+    useEffect(() => {
+        if (initialChallengeId && !initialProcessed.current) {
+            initialProcessed.current = true;
+            handleViewChallenge(initialChallengeId);
+        } else {
+            loadMyChallenges();
+            loadProfiles();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id]); // Re-load when user changes
+
+    // Sync myParticipation and previewParticipant from the participants array (real-time updates)
+    useEffect(() => {
+        if (participants.length > 0 && user) {
+            const currentFromServer = participants.find(p => p.user_id === user.id);
+            const isMarathon = selectedChallenge?.word_length === 1;
+
+            if (currentFromServer) {
+                // Determine if server data is different from local state
+                const isDifferent =
+                    JSON.stringify(currentFromServer.guesses) !== JSON.stringify(myParticipation?.guesses) ||
+                    JSON.stringify(currentFromServer.marathon_progress) !== JSON.stringify(myParticipation?.marathon_progress) ||
+                    currentFromServer.status !== myParticipation?.status ||
+                    currentFromServer.score !== myParticipation?.score;
+
+                if (!isPlaying || isDifferent) {
+                    // If we are playing, we only sync if the server has MORE progress
+                    if (isPlaying) {
+                        // eslint-disable-next-line no-useless-assignment
+                        let shouldSync = false;
+                        if (isMarathon) {
+                            const serverSubCount = currentFromServer.marathon_progress?.length || 0;
+                            const localSubCount = myParticipation?.marathon_progress?.length || 0;
+                            const serverGuessCount = currentFromServer.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
+                            const localGuessCount = myParticipation?.marathon_progress?.reduce((acc, p) => acc + (p.guesses?.length || 0), 0) || 0;
+
+                            shouldSync = serverSubCount > localSubCount || serverGuessCount > localGuessCount;
+                        } else {
+                            const serverGuessCount = currentFromServer.guesses?.length || 0;
+                            const localGuessCount = myParticipation?.guesses?.length || 0;
+                            shouldSync = serverGuessCount > localGuessCount;
+                        }
+
+                        // eslint-disable-next-line react-hooks/set-state-in-effect
+                        if (shouldSync) setMyParticipation(currentFromServer);
+                    } else {
+                        setMyParticipation(currentFromServer);
+                    }
+                }
+            }
+
+            if (previewParticipant) {
+                const updated = participants.find(p => p.id === previewParticipant.id);
+                if (updated) setPreviewParticipant(updated);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [participants, user?.id, isPlaying, selectedChallenge?.word_length]);
+
+
+
     const handleCreate = useCallback(async () => {
         const challenge = await createChallenge(mode, length, mode === 'LIVE' ? maxTime : null, invitedIds);
         if (challenge) {
@@ -330,21 +340,21 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 .filter(p => invitedIds.includes(p.id))
                 .map(p => p.username);
             if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
-            
+
             // Reset Form Defaults
             setMode('ANYTIME');
             setLength(5);
             setMaxTime(null);
             setInvitedIds([]);
-            
+
             handleViewChallenge(challenge.id);
         }
     }, [mode, length, maxTime, invitedIds, availableProfiles, createChallenge, onChallengeCreated, handleViewChallenge]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
-        
-        let updatedChallenge = { ...selectedChallenge };
+
+        const updatedChallenge = { ...selectedChallenge };
 
         if (selectedChallenge.word_length === 1) {
             try {
@@ -407,6 +417,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             error,
             joinId, setJoinId,
             submitChallengeResult,
+            submitMarathonResult,
             startChallenge,
             previewParticipant,
             setPreviewParticipant,
@@ -421,6 +432,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useChallengeContext = () => {
     const context = useContext(ChallengeContext);
     if (context === undefined) {

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { RegularGameplay } from './RegularGameplay';
 import { MarathonGameplay } from './MarathonGameplay';
@@ -15,7 +15,7 @@ export const ChallengeGameplayContainer = memo(() => {
 
     const isMarathon = selectedChallenge.word_length === 1;
 
-    const onFinish = () => setIsPlaying(false);
+    const onFinish = useCallback(() => setIsPlaying(false), [setIsPlaying]);
 
     if (isMarathon) {
         return (
