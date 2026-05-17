@@ -91,7 +91,7 @@ export const useGameEngine = (date: string) => {
 
             setTimeout(() => {
                 dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen: true });
-                triggerToast(message || state.gameMessage, 8500);
+                triggerToast(message || state.gameMessage, 5000);
             }, revealDelay);
         }
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
