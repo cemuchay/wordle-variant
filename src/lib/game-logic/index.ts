@@ -392,22 +392,74 @@ export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
-   guesses: GuessResult[][]
+   guesses: GuessResult[][],
+   gameDate?: string
 ) => {
-   // Base score: 1000 for 1st try, 800 for 2nd, etc.
-   let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+   // New scoring system logic starting May 18, 2026
+   const targetDate = new Date('2026-05-18');
+   const currentDate = gameDate ? new Date(gameDate) : new Date();
+   const isNewSystem = currentDate >= targetDate;
 
-   // Penalty for being a scrub
+   if (!isNewSystem) {
+      // Legacy scoring
+      let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+      if (usedHint) score -= 100;
+
+      let bonus = 0;
+      guesses.forEach((row) => {
+         row.forEach((cell) => {
+            if (cell.status === "correct") bonus += 15;
+            if (cell.status === "present") bonus += 2;
+            if (cell.status === "absent") bonus -= 10;
+         });
+      });
+      return Math.floor(score + bonus);
+   }
+
+   // New Scoring System (starting 18th May 2026)
+   const lastGuess = guesses[guesses.length - 1];
+   const won = lastGuess && lastGuess.every(cell => cell.status === "correct");
+
+   // 1. Base Point Calculation
+   // fail base performance is 0
+   let score = 0;
+   if (won) {
+      score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+   }
+
+   // 2. Hint Penalty
    if (usedHint) score -= 100;
 
-   // Precision weights
+   // 3. Discovery Bonuses & Penalties
    let bonus = 0;
+   const discoveredGreens = new Set<number>(); // index
+   const discoveredYellows = new Set<string>(); // index-letter
+   const usedBlacks = new Set<string>(); // letter
 
    guesses.forEach((row) => {
-      row.forEach((cell) => {
-         if (cell.status === "correct") bonus += 15;
-         if (cell.status === "present") bonus += 2;
-         if (cell.status === "absent") bonus -= 10;
+      row.forEach((cell, index) => {
+         if (cell.status === "correct") {
+            // green one off +40
+            if (!discoveredGreens.has(index)) {
+               bonus += 40;
+               discoveredGreens.add(index);
+            }
+         } else if (cell.status === "present") {
+            // yellow +25 (one-off per placement+letter)
+            const yellowKey = `${index}-${cell.letter}`;
+            if (!discoveredYellows.has(yellowKey)) {
+               bonus += 25;
+               discoveredYellows.add(yellowKey);
+            }
+         } else if (cell.status === "absent") {
+            // each black -5, if used again -20
+            if (usedBlacks.has(cell.letter)) {
+               bonus -= 20;
+            } else {
+               bonus -= 5;
+               usedBlacks.add(cell.letter);
+            }
+         }
       });
    });
 
@@ -429,7 +481,8 @@ export const syncGameState = async (
          payload.guesses.length,
          payload.config.maxAttempts,
          payload.usedHint,
-         payload.guesses
+         payload.guesses,
+         date
       )
       : 0;
 

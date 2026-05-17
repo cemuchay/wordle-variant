@@ -261,7 +261,7 @@ export const useChallengeGameEngine = ({
         let resultPayload: any;
         if (isMarathon) {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0]);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -280,7 +280,7 @@ export const useChallengeGameEngine = ({
             }
         } else {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses);
+                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0]);
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
