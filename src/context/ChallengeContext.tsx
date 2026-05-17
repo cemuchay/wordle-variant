@@ -87,8 +87,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(user?.id);
     const { data: profilesData } = useAvailableProfiles(user?.id);
-    const { 
-        createChallenge: createMutation, 
+    const {
+        createChallenge: createMutation,
         submitResult: submitMutation,
         joinChallenge: joinMutation,
         startChallenge: startMutation,

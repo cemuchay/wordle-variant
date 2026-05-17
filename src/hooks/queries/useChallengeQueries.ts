@@ -50,6 +50,7 @@ export const useAvailableProfiles = (currentUserId: string | undefined) => {
             if (error) throw error;
             return data.filter(p => p.id !== currentUserId);
         },
+        enabled: !!currentUserId,
     });
 };
 
