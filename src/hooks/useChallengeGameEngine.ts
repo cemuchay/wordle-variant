@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useReducer, useState, useMemo, useRef } from 'react';
 import { getWordLists } from '../data/words';
-import { calculateSkillIndex, checkGuess, getHint, getLetterStatuses, isHintDisabled } from '../lib/game-logic';
+import { calculateSkillIndex, checkGuess, deobfuscateWord, getHint, getLetterStatuses, isHintDisabled } from '../lib/game-logic';
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
 import { useChallengeStore } from '../store/useChallengeStore';
 
@@ -23,12 +23,17 @@ export const useChallengeGameEngine = ({
     const marathonWords = useMemo(() => {
         if (!isMarathon) return null;
         try {
-            return JSON.parse(challenge.target_word);
+            const words = JSON.parse(challenge.target_word);
+            const decrypted: Record<number, string> = {};
+            Object.entries(words).forEach(([len, word]) => {
+                decrypted[Number(len)] = deobfuscateWord(word as string, challenge.salt);
+            });
+            return decrypted;
         } catch (e) {
             console.error("Failed to parse marathon words", e);
             return null;
         }
-    }, [challenge.target_word, isMarathon]);
+    }, [challenge.target_word, isMarathon, challenge.salt]);
 
     const [state, dispatch] = useReducer(challengeGameReducer, {
         ...initialChallengeState,
@@ -99,7 +104,7 @@ export const useChallengeGameEngine = ({
 
     // Word Length & Target Word Resolution
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;
-    const targetWord = isMarathon ? marathonWords[selectedLength!] : challenge.target_word;
+    const targetWord = isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
 
     // Helper to extract guesses for current word with extreme defensiveness
     const getIncomingGuesses = useCallback(() => {

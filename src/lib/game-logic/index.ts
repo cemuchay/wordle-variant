@@ -160,16 +160,25 @@ export const obfuscateWord = (word: string, salt: string) => {
  * @param salt - Must match the salt used for obfuscation.
  */
 export const deobfuscateWord = (obfuscated: string, salt: string) => {
+   if (!obfuscated) return "";
    try {
       const decoded = atob(obfuscated);
-      return decoded.split('').map((char, i) => {
+      const result = decoded.split('').map((char, i) => {
          const charCode = char.charCodeAt(0);
          const saltCode = salt.charCodeAt(i % salt.length);
          return String.fromCharCode(charCode ^ saltCode);
       }).join('');
+
+      // If the result contains non-printable characters or is not uppercase A-Z, 
+      // it's likely already deobfuscated or the salt is wrong.
+      if (/^[A-Z]+$/.test(result)) {
+         return result;
+      }
+      return obfuscated;
    } catch (e) {
-      console.error("Deobfuscation failed:", e);
-      return "";
+      // If atob fails, it's definitely not obfuscated Base64.
+      console.log("Deobfuscation failed:", e);
+      return obfuscated;
    }
 };
 

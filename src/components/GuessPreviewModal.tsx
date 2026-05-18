@@ -104,7 +104,7 @@ const GuessPreviewModal: React.FC<{
 
         if (isMarathon && targetWord) {
             try {
-                const words = JSON.parse(targetWord);
+                const words = typeof targetWord === 'string' ? JSON.parse(targetWord) : targetWord;
                 const obfuscatedWord = words[marathonLength] || "";
                 wordToUse = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
             } catch (e) {

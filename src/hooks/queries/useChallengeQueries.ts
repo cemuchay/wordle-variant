@@ -158,9 +158,13 @@ export const useChallengeMutations = () => {
             if (error) throw error;
             return true;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
-            queryClient.invalidateQueries({ queryKey: ['challenge'] });
+        onSuccess: (_, variables) => {
+            // Only invalidate if the game is actually finished or timed out
+            // This avoids heavy re-fetches on every single guess
+            if (variables.result.status !== 'playing') {
+                queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+                queryClient.invalidateQueries({ queryKey: ['challenge'] });
+            }
         }
     });
 
@@ -234,9 +238,12 @@ export const useChallengeMutations = () => {
             if (error) throw error;
             return true;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
-            queryClient.invalidateQueries({ queryKey: ['challenge'] });
+        onSuccess: (_, variables) => {
+            // Only invalidate if this specific length is finished
+            if (variables.result.status !== 'playing') {
+                queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+                queryClient.invalidateQueries({ queryKey: ['challenge'] });
+            }
         }
     });
 

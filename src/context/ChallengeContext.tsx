@@ -1,13 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createContext, useContext, useEffect, useCallback, useMemo, type ReactNode, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useAvailableProfiles, useChallengeMutations, useMyChallenges } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
-import { useApp } from './AppContext';
-import { deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
-import { useMyChallenges, useAvailableProfiles, useChallengeMutations } from '../hooks/queries/useChallengeQueries';
-import { useShallow } from 'zustand/react/shallow';
+import { useApp } from './AppContext';
 
 interface ChallengeContextType {
     // UI State
@@ -154,7 +153,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (!p || !challenge) return p;
         // Marathon mode uses per-word timers, bypass global LIVE timeout
         if (challenge.word_length === 1) return p;
-        
+
         if (challenge.mode !== 'LIVE' || !challenge.max_time || p.status !== 'playing' || !p.started_at) return p;
 
         const start = new Date(p.started_at).getTime();
@@ -239,24 +238,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const handleStartGame = useCallback(async () => {
         if (!store.selectedChallenge || !store.myParticipation) return;
 
-        const updatedChallenge = { ...store.selectedChallenge };
-
-        if (store.selectedChallenge.word_length === 1) {
-            try {
-                const obfuscatedWords = JSON.parse(store.selectedChallenge.target_word);
-                const plainWords: Record<number, string> = {};
-                Object.entries(obfuscatedWords).forEach(([len, word]) => {
-                    plainWords[Number(len)] = deobfuscateWord(word as string, store.selectedChallenge!.salt);
-                });
-                updatedChallenge.target_word = JSON.stringify(plainWords);
-            } catch (e) {
-                console.error("Failed to parse marathon words", e);
-            }
-        } else {
-            updatedChallenge.target_word = deobfuscateWord(store.selectedChallenge.target_word, store.selectedChallenge.salt);
-        }
-
-        store.setSelectedChallenge(updatedChallenge);
         if (store.myParticipation.status === 'pending') {
             await startMutation.mutateAsync(store.myParticipation.id);
         }
@@ -267,16 +248,34 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (!store.myParticipation) return false;
 
         const isMarathon = store.selectedChallenge?.word_length === 1;
-        let finalUpdateData: any;
 
         if (isMarathon && wordLength) {
-            const success = await marathonMutation.mutateAsync({
+            const isWordFinished = result.status !== 'playing';
+            
+            // 1. Always update the specific word progress
+            const marathonPromise = marathonMutation.mutateAsync({
                 participationId: store.myParticipation.id,
                 wordLength,
                 result
             });
-            if (!success) return false;
 
+            // If not finishing the word, we can just wait for the marathon update
+            if (!isWordFinished) {
+                const success = await marathonPromise;
+                if (!success) return false;
+
+                // Update local state for immediate UI feedback without full re-fetch
+                const currentMarathon = store.myParticipation.marathon_progress || [];
+                const updatedMarathon = [...currentMarathon];
+                const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
+                if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], ...result };
+                else updatedMarathon.push({ word_length: wordLength, ...result } as any);
+
+                store.setMyParticipation({ ...store.myParticipation, marathon_progress: updatedMarathon });
+                return true;
+            }
+
+            // 2. Word finished: Calculate aggregates and update main participation
             const currentMarathon = store.myParticipation.marathon_progress || [];
             const updatedMarathon = [...currentMarathon];
             const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
@@ -306,26 +305,37 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             });
 
             const allCompleted = completedCount === 5;
-            finalUpdateData = {
+            const finalUpdateData = {
                 score: totalScore,
                 attempts: totalAttempts,
                 time_taken: totalTimeTaken,
-                status: allCompleted ? 'completed' : 'playing',
+                status: (allCompleted ? 'completed' : 'playing') as 'completed' | 'playing',
                 hints_used: updatedMarathon.some(p => p.hints_used)
             };
 
-            // Update local state with the full progress object for UI consistency
-            store.setMyParticipation(store.myParticipation ? {
-                ...store.myParticipation,
-                ...finalUpdateData,
-                marathon_progress: updatedMarathon
-            } : null);
-        } else {
-            finalUpdateData = { ...result };
-            store.setMyParticipation(store.myParticipation ? { ...store.myParticipation, ...finalUpdateData } : null);
-        }
+            // Run both updates in parallel for better performance
+            const [mSuccess, sSuccess] = await Promise.all([
+                marathonPromise,
+                submitMutation.mutateAsync({ participationId: store.myParticipation.id, result: finalUpdateData })
+            ]);
 
-        return await submitMutation.mutateAsync({ participationId: store.myParticipation.id, result: finalUpdateData });
+            if (mSuccess && sSuccess) {
+                store.setMyParticipation({
+                    ...store.myParticipation,
+                    ...finalUpdateData,
+                    marathon_progress: updatedMarathon
+                });
+                return true;
+            }
+            return false;
+        } else {
+            // Regular Challenge Mode
+            const success = await submitMutation.mutateAsync({ participationId: store.myParticipation.id, result });
+            if (success) {
+                store.setMyParticipation(store.myParticipation ? { ...store.myParticipation, ...result } : null);
+            }
+            return success;
+        }
     }, [store, marathonMutation, submitMutation]);
 
     // Initial Load Logic
