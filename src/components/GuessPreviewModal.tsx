@@ -89,7 +89,7 @@ const GuessPreviewModal: React.FC<{
         // 2. PROCESS ROWS: Calculate deductions for rows 1 to (N-1), award points on Row N
         gameData.guesses.forEach((row: any[], rowIndex: number) => {
             let rowBonus = 0;
-            const isLastRow = rowIndex === gameData.guesses.length - 1;
+            const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
             const rowWord = row.map(c => c.letter).join("").toUpperCase();
 
             const won = row.every(cell => cell.status === 'correct');
@@ -156,7 +156,30 @@ const GuessPreviewModal: React.FC<{
 
     const breakdown = getBreakdown();
 
+    if (!gameData || !breakdown) return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-130 p-4" onClick={onClose}>
+            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
+                    <X size={20} />
+                </button>
+
+                <p className="text-sm uppercase tracking-tighter mb-4 pb-4 text-center text-gray-100 font-bold">{entry.username || entry.profiles?.username}'s Guesses</p>
+                <div className="flex gap-2">
+                    {Array(5).fill(null).map((_, i) => <div key={i} className="flex-1 bg-gray-800 rounded-lg aspect-square flex items-center justify-center" />)}
+                </div>
+
+                {loading && (
+                    <div className="mt-6 text-center text-gray-400">
+                        <Loader2 className="animate-spin mx-auto mb-2" />
+                        Fetching guess data...
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+
     return (
+
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-130 p-4" onClick={onClose}>
             <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">

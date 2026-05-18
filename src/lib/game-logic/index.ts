@@ -494,16 +494,26 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
  *    - HINT PENALTY: -100.
  *    - LOSS: No payoff, base score is 0.
  */
-export const calculateSkillIndex = (
+export const calculateSkillIndex = ({
+   attempts,
+   maxAttempts,
+   usedHint,
+   guesses,
+   targetWord,
+   gameDate,
+   hintRecord
+}: {
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
    guesses: GuessResult[][],
    targetWord: string,
    gameDate?: string,
-   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-   _hintRecord?: { index: number; letter: string } | null
+   hintRecord?: { index: number; letter: string } | null
+}
 ) => {
+   //REMOVE:  
+   console.log(hintRecord)
    const targetDate = new Date('2026-05-18');
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
@@ -595,14 +605,15 @@ export const syncGameState = async (
    const isGameOver = payload.status !== "playing";
 
    const skillScore = isGameOver
-      ? calculateSkillIndex(
-         payload.guesses.length,
-         payload.config.maxAttempts,
-         payload.usedHint,
-         payload.guesses,
-         date,
-         payload.hintRecord
-      )
+      ? calculateSkillIndex({
+         attempts: payload.guesses.length,
+         maxAttempts: payload.config.maxAttempts,
+         usedHint: payload.usedHint,
+         guesses: payload.guesses,
+         gameDate: date,
+         hintRecord: payload.hintRecord,
+         targetWord: payload.config.targetWord,
+      })
       : 0;
 
    const { error } = await supabase.from("scores").upsert(
