@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { getDailyConfig } from "../lib/game-logic";
+import { SCORING, MAX_ATTEMPTS } from "../constants/game";
+import { Z_INDEX } from "../constants/ui";
+import { CHALLENGE_CONFIG } from "../constants/challenge";
 
 const formatTime = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return null;
@@ -46,9 +49,9 @@ const GuessPreviewModal: React.FC<{
             const isMe = entry.user_id === myParticipation?.user_id;
             const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === marathonLength);
             const myFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
-            
+
             const prog = entry.marathon_progress?.find((p: any) => p.word_length === marathonLength);
-            
+
             if (prog && (isMe || myFinished)) {
                 // eslint-disable-next-line react-hooks/set-state-in-effect
                 setGameData({
@@ -92,7 +95,7 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [date, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress]);
+    }, [date, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress]);
 
     const getBreakdown = () => {
         if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
@@ -125,7 +128,7 @@ const GuessPreviewModal: React.FC<{
 
             if (isLastRow && won) {
                 // THE PAYOFF: Award the full discovery points
-                const discoveryPoints = wordLength * 40;
+                const discoveryPoints = wordLength * SCORING.POINTS_PER_LETTER;
                 rowBonus += discoveryPoints;
             } else {
                 // THE DEDUCTIONS: Evaluate every letter entity individually
@@ -134,17 +137,17 @@ const GuessPreviewModal: React.FC<{
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
-                        rowBonus -= 15;
+                        rowBonus -= SCORING.YELLOW_PENALTY;
                     }
 
                     // CASE: BLACK (Absent)
                     else if (cell.status === 'absent') {
                         if (targetChars.includes(letter)) {
-                            rowBonus -= 5;
+                            rowBonus -= SCORING.ABSENT_PENALTY;
                         } else if (knownBlacks.has(letter)) {
-                            rowBonus -= 20;
+                            rowBonus -= SCORING.REPEATED_ABSENT_PENALTY;
                         } else {
-                            rowBonus -= 5;
+                            rowBonus -= SCORING.ABSENT_PENALTY;
                             knownBlacks.add(letter);
                         }
                     }
@@ -166,16 +169,15 @@ const GuessPreviewModal: React.FC<{
         if (gameData.hints_used && gameData.hint_record?.row !== undefined) {
             const rowBonus = rows[gameData.hint_record.row - 1];
             if (rowBonus !== undefined) {
-                totalBonus -= 100;
-                localHint -= 100;
+                totalBonus -= SCORING.HINT_PENALTY;
+                localHint -= SCORING.HINT_PENALTY;
             }
         }
 
         // 3. FINAL AGGREGATION
-        const maxAttempts = 6;
         const currentAttempts = gameData.guesses.length;
         const won = gameData.guesses[currentAttempts - 1]?.every((c: any) => c.status === 'correct');
-        const baseScore = won ? Math.floor(((maxAttempts - currentAttempts + 1) / maxAttempts) * 1000) : 0;
+        const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
 
         return { rows, base: baseScore, bonus: totalBonus, hint: localHint };
     };
@@ -186,7 +188,7 @@ const GuessPreviewModal: React.FC<{
 
     return (
 
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-130 p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.GUESS_PREVIEW }} onClick={onClose}>
             <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />
@@ -196,7 +198,7 @@ const GuessPreviewModal: React.FC<{
 
                 {isMarathon && (
                     <div className="flex justify-center gap-1 mb-4 border-b border-white/5 pb-4">
-                        {[3, 4, 5, 6, 7].map(l => {
+                        {CHALLENGE_CONFIG.MARATHON_LENGTHS.map(l => {
                             const prog = entry.marathon_progress?.find((p: any) => p.word_length === l);
                             const isPlayed = !!prog;
                             return (

@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect, useRef } from 'react';
 import type { GuessResult } from '../types/game';
+import { ANIMATION_DURATION } from '../constants/ui';
 
 interface GridProps {
   wordLength: number;
@@ -21,7 +22,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       setRevealingRowIndex(guesses.length - 1);
       const timer = setTimeout(() => {
         setRevealingRowIndex(null);
-      }, wordLength * 150 + 400); // Wait for reveal animation to finish
+      }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400); // Wait for reveal animation to finish
       return () => clearTimeout(timer);
     }
     prevGuessesLength.current = guesses.length;
@@ -62,7 +63,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                   res.status === 'present' ? 'animate-reveal-present' :
                     'animate-reveal-absent'
               ) : ''}`}
-            style={isLastRow ? { animationDelay: `${j * 150}ms`, animationFillMode: 'both' } : {}}
+            style={isLastRow ? { animationDelay: `${j * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' } : {}}
           >
             {res.letter}
           </div>

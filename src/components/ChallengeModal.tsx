@@ -6,6 +6,7 @@ import { type Challenge } from '../hooks/useChallenge';
 import { ChallengeProvider, useChallengeContext } from '../context/ChallengeContext';
 import GuessPreviewModal from './GuessPreviewModal';
 import { AudioChatControls } from './challenge/AudioChatControls';
+import { Z_INDEX, ANIMATION_DURATION } from '../constants/ui';
 
 import { useChallengeStore } from '../store/useChallengeStore';
 
@@ -14,6 +15,7 @@ import { ChallengeCreate } from './challenge/ChallengeCreate';
 import { ChallengeLobby } from './challenge/ChallengeLobby';
 import { ChallengeGameplayContainer } from './challenge/ChallengeGameplayContainer';
 import { ChallengeSkeleton, ErrorFallback, ChallengeItem } from './challenge/ChallengeUIElements';
+import { WORD_LENGTHS } from '../constants/game';
 
 interface ChallengeModalProps {
     isOpen: boolean;
@@ -37,7 +39,7 @@ const GameplayTimer = memo(() => {
 
 const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: Z_INDEX.MODAL_BACKDROP }}>
             <div className="flex flex-col h-full w-full overflow-hidden bg-background">
                 <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
@@ -196,6 +198,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         initial={{ opacity: 0, x: isPlaying ? 20 : -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: isPlaying ? -20 : 20 }}
+                        transition={{ duration: ANIMATION_DURATION.NORMAL / 1000 }}
                         className="flex flex-col h-full overflow-hidden"
                     >
                         {isPlaying ? (
@@ -318,7 +321,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                                     >
                                                                         Marathon
                                                                     </button>
-                                                                    {[3, 4, 5, 6, 7].map((l) => (
+                                                                    {WORD_LENGTHS.map((l) => (
                                                                         <button
                                                                             key={l}
                                                                             onClick={() => setLengthFilter(l)}
@@ -401,10 +404,11 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     return (
         <ChallengeProvider user={user} onChallengeCreated={onChallengeCreated} initialChallengeId={initialChallengeId}>
-            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" style={{ zIndex: Z_INDEX.MODAL_CONTENT }}>
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
                     className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
                 >
                     <ChallengeModalContent onClose={onClose} user={user} />

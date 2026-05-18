@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Bell, Info } from 'lucide-react';
 import type { Announcement } from '../data/announcements';
+import { Z_INDEX } from '../constants/ui';
 
 interface Props {
   announcement: Announcement;
@@ -12,7 +13,7 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.ANNOUNCEMENT_MODAL }}>
       <div className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 h-[90vh]">
 
         {/* Header */}
