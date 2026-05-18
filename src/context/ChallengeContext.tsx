@@ -150,6 +150,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
+        // Marathon mode uses per-word timers, bypass global LIVE timeout
+        if (challenge.word_length === 1) return p;
+        
         if (challenge.mode !== 'LIVE' || !challenge.max_time || p.status !== 'playing' || !p.started_at) return p;
 
         const start = new Date(p.started_at).getTime();

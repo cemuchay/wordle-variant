@@ -137,8 +137,13 @@ export const useChallengeGameEngine = ({
         let hasTimedOutOffline = false;
 
         if (challenge.mode === 'LIVE' && challenge.max_time) {
+            // Marathon: use per-word startTime ONLY. Regular: use participation startTime.
             const startTime = isMarathon ? progress?.started_at : participation.started_at;
-            if (startTime) {
+            
+            if (isMarathon && !progress?.started_at) {
+                // Word hasn't started yet, give full time
+                initialTimeLeft = challenge.max_time * 60;
+            } else if (startTime) {
                 const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
                 initialTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
                 if (initialTimeLeft <= 0 && !isFinishedStatus) {
