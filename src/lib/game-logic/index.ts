@@ -538,6 +538,7 @@ export const calculateSkillIndex = ({
    const lastRowIdx = guesses.length - 1;
    const lastRow = guesses[lastRowIdx];
    const won = lastRow && lastRow.every(cell => cell.status === "correct");
+   console.log("won", won)
 
    // 1. Base Performance (Efficiency)
    let score = 0;
@@ -582,7 +583,7 @@ export const calculateSkillIndex = ({
       }
    });
 
-   return Math.max(0, Math.floor(score + bonus));
+   return Math.floor(score + bonus);
 };
 
 /**
