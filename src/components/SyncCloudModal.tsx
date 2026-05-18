@@ -1,7 +1,7 @@
-import { Cloud, CloudCheck, CloudOff, Loader2 } from "lucide-react";
+import { Cloud, CloudCheck, CloudOff, Loader2, RefreshCw } from "lucide-react";
 import type { SyncStatus } from "../types/game";
 
-export function CloudSyncMenu({ status }: { status: SyncStatus }) {
+export function CloudSyncMenu({ status, onRetry }: { status: SyncStatus, onRetry?: () => void }) {
   return (
     <div className="flex items-center gap-2 px-1 py-1 rounded-full bg-secondary/50 text-xs font-medium">
       {status === 'syncing' && (
@@ -20,6 +20,18 @@ export function CloudSyncMenu({ status }: { status: SyncStatus }) {
         <>
           <CloudOff className="w-3 h-3 text-red-500" />
           <span>Sync Failed</span>
+          {onRetry && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetry();
+              }}
+              className="ml-1 p-1 hover:bg-white/10 rounded-full transition-colors text-blue-400"
+              title="Retry Sync"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          )}
         </>
       )}
       {status === 'idle' && (

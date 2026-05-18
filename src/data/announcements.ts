@@ -27,5 +27,12 @@ export const ANNOUNCEMENTS: Announcement[] = [
             
             <p>Enjoy!</p>
         `
+    },
+    {
+        id: `refresh_18052026`,
+        title: "An Update Was Made!",
+        date: "2026-05-18",
+        content: `<p>After accepting this announcement. Please refresh the page before playing or continuing to play (better, you can close the tab and open it again)</p>`,
+        type: "maintenance"
     }
 ];

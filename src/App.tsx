@@ -98,6 +98,7 @@ export default function App() {
                         onHint={actions.handleHint}
                         onReset={() => window.location.reload()}
                         onShare={() => actions.setGameOverModalOpen(true)}
+                        onRetrySync={actions.retrySync}
                         isGameOver={state.isGameOver}
                         usedHint={state.usedHint}
                         canShowHint={state.guesses.length >= 2}
@@ -114,6 +115,7 @@ export default function App() {
                         hintRecord={state.hintRecord}
                         isGameOver={state.isGameOver}
                         isShake={state.isShake}
+                        isSaving={state.syncStatus === 'syncing'}
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}

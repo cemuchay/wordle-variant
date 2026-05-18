@@ -612,7 +612,7 @@ export const syncGameState = async (
          guesses: payload.guesses,
          gameDate: date,
          hintRecord: payload.hintRecord,
-         targetWord: payload.config.targetWord,
+         targetWord: payload.config.word || payload.config.targetWord,
       })
       : 0;
 
@@ -632,7 +632,10 @@ export const syncGameState = async (
       { onConflict: "user_id, game_date" }
    );
 
-   if (error) console.error("Cloud sync failed:", error.message);
+   if (error) {
+      console.error("Cloud sync failed:", error.message);
+      throw error;
+   }
    return skillScore;
 };
 

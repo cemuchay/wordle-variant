@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncWithRetry, updateStats } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
@@ -16,12 +16,45 @@ export const useGameEngine = (date: string) => {
     const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
     const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const performSync = useCallback(async (gamePayload: any) => {
+        if (!user || !date) return;
+        dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
+        try {
+            await syncWithRetry(user.id, date, gamePayload);
+            dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
+
+            // Clear needsSync flag in localStorage
+            const saved = localStorage.getItem(`wordle-${date}`);
+            if (saved) {
+                const current = JSON.parse(saved);
+                if (current.needsSync) {
+                    delete current.needsSync;
+                    localStorage.setItem(`wordle-${date}`, JSON.stringify(current));
+                }
+            }
+
+            setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
+            return true;
+        } catch (error) {
+            dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
+            // Ensure needsSync flag is set in localStorage
+            const saved = localStorage.getItem(`wordle-${date}`);
+            if (saved) {
+                const current = JSON.parse(saved);
+                current.needsSync = true;
+                localStorage.setItem(`wordle-${date}`, JSON.stringify(current));
+            }
+            return false;
+        }
+    }, [user, date]);
+
     // Hydration & Authentication Swap Logic
     useEffect(() => {
         if (!date || isAuthLoading) return;
-        
+
         const saved = localStorage.getItem(`wordle-${date}`);
-        
+
         const loadFromCloud = async () => {
             if (!user) return null;
             try {
@@ -31,7 +64,7 @@ export const useGameEngine = (date: string) => {
                     .eq('user_id', user.id)
                     .eq('game_date', date)
                     .single();
-                
+
                 if (!error && data) {
                     return {
                         guesses: data.guesses,
@@ -53,22 +86,28 @@ export const useGameEngine = (date: string) => {
             if (saved) {
                 try {
                     const payload = JSON.parse(saved);
-                    
+
                     // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY: 
                     // Only perform mismatch check once auth state is stable.
                     if (payload.config && payload.config.word !== config.word) {
                         console.log("[Engine] Target word mismatch (Auth status changed), wiping today's progress.");
                         localStorage.removeItem(`wordle-${date}`);
-                        
+
                         // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
                         if (user && payload.isGuest) {
                             localStorage.removeItem("wordle-statistics");
                             triggerToast("Logged in: Starting today's official word fresh.");
                         }
-                        
+
                         dispatch({ type: 'LOAD_STATE', payload: initialState });
                     } else {
                         dispatch({ type: 'LOAD_STATE', payload });
+
+                        // Auto-sync if data was left unsynced
+                        if (payload.needsSync && user) {
+                            console.log("[Engine] Unsynced local data found, attempting background sync...");
+                            performSync(payload);
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to hydrate game state:", e);
@@ -85,12 +124,12 @@ export const useGameEngine = (date: string) => {
             } else {
                 dispatch({ type: 'LOAD_STATE', payload: initialState });
             }
-            // eslint-disable-next-line react-hooks/set-state-in-effect
+
             setIsHydrated(true);
         };
 
         hydrate();
-    }, [date, user, isAuthLoading, config.word, triggerToast]);
+    }, [date, user, isAuthLoading, config, triggerToast, performSync]);
 
     const onChar = useCallback((char: string) => {
         dispatch({ type: 'ADD_LETTER', char, maxLength: config.length });
@@ -135,6 +174,16 @@ export const useGameEngine = (date: string) => {
         // 1. Save locally FIRST to ensure data integrity
         localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
 
+        if (user) {
+            const success = await performSync(payload);
+            if (!success) {
+                triggerToast("Cloud sync failed after 3 attempts. Progress saved locally.", 5000);
+            }
+        }
+
+        // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
+        await new Promise(r => setTimeout(r, 300));
+
         // 2. Update UI (flips row)
         dispatch({
             type: 'SUBMIT_GUESS',
@@ -144,29 +193,10 @@ export const useGameEngine = (date: string) => {
             message
         });
 
-        if (user) {
-            dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
-            try {
-                await syncWithRetry(user.id, date, payload);
-                dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
-                setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
-            } catch (error) {
-                dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
-                triggerToast("Connection lost. Progress saved locally.", 5000);
-            }
-        }
-
         if (won || lost) {
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
             await refresh();
-
-            // TEMP: Skill index reveal for testing
-            // if (!user) {
-            //     const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, config.word, date);
-            //     console.log(score);
-            //     setTimeout(() => triggerToast(`Skill Score: ${score} (Testing Note)`, 10000), 1000);
-            // }
 
             // Only show reveal after sync attempt (successful or failed-but-locally-saved)
             if (lost) triggerToast(`The word is: ${config.word}`, 5000);
@@ -179,7 +209,7 @@ export const useGameEngine = (date: string) => {
                 triggerToast(message || state.gameMessage, 5000);
             }, revealDelay);
         }
-    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh]);
+    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync]);
 
     const handleHint = useCallback(async () => {
         if (state.guesses.length < 2 || state.isGameOver) return;
@@ -217,18 +247,31 @@ export const useGameEngine = (date: string) => {
             dispatch({ type: 'SET_HINT', hint: hintWithRow });
 
             if (user) {
-                dispatch({ type: 'SET_SYNC_STATUS', status: 'syncing' });
-                try {
-                    await syncGameState(user.id, date, payload);
-                    dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
-                    setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
-                } catch (error) {
-                    dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
+                const success = await performSync(payload);
+                if (!success) {
+                    triggerToast("Sync failed after 3 attempts. Hint saved locally.");
                 }
             }
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
         }
-    }, [state.guesses, state.isGameOver, state.usedHint, state.hintRecord, config, date, user, triggerToast]);
+    }, [state.guesses, state.isGameOver, state.usedHint, state.hintRecord, config, date, user, triggerToast, performSync]);
+
+    const retrySync = useCallback(async () => {
+        const saved = localStorage.getItem(`wordle-${date}`);
+        if (!saved || !user) return;
+
+        try {
+            const payload = JSON.parse(saved);
+            const success = await performSync(payload);
+            if (success) {
+                triggerToast("Sync successful!");
+            } else {
+                triggerToast("Sync failed again. Please check your connection.");
+            }
+        } catch (e) {
+            console.error("Failed to parse local state for retry:", e);
+        }
+    }, [date, user, performSync, triggerToast]);
 
     const setGameOverModalOpen = useCallback((isOpen: boolean) => {
         dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen });
@@ -248,6 +291,7 @@ export const useGameEngine = (date: string) => {
             onDelete,
             onEnter,
             handleHint,
+            retrySync,
             setGameOverModalOpen,
             loadState
         },

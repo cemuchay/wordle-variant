@@ -10,6 +10,7 @@ interface GameToolbarProps {
     onHint: () => void;
     onReset: () => void;
     onShare: () => void;
+    onRetrySync: () => void;
     isGameOver: boolean;
     usedHint: boolean;
     canShowHint: boolean;
@@ -26,6 +27,7 @@ export const GameToolbar = ({
     onHint,
     onReset,
     onShare,
+    onRetrySync,
     isGameOver,
     usedHint,
     canShowHint,
@@ -68,7 +70,7 @@ export const GameToolbar = ({
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 border-l border-white/10 pl-2 ml-1">
-                        <CloudSyncMenu status={syncStatus} />
+                        <CloudSyncMenu status={syncStatus} onRetry={onRetrySync} />
                         {canShowHint && !isGameOver && (
                             <button
                                 onClick={onHint}
