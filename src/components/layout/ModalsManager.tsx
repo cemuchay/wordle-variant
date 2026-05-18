@@ -91,7 +91,7 @@ export const ModalsManager = ({
                 />
             )}
 
-            {modals.isGameOverOpen && (
+            {modals.isGameOverOpen && gameContext.guesses && gameContext.guesses.length > 0 && gameContext.config && (
                 <GameOverModal
                     isOpen={modals.isGameOverOpen}
                     onClose={() => actions.setGameOverOpen(false)}

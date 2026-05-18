@@ -19,44 +19,51 @@ interface Props {
 export const GameOverModal: React.FC<Props> = ({
     isOpen, onClose, guesses, date, config, usedHint, gameMessage, stats
 }) => {
-    const won = guesses[guesses.length - 1].every(r => r.status === 'correct');
+
+
+    const won = guesses[guesses.length - 1]?.every(r => r.status === 'correct') ?? false;
 
     const [countdown, setCountdown] = useState("");
 
     useEffect(() => {
+        if (!isOpen) return;
         // This works in both browser (returns a number) and Node (returns a Timeout object)
         let timer: ReturnType<typeof setInterval> | undefined;
 
         const initCountdown = async () => {
-            const { raw } = await getServerDate();
-            const serverOffset = raw.getTime() - Date.now();
+            try {
+                const { raw } = await getServerDate();
+                const serverOffset = raw.getTime() - Date.now();
 
-            timer = setInterval(() => {
-                const now = new Date(Date.now() + serverOffset);
-                const nigeriaTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Lagos" });
-                const tomorrow = new Date(nigeriaTimeStr);
-                tomorrow.setHours(24, 0, 0, 0);
+                timer = setInterval(() => {
+                    const now = new Date(Date.now() + serverOffset);
+                    const nigeriaTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Lagos" });
+                    const tomorrow = new Date(nigeriaTimeStr);
+                    tomorrow.setHours(24, 0, 0, 0);
 
-                const diff = tomorrow.getTime() - new Date(nigeriaTimeStr).getTime();
+                    const diff = tomorrow.getTime() - new Date(nigeriaTimeStr).getTime();
 
-                if (diff <= 0) {
-                    setCountdown("0:00:00");
-                    return;
-                }
+                    if (diff <= 0) {
+                        setCountdown("0:00:00");
+                        return;
+                    }
 
-                const h = Math.floor(diff / (1000 * 60 * 60));
-                const m = Math.floor((diff / (1000 * 60)) % 60);
-                const s = Math.floor((diff / 1000) % 60);
+                    const h = Math.floor(diff / (1000 * 60 * 60));
+                    const m = Math.floor((diff / (1000 * 60)) % 60);
+                    const s = Math.floor((diff / 1000) % 60);
 
-                setCountdown(`${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-            }, 1000);
+                    setCountdown(`${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+                }, 1000);
+            } catch (e) {
+                console.error("Countdown init failed", e);
+            }
         };
 
         initCountdown();
         return () => {
             if (timer) clearInterval(timer);
         };
-    }, []);
+    }, [isOpen]);
 
     const [showWord, setShowWord] = useState(false);
 
@@ -68,8 +75,8 @@ export const GameOverModal: React.FC<Props> = ({
         }, 15000); // 15 seconds
     };
 
-    if (!isOpen) return null;
-
+    // Defensive checks to prevent crashes if props are briefly inconsistent or missing
+    if (!isOpen || !config || !guesses || guesses.length === 0 || !stats) return null;
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4">
@@ -79,7 +86,7 @@ export const GameOverModal: React.FC<Props> = ({
                 <div className="mb-3 mt-2 flex flex-col items-center">
                     {showWord ? (
                         <h2 className="text-2xl font-serif font-bold text-white tracking-widest animate-in fade-in zoom-in duration-300">
-                            {config.word}
+                            {config?.word || "???"}
                         </h2>
                     ) : (
                         <button
@@ -99,16 +106,16 @@ export const GameOverModal: React.FC<Props> = ({
                         </div>
                     )}
                 </div>
-                <p className="text-base font-serif font-bold text-white mb-6 mt-2">{gameMessage}</p>
+                <p className="text-base font-serif font-bold text-white mb-6 mt-2">{gameMessage || (won ? "Splendid!" : "Next time!")}</p>
 
                 {/* Statistics Section */}
                 <div className="mb-8">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Statistics</h3>
                     <div className="flex justify-between px-4">
-                        <StatBox value={stats.gamesPlayed} label="Played" />
-                        <StatBox value={stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0} label="Win %" />
-                        <StatBox value={stats.currentStreak} label="Streak" />
-                        <StatBox value={stats.maxStreak} label="Max" />
+                        <StatBox value={stats?.gamesPlayed ?? 0} label="Played" />
+                        <StatBox value={stats?.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0} label="Win %" />
+                        <StatBox value={stats?.currentStreak ?? 0} label="Streak" />
+                        <StatBox value={stats?.maxStreak ?? 0} label="Max" />
                     </div>
                 </div>
 
@@ -116,15 +123,15 @@ export const GameOverModal: React.FC<Props> = ({
                 <div className="mb-8 text-left">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 text-center">Guess Distribution</h3>
                     <div className="space-y-1.5">
-                        {Object.entries(stats.guesses).map(([num, count]) => {
+                        {Object.entries(stats?.guesses || {}).map(([num, count]) => {
                             const isCurrentDist = won && guesses.length === parseInt(num);
-                            const maxVal = Math.max(...Object.values(stats.guesses) as number[], 1);
+                            const maxVal = Math.max(...Object.values(stats?.guesses || {}) as number[], 1);
                             return (
                                 <div key={num} className={`flex items-center gap-2 text-xs `}>
                                     <span className="w-2 font-medium text-gray-300">{num}</span>
                                     <div className="flex-1 h-4 bg-gray-800/50 rounded-md">
                                         <div
-                                            style={{ width: `${Math.max((count as number / maxVal) * 100, 8)}%` }}
+                                            style={{ width: `${Math.max(((count as number) / maxVal) * 100, 8)}%` }}
                                             className={`h-full flex items-center justify-end px-1 font-bold text-white transition-all duration-1000 ${isCurrentDist ? 'bg-correct' : num === "X" ? `bg-red-400` : 'bg-gray-600'}`}
                                         >
                                             {count as number}
@@ -142,18 +149,18 @@ export const GameOverModal: React.FC<Props> = ({
                 <div className="flex items-center justify-between gap-6">
                     <div className="text-left">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Next Game</p>
-                        <p className="text-2xl font-mono font-medium text-white tracking-tighter">{countdown}</p>
+                        <p className="text-2xl font-mono font-medium text-white tracking-tighter">{countdown || "--:--:--"}</p>
                     </div>
                     <div className="flex-1">
                         <ShareButton
                             text={generateShareText({
                                 date,
                                 guesses,
-                                maxAttempts: config.maxAttempts,
-                                won: guesses[guesses.length - 1].every(r => r.status === 'correct'),
+                                maxAttempts: config?.maxAttempts || 6,
+                                won: guesses[guesses.length - 1]?.every(r => r.status === 'correct') ?? false,
                                 usedHint,
-                                 gameMessage,
-                                 wordLength: config.word.length,
+                                gameMessage,
+                                wordLength: config?.word?.length || 0,
                             }
                             )}
                         />
