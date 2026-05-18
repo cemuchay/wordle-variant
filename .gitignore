@@ -24,3 +24,6 @@ dev-dist/
 *.njsproj
 *.sln
 *.sw?
+
+GEMINI.md
+GEMINI_README.md

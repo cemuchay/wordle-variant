@@ -72,9 +72,8 @@ export const GameToolbar = ({
                         {canShowHint && !isGameOver && (
                             <button
                                 onClick={onHint}
-                                disabled={isHintLocked && !usedHint}
                                 className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
-                                title={usedHint ? "Hint Used" : isHintLocked ? "Hint Locked on Last Guess" : "Get Hint"}
+                                title={usedHint ? "Hint Used" : isHintLocked ? "Hint Unavailable" : "Get Hint"}
                             >
                                 <Lightbulb size={ICON_SIZE} />
                                 {isHintLocked && !usedHint && (

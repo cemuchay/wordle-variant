@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncGameState, syncWithRetry, updateStats } from '../lib/game-logic';
+import { supabase } from '../lib/supabaseClient';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
@@ -10,26 +11,86 @@ import { useWordleStats } from './useStats';
 export const useGameEngine = (date: string) => {
     const [state, dispatch] = useReducer(gameReducer, initialState);
     const [isHydrated, setIsHydrated] = useState(false);
-    const { user } = useAuth();
+    const { user, loading: isAuthLoading } = useAuth();
     const { triggerToast, preferences } = useApp();
-    const config = useMemo(() => getDailyConfig(date), [date]);
+    const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
     const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
-    // Hydration logic: Load saved game for this date
+    // Hydration & Authentication Swap Logic
     useEffect(() => {
-        if (!date) return;
+        if (!date || isAuthLoading) return;
+        
         const saved = localStorage.getItem(`wordle-${date}`);
-        if (saved) {
+        
+        const loadFromCloud = async () => {
+            if (!user) return null;
             try {
-                const payload = JSON.parse(saved);
-                dispatch({ type: 'LOAD_STATE', payload });
+                const { data, error } = await supabase
+                    .from('scores')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('game_date', date)
+                    .single();
+                
+                if (!error && data) {
+                    return {
+                        guesses: data.guesses,
+                        letterStatuses: getLetterStatuses(data.guesses),
+                        status: data.status,
+                        usedHint: data.hints_used,
+                        hintRecord: data.hint_record,
+                        config: { ...config, word: config.word }, // Use current config
+                        gameMessage: data.game_message
+                    };
+                }
             } catch (e) {
-                console.error("Failed to hydrate game state:", e);
+                console.error("Cloud fetch failed:", e);
             }
-        }
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsHydrated(true);
-    }, [date]);
+            return null;
+        };
+
+        const hydrate = async () => {
+            if (saved) {
+                try {
+                    const payload = JSON.parse(saved);
+                    
+                    // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY: 
+                    // Only perform mismatch check once auth state is stable.
+                    if (payload.config && payload.config.word !== config.word) {
+                        console.log("[Engine] Target word mismatch (Auth status changed), wiping today's progress.");
+                        localStorage.removeItem(`wordle-${date}`);
+                        
+                        // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
+                        if (user && payload.isGuest) {
+                            localStorage.removeItem("wordle-statistics");
+                            triggerToast("Logged in: Starting today's official word fresh.");
+                        }
+                        
+                        dispatch({ type: 'LOAD_STATE', payload: initialState });
+                    } else {
+                        dispatch({ type: 'LOAD_STATE', payload });
+                    }
+                } catch (e) {
+                    console.error("Failed to hydrate game state:", e);
+                }
+            } else if (user) {
+                // No local state but authenticated: try to fetch from cloud
+                const cloudPayload = await loadFromCloud();
+                if (cloudPayload) {
+                    dispatch({ type: 'LOAD_STATE', payload: cloudPayload });
+                    localStorage.setItem(`wordle-${date}`, JSON.stringify(cloudPayload));
+                } else {
+                    dispatch({ type: 'LOAD_STATE', payload: initialState });
+                }
+            } else {
+                dispatch({ type: 'LOAD_STATE', payload: initialState });
+            }
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setIsHydrated(true);
+        };
+
+        hydrate();
+    }, [date, user, isAuthLoading, config.word, triggerToast]);
 
     const onChar = useCallback((char: string) => {
         dispatch({ type: 'ADD_LETTER', char, maxLength: config.length });
@@ -61,6 +122,7 @@ export const useGameEngine = (date: string) => {
         const newStatus = won ? 'won' : (lost ? 'lost' : 'playing');
         const payload = {
             date,
+            isGuest: !user,
             guesses: newGuesses,
             letterStatuses: getLetterStatuses(newGuesses),
             status: newStatus,
@@ -125,6 +187,10 @@ export const useGameEngine = (date: string) => {
             triggerToast("Hint locked on last available guess.");
             return;
         }
+        if (isHintDisabled(config.word, state.guesses) && !state.usedHint) {
+            triggerToast("Hint disabled: Only one letter remains!");
+            return;
+        }
         if (state.usedHint && state.hintRecord) {
             triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, 3000);
             return;
@@ -135,6 +201,7 @@ export const useGameEngine = (date: string) => {
 
             const payload = {
                 date,
+                isGuest: !user,
                 guesses: state.guesses,
                 letterStatuses: getLetterStatuses(state.guesses),
                 status: 'playing',
@@ -172,9 +239,10 @@ export const useGameEngine = (date: string) => {
     }, []);
 
     const letterStatuses = useMemo(() => getLetterStatuses(state.guesses), [state.guesses]);
+    const isHintBar1Restricted = useMemo(() => isHintDisabled(config.word, state.guesses), [config.word, state.guesses]);
 
     return {
-        state: { ...state, letterStatuses },
+        state: { ...state, letterStatuses, isHintDisabled: isHintBar1Restricted },
         actions: {
             onChar,
             onDelete,

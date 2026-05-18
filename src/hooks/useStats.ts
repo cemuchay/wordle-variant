@@ -99,13 +99,13 @@ export const useWordleStats = (
       if (isMounted.current) setLoading(false);
    }, [userId, setStats]);
 
-   // Trigger fetch when modal opens
+   // Trigger fetch when user is present (e.g. on mount/refresh) OR when modal opens
    useEffect(() => {
-      if (isOpen && userId) {
+      if (userId) {
          // Use a microtask to ensure we don't block the initial mount render
          queueMicrotask(() => fetchCloudStats());
       }
-   }, [isOpen, userId, fetchCloudStats]);
+   }, [userId, isOpen, fetchCloudStats]);
 
    // Load initial stats from local storage if no user
    useEffect(() => {

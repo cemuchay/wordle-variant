@@ -81,11 +81,11 @@ export const RegularGameplay = memo(({
                 {guesses.length >= 2 && !isGameOver && (
                     <button
                         onClick={actions.handleHint}
-                        disabled={guesses.length >= 5 && !usedHint}
-                        className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : (guesses.length >= 5 ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
+                        className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
+                        title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
                     >
                         <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                        {guesses.length >= 5 && !usedHint && (
+                        {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
                             </div>

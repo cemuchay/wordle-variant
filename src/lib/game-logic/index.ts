@@ -47,6 +47,7 @@ const mulberry32 = (seed: number) => {
 };
 
 const SALT = "GFARMS_BETA_V2";
+const GUEST_SALT = "GFARMS_GUEST_V1";
 const TRANSITION_DATE = "2026-05-03";
 const LENGTH_TRANSITION_DATE = "2026-05-11";
 
@@ -82,14 +83,16 @@ const newHash = (str: string) =>
  * 3. Post-May 11: New hash, expanded length selection (3-7 chars) with weighted buckets.
  * 
  * @param dateStr - ISO date string (YYYY-MM-DD).
+ * @param isAuthenticated - Whether the user is logged in (affects the salt).
  * @param attempt - Iteration count for collision retries.
  * 
  * @adjustment Tip: To change length distribution, adjust the 'r < X' thresholds below.
  */
-function getWordAtDate(dateStr: string, attempt = 0): string {
+function getWordAtDate(dateStr: string, isAuthenticated: boolean = true, attempt = 0): string {
    const isNew = dateStr >= TRANSITION_DATE;
    const isNewLength = dateStr >= LENGTH_TRANSITION_DATE;
-   const seedBase = dateStr + SALT + (attempt > 0 ? `_retry_${attempt}` : "");
+   const activeSalt = isAuthenticated ? SALT : GUEST_SALT;
+   const seedBase = dateStr + activeSalt + (attempt > 0 ? `_retry_${attempt}` : "");
 
    const seed = isNew ? newHash(seedBase) : oldHash(seedBase);
    const random = mulberry32(seed);
@@ -175,19 +178,20 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
  * @what Includes a collision check to ensure today's word hasn't appeared
  * in the last 14 days (prevents boring repetition).
  * 
+ * @param isAuthenticated - Whether the user is logged in.
  * @param dateOverride - Optional date to fetch config for (defaults to today).
  * 
  * @adjustment Tip: Starting May 6, 2026, maxAttempts is hardcoded to 6 for 
  * consistency across all lengths. Change this if you want 3-letter words to be easier/harder.
  */
-export function getDailyConfig(dateOverride?: string): GameConfig {
+export function getDailyConfig(isAuthenticated: boolean, dateOverride?: string): GameConfig {
    const dateStr = dateOverride || new Date().toISOString().split("T")[0];
 
    const isNewEra = dateStr >= TRANSITION_DATE;
 
    // 1. If before transition, return the legacy result immediately
    if (!isNewEra) {
-      const word = getWordAtDate(dateStr);
+      const word = getWordAtDate(dateStr, isAuthenticated);
       const length = word.length as 4 | 6 | 5;
 
       return { word, length, maxAttempts: length + 1 };
@@ -201,7 +205,7 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
       const prevDate = new Date(cursor);
       prevDate.setDate(cursor.getDate() - i);
       const prevStr = prevDate.toISOString().split("T")[0];
-      history.add(getWordAtDate(prevStr));
+      history.add(getWordAtDate(prevStr, isAuthenticated));
    }
 
    // 3. Generate today's word with a retry loop if it exists in history
@@ -209,7 +213,7 @@ export function getDailyConfig(dateOverride?: string): GameConfig {
    let word;
 
    do {
-      word = getWordAtDate(dateStr, attempt);
+      word = getWordAtDate(dateStr, isAuthenticated, attempt);
       attempt++;
    } while (history.has(word) && attempt < 50); // Safety cap
 
@@ -263,6 +267,27 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
 }
 
 /**
+ * Determines if the hint feature should be disabled based on the "Bar 1" rule:
+ * If only one letter remains to be correctly placed, hints are disabled to prevent
+ * an automatic win.
+ */
+export const isHintDisabled = (word: string, guesses: GuessResult[][]) => {
+   const targetWord = word.toUpperCase();
+   const correctIndices = new Set<number>();
+
+   guesses.forEach((row) => {
+      row.forEach((cell, index) => {
+         if (cell.status === "correct") {
+            correctIndices.add(index);
+         }
+      });
+   });
+
+   const remainingCount = targetWord.length - correctIndices.size;
+   return remainingCount <= 1;
+};
+
+/**
  * Determines a helpful hint for the user.
  * 
  * @what It ignores indices the user has already solved and picks one 
@@ -271,8 +296,9 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
  * @returns {letter: string, index: number} or null if the word is already solved.
  */
 export const getHint = (word: string, guesses: GuessResult[][]) => {
-   const targetWord = word.toUpperCase();
+   if (isHintDisabled(word, guesses)) return null;
 
+   const targetWord = word.toUpperCase();
    const correctIndices = new Set<number>();
 
    guesses.forEach((row) => {
@@ -287,8 +313,6 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
       .split("")
       .map((_, i) => i)
       .filter((i) => !correctIndices.has(i));
-
-   if (remainingIndices.length === 0) return null;
 
    const randomIndex =
       remainingIndices[Math.floor(Math.random() * remainingIndices.length)];

@@ -87,7 +87,7 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <div>
               <p className="font-bold text-white mb-1 uppercase tracking-wide">Scrub Mode</p>
               <p className="text-gray-400 leading-relaxed">
-                Stuck? A hint unlocks after your <span className="text-white font-bold">2nd attempt</span>. Using it marks your result with shame. <span className="text-red-500 font-bold">Locked on the last guess!</span>
+                Stuck? A hint unlocks after your <span className="text-white font-bold">2nd attempt</span>. Using it marks your result with shame. <span className="text-red-500 font-bold">Locked on the last guess or when only 1 letter remains!</span>
               </p>
             </div>
           </div>
