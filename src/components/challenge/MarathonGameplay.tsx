@@ -3,6 +3,8 @@ import { memo, useState, useCallback } from 'react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
+import { CHALLENGE_CONFIG } from '../../constants/challenge';
+import { MAX_ATTEMPTS } from '../../constants/game';
 
 interface MarathonGameplayProps {
     challenge: any;
@@ -35,7 +37,7 @@ export const MarathonGameplay = memo(({
         );
     }
 
-    const allLengths = [3, 4, 5, 6, 7];
+    const allLengths = CHALLENGE_CONFIG.MARATHON_LENGTHS;
 
     return (
         <div className="flex-1 p-6 flex flex-col gap-8">
@@ -48,7 +50,7 @@ export const MarathonGameplay = memo(({
                 {allLengths.map(l => {
                     const prog = participation.marathon_progress?.find((p: any) => p.word_length === l);
                     const isCompleted = prog?.status === 'completed';
-                    const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= 6 && !isCompleted);
+                    const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
                     const isFinished = isCompleted || isFailed;
 
                     // Find other participants who finished this length
@@ -85,7 +87,7 @@ export const MarathonGameplay = memo(({
                                 </div>
                                 {prog && (
                                     <div className="text-right">
-                                        <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/6 Tries</p>
+                                        <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/{MAX_ATTEMPTS} Tries</p>
                                         {challenge.mode === 'LIVE' && prog.time_taken && (
                                             <p className="text-[9px] font-black text-white/30">{formatTime(prog.time_taken)}</p>
                                         )}

@@ -9,6 +9,7 @@ import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
 
 import { logger } from '../lib/logger';
+import { TOAST_DURATION } from '../constants/ui';
 
 export const useGameEngine = (date: string) => {
     const [state, dispatch] = useReducer(gameReducer, initialState);
@@ -36,14 +37,15 @@ export const useGameEngine = (date: string) => {
                 }
             }
 
-            setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
+            setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), TOAST_DURATION.DEFAULT);
             return true;
-        } catch (error: any) {
-            dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
+        } catch (error: unknown) {
+            const err = error as Error;
+            dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error: err });
             logger.error('Cloud Sync Failure', {
                 date,
                 userId: user.id,
-                error: error?.message || error,
+                error: err?.message || err,
                 payload: gamePayload
             });
             // Ensure needsSync flag is set in localStorage
@@ -185,7 +187,7 @@ export const useGameEngine = (date: string) => {
         if (user) {
             const success = await performSync(payload);
             if (!success) {
-                triggerToast("Cloud sync failed after 3 attempts. Progress saved locally.", 5000);
+                triggerToast("Cloud sync failed after 3 attempts. Progress saved locally.", TOAST_DURATION.LONG + 1000);
             }
         }
 
@@ -207,14 +209,14 @@ export const useGameEngine = (date: string) => {
             await refresh();
 
             // Only show reveal after sync attempt (successful or failed-but-locally-saved)
-            if (lost) triggerToast(`The word is: ${config.word}`, 5000);
+            if (lost) triggerToast(`The word is: ${config.word}`, TOAST_DURATION.LONG + 1000);
 
             // Calculate delay: wordLength * 150ms + 600ms (last tile flip) + padding
             const revealDelay = (config.length - 1) * 150 + 600 + 500;
 
             setTimeout(() => {
                 dispatch({ type: 'SET_GAME_OVER_MODAL', isOpen: true });
-                triggerToast(message || state.gameMessage, 5000);
+                triggerToast(message || state.gameMessage, TOAST_DURATION.LONG + 1000);
             }, revealDelay);
         }
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync]);
@@ -230,7 +232,7 @@ export const useGameEngine = (date: string) => {
             return;
         }
         if (state.usedHint && state.hintRecord) {
-            triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, 3000);
+            triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, TOAST_DURATION.DEFAULT);
             return;
         }
         const hint = getHint(config.word, state.guesses);

@@ -1,5 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { X, Trophy, User, Loader2, Eye } from 'lucide-react';
+import { Eye, Loader2, Trophy, User, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { MAX_ATTEMPTS } from '../constants/game';
+import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
@@ -94,7 +96,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-120 p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.STATS_MODAL }}>
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
@@ -284,7 +286,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
 
   if (status === "lost") attempts = "X"
 
-  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${6})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
+  const formattedGameScore = attempts && wordLength ? ` (${attempts}/${MAX_ATTEMPTS})` : ` (${entry.days_active} game${pluralCheck(entry.days_active)})`
   const isFirst = rank === 1;
   const isTopThree = rank <= 3;
   const pieceWidth = 100 / tieCount;

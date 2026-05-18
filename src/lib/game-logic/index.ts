@@ -1,6 +1,7 @@
 import type { GameConfig, GameStats, GuessResult, LetterStatus } from "../../types/game";
 import { getWordLists } from "../../data/words";
 import { supabase } from "../supabaseClient";
+import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -222,7 +223,7 @@ export function getDailyConfig(isAuthenticated: boolean, dateOverride?: string):
    return {
       word,
       length,
-      maxAttempts: 6,
+      maxAttempts: MAX_ATTEMPTS,
    };
 }
 
@@ -520,8 +521,8 @@ export const calculateSkillIndex = ({
 
    if (!isNewSystem) {
       // Legacy scoring logic for backwards compatibility
-      let score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
-      if (usedHint) score -= 100;
+      let score = ((maxAttempts - attempts + 1) / maxAttempts) * SCORING.BASE_SCORE_MAX;
+      if (usedHint) score -= SCORING.HINT_PENALTY;
 
       let bonus = 0;
       guesses.forEach((row) => {
@@ -541,11 +542,11 @@ export const calculateSkillIndex = ({
    // 1. Base Performance (Efficiency)
    let score = 0;
    if (won) {
-      score = ((maxAttempts - (lastRowIdx + 1) + 1) / maxAttempts) * 1000;
+      score = ((maxAttempts - (lastRowIdx + 1) + 1) / maxAttempts) * SCORING.BASE_SCORE_MAX;
    }
 
    // 2. Hint Penalty
-   if (usedHint) score -= 100;
+   if (usedHint) score -= SCORING.HINT_PENALTY;
 
    // 3. Discovery & Strategy Logic
    let bonus = 0;
@@ -557,22 +558,22 @@ export const calculateSkillIndex = ({
 
       if (isLastRow && won) {
          // THE PAYOFF: Reward all discovered entities
-         bonus += targetChars.length * 40;
+         bonus += targetChars.length * SCORING.POINTS_PER_LETTER;
       } else {
          // THE DEDUCTIONS: Only apply to rows before the win (or all rows if lost)
          row.forEach((cell) => {
             const letter = cell.letter.toUpperCase();
 
             if (cell.status === 'present') {
-               bonus -= 15;
+               bonus -= SCORING.YELLOW_PENALTY;
             } else if (cell.status === 'absent') {
                if (targetChars.includes(letter)) {
                   // Quantity mistake or known letter in wrong spot (treated as minor)
-                  bonus -= 5;
+                  bonus -= SCORING.ABSENT_PENALTY;
                } else if (knownBlacks.has(letter)) {
-                  bonus -= 20; // High-severity repeat mistake
+                  bonus -= SCORING.REPEATED_ABSENT_PENALTY; // High-severity repeat mistake
                } else {
-                  bonus -= 5; // Fresh discovery of absent letter
+                  bonus -= SCORING.ABSENT_PENALTY; // Fresh discovery of absent letter
                   knownBlacks.add(letter);
                }
             }
