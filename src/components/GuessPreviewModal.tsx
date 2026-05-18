@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Eye } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
-import { getDailyConfig } from "../lib/game-logic";
+import { getDailyConfig, deobfuscateWord } from "../lib/game-logic";
 import { SCORING, MAX_ATTEMPTS } from "../constants/game";
 import { Z_INDEX } from "../constants/ui";
 import { CHALLENGE_CONFIG } from "../constants/challenge";
@@ -19,6 +19,7 @@ const GuessPreviewModal: React.FC<{
     entry: any; // More flexible for challenge participants
     onClose: () => void;
     targetWord?: string;
+    salt?: string;
     lengthOfWord?: number;
     myParticipation?: any;
     initialMarathonLength?: number;
@@ -29,9 +30,10 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, lengthOfWord, myParticipation, initialMarathonLength, initialData }) => {
+}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, initialData }) => {
     const isMarathon = lengthOfWord === 1;
     const [marathonLength, setMarathonLength] = useState<number>(initialMarathonLength || 3);
+    const [showTargetWord, setShowTargetWord] = useState(false);
 
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
@@ -42,7 +44,7 @@ const GuessPreviewModal: React.FC<{
     } | null>(null);
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
-    const { date } = useApp();
+    const { date, profile } = useApp();
 
     useEffect(() => {
         if (isMarathon) {
@@ -97,21 +99,30 @@ const GuessPreviewModal: React.FC<{
         fetchGuesses();
     }, [date, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress]);
 
-    const getBreakdown = () => {
-        if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
-
-        // 1. CONFIG: Define target word from authoritative sources (Source of Truth)
-        let wordToUse = targetWord || getDailyConfig(true, date || undefined).word;
+    const getTargetWordToUse = () => {
+        let wordToUse = targetWord || getDailyConfig(!!profile, date || undefined).word;
 
         if (isMarathon && targetWord) {
             try {
                 const words = JSON.parse(targetWord);
-                wordToUse = words[marathonLength] || "";
+                const obfuscatedWord = words[marathonLength] || "";
+                wordToUse = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
             } catch (e) {
                 console.error("Failed to parse targetWord in marathon preview", e);
             }
+        } else if (targetWord && salt) {
+            wordToUse = deobfuscateWord(targetWord, salt);
         }
 
+        return wordToUse;
+    };
+
+    const targetWordToUse = getTargetWordToUse();
+
+    const getBreakdown = () => {
+        if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
+
+        const wordToUse = targetWordToUse;
         const targetChars = wordToUse.toUpperCase().split("");
         const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
 
@@ -189,7 +200,7 @@ const GuessPreviewModal: React.FC<{
     return (
 
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.GUESS_PREVIEW }} onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[80vh]" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />
                 </button>
@@ -205,7 +216,10 @@ const GuessPreviewModal: React.FC<{
                                 <button
                                     key={l}
                                     disabled={!isPlayed}
-                                    onClick={() => setMarathonLength(l)}
+                                    onClick={() => {
+                                        setMarathonLength(l);
+                                        setShowTargetWord(false);
+                                    }}
                                     className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${marathonLength === l ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : isPlayed ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
                                 >
                                     {l}
@@ -223,6 +237,32 @@ const GuessPreviewModal: React.FC<{
                     </div>
                 ) : (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Target Word Section */}
+                        <div className="mb-6 flex flex-col items-center">
+                            {showTargetWord ? (
+                                <div className="flex flex-col items-center animate-in zoom-in duration-300">
+                                    <span className="text-[8px] uppercase font-black text-gray-500 mb-1">Target Word</span>
+                                    <div className="flex gap-1">
+                                        {targetWordToUse.toUpperCase().split('').map((letter, i) => (
+                                            <div key={i} className="w-7 h-7 rounded-lg bg-correct/10 border border-correct/20 flex items-center justify-center text-[10px] font-black text-correct">
+                                                {letter}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowTargetWord(true)}
+                                    className="group flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all"
+                                >
+                                    <Eye size={12} className="text-gray-500 group-hover:text-correct transition-colors" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 group-hover:text-white">
+                                        Reveal Word
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+
                         <div className="grid gap-2 mb-6 justify-center">
                             {gameData?.guesses?.map((row: any[], i) => {
                                 const rowScore = breakdown.rows[i];
