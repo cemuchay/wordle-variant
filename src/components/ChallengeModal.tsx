@@ -381,6 +381,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         time_taken: previewParticipant.time_taken
                     }}
                     targetWord={selectedChallenge?.target_word}
+                    salt={selectedChallenge?.salt}
                     lengthOfWord={selectedChallenge?.word_length}
                 />
             )}
