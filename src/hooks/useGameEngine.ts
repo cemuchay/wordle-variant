@@ -8,6 +8,8 @@ import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
 
+import { logger } from '../lib/logger';
+
 export const useGameEngine = (date: string) => {
     const [state, dispatch] = useReducer(gameReducer, initialState);
     const [isHydrated, setIsHydrated] = useState(false);
@@ -36,8 +38,14 @@ export const useGameEngine = (date: string) => {
 
             setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), 3000);
             return true;
-        } catch (error) {
+        } catch (error: any) {
             dispatch({ type: 'SET_SYNC_STATUS', status: 'error', error });
+            logger.error('Cloud Sync Failure', {
+                date,
+                userId: user.id,
+                error: error?.message || error,
+                payload: gamePayload
+            });
             // Ensure needsSync flag is set in localStorage
             const saved = localStorage.getItem(`wordle-${date}`);
             if (saved) {

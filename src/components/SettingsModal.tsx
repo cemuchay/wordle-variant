@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { logger } from '../lib/logger';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -89,7 +90,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8">
+                <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {/* Security & Identity (Private Data) */}
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 mb-1">
@@ -136,6 +137,31 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             >
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
                                     }`} />
+                            </button>
+                        </div>
+                    </section>
+
+                    {/* Debugging & Diagnostics */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Terminal size={14} className="text-indigo-400" />
+                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                Diagnostics
+                            </label>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                            <div className="flex-1 pr-4">
+                                <p className="text-sm font-bold text-gray-100">Session Logs</p>
+                                <p className="text-[11px] text-gray-500 leading-relaxed">
+                                    Download diagnostic logs to help us debug issues.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => logger.downloadLogs()}
+                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all"
+                            >
+                                DOWNLOAD
                             </button>
                         </div>
                     </section>
