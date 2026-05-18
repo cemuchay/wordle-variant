@@ -115,6 +115,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setChallengeUnreadCount(unplayedCount);
     }, [unplayedCount, setChallengeUnreadCount]);
 
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const filteredChallenges = useMemo(() => {
         return myChallenges.filter((item: any) => {
             const challenge = item.challenge;
@@ -309,10 +310,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             };
 
             // Update local state with the full progress object for UI consistency
-            store.setMyParticipation(store.myParticipation ? { 
-                ...store.myParticipation, 
+            store.setMyParticipation(store.myParticipation ? {
+                ...store.myParticipation,
                 ...finalUpdateData,
-                marathon_progress: updatedMarathon 
+                marathon_progress: updatedMarathon
             } : null);
         } else {
             finalUpdateData = { ...result };

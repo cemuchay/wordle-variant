@@ -16,6 +16,7 @@ const GuessPreviewModal: React.FC<{
     entry: any; // More flexible for challenge participants
     onClose: () => void;
     targetWord?: string;
+    lengthOfWord?: number;
     initialData?: {
         guesses: any[] | null;
         hints_used?: boolean;
@@ -23,7 +24,7 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, initialData }) => {
+}> = ({ entry, onClose, targetWord, lengthOfWord, initialData }) => {
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
         hints_used: boolean;
@@ -77,10 +78,7 @@ const GuessPreviewModal: React.FC<{
         // 1. CONFIG: Define target word from authoritative sources (Source of Truth)
         const wordToUse = targetWord || getDailyConfig(true, date || undefined).word;
         const targetChars = wordToUse.toUpperCase().split("");
-        const wordLength = targetChars.length;
-
-        console.log(`--- OMNI-SCORE ENGINE START ---`);
-        console.log(`Target Word Configuration: ${targetChars.join("")}`);
+        const wordLength = lengthOfWord || targetChars.length;
 
         const rows: number[] = [];
         const knownBlacks = new Set<string>(); // For repeat -20 penalties
@@ -90,26 +88,26 @@ const GuessPreviewModal: React.FC<{
         gameData.guesses.forEach((row: any[], rowIndex: number) => {
             let rowBonus = 0;
             const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
-            const rowWord = row.map(c => c.letter).join("").toUpperCase();
+            // const rowWord = row.map(c => c.letter).join("").toUpperCase();
 
             const won = row.every(cell => cell.status === 'correct');
 
-            console.log(`\n>> PROCESSING ROW ${rowIndex + 1}: [${rowWord}]`);
+            // console.log(`\n>> PROCESSING ROW ${rowIndex + 1}: [${rowWord}]`);
 
             if (isLastRow && won) {
                 // THE PAYOFF: Award the full discovery points
                 const discoveryPoints = wordLength * 40;
                 rowBonus += discoveryPoints;
-                console.log(`[REWARD] Final Row Reached. Awarding +${discoveryPoints} discovery points.`);
+                // console.log(`[REWARD] Final Row Reached. Awarding +${discoveryPoints} discovery points.`);
             } else {
                 // THE DEDUCTIONS: Evaluate every letter entity individually
-                row.forEach((cell, cellIndex) => {
+                row.forEach((cell,) => {
                     const letter = cell.letter.toUpperCase();
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
                         rowBonus -= 15;
-                        console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Yellow status. Retroactive penalty applied (-15).`);
+                        // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Yellow status. Retroactive penalty applied (-15).`);
                     }
 
                     // CASE: BLACK (Absent)
@@ -117,28 +115,39 @@ const GuessPreviewModal: React.FC<{
                         if (targetChars.includes(letter)) {
                             // Quantity mistake or known letter in wrong spot
                             rowBonus -= 5;
-                            console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Known letter but absent instance. Minor penalty (-5).`);
+                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Known letter but absent instance. Minor penalty (-5).`);
                         } else if (knownBlacks.has(letter)) {
                             rowBonus -= 20;
-                            console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): REPEAT Black. High-severity penalty (-20).`);
+                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): REPEAT Black. High-severity penalty (-20).`);
                         } else {
                             rowBonus -= 5;
                             knownBlacks.add(letter);
-                            console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): NEW Black. Standard penalty (-5).`);
+                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): NEW Black. Standard penalty (-5).`);
                         }
                     }
 
                     // CASE: GREEN (Correct)
                     else if (cell.status === 'correct') {
-                        console.log(`[STASIS] Index ${cellIndex} (${letter}): Green status. No deduction (0).`);
+                        // console.log(`[STASIS] Index ${cellIndex} (${letter}): Green status. No deduction (0).`);
                     }
                 });
             }
 
-            console.log(`ROW ${rowIndex + 1} RESULT: ${rowBonus}`);
+            // console.log(`ROW ${rowIndex + 1} RESULT: ${rowBonus}`);
             rows.push(rowBonus);
             totalBonus += rowBonus;
         });
+
+        let localHint = 0
+
+        // DEDUCT HINT POINTS
+        if (gameData.hints_used && gameData.hint_record?.row !== undefined) {
+            const rowBonus = rows[gameData.hint_record.row - 1];
+            if (rowBonus !== undefined) {
+                totalBonus -= 100;
+                localHint -= 100;
+            }
+        }
 
         // 3. FINAL AGGREGATION
         const maxAttempts = 6;
@@ -146,12 +155,12 @@ const GuessPreviewModal: React.FC<{
         const won = entry.status === 'won' || entry.status === 'completed';
         const baseScore = won ? Math.floor(((maxAttempts - attempts + 1) / maxAttempts) * 1000) : 0;
 
-        console.log(`\n--- FINAL SCORING SUMMARY ---`);
-        console.log(`Bonus Breakdown: ${JSON.stringify(rows)}`);
-        console.log(`Net Bonus: ${totalBonus}`);
-        console.log(`Base Efficiency Score: ${baseScore}`);
+        // console.log(`\n--- FINAL SCORING SUMMARY ---`);
+        // console.log(`Bonus Breakdown: ${JSON.stringify(rows)}`);
+        // console.log(`Net Bonus: ${totalBonus}`);
+        // console.log(`Base Efficiency Score: ${baseScore}`);
 
-        return { rows, base: baseScore, bonus: totalBonus, hint: 0 };
+        return { rows, base: baseScore, bonus: totalBonus, hint: localHint };
     };
 
     const breakdown = getBreakdown();

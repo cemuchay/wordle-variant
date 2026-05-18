@@ -73,16 +73,17 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     setJoinId: (joinId) => set({ joinId }),
     setPreviewParticipant: (previewParticipant) => set({ previewParticipant }),
     setTimeLeft: (timeLeft) => set({ timeLeft }),
-    setBackAction: (fn) => set((state) => ({ 
-        backAction: typeof fn === 'function' ? (fn as any)(state.backAction) : fn 
+    setBackAction: (fn) => set((state) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        backAction: typeof fn === 'function' ? (fn as any)(state.backAction) : fn
     })),
     setMode: (mode) => set({ mode, maxTime: mode === 'LIVE' ? 5 : null }),
     setLength: (length) => set({ length }),
     setMaxTime: (maxTime) => set({ maxTime }),
     setInvitedIds: (invitedIds) => set({ invitedIds }),
     toggleInvite: (id) => set((state) => ({
-        invitedIds: state.invitedIds.includes(id) 
-            ? state.invitedIds.filter(i => i !== id) 
+        invitedIds: state.invitedIds.includes(id)
+            ? state.invitedIds.filter(i => i !== id)
             : [...state.invitedIds, id]
     })),
     setSelectedChallenge: (selectedChallenge) => set({ selectedChallenge }),
