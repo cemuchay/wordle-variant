@@ -379,7 +379,7 @@ export const syncStatsFromLocalStorage = () => {
 
    const gameKeys = Object.keys(localStorage)
       .filter((key) => /^wordle-\d{4}-\d{2}-\d{2}$/.test(key))
-      .sort(); 
+      .sort();
 
    gameKeys.forEach((key) => {
       const data = localStorage.getItem(key);
@@ -483,24 +483,26 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
  * 
  * @what Calculates a player's performance based on their strategic choices.
  * 
- * @why ERA TRANSITION (May 18, 2026):
- * 1. Pre-May 18: Simple attempt-based scoring with minor letter bonuses.
- * 2. Post-May 18: "Discovery System". 
- *    - Reward finding letters in new positions (+40 correct, +25 present).
- *    - Heavily penalize reusing known-wrong letters (-20 vs -5 for new mistakes).
- *    - Hints are costly (-100).
- *    - Failing to solve the word results in a base score of 0.
- * 
- * @adjustment Tip: To adjust the "severity" of mistakes, change the 'knownBlacks' penalty.
- * @adjustment Tip: To reward speed over discovery, increase the multiplier in the base score.
+ * @why ERA TRANSITION (May 18, 2026): "Payoff + Deduction System". 
+ *    - Process rows chronologically.
+ *    - WINNER PAYOFF: If won, Row N awards (WordLength * 40) points.
+ *    - DEDUCTIONS (Rows 1 to N-1):
+ *      - Yellow: -15 (Net 25 discovery after final payoff).
+ *      - Green: 0 (Net 40 discovery after final payoff).
+ *      - New Absent: -5.
+ *      - Repeat Absent: -20 (Strategic failure).
+ *    - HINT PENALTY: -100.
+ *    - LOSS: No payoff, base score is 0.
  */
 export const calculateSkillIndex = (
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
    guesses: GuessResult[][],
+   targetWord: string,
    gameDate?: string,
-   hintRecord?: { index: number; letter: string } | null
+   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   _hintRecord?: { index: number; letter: string } | null
 ) => {
    const targetDate = new Date('2026-05-18');
    const currentDate = gameDate ? new Date(gameDate) : new Date();
@@ -522,57 +524,54 @@ export const calculateSkillIndex = (
       return Math.floor(score + bonus);
    }
 
-   const lastGuess = guesses[guesses.length - 1];
-   const won = lastGuess && lastGuess.every(cell => cell.status === "correct");
+   const lastRowIdx = guesses.length - 1;
+   const lastRow = guesses[lastRowIdx];
+   const won = lastRow && lastRow.every(cell => cell.status === "correct");
 
-   // 1. Base Points
+   // 1. Base Performance (Efficiency)
    let score = 0;
    if (won) {
-      score = ((maxAttempts - attempts + 1) / maxAttempts) * 1000;
+      score = ((maxAttempts - (lastRowIdx + 1) + 1) / maxAttempts) * 1000;
    }
 
    // 2. Hint Penalty
    if (usedHint) score -= 100;
 
-   // 3. Discovery Bonuses & Strategy Penalties
+   // 3. Discovery & Strategy Logic
    let bonus = 0;
-   const scoredIndices = new Set<number>(); 
    const knownBlacks = new Set<string>();
+   const targetChars = targetWord.toUpperCase().split("");
 
-   // Don't award discovery points for a letter revealed by a hint!
-   if (usedHint && hintRecord) {
-      scoredIndices.add(hintRecord.index);
-   }
+   guesses.forEach((row, rowIdx) => {
+      const isLastRow = rowIdx === lastRowIdx;
 
-   guesses.forEach((row) => {
-      const newBlacksThisRow = new Set<string>();
+      if (isLastRow && won) {
+         // THE PAYOFF: Reward all discovered entities
+         bonus += targetChars.length * 40;
+      } else {
+         // THE DEDUCTIONS: Only apply to rows before the win (or all rows if lost)
+         row.forEach((cell) => {
+            const letter = cell.letter.toUpperCase();
 
-      row.forEach((cell, index) => {
-         if (cell.status === "correct") {
-            if (!scoredIndices.has(index)) {
-               bonus += 40;
-               scoredIndices.add(index);
+            if (cell.status === 'present') {
+               bonus -= 15;
+            } else if (cell.status === 'absent') {
+               if (targetChars.includes(letter)) {
+                  // Quantity mistake or known letter in wrong spot (treated as minor)
+                  bonus -= 5;
+               } else if (knownBlacks.has(letter)) {
+                  bonus -= 20; // High-severity repeat mistake
+               } else {
+                  bonus -= 5; // Fresh discovery of absent letter
+                  knownBlacks.add(letter);
+               }
             }
-         } else if (cell.status === "present") {
-            if (!scoredIndices.has(index)) {
-               bonus += 25;
-               scoredIndices.add(index);
-            }
-         } else if (cell.status === "absent") {
-            // Strategic Check: Did the user ignore previous information?
-            if (knownBlacks.has(cell.letter)) {
-               bonus -= 20; // Reusing a known black letter
-            } else {
-               bonus -= 5;  // Making a fresh discovery of a black letter
-               newBlacksThisRow.add(cell.letter);
-            }
-         }
-      });
-
-      newBlacksThisRow.forEach(letter => knownBlacks.add(letter));
+            // Green in early rows (cell.status === 'correct') results in 0 deduction, netting full +40 later
+         });
+      }
    });
 
-   return Math.floor(score + bonus);
+   return Math.max(0, Math.floor(score + bonus));
 };
 
 /**
@@ -615,7 +614,7 @@ export const syncGameState = async (
          hints_used: payload.usedHint,
          hint_record: payload.hintRecord,
          word_length: payload.config.length,
-         skill_score: skillScore, 
+         skill_score: skillScore,
          attempts: payload.guesses.length,
          game_message: payload.gameMessage,
       },
