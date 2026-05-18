@@ -44,7 +44,7 @@ export const ChallengeLobby = memo(() => {
                 </h3>
                 <p className="text-gray-400 text-sm mb-4">
                     {isMarathon
-                        ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes total!` : 'Take your time, async play.'}`
+                        ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes per word!` : 'Take your time, async play.'}`
                         : selectedChallenge.mode === 'LIVE'
                             ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
                             : "Play anytime within 24 hours. Highest skill score wins!"}

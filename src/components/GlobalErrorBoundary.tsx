@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RefreshCcw, Home } from "lucide-react";
+import { logger } from "../lib/logger";
 
 interface Props {
   children: ReactNode;
@@ -22,8 +23,12 @@ class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // You can log this to an external service like Sentry here
-    console.error("CRITICAL UI CRASH:", error, errorInfo);
+    // Log fatal UI crash
+    logger.fatal("CRITICAL UI CRASH", {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   private handleReset = () => {

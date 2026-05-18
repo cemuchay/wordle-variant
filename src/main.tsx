@@ -6,9 +6,13 @@ import { Analytics } from "@vercel/analytics/react";
 import { AppProvider } from './context/AppContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary.tsx';
+import { logger } from './lib/logger.ts';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+// Initialize logger early
+logger.info('Application starting...');
 
 const queryClient = new QueryClient({
   defaultOptions: {

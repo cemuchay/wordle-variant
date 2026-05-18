@@ -217,37 +217,21 @@ export const useChallengeMutations = () => {
 
     const submitMarathonResult = useMutation({
         mutationFn: async ({ participationId, wordLength, result }: { participationId: string, wordLength: number, result: any }) => {
-            const { data: existing } = await supabase
-                .from('challenge_participants_marathon')
-                .select('id')
-                .eq('participation_id', participationId)
-                .eq('word_length', wordLength)
-                .maybeSingle();
-
-            if (existing) {
-                const updateData: any = { ...result };
-                if (result.status && result.status !== 'playing') {
-                    updateData.completed_at = new Date().toISOString();
-                }
-                const { error } = await supabase
-                    .from('challenge_participants_marathon')
-                    .update(updateData)
-                    .eq('id', existing.id);
-                if (error) throw error;
-            } else {
-                const insertData: any = {
-                    participation_id: participationId,
-                    word_length: wordLength,
-                    ...result
-                };
-                if (result.status && result.status !== 'playing') {
-                    insertData.completed_at = new Date().toISOString();
-                }
-                const { error } = await supabase
-                    .from('challenge_participants_marathon')
-                    .insert([insertData]);
-                if (error) throw error;
+            const data: any = {
+                participation_id: participationId,
+                word_length: wordLength,
+                ...result
+            };
+            
+            if (result.status && result.status !== 'playing') {
+                data.completed_at = new Date().toISOString();
             }
+
+            const { error } = await supabase
+                .from('challenge_participants_marathon')
+                .upsert(data, { onConflict: 'participation_id, word_length' });
+
+            if (error) throw error;
             return true;
         },
         onSuccess: () => {
