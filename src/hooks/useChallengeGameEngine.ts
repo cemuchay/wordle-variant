@@ -190,12 +190,13 @@ export const useChallengeGameEngine = ({
         if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
             dispatch({
-            type: 'SWITCH_LENGTH', payload: {
-                guesses: incoming,
-                letterStatuses: getLetterStatuses(incoming),
-                isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
-            }
-            });        }
+                type: 'SWITCH_LENGTH', payload: {
+                    guesses: incoming,
+                    letterStatuses: getLetterStatuses(incoming),
+                    isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                }
+            });
+        }
     }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses]);
 
     // Timer Interval Management
@@ -257,7 +258,15 @@ export const useChallengeGameEngine = ({
         let resultPayload: any;
         if (isMarathon) {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
+                const skillScore = calculateSkillIndex({
+                    attempts: newGuesses.length,
+                    maxAttempts: 6,
+                    usedHint: usedHint,
+                    guesses: newGuesses,
+                    targetWord: targetWord,
+                    gameDate: new Date().toISOString().split('T')[0],
+                    hintRecord: hintRecord
+                });
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -276,7 +285,15 @@ export const useChallengeGameEngine = ({
             }
         } else {
             if (won || lost) {
-                const skillScore = calculateSkillIndex(newGuesses.length, 6, usedHint, newGuesses, new Date().toISOString().split('T')[0], hintRecord);
+                const skillScore = calculateSkillIndex({
+                    attempts: newGuesses.length,
+                    maxAttempts: 6,
+                    usedHint: usedHint,
+                    guesses: newGuesses,
+                    targetWord: targetWord,
+                    gameDate: new Date().toISOString().split('T')[0],
+                    hintRecord: hintRecord
+                });
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,

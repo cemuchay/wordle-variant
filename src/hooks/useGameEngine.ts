@@ -163,7 +163,7 @@ export const useGameEngine = (date: string) => {
 
             // TEMP: Skill index reveal for testing
             // if (!user) {
-            //     const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, date);
+            //     const score = calculateSkillIndex(newGuesses.length, config.maxAttempts, state.usedHint, newGuesses, config.word, date);
             //     console.log(score);
             //     setTimeout(() => triggerToast(`Skill Score: ${score} (Testing Note)`, 10000), 1000);
             // }
