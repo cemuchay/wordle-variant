@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Play, Share2, Clock } from 'lucide-react';
 import { memo } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
@@ -76,11 +75,11 @@ export const ChallengeLobby = memo(() => {
                                 <div
                                     key={p.id}
                                     onClick={() => {
-                                        if (myHasFinished && !isMarathon) {
+                                        if (myHasFinished || isMarathon) {
                                             setPreviewParticipant(p);
                                         }
                                     }}
-                                    className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${(myHasFinished && !isMarathon) ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
+                                    className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${(myHasFinished || isMarathon) ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden bg-gray-800">

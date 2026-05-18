@@ -61,6 +61,8 @@ interface ChallengeContextType {
     setJoinId: (id: string) => void;
     previewParticipant: ChallengeParticipant | null;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
+    previewMarathonLength: number | null;
+    setPreviewMarathonLength: (l: number | null) => void;
     unplayedCount: number;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
@@ -381,6 +383,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setJoinId: store.setJoinId,
         previewParticipant: store.previewParticipant,
         setPreviewParticipant: store.setPreviewParticipant,
+        previewMarathonLength: store.previewMarathonLength,
+        setPreviewMarathonLength: store.setPreviewMarathonLength,
         unplayedCount,
         backAction: store.backAction,
         setBackAction: store.setBackAction

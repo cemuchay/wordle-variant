@@ -17,6 +17,8 @@ const GuessPreviewModal: React.FC<{
     onClose: () => void;
     targetWord?: string;
     lengthOfWord?: number;
+    myParticipation?: any;
+    initialMarathonLength?: number;
     initialData?: {
         guesses: any[] | null;
         hints_used?: boolean;
@@ -24,26 +26,46 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, lengthOfWord, initialData }) => {
+}> = ({ entry, onClose, targetWord, lengthOfWord, myParticipation, initialMarathonLength, initialData }) => {
+    const isMarathon = lengthOfWord === 1;
+    const [marathonLength, setMarathonLength] = useState<number>(initialMarathonLength || 3);
+
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
         hints_used: boolean;
         skill_score: number;
         hint_record: { letter: string; index: number; row?: number } | null;
         time_taken?: number | null;
-    } | null>(initialData ? {
-        guesses: initialData.guesses,
-        hints_used: initialData.hints_used || false,
-        skill_score: initialData.skill_score || 0,
-        hint_record: initialData.hint_record || null,
-        time_taken: initialData.time_taken
-    } : null);
-    const [loading, setLoading] = useState(!initialData);
+    } | null>(null);
+
+    const [loading, setLoading] = useState(!initialData || isMarathon);
     const { date } = useApp();
 
     useEffect(() => {
+        if (isMarathon) {
+            const isMe = entry.user_id === myParticipation?.user_id;
+            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+            const myFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
+            
+            const prog = entry.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+            
+            if (prog && (isMe || myFinished)) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setGameData({
+                    guesses: prog.guesses || [],
+                    hints_used: prog.hints_used || false,
+                    skill_score: prog.score || 0,
+                    hint_record: prog.hint_record || null,
+                    time_taken: prog.time_taken
+                });
+            } else {
+                setGameData(null);
+            }
+            setLoading(false);
+            return;
+        }
+
         if (initialData) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setGameData({
                 guesses: initialData.guesses,
                 hints_used: initialData.hints_used || false,
@@ -51,6 +73,7 @@ const GuessPreviewModal: React.FC<{
                 hint_record: initialData.hint_record || null,
                 time_taken: initialData.time_taken
             });
+            setLoading(false);
             return;
         }
 
@@ -69,16 +92,25 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [date, entry.user_id, initialData?.guesses, initialData?.hints_used, initialData?.skill_score, initialData?.hint_record, initialData?.time_taken]);
+    }, [date, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress]);
 
     const getBreakdown = () => {
         if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
 
         // 1. CONFIG: Define target word from authoritative sources (Source of Truth)
-        const wordToUse = targetWord || getDailyConfig(true, date || undefined).word;
+        let wordToUse = targetWord || getDailyConfig(true, date || undefined).word;
+
+        if (isMarathon && targetWord) {
+            try {
+                const words = JSON.parse(targetWord);
+                wordToUse = words[marathonLength] || "";
+            } catch (e) {
+                console.error("Failed to parse targetWord in marathon preview", e);
+            }
+        }
+
         const targetChars = wordToUse.toUpperCase().split("");
-        const wordLength = lengthOfWord || targetChars.length;
+        const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
 
         const rows: number[] = [];
         const knownBlacks = new Set<string>(); // For repeat -20 penalties
@@ -88,41 +120,32 @@ const GuessPreviewModal: React.FC<{
         gameData.guesses.forEach((row: any[], rowIndex: number) => {
             let rowBonus = 0;
             const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
-            // const rowWord = row.map(c => c.letter).join("").toUpperCase();
 
             const won = row.every(cell => cell.status === 'correct');
-
-            // console.log(`\n>> PROCESSING ROW ${rowIndex + 1}: [${rowWord}]`);
 
             if (isLastRow && won) {
                 // THE PAYOFF: Award the full discovery points
                 const discoveryPoints = wordLength * 40;
                 rowBonus += discoveryPoints;
-                // console.log(`[REWARD] Final Row Reached. Awarding +${discoveryPoints} discovery points.`);
             } else {
                 // THE DEDUCTIONS: Evaluate every letter entity individually
-                row.forEach((cell,) => {
+                row.forEach((cell) => {
                     const letter = cell.letter.toUpperCase();
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
                         rowBonus -= 15;
-                        // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Yellow status. Retroactive penalty applied (-15).`);
                     }
 
                     // CASE: BLACK (Absent)
                     else if (cell.status === 'absent') {
                         if (targetChars.includes(letter)) {
-                            // Quantity mistake or known letter in wrong spot
                             rowBonus -= 5;
-                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): Known letter but absent instance. Minor penalty (-5).`);
                         } else if (knownBlacks.has(letter)) {
                             rowBonus -= 20;
-                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): REPEAT Black. High-severity penalty (-20).`);
                         } else {
                             rowBonus -= 5;
                             knownBlacks.add(letter);
-                            // console.log(`[DEDUCTION] Index ${cellIndex} (${letter}): NEW Black. Standard penalty (-5).`);
                         }
                     }
 
@@ -133,7 +156,6 @@ const GuessPreviewModal: React.FC<{
                 });
             }
 
-            // console.log(`ROW ${rowIndex + 1} RESULT: ${rowBonus}`);
             rows.push(rowBonus);
             totalBonus += rowBonus;
         });
@@ -151,41 +173,16 @@ const GuessPreviewModal: React.FC<{
 
         // 3. FINAL AGGREGATION
         const maxAttempts = 6;
-        const attempts = entry.attempts === 'X' ? maxAttempts : Number(entry.attempts);
-        const won = entry.status === 'won' || entry.status === 'completed';
-        const baseScore = won ? Math.floor(((maxAttempts - attempts + 1) / maxAttempts) * 1000) : 0;
-
-        // console.log(`\n--- FINAL SCORING SUMMARY ---`);
-        // console.log(`Bonus Breakdown: ${JSON.stringify(rows)}`);
-        // console.log(`Net Bonus: ${totalBonus}`);
-        // console.log(`Base Efficiency Score: ${baseScore}`);
+        const currentAttempts = gameData.guesses.length;
+        const won = gameData.guesses[currentAttempts - 1]?.every((c: any) => c.status === 'correct');
+        const baseScore = won ? Math.floor(((maxAttempts - currentAttempts + 1) / maxAttempts) * 1000) : 0;
 
         return { rows, base: baseScore, bonus: totalBonus, hint: localHint };
     };
 
     const breakdown = getBreakdown();
 
-    if (!gameData || !breakdown) return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-130 p-4" onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
-                    <X size={20} />
-                </button>
-
-                <p className="text-sm uppercase tracking-tighter mb-4 pb-4 text-center text-gray-100 font-bold">{entry.username || entry.profiles?.username}'s Guesses</p>
-                <div className="flex gap-2">
-                    {Array(5).fill(null).map((_, i) => <div key={i} className="flex-1 bg-gray-800 rounded-lg aspect-square flex items-center justify-center" />)}
-                </div>
-
-                {loading && (
-                    <div className="mt-6 text-center text-gray-400">
-                        <Loader2 className="animate-spin mx-auto mb-2" />
-                        Fetching guess data...
-                    </div>
-                )}
-            </div>
-        </div>
-    )
+    const username = entry.username || entry.profiles?.username || 'Player';
 
     return (
 
@@ -195,10 +192,33 @@ const GuessPreviewModal: React.FC<{
                     <X size={20} />
                 </button>
 
-                <p className="text-sm uppercase tracking-tighter mb-4 pb-4 text-center text-gray-100 font-bold">{entry.username || entry.profiles?.username}'s Guesses</p>
+                <p className="text-sm uppercase tracking-tighter mb-2 text-center text-gray-100 font-bold">{username}'s Guesses</p>
+
+                {isMarathon && (
+                    <div className="flex justify-center gap-1 mb-4 border-b border-white/5 pb-4">
+                        {[3, 4, 5, 6, 7].map(l => {
+                            const prog = entry.marathon_progress?.find((p: any) => p.word_length === l);
+                            const isPlayed = !!prog;
+                            return (
+                                <button
+                                    key={l}
+                                    disabled={!isPlayed}
+                                    onClick={() => setMarathonLength(l)}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${marathonLength === l ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : isPlayed ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
+                                >
+                                    {l}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex justify-center py-12"><Loader2 className="animate-spin text-correct" size={24} /></div>
+                ) : !gameData || !gameData.guesses || gameData.guesses.length === 0 ? (
+                    <div className="py-12 text-center">
+                        <p className="text-xs text-gray-500 italic">No guesses recorded for this length.</p>
+                    </div>
                 ) : (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="grid gap-2 mb-6 justify-center">
@@ -210,7 +230,7 @@ const GuessPreviewModal: React.FC<{
                                             {row.map((cell, j) => (
                                                 <div
                                                     key={j}
-                                                    className={`w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
+                                                    className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
                                                         cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
                                                         }`}
                                                 >
@@ -218,7 +238,7 @@ const GuessPreviewModal: React.FC<{
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className={`text-[10px] font-mono font-bold w-8 ${rowScore >= 0 ? 'text-correct' : 'text-red-400'}`}>
+                                        <div className={`text-[9px] font-mono font-bold w-8 ${rowScore >= 0 ? 'text-correct' : 'text-red-400'}`}>
                                             {rowScore > 0 ? `+${rowScore}` : rowScore}
                                         </div>
                                     </div>
@@ -239,7 +259,7 @@ const GuessPreviewModal: React.FC<{
                                 </span>
                             </div>
 
-                            {gameData?.time_taken && (
+                            {gameData?.time_taken !== null && gameData?.time_taken !== undefined && (
                                 <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
                                     <span>Time Taken:</span>
                                     <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
@@ -268,7 +288,7 @@ const GuessPreviewModal: React.FC<{
                             )}
 
                             <div className="pt-2 mt-1 border-t border-gray-700 flex justify-between text-[11px] uppercase font-black text-gray-100">
-                                <span>Total Index:</span>
+                                <span>{isMarathon ? `Length ${marathonLength} Score:` : 'Total Index:'}</span>
                                 <span className="text-white bg-correct px-2 rounded-full">{gameData?.skill_score || 0}</span>
                             </div>
                         </div>

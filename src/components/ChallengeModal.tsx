@@ -138,6 +138,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         lengthFilter, setLengthFilter,
         clearFilters,
         previewParticipant, setPreviewParticipant,
+        previewMarathonLength, setPreviewMarathonLength,
         unplayedCount,
         backAction
     } = useChallengeContext();
@@ -363,7 +364,12 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
             {previewParticipant && (
                 <GuessPreviewModal
                     entry={previewParticipant}
-                    onClose={() => setPreviewParticipant(null)}
+                    onClose={() => {
+                        setPreviewParticipant(null);
+                        setPreviewMarathonLength(null);
+                    }}
+                    myParticipation={myParticipation}
+                    initialMarathonLength={previewMarathonLength || undefined}
                     initialData={{
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,
@@ -371,6 +377,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         hint_record: previewParticipant.hint_record,
                         time_taken: previewParticipant.time_taken
                     }}
+                    targetWord={selectedChallenge?.target_word}
                     lengthOfWord={selectedChallenge?.word_length}
                 />
             )}

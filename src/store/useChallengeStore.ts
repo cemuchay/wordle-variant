@@ -7,6 +7,7 @@ interface ChallengeState {
     isPlaying: boolean;
     joinId: string;
     previewParticipant: ChallengeParticipant | null;
+    previewMarathonLength: number | null;
     timeLeft: number | null;
     backAction: (() => void) | null;
 
@@ -31,6 +32,7 @@ interface ChallengeState {
     setIsPlaying: (playing: boolean) => void;
     setJoinId: (id: string) => void;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
+    setPreviewMarathonLength: (l: number | null) => void;
     setTimeLeft: (t: number | null) => void;
     setBackAction: (fn: (() => void) | null) => void;
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
@@ -54,6 +56,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     isPlaying: false,
     joinId: '',
     previewParticipant: null,
+    previewMarathonLength: null,
     timeLeft: null,
     backAction: null,
     mode: 'ANYTIME',
@@ -72,6 +75,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setJoinId: (joinId) => set({ joinId }),
     setPreviewParticipant: (previewParticipant) => set({ previewParticipant }),
+    setPreviewMarathonLength: (previewMarathonLength) => set({ previewMarathonLength }),
     setTimeLeft: (timeLeft) => set({ timeLeft }),
     setBackAction: (fn) => set((state) => ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

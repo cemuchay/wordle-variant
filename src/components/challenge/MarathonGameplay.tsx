@@ -2,6 +2,7 @@
 import { memo, useState, useCallback } from 'react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
+import { useChallengeContext } from '../../context/ChallengeContext';
 
 interface MarathonGameplayProps {
     challenge: any;
@@ -15,6 +16,7 @@ interface MarathonGameplayProps {
 export const MarathonGameplay = memo(({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: MarathonGameplayProps) => {
+    const { participants, setPreviewParticipant, setPreviewMarathonLength } = useChallengeContext();
     const [selectedLength, setSelectedLength] = useState<number | null>(null);
 
     const onBack = useCallback(() => setSelectedLength(null), []);
@@ -49,35 +51,77 @@ export const MarathonGameplay = memo(({
                     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= 6 && !isCompleted);
                     const isFinished = isCompleted || isFailed;
 
+                    // Find other participants who finished this length
+                    const finishers = participants?.filter(p => {
+                        const pProg = p.marathon_progress?.find((mp: any) => mp.word_length === l);
+                        return pProg && (pProg.status === 'completed' || pProg.status === 'timed_out') && p.user_id !== participation.user_id;
+                    }) || [];
+
                     return (
-                        <button
-                            key={l}
-                            onClick={() => setSelectedLength(l)}
-                            disabled={isFinished}
-                            className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isFinished ? 'bg-white/5 border-white/5 opacity-50' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
-                                    {l}
+                        <div key={l} className="flex flex-col gap-2">
+                            <button
+                                onClick={() => {
+                                    if (isFinished) {
+                                        setPreviewMarathonLength(l);
+                                        setPreviewParticipant(participation);
+                                    } else {
+                                        setSelectedLength(l);
+                                    }
+                                }}
+                                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isFinished ? 'bg-white/5 border-white/10 hover:border-correct/50 hover:bg-correct/5' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
+                                        {l}
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-xs font-black uppercase">{l} Letters</p>
+                                        <p className="text-[10px] text-gray-500">
+                                            {isFinished
+                                                ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
+                                                : (prog ? 'In Progress' : 'Not Started')}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="text-left">
-                                    <p className="text-xs font-black uppercase">{l} Letters</p>
-                                    <p className="text-[10px] text-gray-500">
-                                        {isFinished
-                                            ? (isCompleted ? 'Completed' : 'Failed')
-                                            : (prog ? 'In Progress' : 'Not Started')}
-                                    </p>
-                                </div>
-                            </div>
-                            {prog && (
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/6 Tries</p>
-                                    {challenge.mode === 'LIVE' && prog.time_taken && (
-                                        <p className="text-[9px] font-black text-white/30">{formatTime(prog.time_taken)}</p>
-                                    )}
+                                {prog && (
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/6 Tries</p>
+                                        {challenge.mode === 'LIVE' && prog.time_taken && (
+                                            <p className="text-[9px] font-black text-white/30">{formatTime(prog.time_taken)}</p>
+                                        )}
+                                    </div>
+                                )}
+                            </button>
+
+                            {isFinished && finishers.length > 0 && (
+                                <div className="flex items-center justify-between px-2">
+                                    <p className="text-[9px] font-black uppercase text-gray-600">Compare Results:</p>
+                                    <div className="flex -space-x-2">
+                                        {finishers.map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => {
+                                                    setPreviewMarathonLength(l);
+                                                    setPreviewParticipant(p);
+                                                }}
+                                                className="w-6 h-6 rounded-full border-2 border-gray-900 bg-gray-800 overflow-hidden hover:scale-110 hover:z-10 transition-transform relative group"
+                                            >
+                                                {p.profiles?.avatar_url ? (
+                                                    <img src={p.profiles.avatar_url} alt={p.profiles.username} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-[8px] font-black uppercase text-gray-400">
+                                                        {p.profiles?.username?.[0] || '?'}
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                    <div className="w-1 h-1 bg-white rounded-full" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
-                        </button>
+                        </div>
                     );
                 })}
             </div>
