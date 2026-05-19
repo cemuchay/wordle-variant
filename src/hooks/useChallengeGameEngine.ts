@@ -47,9 +47,23 @@ export const useChallengeGameEngine = ({
 
     const [isSaving, setIsSaving] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
+    const [networkLogs, setNetworkLogs] = useState<Array<{ id: string, msg: string, duration?: number }>>([]);
     const startTimerRef = useRef(false);
     const initializedRef = useRef<string>("");
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
+
+    const addLog = useCallback((msg: string, duration?: number) => {
+        setNetworkLogs(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), msg, duration }]);
+    }, []);
+
+    const wrappedSubmitResult = useCallback(async (payload: any, wordLen?: number) => {
+        const start = Date.now();
+        addLog(`Sync Start: ${payload.status}`);
+        const success = await submitChallengeResult(payload, wordLen);
+        const duration = Date.now() - start;
+        addLog(`Sync End: ${success ? 'Success' : 'Failed'}`, duration);
+        return success;
+    }, [submitChallengeResult, addLog]);
 
     const currentKey = isMarathon ? `m-${selectedLength}` : `r-${challenge.id}`;
 
@@ -68,7 +82,7 @@ export const useChallengeGameEngine = ({
 
         if (isMarathon) {
             // Just fail this specific word, but keep marathon playing
-            const success = await submitChallengeResult({
+            const success = await wrappedSubmitResult({
                 status: 'timed_out',
                 attempts: guesses.length,
                 guesses: guesses,
@@ -81,7 +95,7 @@ export const useChallengeGameEngine = ({
             if (!success) triggerToast("Failed to save progress.", 3000);
             if (onLengthComplete) onLengthComplete();
         } else {
-            const success = await submitChallengeResult({
+            const success = await wrappedSubmitResult({
                 status: 'timed_out',
                 score: 0,
                 attempts: guesses.length,
@@ -94,7 +108,7 @@ export const useChallengeGameEngine = ({
             if (!success) triggerToast("Failed to save result.", 4000);
             onFinish();
         }
-    }, [isSaving, challenge.mode, challenge.max_time, isMarathon, submitChallengeResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
+    }, [isSaving, challenge.mode, challenge.max_time, isMarathon, wrappedSubmitResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
 
     // Sync timeLeft with Global Store
     useEffect(() => {
@@ -104,7 +118,11 @@ export const useChallengeGameEngine = ({
 
     // Word Length & Target Word Resolution
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;
-    const targetWord = isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
+    const targetWord = useMemo(() => {
+        const word = isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
+        if (word) addLog("Word Resolved");
+        return word;
+    }, [isMarathon, marathonWords, selectedLength, challenge.target_word, challenge.salt, addLog]);
 
     // Helper to extract guesses for current word with extreme defensiveness
     const getIncomingGuesses = useCallback(() => {
@@ -134,6 +152,7 @@ export const useChallengeGameEngine = ({
         const progress = isMarathon ? participation.marathon_progress?.find((p: any) => p.word_length === selectedLength) : null;
 
         console.log(`[Engine] Initializing length ${wordLength}. Key: ${currentKey}`);
+        addLog(`Game Initialized: ${wordLength}L`);
 
         const serverStatus = isMarathon ? (progress?.status || 'playing') : participation.status;
         const isFinishedStatus = serverStatus === 'completed' || serverStatus === 'timed_out';
@@ -187,7 +206,7 @@ export const useChallengeGameEngine = ({
                 if (!startTime) {
                     console.log("[Engine] Starting LIVE timer...");
                     startTimerRef.current = true;
-                    await submitChallengeResult({
+                    await wrappedSubmitResult({
                         status: 'playing',
                         started_at: new Date().toISOString()
                     }, isMarathon ? selectedLength! : undefined);
@@ -213,6 +232,7 @@ export const useChallengeGameEngine = ({
 
         if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
+            addLog(`Background Sync: +${incoming.length - guesses.length}`);
             dispatch({
                 type: 'SWITCH_LENGTH', payload: {
                     guesses: incoming,
@@ -221,7 +241,7 @@ export const useChallengeGameEngine = ({
                 }
             });
         }
-    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses]);
+    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses, addLog]);
 
     // Timer Interval Management
     useEffect(() => {
@@ -349,7 +369,7 @@ export const useChallengeGameEngine = ({
                 await new Promise(r => setTimeout(r, 1500));
             }
 
-            success = await submitChallengeResult(resultPayload, isMarathon ? wordLength : undefined);
+            success = await wrappedSubmitResult(resultPayload, isMarathon ? wordLength : undefined);
             attempt++;
         }
 
@@ -378,7 +398,7 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, submitChallengeResult, onLengthComplete, onFinish]);
+    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish]);
 
     const handleHint = useCallback(async () => {
         if (isGameOver || isSaving) return;
@@ -423,11 +443,11 @@ export const useChallengeGameEngine = ({
                     hint_record: hintWithRow
                 };
             }
-            const success = await submitChallengeResult(resultPayload, isMarathon ? selectedLength! : undefined);
+            const success = await wrappedSubmitResult(resultPayload, isMarathon ? selectedLength! : undefined);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save hint usage.", 3000);
         }
-    }, [isGameOver, isSaving, usedHint, hintRecord, triggerToast, guesses, targetWord, isMarathon, selectedLength, submitChallengeResult]);
+    }, [isGameOver, isSaving, usedHint, hintRecord, triggerToast, guesses, targetWord, isMarathon, selectedLength, wrappedSubmitResult]);
 
 
     const actions = useMemo(() => ({
@@ -446,6 +466,7 @@ export const useChallengeGameEngine = ({
         retryCount,
         wordLength,
         targetWord,
-        timeLeft
+        timeLeft,
+        networkLogs
     };
 };

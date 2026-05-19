@@ -214,3 +214,16 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
         </button>
     );
 });
+
+export const NetworkLog = memo(({ logs }: { logs: Array<{ id: string, msg: string, duration?: number }> }) => {
+    if (logs.length === 0) return null;
+    return (
+        <div className="absolute top-2 right-2 z-110 flex flex-col items-end gap-1 pointer-events-none max-w-[200px]">
+            {logs.slice(-5).map((log, index) => (
+                <div key={log.id} className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 text-[8px] font-mono text-white uppercase tracking-tighter animate-in fade-in slide-in-from-right-2">
+                    {index + 1}. {log.msg} {log.duration !== undefined && <span className="text-correct">({log.duration}ms)</span>}
+                </div>
+            ))}
+        </div>
+    );
+});

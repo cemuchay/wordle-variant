@@ -6,6 +6,7 @@ import { useKeyboard } from '../../hooks/useKeyboard';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import { useChallengeContext } from '../../context/ChallengeContext';
+import { NetworkLog } from './ChallengeUIElements';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -22,7 +23,7 @@ export const RegularGameplay = memo(({
 }: RegularGameplayProps) => {
     const { setBackAction } = useChallengeContext();
 
-    const { state, actions, isSaving, retryCount, wordLength } = useChallengeGameEngine({
+    const { state, actions, isSaving, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
         challenge,
         participation,
         triggerToast,
@@ -40,7 +41,7 @@ export const RegularGameplay = memo(({
     useEffect(() => {
         // Ensure window has focus to capture keyboard events when game starts
         window.focus();
-        
+
         const back = onBack || onFinish;
         setBackAction(() => back);
         return () => {
@@ -52,6 +53,7 @@ export const RegularGameplay = memo(({
 
     return (
         <div className="flex-1 flex flex-col p-4 gap-6 relative">
+            <NetworkLog logs={networkLogs} />
             {isSaving && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
                     <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
@@ -63,35 +65,24 @@ export const RegularGameplay = memo(({
 
             <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-3">
-                    {selectedLength ? (
-                        <div className="bg-yellow-500/10 px-3 py-1.5 rounded-xl border border-yellow-500/20">
-                            <span className="text-xs font-black text-yellow-500 uppercase tracking-widest">
-                                {selectedLength} Letters
-                            </span>
-                        </div>
-                    ) : (
-                        <div className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-                            <span className="text-xs font-black text-white/50 uppercase tracking-widest">
-                                {challenge.word_length} Letters
-                            </span>
-                        </div>
+                    {guesses.length >= 2 && !isGameOver && (
+                        <button
+                            onClick={actions.handleHint}
+                            className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
+                            title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                        >
+                            <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                            {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
+                                </div>
+                            )}
+                        </button>
                     )}
+
                 </div>
 
-                {guesses.length >= 2 && !isGameOver && (
-                    <button
-                        onClick={actions.handleHint}
-                        className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
-                        title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
-                    >
-                        <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                        {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
-                            </div>
-                        )}
-                    </button>
-                )}
+
             </div>
 
             <div className="flex-1 flex items-center justify-center min-h-0">
