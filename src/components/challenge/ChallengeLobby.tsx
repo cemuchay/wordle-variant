@@ -26,7 +26,7 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
     }, [isMarathon, p.marathon_progress]);
 
     const showScore = pIsFinished || (isMarathon && p.score > 0);
-    const canClick = myHasFinished || isMarathon;
+    const canClick = myHasFinished;
 
     return (
         <div
@@ -67,7 +67,7 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                         </div>
                     </div>
                 )}
-                {myHasFinished && !isMarathon && (
+                {myHasFinished && (
                     <div className="text-gray-500">
                         <Eye size={16} />
                     </div>

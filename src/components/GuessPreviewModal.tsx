@@ -45,6 +45,7 @@ const GuessPreviewModal: React.FC<{
     } | null>(null);
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
+    const [viewerHasFinished, setViewerHasFinished] = useState(yesterday || false);
     const { date, profile } = useApp();
 
     const getTargetDate = () => {
@@ -57,6 +58,48 @@ const GuessPreviewModal: React.FC<{
     };
 
     const targetDate = getTargetDate();
+
+    // Check if viewer has finished
+    useEffect(() => {
+        const checkViewerStatus = async () => {
+            if (yesterday) {
+                setViewerHasFinished(true);
+                return;
+            }
+
+            if (isMarathon) {
+                const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+                const myFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
+                setViewerHasFinished(myFinished);
+                return;
+            }
+
+            if (myParticipation) {
+                const finished = myParticipation.status === 'completed' || myParticipation.status === 'timed_out' || myParticipation.status === 'won' || myParticipation.status === 'lost';
+                setViewerHasFinished(finished);
+                return;
+            }
+
+            // Daily game
+            if (profile?.id) {
+                const { data } = await supabase
+                    .from('scores')
+                    .select('status')
+                    .eq('user_id', profile.id)
+                    .eq('game_date', targetDate)
+                    .single();
+
+                if (data) {
+                    const finished = data.status === 'won' || data.status === 'lost';
+                    setViewerHasFinished(finished);
+                } else {
+                    setViewerHasFinished(false);
+                }
+            }
+        };
+
+        checkViewerStatus();
+    }, [yesterday, isMarathon, marathonLength, myParticipation, profile?.id, targetDate]);
 
     useEffect(() => {
         if (isMarathon) {
@@ -140,6 +183,9 @@ const GuessPreviewModal: React.FC<{
     })
 
     const username = entry.username || entry.profiles?.username || 'Player';
+    const entryUserId = entry.user_id || entry.profiles?.id;
+    const isMe = profile?.id === entryUserId;
+    const canSeeDetails = isMe || viewerHasFinished;
 
     return (
 
@@ -183,7 +229,12 @@ const GuessPreviewModal: React.FC<{
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Target Word Section */}
                         <div className="mb-6 mt-3 flex flex-col items-center">
-                            {showTargetWord ? (
+                            {!canSeeDetails ? (
+                                <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-center">
+                                    <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Target Word Hidden</p>
+                                    <p className="text-[8px] font-bold text-gray-600 uppercase">Complete your game to reveal</p>
+                                </div>
+                            ) : showTargetWord ? (
                                 <div className="flex flex-col items-center animate-in zoom-in duration-300">
                                     <span className="text-[8px] uppercase font-black text-gray-500 mb-1">Target Word</span>
                                     <div className="flex gap-1">
@@ -223,7 +274,7 @@ const GuessPreviewModal: React.FC<{
                                     {gameData.hint_record && (
                                         <div className="flex items-center gap-2 text-[8px] font-black uppercase text-gray-400 bg-yellow-500/10 p-1.5 rounded-lg border border-yellow-500/20">
                                             <div className="w-5 h-5 rounded bg-yellow-500 text-black flex items-center justify-center text-[10px]">
-                                                {gameData.hint_record.letter}
+                                                {canSeeDetails ? gameData.hint_record.letter : '?'}
                                             </div>
                                             <span>
                                                 Revealed at Pos {gameData.hint_record.index + 1}
@@ -273,7 +324,7 @@ const GuessPreviewModal: React.FC<{
                                                             cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
                                                             }`}
                                                     >
-                                                        {cell.letter}
+                                                        {canSeeDetails ? cell.letter : ''}
                                                     </div>
                                                 ))}
                                             </div>
@@ -287,7 +338,7 @@ const GuessPreviewModal: React.FC<{
                                                 {rowDecisions.map((dec: any, idx: number) => (
                                                     <div key={idx} className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tighter">
                                                         <span className="text-gray-500">
-                                                            Letter <span className="text-gray-300">{dec.letter}</span>: {dec.status}
+                                                            Letter <span className="text-gray-300">{canSeeDetails ? dec.letter : '?'}</span>: {dec.status}
                                                         </span>
                                                         {dec.pointDeduction !== 0 && (
                                                             <span className={dec.pointDeduction > 0 ? 'text-correct' : 'text-red-400'}>

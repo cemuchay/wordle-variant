@@ -5,6 +5,7 @@ import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
+import { useApp } from '../context/AppContext';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -34,6 +35,50 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
+  const [viewerHasFinished, setViewerHasFinished] = useState(false);
+
+  const { date: currentDate } = useApp();
+
+  const getTargetDate = () => {
+    if (!currentDate) return undefined;
+    if (timeframe === 'today') return currentDate;
+    if (timeframe === 'yesterday') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    }
+    return undefined;
+  };
+
+  const targetDate = getTargetDate();
+
+  // Check if viewer has finished for the selected timeframe
+  useEffect(() => {
+    if (!isOpen || !user || !targetDate) return;
+
+    if (timeframe === 'today' && isGameOver) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setViewerHasFinished(true);
+      return;
+    }
+
+    const checkStatus = async () => {
+      const { data } = await supabase
+        .from('scores')
+        .select('status')
+        .eq('user_id', user.id)
+        .eq('game_date', targetDate)
+        .single();
+
+      if (data) {
+        setViewerHasFinished(data.status === 'won' || data.status === 'lost');
+      } else {
+        setViewerHasFinished(false);
+      }
+    };
+
+    checkStatus();
+  }, [isOpen, user, targetDate, timeframe, isGameOver]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
@@ -95,7 +140,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     return () => { isMounted = false; };
   }, [isOpen, activeTab, timeframe]);
 
-  const canViewGuess = (timeframe === "today" || timeframe === "yesterday") && !!user;
+  const canViewGuess = (timeframe === "today" || timeframe === "yesterday") && !!user && viewerHasFinished;
   if (!isOpen) return null;
 
   return (
