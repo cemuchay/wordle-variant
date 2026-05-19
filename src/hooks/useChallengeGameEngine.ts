@@ -119,10 +119,15 @@ export const useChallengeGameEngine = ({
     // Word Length & Target Word Resolution
     const wordLength = isMarathon ? selectedLength! : challenge.word_length;
     const targetWord = useMemo(() => {
-        const word = isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
-        if (word) addLog("Word Resolved");
-        return word;
-    }, [isMarathon, marathonWords, selectedLength, challenge.target_word, challenge.salt, addLog]);
+        return isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
+    }, [isMarathon, marathonWords, selectedLength, challenge.target_word, challenge.salt]);
+
+    useEffect(() => {
+        if (targetWord) {
+            const t = setTimeout(() => addLog("Word Resolved"), 0);
+            return () => clearTimeout(t);
+        }
+    }, [targetWord, addLog]);
 
     // Helper to extract guesses for current word with extreme defensiveness
     const getIncomingGuesses = useCallback(() => {
@@ -232,7 +237,7 @@ export const useChallengeGameEngine = ({
 
         if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
             console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
-            addLog(`Background Sync: +${incoming.length - guesses.length}`);
+            setTimeout(() => addLog(`Background Sync: +${incoming.length - guesses.length}`), 0);
             dispatch({
                 type: 'SWITCH_LENGTH', payload: {
                     guesses: incoming,
