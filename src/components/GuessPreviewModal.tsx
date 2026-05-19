@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Loader2, X, Eye } from "lucide-react";
+import { Eye, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { useApp } from "../context/AppContext";
-import { getDailyConfig, deobfuscateWord } from "../lib/game-logic";
-import { SCORING, MAX_ATTEMPTS } from "../constants/game";
-import { Z_INDEX } from "../constants/ui";
 import { CHALLENGE_CONFIG } from "../constants/challenge";
+import { MAX_ATTEMPTS, SCORING } from "../constants/game";
+import { Z_INDEX } from "../constants/ui";
+import { useApp } from "../context/AppContext";
+import { deobfuscateWord, getDailyConfig } from "../lib/game-logic";
+import { supabase } from "../lib/supabaseClient";
 
 const formatTime = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return null;
@@ -122,57 +122,265 @@ const GuessPreviewModal: React.FC<{
     const getBreakdown = () => {
         if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
 
-        const wordToUse = targetWordToUse;
-        const targetChars = wordToUse.toUpperCase().split("");
-        const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
+        // const wordToUse = targetWordToUse;
+        // const targetChars = wordToUse.toUpperCase().split("");
+        // const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
 
         const rows: number[] = [];
-        const knownBlacks = new Set<string>(); // For repeat -20 penalties
+        // const knownBlacks = new Set<string>(); // For repeat -20 penalties
         let totalBonus = 0;
 
+        const wordsAwardedPoints: Array<{
+            letter: string;
+            index: number;
+            status: string;
+            awardRow: number,
+            isChecked: boolean
+        }> = []
+
+
+        const rowPointDecisions: Array<{
+            rowNumber: string;
+            totalRowPoints: number;
+            decisions: Array<{
+                letter: string,
+                status: string,
+                pointDeduction: number
+            }>;
+        }> = [];
+
         // 2. PROCESS ROWS: Calculate deductions for rows 1 to (N-1), award points on Row N
-        gameData.guesses.forEach((row: any[], rowIndex: number) => {
-            let rowBonus = 0;
-            const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
 
-            const won = row.every(cell => cell.status === 'correct');
+        // change to for loop
+        for (let rowIndex = 0; rowIndex < gameData.guesses.length; rowIndex++) {
+            const row = gameData.guesses[rowIndex];
 
-            if (isLastRow && won) {
-                // THE PAYOFF: Award the full discovery points
-                const discoveryPoints = wordLength * SCORING.POINTS_PER_LETTER;
-                rowBonus += discoveryPoints;
-            } else {
-                // THE DEDUCTIONS: Evaluate every letter entity individually
-                row.forEach((cell) => {
-                    const letter = cell.letter.toUpperCase();
+            // get index of last row 
+            // const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
+
+            /* first row **/
+            if (rowIndex === 0) {
+                let points = 0;
+                const localDecisions: Array<{
+                    letter: string,
+                    status: string,
+                    pointDeduction: number
+                }> = [];
+
+                row.forEach((cell: { letter: string; index: number; status: string; }) => {
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
-                        rowBonus -= SCORING.YELLOW_PENALTY;
+                        points += SCORING.YELLOW_SCORE;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} +${SCORING.YELLOW_SCORE}`,
+                            pointDeduction: SCORING.YELLOW_SCORE
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
 
                     // CASE: BLACK (Absent)
                     else if (cell.status === 'absent') {
-                        if (targetChars.includes(letter)) {
-                            rowBonus -= SCORING.ABSENT_PENALTY;
-                        } else if (knownBlacks.has(letter)) {
-                            rowBonus -= SCORING.REPEATED_ABSENT_PENALTY;
-                        } else {
-                            rowBonus -= SCORING.ABSENT_PENALTY;
-                            knownBlacks.add(letter);
-                        }
+                        points -= SCORING.ABSENT_PENALTY;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                            pointDeduction: SCORING.ABSENT_PENALTY
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
 
                     // CASE: GREEN (Correct)
                     else if (cell.status === 'correct') {
-                        // console.log(`[STASIS] Index ${cellIndex} (${letter}): Green status. No deduction (0).`);
+                        points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} +${SCORING.POINTS_PER_LETTER_FIRST_TRY}`,
+                            pointDeduction: SCORING.POINTS_PER_LETTER_FIRST_TRY
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
+
                 });
+
+                rowPointDecisions.push({
+                    rowNumber: `Row ${rowIndex}`,
+                    totalRowPoints: points,
+                    decisions: localDecisions
+                });
+
+
+
+                rows.push(points);
+                totalBonus += points;
+
             }
 
-            rows.push(rowBonus);
-            totalBonus += rowBonus;
-        });
+            /* for every other row besides last row **/
+            // if (rowIndex !== gameData.guesses.length - 1) {
+            else {
+                /* from the overall awarded words, find those with awardRow less than current */
+
+                const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
+
+
+                let points = 0;
+                const localDecisions: Array<{
+                    letter: string,
+                    status: string,
+                    pointDeduction: number
+                }> = [];
+
+
+                // change to for loop
+                for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+                    const cell = row[cellIndex];
+
+                    // CASE: YELLOW (Present but wrong spot)
+                    if (cell.status === 'present') {
+                        /* we will scan all wordsAwardedPoints with present status and return fist instance matching letter*/
+                        const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
+
+                        /* letter not present or isChecked */
+                        const freshYellow = !awardedOldYellow ? true : false;
+
+                        if (awardedOldYellow) {
+                            awardedOldYellow.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [no deduction or addition as points have already been given]`,
+                                pointDeduction: 0
+                            })
+                        }
+
+                        /* award fresh points for a new yellow discovery*/
+                        if (freshYellow) {
+                            points += SCORING.YELLOW_SCORE;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} +${SCORING.YELLOW_SCORE}`,
+                                pointDeduction: SCORING.YELLOW_SCORE
+                            })
+                        }
+
+
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+
+                    // CASE: BLACK (Absent)
+                    else if (cell.status === 'absent') {
+                        // we will check if cell letter is an old absent
+                        // relevantAwardedWords has all absents up to row - 1
+
+                        const oldAbsent = relevantAwardedWords.find((item) => item.letter === cell.letter && item.status === 'absent')
+
+                        if (oldAbsent) {
+                            oldAbsent.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [penalty for subsequent absent use at index ${oldAbsent.index}]`,
+                                pointDeduction: SCORING.REPEATED_ABSENT_PENALTY
+                            })
+
+                            points -= SCORING.REPEATED_ABSENT_PENALTY
+                        }
+
+                        /* award fresh points for a new absent discovery*/
+                        if (!oldAbsent) {
+                            points -= SCORING.ABSENT_PENALTY;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                                pointDeduction: SCORING.ABSENT_PENALTY
+                            })
+                        }
+
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+
+                    // CASE: GREEN (Correct)
+                    else if (cell.status === 'correct') {
+                        const oldGreen = wordsAwardedPoints.find((item) => item.status === 'correct' && item.letter === cell.letter);
+                        const oldYellow = wordsAwardedPoints.find((item) => item.status === 'present' && item.letter === cell.letter);
+
+                        const oldPresent = oldGreen || oldYellow;
+
+                        if (oldPresent) {
+                            oldPresent.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [points already awarded]`,
+                                pointDeduction: 0
+                            })
+                        }
+
+                        if (!oldPresent) {
+                            const isSecondGuess = rowIndex === 2
+
+                            // award fresh points
+                            points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} +${isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER}`,
+                                pointDeduction: isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER
+                            })
+                        }
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+                }
+
+                rowPointDecisions.push({
+                    rowNumber: `Row ${rowIndex}`,
+                    totalRowPoints: points,
+                    decisions: localDecisions
+                });
+
+                if (rowIndex === 1) {
+                    console.log(localDecisions, "localDecisions")
+                }
+
+                rows.push(points);
+                totalBonus += points;
+
+            }
+        }
 
         let localHint = 0
 
@@ -184,6 +392,8 @@ const GuessPreviewModal: React.FC<{
                 localHint -= SCORING.HINT_PENALTY;
             }
         }
+
+
 
         // 3. FINAL AGGREGATION
         const currentAttempts = gameData.guesses.length;
