@@ -235,18 +235,33 @@ export const useChallengeGameEngine = ({
         // 2. The incoming data is MORE complete than our local state (sync from another device)
         const shouldSync = (guesses.length === 0 && incoming.length > 0) || incoming.length > guesses.length;
 
-        if (shouldSync && JSON.stringify(incoming) !== JSON.stringify(guesses)) {
-            console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
-            setTimeout(() => addLog(`Background Sync: +${incoming.length - guesses.length}`), 0);
-            dispatch({
-                type: 'SWITCH_LENGTH', payload: {
-                    guesses: incoming,
-                    letterStatuses: getLetterStatuses(incoming),
-                    isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+        if (shouldSync) {
+            // Check if content actually differs before dispatching
+            let hasChanged = false;
+            if (incoming.length !== guesses.length) {
+                hasChanged = true;
+            } else {
+                for (let i = 0; i < incoming.length; i++) {
+                    if (JSON.stringify(incoming[i]) !== JSON.stringify(guesses[i])) {
+                        hasChanged = true;
+                        break;
+                    }
                 }
-            });
+            }
+
+            if (hasChanged) {
+                console.log(`[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`);
+                setTimeout(() => addLog(`Background Sync: +${incoming.length - guesses.length}`), 0);
+                dispatch({
+                    type: 'SWITCH_LENGTH', payload: {
+                        guesses: incoming,
+                        letterStatuses: getLetterStatuses(incoming),
+                        isGameOver: incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                    }
+                });
+            }
         }
-    }, [participation.guesses, getIncomingGuesses, guesses.length, isSaving, isMarathon, selectedLength, guesses, addLog]);
+    }, [getIncomingGuesses, guesses, isSaving, isMarathon, selectedLength, addLog]);
 
     // Timer Interval Management
     useEffect(() => {
