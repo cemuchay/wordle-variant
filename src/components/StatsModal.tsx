@@ -7,7 +7,7 @@ import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
-type Timeframe = 'today' | 'weekly' | 'monthly'
+type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
 
 
 interface GameStats {
@@ -50,6 +50,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
       const viewMap: Record<Timeframe, string> = {
         today: 'leaderboard_today',
+        yesterday: 'leaderboard_yesterday',
         weekly: 'leaderboard_weekly',
         monthly: 'leaderboard_monthly',
         // all: 'leaderboard_all_time'
@@ -60,9 +61,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       const standardSelect = `${baseSelect}, days_active`;
       const todaySelect = `${baseSelect}, word_length, attempts, status, user_id`;
 
+      const isDailyView = timeframe === 'today' || timeframe === 'yesterday';
+
       const { data, error } = await supabase
         .from(viewMap[timeframe])
-        .select(timeframe === 'today' ? todaySelect : standardSelect)
+        .select(isDailyView ? todaySelect : standardSelect)
         .order('total_points', { ascending: false })
         .limit(20);
 
@@ -92,7 +95,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     return () => { isMounted = false; };
   }, [isOpen, activeTab, timeframe]);
 
-  const canViewGuess = isGameOver && timeframe === "today" && !!user;
+  const canViewGuess = (timeframe === "today" || timeframe === "yesterday") && !!user;
   if (!isOpen) return null;
 
   return (
@@ -175,7 +178,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Timeframe Toggles */}
               <div className="flex gap-1 mb-2">
-                {(['today', 'weekly', 'monthly'] as Timeframe[]).map((t) => (
+                {(['today', 'yesterday', 'weekly', 'monthly'] as Timeframe[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTimeframe(t)}
@@ -248,10 +251,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         </div>
 
         {/* The Modal */}
-        {(selectedEntry && (timeframe === "today" || activeTab === 'stats')) && (
+        {(selectedEntry && (timeframe === "today" || timeframe === "yesterday" || activeTab === 'stats')) && (
           <GuessPreviewModal
             entry={selectedEntry}
             onClose={() => setSelectedEntry(null)}
+            yesterday={timeframe === "yesterday"}
           />
         )}
 
@@ -309,7 +313,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
             {rank}
           </span>
           {isFirst && (
-            <div className="absolute -top-6 left-7.5 text-[18px] w-[18px] flex justify-center select-none">
+            <div className="absolute -top-6 left-8.5 text-[18px] w-[18px] flex justify-center select-none">
               <div style={tieCount > 1 ? {
                 clipPath: `inset(0 ${100 - pieceWidth * (tieIndex + 1)}% 0 ${pieceWidth * tieIndex}%)`,
                 transform: `translateX(${50 - (pieceWidth * tieIndex + pieceWidth / 2)}%)`,
