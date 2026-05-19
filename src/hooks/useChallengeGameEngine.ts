@@ -144,7 +144,7 @@ export const useChallengeGameEngine = ({
         if (challenge.mode === 'LIVE' && challenge.max_time) {
             // Marathon: use per-word startTime ONLY. Regular: use participation startTime.
             const startTime = isMarathon ? progress?.started_at : participation.started_at;
-            
+
             if (isMarathon && !progress?.started_at) {
                 // Word hasn't started yet, give full time
                 initialTimeLeft = challenge.max_time * 60;
@@ -287,7 +287,6 @@ export const useChallengeGameEngine = ({
                     maxAttempts: 6,
                     usedHint: usedHint,
                     guesses: newGuesses,
-                    targetWord: targetWord,
                     gameDate: new Date().toISOString().split('T')[0],
                     hintRecord: hintRecord
                 });
@@ -314,7 +313,6 @@ export const useChallengeGameEngine = ({
                     maxAttempts: 6,
                     usedHint: usedHint,
                     guesses: newGuesses,
-                    targetWord: targetWord,
                     gameDate: new Date().toISOString().split('T')[0],
                     hintRecord: hintRecord
                 });

@@ -520,7 +520,12 @@ const GuessPreviewModal: React.FC<{
                         <div className="grid gap-4 mb-6 justify-center">
                             {gameData?.guesses?.map((row: any[], i) => {
                                 const rowScore = breakdown.rows[i];
-                                const rowDecisions = breakdown.decisions[i]?.decisions;
+                                const rowDecisions = breakdown?.decisions?.[i]?.decisions;
+                                if (!rowDecisions) return <div>
+                                    <h4>Row {i + 1}</h4>
+                                    <p>{rowScore}</p>
+                                    <p>No breakdown available</p>
+                                </div>;
                                 return (
                                     <div key={i} className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
                                         <div className="flex items-center gap-3 justify-between">
