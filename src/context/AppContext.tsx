@@ -53,12 +53,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // 1. Initialize Auth and Real-time Listeners
     useAppInit();
 
-    // 2. Client-Side State (Zustand Selectors)
-    const store = useAppStore(); // Keep for the context bridge
-    const setChallengeUnreadCount = useAppStore(state => state.setChallengeUnreadCount);
-    const setMyParticipations = useAppStore(state => state.setMyParticipations);
-    const setPreferences = useAppStore(state => state.setPreferences);
-    const myParticipations = useAppStore(state => state.myParticipations);
+    // 2. Client-Side State (Destructured Selectors for stability)
+    const preferences = useAppStore(s => s.preferences);
+    const setPreferences = useAppStore(s => s.setPreferences);
+    const toast = useAppStore(s => s.toast);
+    const triggerToast = useAppStore(s => s.triggerToast);
+    const setToast = useAppStore(s => s.setToast);
+    const unreadCount = useAppStore(s => s.unreadCount);
+    const setUnreadCount = useAppStore(s => s.setUnreadCount);
+    const challengeUnreadCount = useAppStore(s => s.challengeUnreadCount);
+    const setChallengeUnreadCount = useAppStore(s => s.setChallengeUnreadCount);
+    const stats = useAppStore(s => s.stats);
+    const setStats = useAppStore(s => s.setStats);
+    const activeCall = useAppStore(s => s.activeCall);
+    const setActiveCall = useAppStore(s => s.setActiveCall);
+    const isChallengeOpen = useAppStore(s => s.isChallengeOpen);
+    const setIsChallengeOpen = useAppStore(s => s.setChallengeOpen);
+    const isChatOpen = useAppStore(s => s.isChatOpen);
+    const setIsChatOpen = useAppStore(s => s.setChatOpen);
+    const setIsLoadingDate = useAppStore(s => s.setIsLoadingDate);
+    const myParticipations = useAppStore(s => s.myParticipations);
+    const setMyParticipations = useAppStore(s => s.setMyParticipations);
 
     // 3. Server-Side State (TanStack Query)
     const { data: serverDateResponse, isLoading: isLoadingDate } = useAuthoritativeDate();
@@ -67,11 +82,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { data: challengeStatus } = useChallengeStatus(user?.id);
 
     // 4. Presence & Audio Logic
-    const { onlineUsers, allProfiles } = useGlobalPresence(user?.id, store.activeCall?.challengeId || null);
+    const { onlineUsers, allProfiles } = useGlobalPresence(user?.id, activeCall?.challengeId || null);
     const audioChat = useAudioChat({
-        challengeId: store.activeCall?.challengeId || '',
+        challengeId: activeCall?.challengeId || '',
         userId: user?.id || '',
-        enabled: !!store.activeCall
+        enabled: !!activeCall
     });
 
     // 5. Computed State
@@ -98,38 +113,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // 7. Context Bridge (Ensures existing components don't break)
     const contextValue: AppContextType = useMemo(() => ({
         profile,
-        preferences: store.preferences,
+        preferences,
         loading: isProfileLoading,
         refreshProfile: async () => { /* Handled by cache invalidation in Init hook */ },
-        toast: store.toast,
-        triggerToast: store.triggerToast,
-        setToast: store.setToast,
-        unreadCount: store.unreadCount,
-        setUnreadCount: store.setUnreadCount,
-        challengeUnreadCount: store.challengeUnreadCount,
-        setChallengeUnreadCount: store.setChallengeUnreadCount,
+        toast,
+        triggerToast,
+        setToast,
+        unreadCount,
+        setUnreadCount,
+        challengeUnreadCount,
+        setChallengeUnreadCount,
         date: serverDateResponse?.formatted || null,
         isLoadingDate,
-        setIsLoadingDate: store.setIsLoadingDate,
-        stats: store.stats,
-        setStats: store.setStats,
-        activeCall: store.activeCall,
-        setActiveCall: store.setActiveCall,
-        isChallengeOpen: store.isChallengeOpen,
-        setIsChallengeOpen: store.setChallengeOpen,
-        isChatOpen: store.isChatOpen,
-        setIsChatOpen: store.setChatOpen,
+        setIsLoadingDate,
+        stats,
+        setStats,
+        activeCall,
+        setActiveCall,
+        isChallengeOpen,
+        setIsChallengeOpen,
+        isChatOpen,
+        setIsChatOpen,
         onlineUsers,
         allProfiles,
         audioChat,
         activeVoiceRooms
     }), [
-        profile, store.preferences, isProfileLoading, store.toast, store.triggerToast,
-        store.setToast, store.unreadCount, store.setUnreadCount, store.challengeUnreadCount,
-        store.setChallengeUnreadCount, serverDateResponse?.formatted, isLoadingDate,
-        store.setIsLoadingDate, store.stats, store.setStats, store.activeCall,
-        store.setActiveCall, store.isChallengeOpen, store.setChallengeOpen,
-        store.isChatOpen, store.setChatOpen, onlineUsers, allProfiles,
+        profile, preferences, isProfileLoading, toast, triggerToast,
+        setToast, unreadCount, setUnreadCount, challengeUnreadCount,
+        setChallengeUnreadCount, serverDateResponse?.formatted, isLoadingDate,
+        setIsLoadingDate, stats, setStats, activeCall,
+        setActiveCall, isChallengeOpen, setIsChallengeOpen,
+        isChatOpen, setIsChatOpen, onlineUsers, allProfiles,
         audioChat, activeVoiceRooms
     ]);
 

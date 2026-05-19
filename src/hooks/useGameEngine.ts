@@ -231,10 +231,7 @@ export const useGameEngine = (date: string) => {
             triggerToast("Hint disabled: Only one letter remains!");
             return;
         }
-        if (state.usedHint && state.hintRecord) {
-            triggerToast(`Reminder: "${state.hintRecord.letter}" is at position ${state.hintRecord.index + 1}.`, TOAST_DURATION.DEFAULT);
-            return;
-        }
+
         const hint = getHint(config.word, state.guesses);
         if (hint) {
             const hintWithRow = { ...hint, row: state.guesses.length };
@@ -264,7 +261,7 @@ export const useGameEngine = (date: string) => {
             }
             triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
         }
-    }, [state.guesses, state.isGameOver, state.usedHint, state.hintRecord, config, date, user, triggerToast, performSync]);
+    }, [state.guesses, state.isGameOver, state.usedHint, config, date, user, triggerToast, performSync]);
 
     const retrySync = useCallback(async () => {
         const saved = localStorage.getItem(`wordle-${date}`);

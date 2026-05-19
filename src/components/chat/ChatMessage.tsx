@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { Reply, CheckCheck } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
@@ -13,9 +14,10 @@ interface ChatMessageProps {
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
-const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: ChatMessageProps) => {
-    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: ChatMessageProps) => {
+    const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), [msg.created_at]);
     const x = useMotionValue(0);
 
     // Transform x position to reply icon properties
@@ -23,84 +25,84 @@ const ChatMessage = ({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }: Chat
     const replyIconScale = useTransform(x, [0, 60], [0.5, 1.1]);
     const replyIconTranslateX = useTransform(x, [0, 60], [-20, 12]);
 
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+    const renderedContent = useMemo(() => {
+        const content = msg.content;
+        if (!content) return null;
+        
+        const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
+        let parts: (string | JSX.Element)[] = [content];
 
-const renderContent = (content: string) => {
-    if (!content) return null;
-    const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
-    let parts: (string | JSX.Element)[] = [content];
+        // Handle Mentions
+        sortedUsers.forEach((user) => {
+            const userIndex = users.findIndex(u => u.username === user.username);
+            const color = MENTION_COLORS[userIndex % MENTION_COLORS.length];
+            const mention = `@${user.username}`;
 
-    // Handle Mentions
-    sortedUsers.forEach((user) => {
-        const userIndex = users.findIndex(u => u.username === user.username);
-        const color = MENTION_COLORS[userIndex % MENTION_COLORS.length];
-        const mention = `@${user.username}`;
+            const newParts: (string | JSX.Element)[] = [];
+            parts.forEach((part, pIdx) => {
+                if (typeof part !== 'string') {
+                    newParts.push(part);
+                    return;
+                }
 
-        const newParts: (string | JSX.Element)[] = [];
-        parts.forEach((part) => {
+                const subParts = part.split(new RegExp(`(${mention}(?:\\s|$))`, 'g'));
+                subParts.forEach((subPart, sIdx) => {
+                    if (subPart.startsWith(mention)) {
+                        const endsWithSpace = subPart.endsWith(' ');
+                        const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
+
+                        newParts.push(
+                            <span
+                                key={`mention-${user.username}-${pIdx}-${sIdx}`}
+                                className={`inline-block px-1.5 py-0.5 rounded-md text-[12px] font-black transition-all`}
+                                style={{
+                                    backgroundColor: `${color}33`,
+                                    color: isMe ? '#000' : color,
+                                    border: isMe ? 'none' : `1px solid ${color}20`
+                                }}
+                            >
+                                {cleanMention}
+                            </span>
+                        );
+                        if (endsWithSpace) newParts.push(' ');
+                    } else if (subPart !== '') {
+                        newParts.push(subPart);
+                    }
+                });
+            });
+            parts = newParts;
+        });
+
+        // Handle URLs
+        const finalParts: (string | JSX.Element)[] = [];
+        parts.forEach((part, pIdx) => {
             if (typeof part !== 'string') {
-                newParts.push(part);
+                finalParts.push(part);
                 return;
             }
 
-            const subParts = part.split(new RegExp(`(${mention}(?:\\s|$))`, 'g'));
-            subParts.forEach((subPart) => {
-                if (subPart.startsWith(mention)) {
-                    const endsWithSpace = subPart.endsWith(' ');
-                    const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
-
-                    newParts.push(
-                        <span
-                            key={`${user.username}-${Math.random()}`}
-                            className={`inline-block px-1.5 py-0.5 rounded-md text-[12px] font-black transition-all`}
-                            style={{
-                                backgroundColor: `${color}33`,
-                                color: isMe ? '#000' : color,
-                                border: isMe ? 'none' : `1px solid ${color}20`
-                            }}
+            const subParts = part.split(URL_REGEX);
+            subParts.forEach((subPart, sIdx) => {
+                if (URL_REGEX.test(subPart)) {
+                    finalParts.push(
+                        <a
+                            key={`url-${pIdx}-${sIdx}`}
+                            href={subPart}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`underline break-all transition-colors ${isMe ? 'text-black/80 hover:text-black' : 'text-correct hover:text-correct/80'}`}
                         >
-                            {cleanMention}
-                        </span>
+                            {subPart}
+                        </a>
                     );
-                    if (endsWithSpace) newParts.push(' ');
                 } else if (subPart !== '') {
-                    newParts.push(subPart);
+                    finalParts.push(subPart);
                 }
             });
         });
-        parts = newParts;
-    });
 
-    // Handle URLs
-    const finalParts: (string | JSX.Element)[] = [];
-    parts.forEach((part) => {
-        if (typeof part !== 'string') {
-            finalParts.push(part);
-            return;
-        }
-
-        const subParts = part.split(URL_REGEX);
-        subParts.forEach((subPart) => {
-            if (URL_REGEX.test(subPart)) {
-                finalParts.push(
-                    <a
-                        key={subPart + Math.random()}
-                        href={subPart}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`underline break-all transition-colors ${isMe ? 'text-black/80 hover:text-black' : 'text-correct hover:text-correct/80'}`}
-                    >
-                        {subPart}
-                    </a>
-                );
-            } else if (subPart !== '') {
-                finalParts.push(subPart);
-            }
-        });
-    });
-
-    return finalParts;
-};
+        return finalParts;
+    }, [msg.content, users, isMe]);
 
     return (
         <div className="relative group overflow-visible">
@@ -157,7 +159,7 @@ const renderContent = (content: string) => {
                     }`}>
 
                     <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap wrap-break-word">
-                        {renderContent(msg.content)}
+                        {renderedContent}
                     </div>
 
                     <div className={`text-[11px] mt-1 flex font-mono font-bold items-center gap-1.5 ${isMe ? 'justify-end text-black' : 'justify-end text-[#8696a0]'}`}>
@@ -173,6 +175,9 @@ const renderContent = (content: string) => {
             </motion.div>
         </div>
     );
-};
+});
+
+ChatMessage.displayName = 'ChatMessage';
 
 export default ChatMessage;
+

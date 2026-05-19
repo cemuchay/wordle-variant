@@ -2,6 +2,61 @@ import React, { memo, useState, useEffect, useRef } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 
+interface CellProps {
+  letter: string;
+  status?: 'correct' | 'present' | 'absent' | 'default';
+  isRevealing?: boolean;
+  revealIndex?: number;
+  isShake?: boolean;
+  isPop?: boolean;
+  isHinted?: boolean;
+  isSaving?: boolean;
+}
+
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted }: CellProps) => {
+  const tileClass = `
+    w-[11vw] h-[11vw] 
+    max-w-[55px] max-h-[55px] 
+    sm:w-[6vh] sm:h-[6vh] 
+    sm:max-w-[62px] sm:max-h-[62px] 
+    flex items-center justify-center 
+    text-xl sm:text-2xl font-bold uppercase transition-colors duration-300
+    border-2 text-white
+  `;
+
+  let statusClass = 'border-gray-800';
+  let animationClass = '';
+
+  if (status === 'correct') statusClass = 'bg-correct border-correct';
+  else if (status === 'present') statusClass = 'bg-present border-present';
+  else if (status === 'absent') statusClass = 'bg-absent border-absent';
+  else if (letter) statusClass = 'border-gray-500';
+
+  if (isRevealing) {
+    if (status === 'correct') animationClass = 'animate-reveal-correct';
+    else if (status === 'present') animationClass = 'animate-reveal-present';
+    else if (status === 'absent') animationClass = 'animate-reveal-absent';
+  } else if (isPop) {
+    animationClass = 'animate-pop';
+  } else if (isShake) {
+    animationClass = 'animate-shake';
+  } else if (isHinted) {
+    animationClass = 'animate-pulse text-yellow-500/50 border-yellow-600/50';
+  }
+
+  const style = isRevealing 
+    ? { animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' } 
+    : {};
+
+  return (
+    <div className={`${tileClass} ${statusClass} ${animationClass}`} style={style}>
+      {letter}
+    </div>
+  );
+});
+
+Cell.displayName = 'Cell';
+
 interface GridProps {
   wordLength: number;
   maxAttempts: number;
@@ -22,23 +77,13 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       setRevealingRowIndex(guesses.length - 1);
       const timer = setTimeout(() => {
         setRevealingRowIndex(null);
-      }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400); // Wait for reveal animation to finish
+      }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
       return () => clearTimeout(timer);
     }
     prevGuessesLength.current = guesses.length;
   }, [guesses.length, wordLength]);
 
   const empties = Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
-
-  // Responsive Tile Size logic
-  const tileClass = `
-    w-[11vw] h-[11vw] 
-    max-w-[55px] max-h-[55px] 
-    sm:w-[6vh] sm:h-[6vh] 
-    sm:max-w-[62px] sm:max-h-[62px] 
-    flex items-center justify-center 
-    text-xl sm:text-2xl font-bold uppercase transition-colors duration-300
-  `;
 
   return (
     <div
@@ -50,41 +95,32 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     >
       {/* Past Guesses */}
       {guesses.map((guess, i) => {
-        const isLastRow = i === guesses.length - 1;
+        const isRevealing = i === revealingRowIndex;
         return guess.map((res, j) => (
-          <div
+          <Cell
             key={`past-${i}-${j}`}
-            className={`${tileClass} border-2 text-white
-              ${res.status === 'correct' ? 'bg-correct border-correct' :
-                res.status === 'present' ? 'bg-present border-present' :
-                  'bg-absent border-absent'}
-              ${isLastRow ? (
-                res.status === 'correct' ? 'animate-reveal-correct' :
-                  res.status === 'present' ? 'animate-reveal-present' :
-                    'animate-reveal-absent'
-              ) : ''}`}
-            style={isLastRow ? { animationDelay: `${j * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' } : {}}
-          >
-            {res.letter}
-          </div>
+            letter={res.letter}
+            status={res.status}
+            isRevealing={isRevealing}
+            revealIndex={j}
+          />
         ));
       })}
 
-      {/* Current Guess Row - Only show if not currently revealing a submission */}
+      {/* Current Guess Row */}
       {guesses.length < maxAttempts && revealingRowIndex === null && (
         Array.from({ length: wordLength }).map((_, i) => {
           const isHinted = !isSaving && hintRecord?.index === i;
           const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
           return (
-            <div
+            <Cell
               key={`current-${i}`}
-              className={`${tileClass} border-2 text-white 
-                ${isShake ? 'animate-shake' : ''}
-                ${currentGuess[i] ? 'border-gray-500 animate-pop' : isHinted ? 'border-yellow-600/50 text-yellow-500/50 animate-pulse' : 'border-gray-500'}`}
-            >
-              {letter}
-            </div>
+              letter={letter}
+              isPop={!!currentGuess[i]}
+              isShake={isShake}
+              isHinted={isHinted}
+            />
           );
         })
       )}
@@ -95,13 +131,11 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
           {Array.from({ length: wordLength }).map((_, j) => {
             const isHinted = !isSaving && hintRecord?.index === j;
             return (
-              <div
+              <Cell
                 key={`empty-${i}-${j}`}
-                className={`${tileClass} border-2 
-                  ${isHinted ? 'border-yellow-600/20 text-yellow-500/30' : 'border-gray-800'}`}
-              >
-                {isHinted ? hintRecord?.letter : ''}
-              </div>
+                letter={isHinted ? hintRecord?.letter : ''}
+                isHinted={isHinted}
+              />
             );
           })}
         </React.Fragment>
@@ -109,3 +143,5 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     </div>
   );
 });
+
+Grid.displayName = 'Grid';

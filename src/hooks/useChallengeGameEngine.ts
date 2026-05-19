@@ -422,10 +422,7 @@ export const useChallengeGameEngine = ({
 
     const handleHint = useCallback(async () => {
         if (isGameOver || isSaving) return;
-        if (usedHint && hintRecord) {
-            triggerToast(`Reminder: "${hintRecord.letter}" is at position ${hintRecord.index + 1}.`, 3000);
-            return;
-        }
+
         if (guesses.length >= 5 && !usedHint) {
             triggerToast("Hint locked on last available guess.");
             return;
@@ -467,7 +464,7 @@ export const useChallengeGameEngine = ({
             setIsSaving(false);
             if (!success) triggerToast("Failed to save hint usage.", 3000);
         }
-    }, [isGameOver, isSaving, usedHint, hintRecord, triggerToast, guesses, targetWord, isMarathon, selectedLength, wrappedSubmitResult]);
+    }, [isGameOver, isSaving, usedHint, triggerToast, guesses, targetWord, isMarathon, selectedLength, wrappedSubmitResult]);
 
 
     const actions = useMemo(() => ({
