@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Loader2, X, Eye } from "lucide-react";
+import { Eye, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { useApp } from "../context/AppContext";
-import { getDailyConfig, deobfuscateWord } from "../lib/game-logic";
-import { SCORING, MAX_ATTEMPTS } from "../constants/game";
-import { Z_INDEX } from "../constants/ui";
 import { CHALLENGE_CONFIG } from "../constants/challenge";
+import { MAX_ATTEMPTS, SCORING } from "../constants/game";
+import { Z_INDEX } from "../constants/ui";
+import { useApp } from "../context/AppContext";
+import { deobfuscateWord, getDailyConfig } from "../lib/game-logic";
+import { supabase } from "../lib/supabaseClient";
 
 const formatTime = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return null;
@@ -104,7 +104,7 @@ const GuessPreviewModal: React.FC<{
 
         if (isMarathon && targetWord) {
             try {
-                const words = JSON.parse(targetWord);
+                const words = typeof targetWord === 'string' ? JSON.parse(targetWord) : targetWord;
                 const obfuscatedWord = words[marathonLength] || "";
                 wordToUse = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
             } catch (e) {
@@ -122,57 +122,263 @@ const GuessPreviewModal: React.FC<{
     const getBreakdown = () => {
         if (!gameData?.guesses || gameData.guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0 };
 
-        const wordToUse = targetWordToUse;
-        const targetChars = wordToUse.toUpperCase().split("");
-        const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
+        // const wordToUse = targetWordToUse;
+        // const targetChars = wordToUse.toUpperCase().split("");
+        // const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
 
         const rows: number[] = [];
-        const knownBlacks = new Set<string>(); // For repeat -20 penalties
+        // const knownBlacks = new Set<string>(); // For repeat -20 penalties
         let totalBonus = 0;
 
+        const wordsAwardedPoints: Array<{
+            letter: string;
+            index: number;
+            status: string;
+            awardRow: number,
+            isChecked: boolean
+        }> = []
+
+
+        const rowPointDecisions: Array<{
+            rowNumber: string;
+            totalRowPoints: number;
+            decisions: Array<{
+                letter: string,
+                status: string,
+                pointDeduction: number
+            }>;
+        }> = [];
+
         // 2. PROCESS ROWS: Calculate deductions for rows 1 to (N-1), award points on Row N
-        gameData.guesses.forEach((row: any[], rowIndex: number) => {
-            let rowBonus = 0;
-            const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
 
-            const won = row.every(cell => cell.status === 'correct');
 
-            if (isLastRow && won) {
-                // THE PAYOFF: Award the full discovery points
-                const discoveryPoints = wordLength * SCORING.POINTS_PER_LETTER;
-                rowBonus += discoveryPoints;
-            } else {
-                // THE DEDUCTIONS: Evaluate every letter entity individually
-                row.forEach((cell) => {
-                    const letter = cell.letter.toUpperCase();
+        for (let rowIndex = 0; rowIndex < gameData.guesses.length; rowIndex++) {
+            const row = gameData.guesses[rowIndex];
+
+            // get index of last row 
+            // const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
+
+            /* first row **/
+            if (rowIndex === 0) {
+                let points = 0;
+                const localDecisions: Array<{
+                    letter: string,
+                    status: string,
+                    pointDeduction: number
+                }> = [];
+
+                row.forEach((cell: { letter: string; index: number; status: string; }) => {
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
-                        rowBonus -= SCORING.YELLOW_PENALTY;
+                        points += SCORING.YELLOW_SCORE_FIRST_TRY;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} +${SCORING.YELLOW_SCORE_FIRST_TRY} 1st try`,
+                            pointDeduction: SCORING.YELLOW_SCORE_FIRST_TRY
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
 
                     // CASE: BLACK (Absent)
                     else if (cell.status === 'absent') {
-                        if (targetChars.includes(letter)) {
-                            rowBonus -= SCORING.ABSENT_PENALTY;
-                        } else if (knownBlacks.has(letter)) {
-                            rowBonus -= SCORING.REPEATED_ABSENT_PENALTY;
-                        } else {
-                            rowBonus -= SCORING.ABSENT_PENALTY;
-                            knownBlacks.add(letter);
-                        }
+                        points -= SCORING.ABSENT_PENALTY;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                            pointDeduction: -SCORING.ABSENT_PENALTY
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
 
                     // CASE: GREEN (Correct)
                     else if (cell.status === 'correct') {
-                        // console.log(`[STASIS] Index ${cellIndex} (${letter}): Green status. No deduction (0).`);
+                        points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
+                        localDecisions.push({
+                            letter: cell.letter,
+                            status: `${cell.status} +${SCORING.POINTS_PER_LETTER_FIRST_TRY} 1st try`,
+                            pointDeduction: SCORING.POINTS_PER_LETTER_FIRST_TRY
+                        })
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
                     }
+
                 });
+
+                rowPointDecisions.push({
+                    rowNumber: `Row ${rowIndex}`,
+                    totalRowPoints: points,
+                    decisions: localDecisions
+                });
+
+
+
+                rows.push(points);
+                totalBonus += points;
+
             }
 
-            rows.push(rowBonus);
-            totalBonus += rowBonus;
-        });
+            /* for every other row besides last row **/
+            // if (rowIndex !== gameData.guesses.length - 1) {
+            else {
+                /* from the overall awarded words, find those with awardRow less than current */
+
+                const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
+
+
+                let points = 0;
+                const localDecisions: Array<{
+                    letter: string,
+                    status: string,
+                    pointDeduction: number
+                }> = [];
+
+
+
+                for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+                    const cell = row[cellIndex];
+                    const isSecondGuess = rowIndex === 1
+
+                    // CASE: YELLOW (Present but wrong spot)
+                    if (cell.status === 'present') {
+                        /* we will scan all wordsAwardedPoints with present status and return fist instance matching letter*/
+                        const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
+
+                        /* letter not present or isChecked */
+                        const freshYellow = !awardedOldYellow ? true : false;
+
+                        if (awardedOldYellow) {
+                            awardedOldYellow.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [no deduction or addition as points have already been given]`,
+                                pointDeduction: 0
+                            })
+                        }
+
+                        /* award fresh points for a new yellow discovery*/
+                        if (freshYellow) {
+                            points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} +${isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE} ${isSecondGuess ? '2nd try' : ''} `,
+                                pointDeduction: isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE
+                            })
+                        }
+
+
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+
+                    // CASE: BLACK (Absent)
+                    else if (cell.status === 'absent') {
+                        // we will check if cell letter is an old absent
+                        // relevantAwardedWords has all absents up to row - 1
+
+                        const oldAbsent = relevantAwardedWords.find((item) => item.letter === cell.letter && item.status === 'absent')
+
+                        if (oldAbsent) {
+                            oldAbsent.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [penalty for subsequent absent use at index ${oldAbsent.index}]`,
+                                pointDeduction: -SCORING.REPEATED_ABSENT_PENALTY
+                            })
+
+                            points -= SCORING.REPEATED_ABSENT_PENALTY
+                        }
+
+                        /* award fresh points for a new absent discovery*/
+                        if (!oldAbsent) {
+                            points -= SCORING.ABSENT_PENALTY;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                                pointDeduction: -SCORING.ABSENT_PENALTY
+                            })
+                        }
+
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+
+                    // CASE: GREEN (Correct)
+                    else if (cell.status === 'correct') {
+                        const oldGreen = wordsAwardedPoints.find((item) => item.status === 'correct' && item.letter === cell.letter);
+                        const oldYellow = wordsAwardedPoints.find((item) => item.status === 'present' && item.letter === cell.letter);
+
+                        const oldPresent = oldGreen || oldYellow;
+
+                        if (oldPresent) {
+                            oldPresent.isChecked = true;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} [points already awarded]`,
+                                pointDeduction: 0
+                            })
+                        }
+
+                        if (!oldPresent) {
+
+
+                            // award fresh points
+                            points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+                            localDecisions.push({
+                                letter: cell.letter,
+                                status: `${cell.status} +${isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER} ${isSecondGuess ? '2nd try' : ''}`,
+                                pointDeduction: isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER
+                            })
+                        }
+                        wordsAwardedPoints.push({
+                            letter: cell.letter,
+                            index: cell.index,
+                            status: cell.status,
+                            awardRow: rowIndex,
+                            isChecked: false
+                        })
+                    }
+                }
+
+                rowPointDecisions.push({
+                    rowNumber: `Row ${rowIndex}`,
+                    totalRowPoints: points,
+                    decisions: localDecisions
+                });
+
+
+                rows.push(points);
+                totalBonus += points;
+
+            }
+        }
 
         let localHint = 0
 
@@ -185,12 +391,14 @@ const GuessPreviewModal: React.FC<{
             }
         }
 
+
+
         // 3. FINAL AGGREGATION
         const currentAttempts = gameData.guesses.length;
         const won = gameData.guesses[currentAttempts - 1]?.every((c: any) => c.status === 'correct');
         const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
 
-        return { rows, base: baseScore, bonus: totalBonus, hint: localHint };
+        return { rows, base: baseScore, bonus: totalBonus, hint: localHint, decisions: rowPointDecisions };
     };
 
     const breakdown = getBreakdown();
@@ -200,7 +408,7 @@ const GuessPreviewModal: React.FC<{
     return (
 
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.GUESS_PREVIEW }} onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />
                 </button>
@@ -238,7 +446,7 @@ const GuessPreviewModal: React.FC<{
                 ) : (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Target Word Section */}
-                        <div className="mb-6 flex flex-col items-center">
+                        <div className="mb-6 mt-3 flex flex-col items-center">
                             {showTargetWord ? (
                                 <div className="flex flex-col items-center animate-in zoom-in duration-300">
                                     <span className="text-[8px] uppercase font-black text-gray-500 mb-1">Target Word</span>
@@ -263,51 +471,12 @@ const GuessPreviewModal: React.FC<{
                             )}
                         </div>
 
-                        <div className="grid gap-2 mb-6 justify-center">
-                            {gameData?.guesses?.map((row: any[], i) => {
-                                const rowScore = breakdown.rows[i];
-                                return (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <div className="flex gap-1">
-                                            {row.map((cell, j) => (
-                                                <div
-                                                    key={j}
-                                                    className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
-                                                        cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
-                                                        }`}
-                                                >
-                                                    {cell.letter}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className={`text-[9px] font-mono font-bold w-8 ${rowScore >= 0 ? 'text-correct' : 'text-red-400'}`}>
-                                            {rowScore > 0 ? `+${rowScore}` : rowScore}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
                         {/* Breakdown Section */}
                         <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 mb-4 space-y-2">
                             <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
                                 <span>Base Performance:</span>
                                 <span className="text-gray-100">{breakdown.base}</span>
                             </div>
-                            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
-                                <span>Precision Bonus:</span>
-                                <span className={breakdown.bonus >= 0 ? 'text-correct' : 'text-red-400'}>
-                                    {breakdown.bonus > 0 ? `+${breakdown.bonus}` : breakdown.bonus}
-                                </span>
-                            </div>
-
-                            {gameData?.time_taken !== null && gameData?.time_taken !== undefined && (
-                                <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
-                                    <span>Time Taken:</span>
-                                    <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
-                                </div>
-                            )}
-
                             {/* Hint Info */}
                             {gameData?.hints_used && (
                                 <div className="pt-2 border-t border-gray-700/50">
@@ -328,12 +497,77 @@ const GuessPreviewModal: React.FC<{
                                     )}
                                 </div>
                             )}
+                            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+                                <span>Precision Bonus:</span>
+                                <span className={breakdown.bonus >= 0 ? 'text-correct' : 'text-red-400'}>
+                                    {breakdown.bonus > 0 ? `+${breakdown.bonus}` : breakdown.bonus}
+                                </span>
+                            </div>
+
+                            {gameData?.time_taken !== null && gameData?.time_taken !== undefined && (
+                                <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+                                    <span>Time Taken:</span>
+                                    <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
+                                </div>
+                            )}
 
                             <div className="pt-2 mt-1 border-t border-gray-700 flex justify-between text-[11px] uppercase font-black text-gray-100">
                                 <span>{isMarathon ? `Length ${marathonLength} Score:` : 'Total Index:'}</span>
                                 <span className="text-white bg-correct px-2 rounded-full">{gameData?.skill_score || 0}</span>
                             </div>
                         </div>
+
+                        <div className="grid gap-4 mb-6 justify-center">
+                            {gameData?.guesses?.map((row: any[], i) => {
+                                const rowScore = breakdown.rows[i];
+                                const rowDecisions = breakdown?.decisions?.[i]?.decisions;
+                                if (!rowDecisions) return <div>
+                                    <h4>Row {i + 1}</h4>
+                                    <p>{rowScore}</p>
+                                    <p>No breakdown available</p>
+                                </div>;
+                                return (
+                                    <div key={i} className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center gap-3 justify-between">
+                                            <div className="flex gap-1">
+                                                {row.map((cell, j) => (
+                                                    <div
+                                                        key={j}
+                                                        className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
+                                                            cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
+                                                            }`}
+                                                    >
+                                                        {cell.letter}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? 'bg-correct/20 text-correct' : 'bg-red-500/20 text-red-400'}`}>
+                                                {rowScore > 0 ? `+${rowScore}` : rowScore}
+                                            </div>
+                                        </div>
+
+                                        {rowDecisions && rowDecisions.length > 0 && (
+                                            <div className="grid grid-cols-1 gap-1 pt-2 border-t border-white/5">
+                                                {rowDecisions.map((dec: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tighter">
+                                                        <span className="text-gray-500">
+                                                            Letter <span className="text-gray-300">{dec.letter}</span>: {dec.status}
+                                                        </span>
+                                                        {dec.pointDeduction !== 0 && (
+                                                            <span className={dec.pointDeduction > 0 ? 'text-correct' : 'text-red-400'}>
+                                                                {dec.pointDeduction > 0 ? `+${dec.pointDeduction}` : dec.pointDeduction}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+
 
                         <button onClick={onClose} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
                             Close

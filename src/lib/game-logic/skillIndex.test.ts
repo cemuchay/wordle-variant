@@ -22,13 +22,13 @@ const legacyGuesses = [
     [g('A', 'correct'), g('P', 'correct'), g('P', 'correct'), g('L', 'correct'), g('E', 'correct')]
 ];
 // Legacy: (6-1+1)/6*1000 = 1000. Bonus: 15*5 = 75. Total: 1075.
-runTest("Legacy System (Win in 1)", calculateSkillIndex({ attempts: 1, maxAttempts: 6, usedHint: false, guesses: legacyGuesses, targetWord: 'APPLE', gameDate: '2026-05-17' }), 1075);
+runTest("Legacy System (Win in 1)", calculateSkillIndex({ attempts: 1, maxAttempts: 6, usedHint: false, guesses: legacyGuesses, gameDate: '2026-05-17' }), 1075);
 
 /**
  * 2. New System: Win in 2
  * Word: TRACE
- * Row 1: TRIED (T,R correct, I,E,D absent)
- * Row 2: TRACE (Win)
+ * Row 0: TRIED (T,R correct, I,E,D absent)
+ * Row 1: TRACE (Win)
  */
 const winIn2Guesses = [
     [g('T', 'correct'), g('R', 'correct'), g('I', 'absent'), g('E', 'absent'), g('D', 'absent')],
@@ -37,24 +37,28 @@ const winIn2Guesses = [
 /**
  * Calculation:
  * Base Score: (6-2+1)/6 * 1000 = 833
- * Row 1 Bonus: 
- *   - T correct: 0 deduction
- *   - R correct: 0 deduction
- *   - I absent (new): -5
- *   - E absent (known letter in wrong spot): -5
- *   - D absent (new): -5
- *   Row 1 total: -15
- * Row 2 Bonus (Payoff Row):
- *   - Payoff: 5 * 40 = 200
- *   Row 2 total: 200
- * Total Skill Index: 833 + (-15) + 200 = 1018
+ * Row 0 Points:
+ *   - T correct: 60
+ *   - R correct: 60
+ *   - I absent: -5
+ *   - E absent: -5
+ *   - D absent: -5
+ *   Row 0 total: 105
+ * Row 1 Points:
+ *   - T correct (old): 0
+ *   - R correct (old): 0
+ *   - A correct (fresh): 40
+ *   - C correct (fresh): 40
+ *   - E correct (fresh): 40
+ *   Row 1 total: 120
+ * Total Skill Index: 833 + 105 + 120 = 1058
  */
-runTest("New System (Win in 2)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: winIn2Guesses, targetWord: 'TRACE', gameDate: '2026-05-18' }), 1018);
+runTest("New System (Win in 2)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: winIn2Guesses, gameDate: '2026-05-18' }), 1058);
 
 /**
  * 3. New System: Duplicate Letter Discovery (Entity-based)
  * Word: STEEL
- * Row 1: SEEDS (S correct, E present, E absent, D absent, S absent)
+ * Row 0: SEEDS (S correct, E present, E absent, D absent, S absent)
  */
 const duplicateGuesses = [
     [g('S', 'correct'), g('E', 'present'), g('E', 'absent'), g('D', 'absent'), g('S', 'absent')],
@@ -63,57 +67,62 @@ const duplicateGuesses = [
 /**
  * Calculation:
  * Base Score: (6-2+1)/6 * 1000 = 833
- * Row 1 Bonus:
- *   - S correct: 0
- *   - E present: -15
- *   - E absent (known letter): -5
- *   - D absent (new): -5
- *   - S absent (known letter): -5
- *   Row 1 total: -30
- * Row 2 Bonus:
- *   - Payoff: 5 * 40 = 200
- *   Row 2 total: 200
- * Total Skill Index: 833 - 30 + 200 = 1003
+ * Row 0 Points:
+ *   - S correct: 60
+ *   - E present: 25
+ *   - E absent: -5
+ *   - D absent: -5
+ *   - S absent: -5
+ *   Row 0 total: 70
+ * Row 1 Points:
+ *   - S correct (old): 0
+ *   - T correct (fresh): 40
+ *   - E correct (old yellow): 0
+ *   - E correct (old yellow): 0
+ *   - L correct (fresh): 40
+ *   Row 1 total: 80
+ * Total Skill Index: 833 + 70 + 80 = 983
  */
-runTest("New System (STEEL duplicate logic)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: duplicateGuesses, targetWord: 'STEEL', gameDate: '2026-05-18' }), 1003);
+runTest("New System (STEEL duplicate logic)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: duplicateGuesses, gameDate: '2026-05-18' }), 983);
 
 /**
  * 4. New System: Failing to win (Losing Bug Fix)
  * Word: APPLE
- * Final Row: APPLY (A,P,P,L correct, Y absent)
+ * Row 0: ZZZZZ (absent)
+ * Row 1: APPLY (A,P,P,L correct, Y absent)
  */
 const lossGuesses = [
-    [g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent')], // Row 1: -25
-    [g('A', 'correct'), g('P', 'correct'), g('P', 'correct'), g('L', 'correct'), g('Y', 'absent')] // Row 2 (Loss): 0 payoffs. A,P,P,L (Greens) = 0. Y (New) = -5.
+    [g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent')], // Row 0: -25
+    [g('A', 'correct'), g('P', 'correct'), g('P', 'correct'), g('L', 'correct'), g('Y', 'absent')] // Row 1: 40 + 40 + 0 + 40 - 5 = 115
 ];
 /**
  * Calculation:
  * Base Score: 0 (Loss)
- * Row 1 Bonus: -25
- * Row 2 Bonus: -5
- * Total Skill Index: -30
+ * Row 0 Bonus: -25
+ * Row 1 Bonus: 115
+ * Total Skill Index: 90
  */
-runTest("New System (Fail - No Payoff)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: lossGuesses, targetWord: 'APPLE', gameDate: '2026-05-18' }), -30);
+runTest("New System (Fail - No Payoff)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: lossGuesses, gameDate: '2026-05-18' }), 90);
 
 /**
  * 5. New System: Repeat Mistake Penalty (-20)
  * Word: APPLE
- * Row 1: ZZZZZ (-25, Z added to knownBlacks)
- * Row 2: ZZZZZ (-100, 5 * -20)
+ * Row 0: ZZZZZ (-25, Z added to knownBlacks)
+ * Row 1: ZZZZZ (-100, 5 * -20)
  */
 const repeatMistakeGuesses = [
     [g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent')],
     [g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent'), g('Z', 'absent')]
 ];
-// Row 1: -25. Row 2: -100. Total: -125.
-runTest("New System (Repeat Strategic Mistake)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: repeatMistakeGuesses, targetWord: 'APPLE', gameDate: '2026-05-18' }), -125);
+// Row 0: -25. Row 1: -100. Total: -125.
+runTest("New System (Repeat Strategic Mistake)", calculateSkillIndex({ attempts: 2, maxAttempts: 6, usedHint: false, guesses: repeatMistakeGuesses, gameDate: '2026-05-18' }), -125);
 
 /**
  * 6. New System: Hint Penalty
  * Word: APPLE
  * Win in 1 with hint used
  */
-const hintRecord = { index: 2, letter: 'P' };
-runTest("New System (Win with Hint)", calculateSkillIndex({ attempts: 1, maxAttempts: 6, usedHint: true, guesses: legacyGuesses, targetWord: 'APPLE', gameDate: '2026-05-18', hintRecord }), 1100);
-// Base: 1000. Hint: -100. Payoff: 5 * 40 = 200. Total: 1000 - 100 + 200 = 1100.
-// Note: Deductions (hints_used/hint_record) don't affect payoff row currently in payoff model, they are handled at engine level.
+const hintRecordWithRow = { index: 2, letter: 'P', row: 1 };
+runTest("New System (Win with Hint)", calculateSkillIndex({ attempts: 1, maxAttempts: 6, usedHint: true, guesses: legacyGuesses, gameDate: '2026-05-18', hintRecord: hintRecordWithRow }), 1200);
+// Base: 1000. Row 0: 300. Hint: -100. Total: 1200.
+

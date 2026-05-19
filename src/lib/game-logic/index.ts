@@ -160,16 +160,25 @@ export const obfuscateWord = (word: string, salt: string) => {
  * @param salt - Must match the salt used for obfuscation.
  */
 export const deobfuscateWord = (obfuscated: string, salt: string) => {
+   if (!obfuscated) return "";
    try {
       const decoded = atob(obfuscated);
-      return decoded.split('').map((char, i) => {
+      const result = decoded.split('').map((char, i) => {
          const charCode = char.charCodeAt(0);
          const saltCode = salt.charCodeAt(i % salt.length);
          return String.fromCharCode(charCode ^ saltCode);
       }).join('');
+
+      // If the result contains non-printable characters or is not uppercase A-Z, 
+      // it's likely already deobfuscated or the salt is wrong.
+      if (/^[A-Z]+$/.test(result)) {
+         return result;
+      }
+      return obfuscated;
    } catch (e) {
-      console.error("Deobfuscation failed:", e);
-      return "";
+      // If atob fails, it's definitely not obfuscated Base64.
+      console.log("Deobfuscation failed:", e);
+      return obfuscated;
    }
 };
 
@@ -500,21 +509,22 @@ export const calculateSkillIndex = ({
    maxAttempts,
    usedHint,
    guesses,
-   targetWord,
    gameDate,
    hintRecord
 }: {
+
+   /* REMOVE:
+   this temporarily silences unused variable error
+   */
+
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
    guesses: GuessResult[][],
-   targetWord: string,
    gameDate?: string,
-   hintRecord?: { index: number; letter: string } | null
+   hintRecord?: { index: number; letter: string; row?: number } | null
 }
 ) => {
-   //REMOVE:  
-   console.log(hintRecord)
    const targetDate = new Date('2026-05-18');
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
@@ -535,55 +545,147 @@ export const calculateSkillIndex = ({
       return Math.floor(score + bonus);
    }
 
-   const lastRowIdx = guesses.length - 1;
-   const lastRow = guesses[lastRowIdx];
+   // REVAMPED ALGORITHM (Harmony with GuessPreviewModal)
+   if (!guesses || guesses.length === 0) return 0;
+
+   const currentAttempts = guesses.length;
+   const lastRow = guesses[currentAttempts - 1];
    const won = lastRow && lastRow.every(cell => cell.status === "correct");
-   console.log("won", won)
 
-   // 1. Base Performance (Efficiency)
-   let score = 0;
-   if (won) {
-      score = ((maxAttempts - (lastRowIdx + 1) + 1) / maxAttempts) * SCORING.BASE_SCORE_MAX;
-   }
+   const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
 
-   // 2. Hint Penalty
-   if (usedHint) score -= SCORING.HINT_PENALTY;
+   const rows: number[] = [];
+   let totalBonus = 0;
 
-   // 3. Discovery & Strategy Logic
-   let bonus = 0;
-   const knownBlacks = new Set<string>();
-   const targetChars = targetWord.toUpperCase().split("");
+   const wordsAwardedPoints: Array<{
+      letter: string;
+      index: number | undefined;
+      status: string;
+      awardRow: number,
+      isChecked: boolean
+   }> = []
 
-   guesses.forEach((row, rowIdx) => {
-      const isLastRow = rowIdx === lastRowIdx;
+   for (let rowIndex = 0; rowIndex < guesses.length; rowIndex++) {
+      const row = guesses[rowIndex];
+      let points = 0;
 
-      if (isLastRow && won) {
-         // THE PAYOFF: Reward all discovered entities
-         bonus += targetChars.length * SCORING.POINTS_PER_LETTER;
-      } else {
-         // THE DEDUCTIONS: Only apply to rows before the win (or all rows if lost)
+      if (rowIndex === 0) {
          row.forEach((cell) => {
-            const letter = cell.letter.toUpperCase();
-
             if (cell.status === 'present') {
-               bonus -= SCORING.YELLOW_PENALTY;
-            } else if (cell.status === 'absent') {
-               if (targetChars.includes(letter)) {
-                  // Quantity mistake or known letter in wrong spot (treated as minor)
-                  bonus -= SCORING.ABSENT_PENALTY;
-               } else if (knownBlacks.has(letter)) {
-                  bonus -= SCORING.REPEATED_ABSENT_PENALTY; // High-severity repeat mistake
-               } else {
-                  bonus -= SCORING.ABSENT_PENALTY; // Fresh discovery of absent letter
-                  knownBlacks.add(letter);
-               }
+               points += SCORING.YELLOW_SCORE_FIRST_TRY;
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
             }
-            // Green in early rows (cell.status === 'correct') results in 0 deduction, netting full +40 later
+            else if (cell.status === 'absent') {
+               points -= SCORING.ABSENT_PENALTY;
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
+            }
+            else if (cell.status === 'correct') {
+               points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
+            }
          });
       }
-   });
+      else {
+         const isSecondGuess = rowIndex === 1;
+         const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
 
-   return Math.floor(score + bonus);
+         for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+            const cell = row[cellIndex];
+
+
+            if (cell.status === 'present') {
+               const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
+               const freshYellow = !awardedOldYellow;
+
+               if (awardedOldYellow) {
+                  awardedOldYellow.isChecked = true;
+               }
+
+               if (freshYellow) {
+                  points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
+               }
+
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
+            }
+            else if (cell.status === 'absent') {
+               const oldAbsent = relevantAwardedWords.find((item) => item.letter === cell.letter && item.status === 'absent')
+
+               if (oldAbsent) {
+                  oldAbsent.isChecked = true;
+                  points -= SCORING.REPEATED_ABSENT_PENALTY;
+               } else {
+                  points -= SCORING.ABSENT_PENALTY;
+               }
+
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
+            }
+            else if (cell.status === 'correct') {
+               const oldGreen = wordsAwardedPoints.find((item) => item.status === 'correct' && item.letter === cell.letter);
+               const oldYellow = wordsAwardedPoints.find((item) => item.status === 'present' && item.letter === cell.letter);
+               const oldPresent = oldGreen || oldYellow;
+
+               if (oldPresent) {
+                  oldPresent.isChecked = true;
+               } else {
+
+                  points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+               }
+
+               wordsAwardedPoints.push({
+                  letter: cell.letter,
+                  index: undefined,
+                  status: cell.status,
+                  awardRow: rowIndex,
+                  isChecked: false
+               })
+            }
+         }
+      }
+
+      rows.push(points);
+      totalBonus += points;
+   }
+
+
+   if (usedHint && hintRecord?.row !== undefined) {
+      const rowBonus = rows[hintRecord.row - 1];
+      if (rowBonus !== undefined) {
+         totalBonus -= SCORING.HINT_PENALTY;
+
+      }
+   }
+
+   return Math.floor(baseScore + totalBonus);
 };
 
 /**
@@ -614,7 +716,6 @@ export const syncGameState = async (
          guesses: payload.guesses,
          gameDate: date,
          hintRecord: payload.hintRecord,
-         targetWord: payload.config.word || payload.config.targetWord,
       })
       : 0;
 

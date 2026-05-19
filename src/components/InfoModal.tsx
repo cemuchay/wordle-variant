@@ -55,25 +55,37 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
           {/* Score Calculator Info */}
           <div className="flex gap-4">
-            <div className="bg-yellow-500/20 p-2 h-fit rounded-lg text-yellow-400">
+            <div className="bg-indigo-500/20 p-2 h-fit rounded-lg text-indigo-400">
               <Zap size={20} />
             </div>
             <div>
               <p className="font-bold text-white mb-1 uppercase tracking-wide">Skill Index</p>
-              <div className="text-gray-400 text-sm space-y-2">
+              <div className="text-gray-400 text-sm space-y-3">
                 <p className="leading-relaxed mb-1">
-                  Base score: 1000-0 based on attempts. Discoveries earn bonuses:
+                  Your performance is tracked via a <span className="text-white font-bold">Skill Index</span>. Points are awarded for <span className="text-indigo-400">new letter discoveries</span>:
                 </p>
 
-                <ul className="grid grid-cols-2 gap-y-1 text-[12px] font-mono uppercase tracking-tighter">
-                  <li className="flex items-center gap-2"><span className="text-correct">●</span>Green Discovery: +40 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-yellow-500">●</span>Yellow Discovery: +25 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-gray-500">●</span>New Black: -5 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-red-500">●</span>Repeated Black: -20 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-red-600">●</span> Hints Used: -100 pts</li>
-                  <li className="flex items-center gap-2"><span className="text-blue-400">●</span> Loss: 0 Base Score</li>
+                <div className="bg-black/20 p-3 rounded-xl border border-gray-800 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-mono border-b border-gray-800 pb-1">
+                    <span className="text-gray-500">TYPE</span>
+                    <span className="text-gray-500">1ST / 2ND / OTHER</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] font-mono">
+                    <span className="text-correct">● GREEN</span>
+                    <span className="text-white font-black">+60 / +50 / +40</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] font-mono">
+                    <span className="text-yellow-500">● YELLOW</span>
+                    <span className="text-white font-black">+35 / +30 / +25</span>
+                  </div>
+                </div>
+
+                <ul className="grid grid-cols-1 gap-y-1 text-[11px] font-mono uppercase tracking-tighter pt-1">
+                  <li className="flex items-center gap-2"><span className="text-gray-500">●</span>New Black: <span className="text-red-400">-5 pts</span></li>
+                  <li className="flex items-center gap-2"><span className="text-red-500">●</span>Repeated Black: <span className="text-red-500 font-bold">-20 pts</span></li>
+                  <li className="flex items-center gap-2"><span className="text-red-600">●</span>Hints Used: <span className="text-red-600">-100 pts</span></li>
+                  <li className="flex items-center gap-2"><span className="text-blue-400">●</span>Click any player to see their full row breakdown!</li>
                 </ul>
-                <p className="text-[10px] italic">Placements are only scored once per game.</p>
               </div>
             </div>
           </div>
