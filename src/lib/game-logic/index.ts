@@ -572,7 +572,7 @@ export const calculateSkillIndex = ({
       if (rowIndex === 0) {
          row.forEach((cell) => {
             if (cell.status === 'present') {
-               points += SCORING.YELLOW_SCORE;
+               points += SCORING.YELLOW_SCORE_FIRST_TRY;
                wordsAwardedPoints.push({
                   letter: cell.letter,
                   index: undefined,
@@ -604,10 +604,12 @@ export const calculateSkillIndex = ({
          });
       }
       else {
+         const isSecondGuess = rowIndex === 1;
          const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
 
          for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
             const cell = row[cellIndex];
+
 
             if (cell.status === 'present') {
                const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
@@ -618,7 +620,7 @@ export const calculateSkillIndex = ({
                }
 
                if (freshYellow) {
-                  points += SCORING.YELLOW_SCORE;
+                  points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
                }
 
                wordsAwardedPoints.push({
@@ -655,7 +657,7 @@ export const calculateSkillIndex = ({
                if (oldPresent) {
                   oldPresent.isChecked = true;
                } else {
-                  const isSecondGuess = rowIndex === 1;
+
                   points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
                }
 

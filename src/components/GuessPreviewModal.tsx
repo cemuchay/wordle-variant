@@ -151,7 +151,7 @@ const GuessPreviewModal: React.FC<{
 
         // 2. PROCESS ROWS: Calculate deductions for rows 1 to (N-1), award points on Row N
 
-        // change to for loop
+
         for (let rowIndex = 0; rowIndex < gameData.guesses.length; rowIndex++) {
             const row = gameData.guesses[rowIndex];
 
@@ -171,11 +171,11 @@ const GuessPreviewModal: React.FC<{
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
-                        points += SCORING.YELLOW_SCORE;
+                        points += SCORING.YELLOW_SCORE_FIRST_TRY;
                         localDecisions.push({
                             letter: cell.letter,
-                            status: `${cell.status} +${SCORING.YELLOW_SCORE}`,
-                            pointDeduction: SCORING.YELLOW_SCORE
+                            status: `${cell.status} +${SCORING.YELLOW_SCORE_FIRST_TRY} 1st try`,
+                            pointDeduction: SCORING.YELLOW_SCORE_FIRST_TRY
                         })
                         wordsAwardedPoints.push({
                             letter: cell.letter,
@@ -208,7 +208,7 @@ const GuessPreviewModal: React.FC<{
                         points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
                         localDecisions.push({
                             letter: cell.letter,
-                            status: `${cell.status} +${SCORING.POINTS_PER_LETTER_FIRST_TRY}`,
+                            status: `${cell.status} +${SCORING.POINTS_PER_LETTER_FIRST_TRY} 1st try`,
                             pointDeduction: SCORING.POINTS_PER_LETTER_FIRST_TRY
                         })
                         wordsAwardedPoints.push({
@@ -251,9 +251,10 @@ const GuessPreviewModal: React.FC<{
                 }> = [];
 
 
-                // change to for loop
+
                 for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
                     const cell = row[cellIndex];
+                    const isSecondGuess = rowIndex === 1
 
                     // CASE: YELLOW (Present but wrong spot)
                     if (cell.status === 'present') {
@@ -274,11 +275,11 @@ const GuessPreviewModal: React.FC<{
 
                         /* award fresh points for a new yellow discovery*/
                         if (freshYellow) {
-                            points += SCORING.YELLOW_SCORE;
+                            points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
                             localDecisions.push({
                                 letter: cell.letter,
-                                status: `${cell.status} +${SCORING.YELLOW_SCORE}`,
-                                pointDeduction: SCORING.YELLOW_SCORE
+                                status: `${cell.status} +${isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE} ${isSecondGuess ? '2nd try' : ''} `,
+                                pointDeduction: isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE
                             })
                         }
 
@@ -346,13 +347,13 @@ const GuessPreviewModal: React.FC<{
                         }
 
                         if (!oldPresent) {
-                            const isSecondGuess = rowIndex === 1
+
 
                             // award fresh points
                             points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
                             localDecisions.push({
                                 letter: cell.letter,
-                                status: `${cell.status} +${isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER}`,
+                                status: `${cell.status} +${isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER} ${isSecondGuess ? '2nd try' : ''}`,
                                 pointDeduction: isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER
                             })
                         }
@@ -372,9 +373,6 @@ const GuessPreviewModal: React.FC<{
                     decisions: localDecisions
                 });
 
-                if (rowIndex === 1) {
-                    console.log(localDecisions, "localDecisions")
-                }
 
                 rows.push(points);
                 totalBonus += points;
