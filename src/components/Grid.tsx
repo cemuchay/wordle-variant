@@ -4,7 +4,7 @@ import { ANIMATION_DURATION } from '../constants/ui';
 
 interface CellProps {
   letter: string;
-  status?: 'correct' | 'present' | 'absent' | 'default';
+  status?: 'correct' | 'present' | 'absent' | 'default' | 'empty';
   isRevealing?: boolean;
   revealIndex?: number;
   isShake?: boolean;
@@ -44,8 +44,8 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     animationClass = 'animate-pulse text-yellow-500/50 border-yellow-600/50';
   }
 
-  const style = isRevealing 
-    ? { animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' } 
+  const style = isRevealing
+    ? { animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' }
     : {};
 
   return (
