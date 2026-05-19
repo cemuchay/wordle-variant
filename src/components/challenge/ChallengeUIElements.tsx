@@ -81,26 +81,42 @@ export const ExpirationTimer = memo(function ExpirationTimer({ expiresAt, create
 });
 
 export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect }: { item: any, user: any, onSelect: (id: string) => void }) {
-    const isExpired = useMemo(() => new Date(item.challenge.expires_at) < new Date(), [item.challenge.expires_at]);
-    const isFinished = useMemo(() => item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined', [item.status]);
+    const { challenge, status, score, time_taken, challenge_id } = item;
+    const { expires_at, created_at, mode, word_length, participants: rawParticipants } = challenge;
 
-    // Find the current high score among participants who have actually finished/played
-    const participants = useMemo(() => item.challenge.participants || [], [item.challenge.participants]);
+    const isExpired = useMemo(() => new Date(expires_at) < new Date(), [expires_at]);
+    const isFinished = useMemo(() => status === 'completed' || status === 'timed_out' || status === 'declined', [status]);
+
+    const participants = useMemo(() => rawParticipants || [], [rawParticipants]);
 
     const maxScore = useMemo(() => {
-        const scores = participants
-            .filter((p: any) => p.status !== 'pending')
-            .map((p: any) => p.score || 0);
-        return scores.length > 0 ? Math.max(...scores) : 0;
+        let max = 0;
+        for (let i = 0; i < participants.length; i++) {
+            const p = participants[i];
+            if (p.status !== 'pending') {
+                const s = p.score || 0;
+                if (s > max) max = s;
+            }
+        }
+        return max;
     }, [participants]);
 
-    const myScore = item.score || 0;
+    const myScore = score || 0;
     const isLeader = myScore === maxScore && myScore > 0;
-    const hasStarted = item.status !== 'pending';
+    const hasStarted = status !== 'pending';
 
     const handleSelect = useCallback(() => {
-        onSelect(item.challenge_id);
-    }, [onSelect, item.challenge_id]);
+        onSelect(challenge_id);
+    }, [onSelect, challenge_id]);
+
+    const opponents = useMemo(() =>
+        participants.filter((p: any) => p.user_id !== user?.id),
+        [participants, user?.id]);
+
+    const formattedDate = useMemo(() => {
+        const d = new Date(created_at);
+        return `${d.toLocaleDateString()} - ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    }, [created_at]);
 
     return (
         <button
@@ -114,17 +130,17 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
 
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${item.challenge.mode === 'LIVE' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-correct/10 text-correct border border-correct/20'}`}>
-                        {item.challenge.mode}
+                    <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${mode === 'LIVE' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-correct/10 text-correct border border-correct/20'}`}>
+                        {mode}
                     </div>
                     <div className="bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
                         <span className="text-[9px] font-black uppercase tracking-tighter text-white/50">
-                            {item.challenge.word_length === 1 ? 'Marathon' : `${item.challenge.word_length} Letters`}
+                            {word_length === 1 ? 'Marathon' : `${word_length} Letters`}
                         </span>
                     </div>
                 </div>
                 {!isExpired && !isFinished && (
-                    <ExpirationTimer expiresAt={item.challenge.expires_at} createdAt={item.challenge.created_at} />
+                    <ExpirationTimer expiresAt={expires_at} createdAt={created_at} />
                 )}
                 {isExpired && <span className="text-red-500 text-[10px] font-black uppercase tracking-widest">Expired</span>}
             </div>
@@ -138,8 +154,8 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase text-gray-500">My Progress</p>
-                            <p className={`text-xs font-black uppercase ${item.status === 'completed' ? 'text-correct' : item.status === 'playing' ? 'text-yellow-500' : 'text-gray-400'}`}>
-                                {item.status}
+                            <p className={`text-xs font-black uppercase ${status === 'completed' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-400'}`}>
+                                {status}
                             </p>
                         </div>
                     </div>
@@ -149,10 +165,10 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
                             <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
                                 {hasStarted ? myScore : '--'}
                             </p>
-                            {hasStarted && item.challenge.mode === 'LIVE' && item.time_taken && (
+                            {hasStarted && mode === 'LIVE' && time_taken && (
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-white/40">
                                     <Clock size={8} />
-                                    <span>{formatTime(item.time_taken)}</span>
+                                    <span>{formatTime(time_taken)}</span>
                                 </div>
                             )}
                         </div>
@@ -163,8 +179,8 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
 
                 {/* Opponents Section */}
                 <div className="space-y-3">
-                    {participants.filter((p: any) => p.user_id !== user?.id).length > 0 ? (
-                        participants.filter((p: any) => p.user_id !== user?.id).map((p: any) => {
+                    {opponents.length > 0 ? (
+                        opponents.map((p: any) => {
                             const pScore = p.score || 0;
                             const isPLeader = pScore === maxScore && pScore > 0;
                             const pStarted = p.status !== 'pending';
@@ -195,7 +211,7 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
                                             <p className={`text-base font-black ${isPLeader ? 'text-correct' : pStarted ? 'text-red-500' : 'text-white/20'}`}>
                                                 {pStarted ? pScore : '--'}
                                             </p>
-                                            {pStarted && item.challenge.mode === 'LIVE' && p.time_taken && (
+                                            {pStarted && mode === 'LIVE' && p.time_taken && (
                                                 <div className="flex items-center gap-1 text-[8px] font-bold text-white/30">
                                                     <Clock size={7} />
                                                     <span>{formatTime(p.time_taken)}</span>
@@ -217,7 +233,7 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
             {/* Footer Date */}
             <div className="mt-4 pt-3 border-t border-white/5 flex justify-end">
                 <span className="text-[12px] font-black uppercase tracking-widest text-white">
-                    {new Date(item.challenge.created_at).toLocaleDateString()} - {new Date(item.challenge.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {formattedDate}
                 </span>
             </div>
         </button>
