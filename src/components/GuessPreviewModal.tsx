@@ -201,16 +201,23 @@ const GuessPreviewModal: React.FC<{
                     <div className="flex justify-center gap-1 mb-4 border-b border-white/5 pb-4">
                         {CHALLENGE_CONFIG.MARATHON_LENGTHS.map(l => {
                             const prog = entry.marathon_progress?.find((p: any) => p.word_length === l);
-                            const isPlayed = !!prog;
+                            const targetPlayed = !!prog;
+                            
+                            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === l);
+                            const viewerFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
+                            const isMe = profile?.id === (entry.user_id || entry.profiles?.id);
+                            
+                            const canSelect = isMe || (targetPlayed && viewerFinished);
+
                             return (
                                 <button
                                     key={l}
-                                    disabled={!isPlayed}
+                                    disabled={!canSelect}
                                     onClick={() => {
                                         setMarathonLength(l);
                                         setShowTargetWord(false);
                                     }}
-                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${marathonLength === l ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : isPlayed ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${marathonLength === l ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : canSelect ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
                                 >
                                     {l}
                                 </button>
