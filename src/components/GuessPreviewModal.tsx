@@ -23,6 +23,7 @@ const GuessPreviewModal: React.FC<{
     lengthOfWord?: number;
     myParticipation?: any;
     initialMarathonLength?: number;
+    yesterday?: boolean;
     initialData?: {
         guesses: any[] | null;
         hints_used?: boolean;
@@ -30,7 +31,7 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, initialData }) => {
+}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, yesterday, initialData }) => {
     const isMarathon = lengthOfWord === 1;
     const [marathonLength, setMarathonLength] = useState<number>(initialMarathonLength || 3);
     const [showTargetWord, setShowTargetWord] = useState(false);
@@ -45,6 +46,17 @@ const GuessPreviewModal: React.FC<{
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
     const { date, profile } = useApp();
+
+    const getTargetDate = () => {
+        if (!date) return undefined;
+        if (!yesterday) return date;
+
+        const d = new Date(date);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().split('T')[0];
+    };
+
+    const targetDate = getTargetDate();
 
     useEffect(() => {
         if (isMarathon) {
@@ -88,7 +100,7 @@ const GuessPreviewModal: React.FC<{
                 .from('scores')
                 .select('guesses, hints_used, skill_score, hint_record')
                 .eq('user_id', entry.user_id)
-                .eq('game_date', date)
+                .eq('game_date', targetDate)
                 .single();
 
             if (data) setGameData(data);
@@ -97,10 +109,10 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [date, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress]);
+    }, [targetDate, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress]);
 
     const getTargetWordToUse = () => {
-        let wordToUse = targetWord || getDailyConfig(!!profile, date || undefined).word;
+        let wordToUse = targetWord || getDailyConfig(!!profile, targetDate).word;
 
         if (isMarathon && targetWord) {
             try {
