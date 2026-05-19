@@ -5,7 +5,7 @@ import { RegularGameplay } from './RegularGameplay';
 import { MarathonGameplay } from './MarathonGameplay';
 import { useApp } from '../../context/AppContext';
 
-export const ChallengeGameplayContainer = memo(() => {
+export const ChallengeGameplayContainer = memo(function ChallengeGameplayContainer() {
     const { 
         selectedChallenge, myParticipation, setIsPlaying, submitResult
     } = useChallengeContext();

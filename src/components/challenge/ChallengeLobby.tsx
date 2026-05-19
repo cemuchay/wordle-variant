@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
 
-export const ChallengeLobby = memo(() => {
+export const ChallengeLobby = memo(function ChallengeLobby() {
     const {
         selectedChallenge, myParticipation, participants,
         copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,

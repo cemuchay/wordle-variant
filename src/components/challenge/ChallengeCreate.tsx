@@ -3,7 +3,7 @@ import { Clock, Play, Plus, Search, X, UserPlus } from 'lucide-react';
 import { memo, useState, useMemo } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 
-export const ChallengeCreate = memo(() => {
+export const ChallengeCreate = memo(function ChallengeCreate() {
     const {
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,

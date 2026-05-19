@@ -4,30 +4,34 @@ import { motion } from 'framer-motion';
 import { Clock } from 'lucide-react';
 import { formatTime } from './lib';
 
-export const ChallengeSkeleton = memo(() => (
-    <div className="space-y-4 animate-pulse">
-        {[1, 2, 3].map(i => (
-            <div key={i} className="h-40 bg-white/5 rounded-4xl" />
-        ))}
-    </div>
-));
-
-
-export const ErrorFallback = memo(({ message, onRetry }: { message: string, onRetry: () => void }) => (
-    <div className="py-12 text-center">
-        <div className="bg-red-500/10 text-red-500 p-4 rounded-2xl border border-red-500/20 mb-4 mx-6">
-            <p className="text-sm font-bold">{message}</p>
+export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
+    return (
+        <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map(i => (
+                <div key={i} className="h-40 bg-white/5 rounded-4xl" />
+            ))}
         </div>
-        <button
-            onClick={onRetry}
-            className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
-        >
-            Try Again
-        </button>
-    </div>
-));
+    );
+});
 
-export const ExpirationTimer = memo(({ expiresAt, createdAt }: { expiresAt: string, createdAt: string }) => {
+
+export const ErrorFallback = memo(function ErrorFallback({ message, onRetry }: { message: string, onRetry: () => void }) {
+    return (
+        <div className="py-12 text-center">
+            <div className="bg-red-500/10 text-red-500 p-4 rounded-2xl border border-red-500/20 mb-4 mx-6">
+                <p className="text-sm font-bold">{message}</p>
+            </div>
+            <button
+                onClick={onRetry}
+                className="bg-white text-black px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
+            >
+                Try Again
+            </button>
+        </div>
+    );
+});
+
+export const ExpirationTimer = memo(function ExpirationTimer({ expiresAt, createdAt }: { expiresAt: string, createdAt: string }) {
     const [timeLeft, setTimeLeft] = useState<number>(0);
 
     useEffect(() => {
@@ -76,7 +80,7 @@ export const ExpirationTimer = memo(({ expiresAt, createdAt }: { expiresAt: stri
     );
 });
 
-export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: any, onSelect: (id: string) => void }) => {
+export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect }: { item: any, user: any, onSelect: (id: string) => void }) {
     const isExpired = useMemo(() => new Date(item.challenge.expires_at) < new Date(), [item.challenge.expires_at]);
     const isFinished = useMemo(() => item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined', [item.status]);
 
@@ -215,7 +219,7 @@ export const ChallengeItem = memo(({ item, user, onSelect }: { item: any, user: 
     );
 });
 
-export const NetworkLog = memo(({ logs }: { logs: Array<{ id: string, msg: string, duration?: number }> }) => {
+export const NetworkLog = memo(function NetworkLog({ logs }: { logs: Array<{ id: string, msg: string, duration?: number }> }) {
     if (logs.length === 0) return null;
     return (
         <div className="absolute top-2 right-2 z-110 flex flex-col items-end gap-1 pointer-events-none max-w-[200px]">
