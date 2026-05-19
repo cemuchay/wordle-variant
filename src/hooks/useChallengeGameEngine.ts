@@ -52,20 +52,49 @@ export const useChallengeGameEngine = ({
     const initializedRef = useRef<string>("");
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
 
+    const currentKey = isMarathon ? `m-${selectedLength}` : `r-${challenge.id}`;
+    const storageKey = `challenge-prog-${challenge.id}-${currentKey}`;
+
     const addLog = useCallback((msg: string, duration?: number) => {
         setNetworkLogs(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), msg, duration }]);
     }, []);
 
+    const saveToLocal = useCallback((payload: any) => {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({
+                ...payload,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            console.error("Local save failed", e);
+        }
+    }, [storageKey]);
+
     const wrappedSubmitResult = useCallback(async (payload: any, wordLen?: number) => {
         const start = Date.now();
         addLog(`Sync Start: ${payload.status}`);
+        
+        // Save to local mirror first
+        saveToLocal(payload);
+
         const success = await submitChallengeResult(payload, wordLen);
         const duration = Date.now() - start;
         addLog(`Sync End: ${success ? 'Success' : 'Failed'}`, duration);
-        return success;
-    }, [submitChallengeResult, addLog]);
 
-    const currentKey = isMarathon ? `m-${selectedLength}` : `r-${challenge.id}`;
+        // --- LOCAL STORAGE CLEANUP ---
+        // If sync succeeded, and it was a final state (completed/timed_out), 
+        // we can remove the local mirror as the cloud is now authoritative.
+        if (success && (payload.status === 'completed' || payload.status === 'timed_out')) {
+            try {
+                localStorage.removeItem(storageKey);
+                console.log("[Engine] Local mirror cleaned up after successful completion sync.");
+            } catch (e) {
+                console.error("Local cleanup failed", e);
+            }
+        }
+
+        return success;
+    }, [submitChallengeResult, addLog, saveToLocal, storageKey]);
 
 
 
@@ -184,13 +213,35 @@ export const useChallengeGameEngine = ({
         }
 
         initializedRef.current = currentKey;
+
+        // --- LOCAL STORAGE RECOVERY ---
+        let localGuesses = incoming;
+        let localUsedHint = isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false);
+        let localHintRecord = isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null);
+
+        try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Only use local storage if it's MORE recent or has MORE guesses than server
+                if (parsed.guesses?.length > incoming.length) {
+                    console.log("[Engine] Recovering more advanced progress from localStorage");
+                    localGuesses = parsed.guesses;
+                    localUsedHint = parsed.hints_used || localUsedHint;
+                    localHintRecord = parsed.hint_record || localHintRecord;
+                }
+            }
+        } catch (e) {
+            console.error("Local recovery failed", e);
+        }
+
         dispatch({
             type: 'START_GAME', payload: {
-                guesses: incoming,
-                letterStatuses: getLetterStatuses(incoming),
-                usedHint: isMarathon ? (progress?.hints_used || false) : (participation.hints_used || false),
-                hintRecord: isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null),
-                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || incoming.some((g: any) => g.every((r: any) => r.status === 'correct')) || incoming.length >= 6,
+                guesses: localGuesses,
+                letterStatuses: getLetterStatuses(localGuesses),
+                usedHint: localUsedHint,
+                hintRecord: localHintRecord,
+                isGameOver: isFinishedStatus || (initialTimeLeft !== null && initialTimeLeft <= 0) || localGuesses.some((g: any) => g.every((r: any) => r.status === 'correct')) || localGuesses.length >= 6,
                 status: serverStatus,
                 timeLeft: initialTimeLeft
             }
@@ -283,21 +334,24 @@ export const useChallengeGameEngine = ({
     }, [timeLeft, isGameOver, handleTimeExpired]);
 
     const onChar = useCallback((char: string) => {
-        if (isGameOver || isSaving) return;
+        if (isGameOver) return;
         dispatch({ type: 'TYPE_CHAR', char, wordLength });
-    }, [isGameOver, isSaving, wordLength]);
+    }, [isGameOver, wordLength]);
 
     const onDelete = useCallback(() => {
-        if (isGameOver || isSaving) return;
+        if (isGameOver) return;
         dispatch({ type: 'DELETE_CHAR' });
-    }, [isGameOver, isSaving]);
+    }, [isGameOver]);
 
     const onEnter = useCallback(async () => {
-        if (isGameOver || isSaving || currentGuess.length !== wordLength) return;
-
+        if (isGameOver || currentGuess.length !== wordLength) return;
+        
+        // Prevent submitting if we are already saving this specific row
+        // We use a ref or state check here. For simplicity and robustness, 
+        // we can check if the currentGuess is already being processed.
         const upperGuess = currentGuess.toUpperCase();
+        
         const { valid } = getWordLists(wordLength);
-
         if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: 'SHAKE_GUESS' });
@@ -309,7 +363,11 @@ export const useChallengeGameEngine = ({
         const newGuesses = [...guesses, result];
         const newStatuses = getLetterStatuses(newGuesses);
         const won = upperGuess === targetWord;
-        const lost = newGuesses.length === 6; // Restore 6th attempt
+        const lost = newGuesses.length === 6;
+
+        // --- OPTIMISTIC UPDATE ---
+        // Trigger reveal animation IMMEDIATELY
+        dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
 
         setIsSaving(true);
         setRetryCount(0);
@@ -377,7 +435,7 @@ export const useChallengeGameEngine = ({
             }
         }
 
-        // Retry logic: 3 attempts
+        // Retry logic: 3 attempts in background
         let success = false;
         let attempt = 0;
         const maxAttempts = 3;
@@ -385,10 +443,8 @@ export const useChallengeGameEngine = ({
         while (attempt < maxAttempts && !success) {
             if (attempt > 0) {
                 setRetryCount(attempt);
-                // Wait 1.5s before retry
                 await new Promise(r => setTimeout(r, 1500));
             }
-
             success = await wrappedSubmitResult(resultPayload, isMarathon ? wordLength : undefined);
             attempt++;
         }
@@ -397,16 +453,8 @@ export const useChallengeGameEngine = ({
         setRetryCount(0);
 
         if (!success) {
-            triggerToast("Sync failed after multiple retries. Check connection.", 5000);
-            return;
+            triggerToast("Sync failed. Progress saved locally.", 5000);
         }
-
-        // Stabilization Delay: Wait 300ms after sync succeeds before triggering reveal
-        // This prevents the browser from being overwhelmed by simultaneous re-renders and animations
-        await new Promise(r => setTimeout(r, 300));
-
-        // ONLY NOW we update the UI, triggering the reveal animation
-        dispatch({ type: 'SUBMIT_GUESS', newGuesses, newStatuses, isWon: won, isLost: lost });
 
         if (won || lost) {
             setTimeout(() => {
@@ -418,10 +466,10 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, isSaving, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish]);
+    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish]);
 
     const handleHint = useCallback(async () => {
-        if (isGameOver || isSaving) return;
+        if (isGameOver) return;
 
         if (guesses.length >= 5 && !usedHint) {
             triggerToast("Hint locked on last available guess.");
