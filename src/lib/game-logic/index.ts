@@ -509,15 +509,18 @@ export const calculateSkillIndex = ({
    maxAttempts,
    usedHint,
    guesses,
-   targetWord,
    gameDate,
    hintRecord
 }: {
+
+   /* REMOVE:
+   this temporarily silences unused variable error
+   */
+
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
    guesses: GuessResult[][],
-   targetWord: string,
    gameDate?: string,
    hintRecord?: { index: number; letter: string; row?: number } | null
 }
@@ -572,7 +575,7 @@ export const calculateSkillIndex = ({
                points += SCORING.YELLOW_SCORE;
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -582,7 +585,7 @@ export const calculateSkillIndex = ({
                points -= SCORING.ABSENT_PENALTY;
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -592,7 +595,7 @@ export const calculateSkillIndex = ({
                points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -620,7 +623,7 @@ export const calculateSkillIndex = ({
 
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -638,7 +641,7 @@ export const calculateSkillIndex = ({
 
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -652,13 +655,13 @@ export const calculateSkillIndex = ({
                if (oldPresent) {
                   oldPresent.isChecked = true;
                } else {
-                  const isSecondGuess = rowIndex === 2;
+                  const isSecondGuess = rowIndex === 1;
                   points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
                }
 
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: cell.index,
+                  index: undefined,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
@@ -671,12 +674,12 @@ export const calculateSkillIndex = ({
       totalBonus += points;
    }
 
-   let localHint = 0;
+
    if (usedHint && hintRecord?.row !== undefined) {
       const rowBonus = rows[hintRecord.row - 1];
       if (rowBonus !== undefined) {
          totalBonus -= SCORING.HINT_PENALTY;
-         localHint -= SCORING.HINT_PENALTY;
+
       }
    }
 
@@ -711,7 +714,6 @@ export const syncGameState = async (
          guesses: payload.guesses,
          gameDate: date,
          hintRecord: payload.hintRecord,
-         targetWord: payload.config.word || payload.config.targetWord,
       })
       : 0;
 

@@ -192,7 +192,7 @@ const GuessPreviewModal: React.FC<{
                         localDecisions.push({
                             letter: cell.letter,
                             status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
-                            pointDeduction: SCORING.ABSENT_PENALTY
+                            pointDeduction: -SCORING.ABSENT_PENALTY
                         })
                         wordsAwardedPoints.push({
                             letter: cell.letter,
@@ -304,7 +304,7 @@ const GuessPreviewModal: React.FC<{
                             localDecisions.push({
                                 letter: cell.letter,
                                 status: `${cell.status} [penalty for subsequent absent use at index ${oldAbsent.index}]`,
-                                pointDeduction: SCORING.REPEATED_ABSENT_PENALTY
+                                pointDeduction: -SCORING.REPEATED_ABSENT_PENALTY
                             })
 
                             points -= SCORING.REPEATED_ABSENT_PENALTY
@@ -316,7 +316,7 @@ const GuessPreviewModal: React.FC<{
                             localDecisions.push({
                                 letter: cell.letter,
                                 status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
-                                pointDeduction: SCORING.ABSENT_PENALTY
+                                pointDeduction: -SCORING.ABSENT_PENALTY
                             })
                         }
 
@@ -346,7 +346,7 @@ const GuessPreviewModal: React.FC<{
                         }
 
                         if (!oldPresent) {
-                            const isSecondGuess = rowIndex === 2
+                            const isSecondGuess = rowIndex === 1
 
                             // award fresh points
                             points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
@@ -400,7 +400,7 @@ const GuessPreviewModal: React.FC<{
         const won = gameData.guesses[currentAttempts - 1]?.every((c: any) => c.status === 'correct');
         const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
 
-        return { rows, base: baseScore, bonus: totalBonus, hint: localHint };
+        return { rows, base: baseScore, bonus: totalBonus, hint: localHint, decisions: rowPointDecisions };
     };
 
     const breakdown = getBreakdown();
@@ -410,7 +410,7 @@ const GuessPreviewModal: React.FC<{
     return (
 
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.GUESS_PREVIEW }} onClick={onClose}>
-            <div className="bg-gray-900 border border-gray-700 w-full max-w-xs rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20">
                     <X size={20} />
                 </button>
@@ -448,7 +448,7 @@ const GuessPreviewModal: React.FC<{
                 ) : (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Target Word Section */}
-                        <div className="mb-6 flex flex-col items-center">
+                        <div className="mb-6 mt-3 flex flex-col items-center">
                             {showTargetWord ? (
                                 <div className="flex flex-col items-center animate-in zoom-in duration-300">
                                     <span className="text-[8px] uppercase font-black text-gray-500 mb-1">Target Word</span>
@@ -473,51 +473,12 @@ const GuessPreviewModal: React.FC<{
                             )}
                         </div>
 
-                        <div className="grid gap-2 mb-6 justify-center">
-                            {gameData?.guesses?.map((row: any[], i) => {
-                                const rowScore = breakdown.rows[i];
-                                return (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <div className="flex gap-1">
-                                            {row.map((cell, j) => (
-                                                <div
-                                                    key={j}
-                                                    className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
-                                                        cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
-                                                        }`}
-                                                >
-                                                    {cell.letter}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className={`text-[9px] font-mono font-bold w-8 ${rowScore >= 0 ? 'text-correct' : 'text-red-400'}`}>
-                                            {rowScore > 0 ? `+${rowScore}` : rowScore}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
                         {/* Breakdown Section */}
                         <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 mb-4 space-y-2">
                             <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
                                 <span>Base Performance:</span>
                                 <span className="text-gray-100">{breakdown.base}</span>
                             </div>
-                            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
-                                <span>Precision Bonus:</span>
-                                <span className={breakdown.bonus >= 0 ? 'text-correct' : 'text-red-400'}>
-                                    {breakdown.bonus > 0 ? `+${breakdown.bonus}` : breakdown.bonus}
-                                </span>
-                            </div>
-
-                            {gameData?.time_taken !== null && gameData?.time_taken !== undefined && (
-                                <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
-                                    <span>Time Taken:</span>
-                                    <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
-                                </div>
-                            )}
-
                             {/* Hint Info */}
                             {gameData?.hints_used && (
                                 <div className="pt-2 border-t border-gray-700/50">
@@ -538,12 +499,72 @@ const GuessPreviewModal: React.FC<{
                                     )}
                                 </div>
                             )}
+                            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+                                <span>Precision Bonus:</span>
+                                <span className={breakdown.bonus >= 0 ? 'text-correct' : 'text-red-400'}>
+                                    {breakdown.bonus > 0 ? `+${breakdown.bonus}` : breakdown.bonus}
+                                </span>
+                            </div>
+
+                            {gameData?.time_taken !== null && gameData?.time_taken !== undefined && (
+                                <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+                                    <span>Time Taken:</span>
+                                    <span className="text-gray-100">{formatTime(gameData.time_taken)}</span>
+                                </div>
+                            )}
 
                             <div className="pt-2 mt-1 border-t border-gray-700 flex justify-between text-[11px] uppercase font-black text-gray-100">
                                 <span>{isMarathon ? `Length ${marathonLength} Score:` : 'Total Index:'}</span>
                                 <span className="text-white bg-correct px-2 rounded-full">{gameData?.skill_score || 0}</span>
                             </div>
                         </div>
+
+                        <div className="grid gap-4 mb-6 justify-center">
+                            {gameData?.guesses?.map((row: any[], i) => {
+                                const rowScore = breakdown.rows[i];
+                                const rowDecisions = breakdown.decisions[i]?.decisions;
+                                return (
+                                    <div key={i} className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center gap-3 justify-between">
+                                            <div className="flex gap-1">
+                                                {row.map((cell, j) => (
+                                                    <div
+                                                        key={j}
+                                                        className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === 'correct' ? 'bg-correct text-white' :
+                                                            cell.status === 'present' ? 'bg-present text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'
+                                                            }`}
+                                                    >
+                                                        {cell.letter}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? 'bg-correct/20 text-correct' : 'bg-red-500/20 text-red-400'}`}>
+                                                {rowScore > 0 ? `+${rowScore}` : rowScore}
+                                            </div>
+                                        </div>
+
+                                        {rowDecisions && rowDecisions.length > 0 && (
+                                            <div className="grid grid-cols-1 gap-1 pt-2 border-t border-white/5">
+                                                {rowDecisions.map((dec: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tighter">
+                                                        <span className="text-gray-500">
+                                                            Letter <span className="text-gray-300">{dec.letter}</span>: {dec.status}
+                                                        </span>
+                                                        {dec.pointDeduction !== 0 && (
+                                                            <span className={dec.pointDeduction > 0 ? 'text-correct' : 'text-red-400'}>
+                                                                {dec.pointDeduction > 0 ? `+${dec.pointDeduction}` : dec.pointDeduction}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+
 
                         <button onClick={onClose} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
                             Close
