@@ -17,6 +17,7 @@ export interface GameStats {
 export interface GuessResult {
    letter: string;
    status: LetterStatus;
+   index?: number;
 }
 
 interface UserMetadata {

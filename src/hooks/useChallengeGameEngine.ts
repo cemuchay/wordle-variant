@@ -289,7 +289,7 @@ export const useChallengeGameEngine = ({
                     guesses: newGuesses,
                     gameDate: new Date().toISOString().split('T')[0],
                     hintRecord: hintRecord
-                });
+                }).finalScore;
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,
@@ -315,7 +315,7 @@ export const useChallengeGameEngine = ({
                     guesses: newGuesses,
                     gameDate: new Date().toISOString().split('T')[0],
                     hintRecord: hintRecord
-                });
+                }).finalScore;
                 resultPayload = {
                     status: 'completed',
                     score: skillScore,

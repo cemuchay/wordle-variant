@@ -504,6 +504,186 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
  *    - HINT PENALTY: -100.
  *    - LOSS: No payoff, base score is 0.
  */
+// export const calculateSkillIndex = ({
+//    attempts,
+//    maxAttempts,
+//    usedHint,
+//    guesses,
+//    gameDate,
+//    hintRecord
+// }: {
+
+//    attempts: number,
+//    maxAttempts: number,
+//    usedHint: boolean,
+//    guesses: GuessResult[][],
+//    gameDate?: string,
+//    hintRecord?: { index: number; letter: string; row?: number } | null
+// }
+// ) => {
+//    const targetDate = new Date('2026-05-18');
+//    const currentDate = gameDate ? new Date(gameDate) : new Date();
+//    const isNewSystem = currentDate >= targetDate;
+
+//    if (!isNewSystem) {
+//       // Legacy scoring logic for backwards compatibility
+//       let score = ((maxAttempts - attempts + 1) / maxAttempts) * SCORING.BASE_SCORE_MAX;
+//       if (usedHint) score -= SCORING.HINT_PENALTY;
+
+//       let bonus = 0;
+//       guesses.forEach((row) => {
+//          row.forEach((cell) => {
+//             if (cell.status === "correct") bonus += 15;
+//             if (cell.status === "present") bonus += 2;
+//             if (cell.status === "absent") bonus -= 10;
+//          });
+//       });
+//       return Math.floor(score + bonus);
+//    }
+
+//    // REVAMPED ALGORITHM (Harmony with GuessPreviewModal)
+//    if (!guesses || guesses.length === 0) return 0;
+
+//    const currentAttempts = guesses.length;
+//    const lastRow = guesses[currentAttempts - 1];
+//    const won = lastRow && lastRow.every(cell => cell.status === "correct");
+
+//    const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
+
+//    const rows: number[] = [];
+//    let totalBonus = 0;
+
+//    const wordsAwardedPoints: Array<{
+//       letter: string;
+//       index: number | undefined;
+//       status: string;
+//       awardRow: number,
+//       isChecked: boolean
+//    }> = []
+
+//    for (let rowIndex = 0; rowIndex < guesses.length; rowIndex++) {
+//       const row = guesses[rowIndex];
+//       let points = 0;
+
+//       if (rowIndex === 0) {
+//          row.forEach((cell) => {
+//             if (cell.status === 'present') {
+//                points += SCORING.YELLOW_SCORE_FIRST_TRY;
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//             else if (cell.status === 'absent') {
+//                points -= SCORING.ABSENT_PENALTY;
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//             else if (cell.status === 'correct') {
+//                points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//          });
+//       }
+//       else {
+//          const isSecondGuess = rowIndex === 1;
+//          const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
+
+//          for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+//             const cell = row[cellIndex];
+
+
+//             if (cell.status === 'present') {
+//                const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
+//                const freshYellow = !awardedOldYellow;
+
+//                if (awardedOldYellow) {
+//                   awardedOldYellow.isChecked = true;
+//                }
+
+//                if (freshYellow) {
+//                   points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
+//                }
+
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//             else if (cell.status === 'absent') {
+//                const oldAbsent = relevantAwardedWords.find((item) => item.letter === cell.letter && item.status === 'absent')
+
+//                if (oldAbsent) {
+//                   oldAbsent.isChecked = true;
+//                   points -= SCORING.REPEATED_ABSENT_PENALTY;
+//                } else {
+//                   points -= SCORING.ABSENT_PENALTY;
+//                }
+
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//             else if (cell.status === 'correct') {
+//                const oldGreen = wordsAwardedPoints.find((item) => item.status === 'correct' && item.letter === cell.letter);
+//                const oldYellow = wordsAwardedPoints.find((item) => item.status === 'present' && item.letter === cell.letter);
+//                const oldPresent = oldGreen || oldYellow;
+
+//                if (oldPresent) {
+//                   oldPresent.isChecked = true;
+//                } else {
+
+//                   points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+//                }
+
+//                wordsAwardedPoints.push({
+//                   letter: cell.letter,
+//                   index: undefined,
+//                   status: cell.status,
+//                   awardRow: rowIndex,
+//                   isChecked: false
+//                })
+//             }
+//          }
+//       }
+
+//       rows.push(points);
+//       totalBonus += points;
+//    }
+
+
+//    if (usedHint && hintRecord?.row !== undefined) {
+//       const rowBonus = rows[hintRecord.row - 1];
+//       if (rowBonus !== undefined) {
+//          totalBonus -= SCORING.HINT_PENALTY;
+
+//       }
+//    }
+
+//    return Math.floor(baseScore + totalBonus);
+// };
+
 export const calculateSkillIndex = ({
    attempts,
    maxAttempts,
@@ -513,10 +693,6 @@ export const calculateSkillIndex = ({
    hintRecord
 }: {
 
-   /* REMOVE:
-   this temporarily silences unused variable error
-   */
-
    attempts: number,
    maxAttempts: number,
    usedHint: boolean,
@@ -524,7 +700,14 @@ export const calculateSkillIndex = ({
    gameDate?: string,
    hintRecord?: { index: number; letter: string; row?: number } | null
 }
-) => {
+): {
+   rows: number[];
+   base: number;
+   bonus: number;
+   hint: number;
+   decisions: { rowNumber: string; totalRowPoints: number; decisions: { letter: string; status: string; pointDeduction: number; }[]; }[];
+   finalScore: number;
+} => {
    const targetDate = new Date('2026-05-18');
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
@@ -542,151 +725,291 @@ export const calculateSkillIndex = ({
             if (cell.status === "absent") bonus -= 10;
          });
       });
-      return Math.floor(score + bonus);
+      const finalScore: number = Math.floor(score + bonus);
+      return { rows: [], base: 0, bonus: 0, hint: 0, decisions: [], finalScore };
    }
 
    // REVAMPED ALGORITHM (Harmony with GuessPreviewModal)
-   if (!guesses || guesses.length === 0) return 0;
+   if (!guesses || guesses.length === 0) return { rows: [], base: 0, bonus: 0, hint: 0, decisions: [], finalScore: 0 };
 
-   const currentAttempts = guesses.length;
-   const lastRow = guesses[currentAttempts - 1];
-   const won = lastRow && lastRow.every(cell => cell.status === "correct");
-
-   const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
+   // const targetChars = wordToUse.toUpperCase().split("");
+   // const wordLength = isMarathon ? marathonLength : (lengthOfWord || targetChars.length);
 
    const rows: number[] = [];
+   // const knownBlacks = new Set<string>(); // For repeat -20 penalties
    let totalBonus = 0;
 
    const wordsAwardedPoints: Array<{
       letter: string;
-      index: number | undefined;
+      index: number;
       status: string;
       awardRow: number,
       isChecked: boolean
    }> = []
 
+
+   const rowPointDecisions: Array<{
+      rowNumber: string;
+      totalRowPoints: number;
+      decisions: Array<{
+         letter: string,
+         status: string,
+         pointDeduction: number
+      }>;
+   }> = [];
+
+   // 2. PROCESS ROWS: Calculate deductions for rows 1 to (N-1), award points on Row N
+
+
    for (let rowIndex = 0; rowIndex < guesses.length; rowIndex++) {
       const row = guesses[rowIndex];
-      let points = 0;
 
+      // get index of last row 
+      // const isLastRow = rowIndex === (gameData.guesses?.length ? gameData.guesses.length - 1 : null)
+
+      /* first row **/
       if (rowIndex === 0) {
-         row.forEach((cell) => {
+         let points = 0;
+         const localDecisions: Array<{
+            letter: string,
+            status: string,
+            pointDeduction: number
+         }> = [];
+
+         row.forEach((cell: { letter: string; index?: number; status: string; }) => {
+
+            // CASE: YELLOW (Present but wrong spot)
             if (cell.status === 'present') {
                points += SCORING.YELLOW_SCORE_FIRST_TRY;
+               localDecisions.push({
+                  letter: cell.letter,
+                  status: `${cell.status} +${SCORING.YELLOW_SCORE_FIRST_TRY} 1st try`,
+                  pointDeduction: SCORING.YELLOW_SCORE_FIRST_TRY
+               })
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
+
+            // CASE: BLACK (Absent)
             else if (cell.status === 'absent') {
                points -= SCORING.ABSENT_PENALTY;
+               localDecisions.push({
+                  letter: cell.letter,
+                  status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                  pointDeduction: -SCORING.ABSENT_PENALTY
+               })
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
+
+            // CASE: GREEN (Correct)
             else if (cell.status === 'correct') {
                points += SCORING.POINTS_PER_LETTER_FIRST_TRY;
+               localDecisions.push({
+                  letter: cell.letter,
+                  status: `${cell.status} +${SCORING.POINTS_PER_LETTER_FIRST_TRY} 1st try`,
+                  pointDeduction: SCORING.POINTS_PER_LETTER_FIRST_TRY
+               })
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
+
          });
+
+         rowPointDecisions.push({
+            rowNumber: `Row ${rowIndex}`,
+            totalRowPoints: points,
+            decisions: localDecisions
+         });
+
+
+
+         rows.push(points);
+         totalBonus += points;
+
       }
+
+      /* for every other row besides last row **/
+      // if (rowIndex !== gameData.guesses.length - 1) {
       else {
-         const isSecondGuess = rowIndex === 1;
+         /* from the overall awarded words, find those with awardRow less than current */
+
          const relevantAwardedWords = wordsAwardedPoints.filter((item) => item.awardRow < rowIndex);
+
+
+         let points = 0;
+         const localDecisions: Array<{
+            letter: string,
+            status: string,
+            pointDeduction: number
+         }> = [];
+
+
 
          for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
             const cell = row[cellIndex];
+            const isSecondGuess = rowIndex === 1
 
-
+            // CASE: YELLOW (Present but wrong spot)
             if (cell.status === 'present') {
+               /* we will scan all wordsAwardedPoints with present status and return fist instance matching letter*/
                const awardedOldYellow = relevantAwardedWords.find((item) => item.status === 'present' && !item.isChecked);
-               const freshYellow = !awardedOldYellow;
+
+               /* letter not present or isChecked */
+               const freshYellow = !awardedOldYellow ? true : false;
 
                if (awardedOldYellow) {
                   awardedOldYellow.isChecked = true;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} [no deduction or addition as points have already been given]`,
+                     pointDeduction: 0
+                  })
                }
 
+               /* award fresh points for a new yellow discovery*/
                if (freshYellow) {
                   points += isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} +${isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE} ${isSecondGuess ? '2nd try' : ''} `,
+                     pointDeduction: isSecondGuess ? SCORING.YELLOW_SCORE_SECOND_TRY : SCORING.YELLOW_SCORE
+                  })
                }
+
 
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
+
+            // CASE: BLACK (Absent)
             else if (cell.status === 'absent') {
+               // we will check if cell letter is an old absent
+               // relevantAwardedWords has all absents up to row - 1
+
                const oldAbsent = relevantAwardedWords.find((item) => item.letter === cell.letter && item.status === 'absent')
 
                if (oldAbsent) {
                   oldAbsent.isChecked = true;
-                  points -= SCORING.REPEATED_ABSENT_PENALTY;
-               } else {
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} [penalty for subsequent absent use at index ${oldAbsent.index}]`,
+                     pointDeduction: -SCORING.REPEATED_ABSENT_PENALTY
+                  })
+
+                  points -= SCORING.REPEATED_ABSENT_PENALTY
+               }
+
+               /* award fresh points for a new absent discovery*/
+               if (!oldAbsent) {
                   points -= SCORING.ABSENT_PENALTY;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} -${SCORING.ABSENT_PENALTY}`,
+                     pointDeduction: -SCORING.ABSENT_PENALTY
+                  })
                }
 
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
+
+            // CASE: GREEN (Correct)
             else if (cell.status === 'correct') {
                const oldGreen = wordsAwardedPoints.find((item) => item.status === 'correct' && item.letter === cell.letter);
                const oldYellow = wordsAwardedPoints.find((item) => item.status === 'present' && item.letter === cell.letter);
+
                const oldPresent = oldGreen || oldYellow;
 
                if (oldPresent) {
                   oldPresent.isChecked = true;
-               } else {
-
-                  points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} [points already awarded]`,
+                     pointDeduction: 0
+                  })
                }
 
+               if (!oldPresent) {
+
+
+                  // award fresh points
+                  points += isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} +${isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER} ${isSecondGuess ? '2nd try' : ''}`,
+                     pointDeduction: isSecondGuess ? SCORING.POINTS_PER_LETTER_SECOND_TRY : SCORING.POINTS_PER_LETTER
+                  })
+               }
                wordsAwardedPoints.push({
                   letter: cell.letter,
-                  index: undefined,
+                  index: cell.index,
                   status: cell.status,
                   awardRow: rowIndex,
                   isChecked: false
                })
             }
          }
-      }
 
-      rows.push(points);
-      totalBonus += points;
+         rowPointDecisions.push({
+            rowNumber: `Row ${rowIndex}`,
+            totalRowPoints: points,
+            decisions: localDecisions
+         });
+
+
+         rows.push(points);
+         totalBonus += points;
+
+      }
    }
 
+   let localHint = 0
 
-   if (usedHint && hintRecord?.row !== undefined) {
+   // DEDUCT HINT POINTS
+   if (hintRecord && hintRecord?.row !== undefined) {
       const rowBonus = rows[hintRecord.row - 1];
       if (rowBonus !== undefined) {
          totalBonus -= SCORING.HINT_PENALTY;
-
+         localHint -= SCORING.HINT_PENALTY;
       }
    }
 
-   return Math.floor(baseScore + totalBonus);
-};
+
+
+   // 3. FINAL AGGREGATION
+   const currentAttempts = guesses.length;
+   const won = guesses[currentAttempts - 1]?.every((c: { status: string; }) => c.status === 'correct');
+   const baseScore = won ? Math.floor(((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) * SCORING.BASE_SCORE_MAX) : 0;
+   const finalScore: number = baseScore + totalBonus;
+
+   return { rows, base: baseScore, bonus: totalBonus, hint: localHint, decisions: rowPointDecisions, finalScore };
+}
 
 /**
  * Synchronizes a finished game state to Supabase.
@@ -716,7 +1039,7 @@ export const syncGameState = async (
          guesses: payload.guesses,
          gameDate: date,
          hintRecord: payload.hintRecord,
-      })
+      }).finalScore
       : 0;
 
    const { error } = await supabase.from("scores").upsert(
