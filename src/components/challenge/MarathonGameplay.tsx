@@ -15,9 +15,9 @@ interface MarathonGameplayProps {
 }
 
 
-export const MarathonGameplay = memo(({
+export const MarathonGameplay = memo(function MarathonGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
-}: MarathonGameplayProps) => {
+}: MarathonGameplayProps) {
     const { participants, setPreviewParticipant, setPreviewMarathonLength } = useChallengeContext();
     const [selectedLength, setSelectedLength] = useState<number | null>(null);
 

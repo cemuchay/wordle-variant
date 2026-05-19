@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useEffect, useMemo } from 'react';
+import { memo, useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Clock } from 'lucide-react';
 import { formatTime } from './lib';
@@ -86,6 +86,7 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
 
     // Find the current high score among participants who have actually finished/played
     const participants = useMemo(() => item.challenge.participants || [], [item.challenge.participants]);
+
     const maxScore = useMemo(() => {
         const scores = participants
             .filter((p: any) => p.status !== 'pending')
@@ -97,9 +98,13 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
     const isLeader = myScore === maxScore && myScore > 0;
     const hasStarted = item.status !== 'pending';
 
+    const handleSelect = useCallback(() => {
+        onSelect(item.challenge_id);
+    }, [onSelect, item.challenge_id]);
+
     return (
         <button
-            onClick={() => onSelect(item.challenge_id)}
+            onClick={handleSelect}
             className={`w-full text-left bg-linear-to-br from-white/3 to-transparent border ${isLeader && !isExpired ? 'border-correct/20' : 'border-white/5'} p-5 rounded-4xl hover:border-white/20 transition-all group relative overflow-hidden`}
         >
             {/* Background Glow for Leader */}

@@ -18,9 +18,9 @@ interface RegularGameplayProps {
     onBack?: () => void; // Optional back handler
 }
 
-export const RegularGameplay = memo(({
+export const RegularGameplay = memo(function RegularGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack
-}: RegularGameplayProps) => {
+}: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
 
     const { state, actions, isSaving, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
