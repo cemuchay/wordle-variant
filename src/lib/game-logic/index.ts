@@ -741,7 +741,7 @@ export const calculateSkillIndex = ({
 
    const wordsAwardedPoints: Array<{
       letter: string;
-      index: number;
+      index: number | undefined;
       status: string;
       awardRow: number,
       isChecked: boolean

@@ -133,7 +133,7 @@ const GuessPreviewModal: React.FC<{
 
     const breakdown = calculateSkillIndex({
         attempts: gameData?.guesses?.length || 0,
-        maxAttempts: MAX_ATTEMPTS[lengthOfWord],
+        maxAttempts: MAX_ATTEMPTS,
         guesses: gameData?.guesses || [],
         usedHint: gameData?.hint_record !== null,
         hintRecord: gameData?.hint_record || null,
