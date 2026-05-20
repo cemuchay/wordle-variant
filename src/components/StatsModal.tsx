@@ -87,13 +87,13 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     let isMounted = true;
 
     const fetchLeaderboard = async () => {
-      if (!isOpen || activeTab !== 'leaderboard') return;
+      if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
 
       setLoading(true);
 
       try {
         const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
-          body: { action: 'get-leaderboard', timeframe }
+          body: { action: 'get-leaderboard', timeframe, date: currentDate }
         });
 
         if (error) throw error;
@@ -112,7 +112,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     fetchLeaderboard();
 
     return () => { isMounted = false; };
-  }, [isOpen, activeTab, timeframe]);
+  }, [isOpen, activeTab, timeframe, currentDate]);
 
   const canViewGuess = !!user && (timeframe === "yesterday" || (timeframe === "today" && viewerHasFinished));
   if (!isOpen) return null;
