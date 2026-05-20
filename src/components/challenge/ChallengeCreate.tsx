@@ -307,8 +307,12 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
             }
         }
 
+        if (length === 1 && mode === 'LIVE' && timerType === 'custom') {
+            customParams.marathonTimers = marathonTimers;
+        }
+
         handleCreate(customParams);
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStarters, lifespanHours, length, handleCreate]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStarters, lifespanHours, length, handleCreate, mode, timerType, marathonTimers]);
 
     return (
         <div className="space-y-6">
@@ -518,6 +522,51 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                             </div>
                         )}
                     </div>
+
+                    {/* Marathon Custom Timers */}
+                    {length === 1 && mode === 'LIVE' && (
+                        <div className="space-y-3 border-t border-white/5 pt-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                                        <Clock size={12} className="text-yellow-500" /> Per-Word Timers
+                                    </p>
+                                    <p className="text-[10px] text-gray-500">Set different times for each length</p>
+                                </div>
+                                <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                                    <button
+                                        onClick={() => setTimerType('same')}
+                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-gray-500'}`}
+                                    >
+                                        Same
+                                    </button>
+                                    <button
+                                        onClick={() => setTimerType('custom')}
+                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-gray-500'}`}
+                                    >
+                                        Custom
+                                    </button>
+                                </div>
+                            </div>
+                            {timerType === 'custom' && (
+                                <div className="grid grid-cols-5 gap-2 pl-4 border-l border-white/10">
+                                    {[3, 4, 5, 6, 7].map(l => (
+                                        <div key={l} className="space-y-1">
+                                            <p className="text-[8px] font-black uppercase text-gray-500 text-center">{l}L</p>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={60}
+                                                value={marathonTimers[l]}
+                                                onChange={(e) => setMarathonTimers({ ...marathonTimers, [l]: Math.max(1, Math.min(60, Number(e.target.value))) })}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct outline-none"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
