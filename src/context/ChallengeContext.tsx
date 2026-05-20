@@ -49,6 +49,7 @@ interface ChallengeContextType {
     handleStartGame: () => Promise<void>;
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
+    shareLink: (challenge: Challenge) => Promise<void>;
     loadMyChallenges: () => Promise<void>;
     submitResult: (result: any, wordLength?: number) => Promise<boolean>;
     registerAnonymousUser: (nickname: string) => Promise<any>;
@@ -162,7 +163,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setChallengeUnreadCount(unplayedCount);
     }, [unplayedCount, setChallengeUnreadCount]);
 
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const filteredChallenges = useMemo(() => {
         return myChallenges.filter((item: any) => {
             const challenge = item.challenge;
@@ -317,9 +317,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 return;
             }
 
-            const participation = await joinMutation.mutateAsync({ 
-                challengeId: selectedChallenge.id, 
-                userId: effectiveUser.id 
+            const participation = await joinMutation.mutateAsync({
+                challengeId: selectedChallenge.id,
+                userId: effectiveUser.id
             });
             const normalizedPart = normalizeParticipation(participation, selectedChallenge);
             setMyParticipation(normalizedPart);
@@ -327,7 +327,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             console.error("Failed to join challenge:", err);
             triggerToast(err?.message || "Failed to join challenge.", 4000);
         }
-    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast]);
+    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation]);
 
     const registerAnonymousUser = useCallback(async (nickname: string) => {
         let anonId = localStorage.getItem('wordle_anon_id');
@@ -336,7 +336,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             localStorage.setItem('wordle_anon_id', anonId);
         }
         localStorage.setItem('wordle_anon_username', nickname);
-        
+
         // Insert/update profile in database
         const { error } = await supabase.from('profiles').upsert({
             id: anonId,
@@ -365,7 +365,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             }
         }
-    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending]);
+    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation]);
 
     const handleCreate = useCallback(async (customParams?: any) => {
         if (!effectiveUser) return;
@@ -546,6 +546,29 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
             navigator.clipboard.writeText(text);
             triggerToast('Challenge link copied to clipboard!', 2000);
+        },
+        shareLink: async (c: Challenge) => {
+            const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
+            const title = `Wordle Challenge`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆`;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title,
+                        text,
+                        url
+                    });
+                } catch (err: any) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error sharing:', err);
+                        navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
+                        triggerToast('Copied to clipboard instead!', 2000);
+                    }
+                }
+            } else {
+                navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
+                triggerToast('Copied to clipboard!', 2000);
+            }
         },
         loadMyChallenges: async () => { await refetchChallenges(); },
         submitResult,

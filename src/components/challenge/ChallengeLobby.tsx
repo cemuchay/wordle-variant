@@ -1,4 +1,4 @@
-import { Eye, Play, Share2, Clock } from 'lucide-react';
+import { Eye, Play, Share2, Clock, Copy } from 'lucide-react';
 import { memo, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
@@ -84,7 +84,7 @@ import { useApp } from '../../context/AppContext';
 export const ChallengeLobby = memo(function ChallengeLobby() {
     const {
         selectedChallenge, myParticipation, participants,
-        copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
+        copyLink, shareLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
         loading, registerAnonymousUser, effectiveUser
     } = useChallengeContext();
     const { triggerToast } = useApp();
@@ -127,12 +127,20 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                             </span>
                         )}
                     </div>
-                    <button
-                        onClick={() => copyLink(selectedChallenge)}
-                        className="text-gray-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase"
-                    >
-                        <Share2 size={14} /> Share Link
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => copyLink(selectedChallenge)}
+                            className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                        >
+                            <Copy size={12} /> Copy Link
+                        </button>
+                        <button
+                            onClick={() => shareLink(selectedChallenge)}
+                            className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                        >
+                            <Share2 size={12} /> Share
+                        </button>
+                    </div>
                 </div>
                 <h3 className="text-2xl font-black mb-1">
                     {isMarathon ? 'The Marathon' : `${selectedChallenge.word_length} Letter Word`}
