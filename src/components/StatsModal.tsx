@@ -91,46 +91,21 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
       setLoading(true);
 
-      const viewMap: Record<Timeframe, string> = {
-        today: 'leaderboard_today',
-        yesterday: 'leaderboard_yesterday',
-        weekly: 'leaderboard_weekly',
-        monthly: 'leaderboard_monthly',
-        // all: 'leaderboard_all_time'
-      };
+      try {
+        const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
+          body: { action: 'get-leaderboard', timeframe }
+        });
 
-      // 1. Join array values into a comma-separated string for Supabase .select()
-      const baseSelect = "username, avatar_url, total_points"
-      const standardSelect = `${baseSelect}, days_active`;
-      const todaySelect = `${baseSelect}, word_length, attempts, status, user_id`;
+        if (error) throw error;
 
-      const isDailyView = timeframe === 'today' || timeframe === 'yesterday';
-
-      const { data, error } = await supabase
-        .from(viewMap[timeframe])
-        .select(isDailyView ? todaySelect : standardSelect)
-        .order('total_points', { ascending: false })
-        .limit(20);
-
-      if (isMounted && !error && data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const formattedData: LeaderboardEntry[] = data.map((entry: any) => ({
-          username: entry.username,
-          avatar_url: entry.avatar_url,
-          total_score: entry.total_points,
-          // Pass these through if you want to display them in the UI for 'today'
-          word_length: entry.word_length ?? null,
-          attempts: entry.attempts ?? null,
-          status: entry.status,
-          days_active: entry.days_active ?? 0,
-          user_id: entry.user_id ?? null
-        }));
-
-        setLeaderboard(formattedData);
+        if (isMounted && edgeRes && edgeRes.data) {
+          setLeaderboard(edgeRes.data);
+        }
+      } catch (err: any) {
+        console.error("Leaderboard fetch error:", err.message || err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      if (error) console.error("Leaderboard fetch error:", error.message);
-      if (isMounted) setLoading(false);
     };
 
     fetchLeaderboard();

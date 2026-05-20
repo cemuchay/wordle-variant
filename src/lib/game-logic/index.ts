@@ -1058,11 +1058,12 @@ export const syncGameState = async (
       { onConflict: "user_id, game_date" }
    );
 
-   if (error) {
-      console.error("Cloud sync failed:", error.message);
-      throw error;
-   }
-   return skillScore;
+    if (error) {
+       console.error("Cloud sync failed:", error.message);
+       throw error;
+    }
+
+    return skillScore;
 };
 
 /**

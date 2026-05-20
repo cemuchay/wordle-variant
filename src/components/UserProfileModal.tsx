@@ -97,14 +97,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
             setLoading(true);
             try {
                 // 1. Fetch profile details
-                const { data: profileData, error: profileErr } = await supabase
-                    .from('profiles')
-                    .select('id, username, avatar_url, updated_at, last_seen_at')
-                    .eq('id', userId)
-                    .single();
+                const { data: edgeRes, error: profileErr } = await supabase.functions.invoke('redis-cache', {
+                    body: { action: 'get-user-profile', userId }
+                });
 
                 if (profileErr) throw profileErr;
-                if (isMounted) setProfile(profileData);
+                if (isMounted && edgeRes && edgeRes.data) {
+                    setProfile(edgeRes.data);
+                }
 
                 // 2. Fetch daily scores of target user
                 const { data: scoresData } = await supabase
