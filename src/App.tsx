@@ -56,8 +56,24 @@ export default function App() {
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
+    const [statsActiveTab, setStatsActiveTab] = useState<'stats' | 'leaderboard'>('stats');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+    // Listen to custom event to open stats modal at a specific tab
+    useEffect(() => {
+        const handleOpenStats = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.tab) {
+                setStatsActiveTab(detail.tab);
+            } else {
+                setStatsActiveTab('stats');
+            }
+            setIsStatsOpen(true);
+        };
+        window.addEventListener('open-stats-modal', handleOpenStats);
+        return () => window.removeEventListener('open-stats-modal', handleOpenStats);
+    }, []);
 
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
@@ -97,7 +113,7 @@ export default function App() {
 
                     <GameToolbar
                         onOpenChallenge={() => setIsChallengeOpen(true)}
-                        onOpenStats={() => setIsStatsOpen(true)}
+                        onOpenStats={() => { setStatsActiveTab('stats'); setIsStatsOpen(true); }}
                         onOpenInfo={() => setIsInfoOpen(true)}
                         onHint={actions.handleHint}
                         onReset={() => window.location.reload()}
@@ -152,6 +168,7 @@ export default function App() {
                             isGameOver: state.isGameOver,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
+                        statsActiveTab={statsActiveTab}
                         onChallengeCreated={handleChallengeCreated}
                     />
 

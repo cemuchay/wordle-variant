@@ -40,6 +40,7 @@ interface ModalsManagerProps {
         gameMessage: string;
         stats: any;
     };
+    statsActiveTab?: 'stats' | 'leaderboard';
     onChallengeCreated: (challenge: any, invitedUsernames: string[], invitedIds: string[]) => void;
 }
 
@@ -47,6 +48,7 @@ export const ModalsManager = ({
     modals,
     actions,
     gameContext,
+    statsActiveTab = 'stats',
     onChallengeCreated
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
@@ -81,6 +83,7 @@ export const ModalsManager = ({
                     onClose={() => actions.setStatsOpen(false)}
                     user={gameContext.user}
                     isGameOver={gameContext.isGameOver}
+                    initialTab={statsActiveTab}
                 />
             )}
 

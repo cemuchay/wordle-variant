@@ -10,11 +10,13 @@ import { type AppNotification } from '../../types/notifications';
 const NotificationItem = memo(({ 
     notification, 
     onMarkRead, 
-    onDelete 
+    onDelete,
+    onClick
 }: { 
     notification: AppNotification, 
     onMarkRead: (id: string) => void, 
-    onDelete: (id: string) => void 
+    onDelete: (id: string) => void,
+    onClick?: () => void
 }) => {
     return (
         <motion.div
@@ -22,7 +24,8 @@ const NotificationItem = memo(({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className={`p-4 rounded-2xl border transition-all ${notification.is_read ? 'bg-white/2 border-white/5 opacity-60' : 'bg-white/5 border-white/10 shadow-lg shadow-black/20'}`}
+            onClick={onClick}
+            className={`p-4 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''} ${notification.is_read ? 'bg-white/2 border-white/5 opacity-60' : 'bg-white/5 border-white/10 shadow-lg shadow-black/20'}`}
         >
             <div className="flex justify-between items-start gap-3">
                 <div className="flex-1 space-y-1">
@@ -39,7 +42,7 @@ const NotificationItem = memo(({
                 <div className="flex items-center gap-1 shrink-0">
                     {!notification.is_read && (
                         <button
-                            onClick={() => onMarkRead(notification.id)}
+                            onClick={(e) => { e.stopPropagation(); onMarkRead(notification.id); }}
                             className="p-2 hover:bg-correct/10 text-gray-500 hover:text-correct rounded-xl transition-all"
                             title="Mark as read"
                         >
@@ -47,7 +50,7 @@ const NotificationItem = memo(({
                         </button>
                     )}
                     <button
-                        onClick={() => onDelete(notification.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(notification.id); }}
                         className="p-2 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-xl transition-all"
                         title="Delete"
                     >
@@ -60,8 +63,28 @@ const NotificationItem = memo(({
 });
 
 export const NotificationModal = memo(() => {
-    const { profile, isNotificationsOpen, setIsNotificationsOpen } = useApp();
+    const { profile, isNotificationsOpen, setIsNotificationsOpen, setIsChallengeOpen } = useApp();
     const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, isLoading } = useNotifications(profile?.id, { enableRealtime: false });
+
+    const handleNotificationClick = (n: AppNotification) => {
+        if (!n.is_read) {
+            markAsRead(n.id);
+        }
+
+        if (n.type === 'CHALLENGE_INVITE' || n.type === 'CHALLENGE_COMPLETED' || n.type === 'MARATHON_GAME_COMPLETED') {
+            const challengeId = n.data?.challenge_id;
+            if (challengeId) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('challenge', challengeId);
+                window.history.pushState({}, '', url.pathname + url.search);
+                setIsChallengeOpen(true);
+                setIsNotificationsOpen(false);
+            }
+        } else if (n.type === 'LEADERBOARD_OVERTAKEN') {
+            window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
+            setIsNotificationsOpen(false);
+        }
+    };
 
     const sortedNotifications = useMemo(() => {
         return [...notifications].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -138,14 +161,21 @@ export const NotificationModal = memo(() => {
                         </div>
                     ) : (
                         <AnimatePresence mode="popLayout">
-                            {sortedNotifications.map(n => (
-                                <NotificationItem 
-                                    key={n.id} 
-                                    notification={n} 
-                                    onMarkRead={markAsRead} 
-                                    onDelete={deleteNotification} 
-                                />
-                            ))}
+                            {sortedNotifications.map(n => {
+                                const isInteractive = n.type === 'CHALLENGE_INVITE' || 
+                                                     n.type === 'CHALLENGE_COMPLETED' || 
+                                                     n.type === 'MARATHON_GAME_COMPLETED' || 
+                                                     n.type === 'LEADERBOARD_OVERTAKEN';
+                                return (
+                                    <NotificationItem 
+                                        key={n.id} 
+                                        notification={n} 
+                                        onMarkRead={markAsRead} 
+                                        onDelete={deleteNotification} 
+                                        onClick={isInteractive ? () => handleNotificationClick(n) : undefined}
+                                    />
+                                );
+                            })}
                         </AnimatePresence>
                     )}
                 </div>

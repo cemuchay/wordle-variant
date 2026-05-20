@@ -1,4 +1,4 @@
-export type NotificationType = 'CHALLENGE_INVITE' | 'CHALLENGE_STARTED' | 'CHALLENGE_COMPLETED' | 'SYSTEM' | 'GENERAL';
+export type NotificationType = 'CHALLENGE_INVITE' | 'CHALLENGE_STARTED' | 'CHALLENGE_COMPLETED' | 'SYSTEM' | 'GENERAL' | 'MARATHON_GAME_COMPLETED' | 'LEADERBOARD_OVERTAKEN';
 
 export interface AppNotification {
     id: string;

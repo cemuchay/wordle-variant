@@ -25,12 +25,13 @@ interface Props {
   user: AppUser | null;
   stats: GameStats;
   isGameOver: boolean;
+  initialTab?: 'stats' | 'leaderboard';
 }
 
 // --- Component ---
 
-export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver }) => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
+export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver, initialTab = 'stats' }) => {
+  const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(initialTab);
   const [timeframe, setTimeframe] = useState<Timeframe>('today');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,12 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [viewerHasFinished, setViewerHasFinished] = useState(false);
 
   const { date: currentDate } = useApp();
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
 
   // Check if viewer has finished TODAY's game specifically
