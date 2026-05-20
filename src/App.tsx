@@ -60,6 +60,7 @@ export default function App() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [isAuthOpen, setIsAuthOpen] = useState(false);
+    const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
 
     // Listen to custom event to open stats modal at a specific tab
     useEffect(() => {
@@ -83,11 +84,23 @@ export default function App() {
         return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
     }, []);
 
+    // Listen to custom event to open user profile modal
+    useEffect(() => {
+        const handleOpenProfile = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.userId) {
+                setViewedProfileId(detail.userId);
+            }
+        };
+        window.addEventListener('open-user-profile', handleOpenProfile);
+        return () => window.removeEventListener('open-user-profile', handleOpenProfile);
+    }, []);
+
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen || isAuthOpen);
+    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen || isAuthOpen || !!viewedProfileId);
 
 
     const handleChallengeCreated = () => {
@@ -180,6 +193,8 @@ export default function App() {
                         }}
                         statsActiveTab={statsActiveTab}
                         onChallengeCreated={handleChallengeCreated}
+                        viewedProfileId={viewedProfileId}
+                        setViewedProfileId={setViewedProfileId}
                     />
 
 

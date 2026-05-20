@@ -31,7 +31,18 @@ interface Props {
 // --- Component ---
 
 export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver, initialTab = 'stats' }) => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(initialTab);
+
+  if (isOpen !== prevIsOpen || initialTab !== prevInitialTab) {
+    setPrevIsOpen(isOpen);
+    setPrevInitialTab(initialTab);
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }
+
   const [timeframe, setTimeframe] = useState<Timeframe>('today');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,12 +50,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [viewerHasFinished, setViewerHasFinished] = useState(false);
 
   const { date: currentDate } = useApp();
-
-  useEffect(() => {
-    if (isOpen && initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [isOpen, initialTab]);
 
 
   // Check if viewer has finished TODAY's game specifically
@@ -365,12 +370,26 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
 
         <img
           src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`}
-          className={`w-7 h-7 rounded-full border ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
+          className={`w-7 h-7 rounded-full border cursor-pointer hover:scale-105 transition-transform ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
           alt={entry.username}
+          onClick={(e) => {
+            if (entry.user_id) {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
+            }
+          }}
         />
 
         <div className="flex flex-col">
-          <span className={`text-xs font-bold truncate max-w-24 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}>
+          <span 
+            onClick={(e) => {
+              if (entry.user_id) {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
+              }
+            }}
+            className={`text-xs font-bold truncate max-w-24 cursor-pointer hover:underline ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}
+          >
             {entry.username}
           </span>
           {canViewGuesses && (

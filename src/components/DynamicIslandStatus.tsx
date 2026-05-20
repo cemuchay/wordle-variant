@@ -250,7 +250,15 @@ export const DynamicIslandStatus = () => {
                                     return (
                                         <div key={p.id} className="flex items-center justify-between group">
                                             <div className="flex items-center gap-3">
-                                                <div className="relative">
+                                                <div 
+                                                    className="relative cursor-pointer hover:scale-105 transition-transform"
+                                                    onClick={(e) => {
+                                                        if (p.id) {
+                                                            e.stopPropagation();
+                                                            window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
+                                                        }
+                                                    }}
+                                                >
                                                     <img
                                                         src={p.avatar_url}
                                                         alt=""
@@ -261,7 +269,15 @@ export const DynamicIslandStatus = () => {
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">
+                                                    <span 
+                                                        className="text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                        onClick={(e) => {
+                                                            if (p.id) {
+                                                                e.stopPropagation();
+                                                                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
+                                                            }
+                                                        }}
+                                                    >
                                                         {p.username} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
                                                     </span>
                                                     <div className="flex items-center gap-1 text-[9px] text-gray-500">

@@ -10,6 +10,7 @@ const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.St
 const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
 const NotificationModal = lazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
 const AuthModal = lazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
+const UserProfileModal = lazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
@@ -45,6 +46,8 @@ interface ModalsManagerProps {
     };
     statsActiveTab?: 'stats' | 'leaderboard';
     onChallengeCreated: (challenge: any, invitedUsernames: string[], invitedIds: string[]) => void;
+    viewedProfileId: string | null;
+    setViewedProfileId: (id: string | null) => void;
 }
 
 export const ModalsManager = ({
@@ -52,7 +55,9 @@ export const ModalsManager = ({
     actions,
     gameContext,
     statsActiveTab = 'stats',
-    onChallengeCreated
+    onChallengeCreated,
+    viewedProfileId,
+    setViewedProfileId
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
 
@@ -121,6 +126,12 @@ export const ModalsManager = ({
                     usedHint={gameContext.usedHint}
                     gameMessage={gameContext.gameMessage}
                     stats={gameContext.stats}
+                />
+            )}
+            {viewedProfileId && (
+                <UserProfileModal
+                    userId={viewedProfileId}
+                    onClose={() => setViewedProfileId(null)}
                 />
             )}
         </Suspense>

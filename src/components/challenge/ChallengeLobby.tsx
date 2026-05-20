@@ -37,7 +37,15 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
             className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${canClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
         >
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden bg-gray-800">
+                <div 
+                    className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden bg-gray-800 cursor-pointer hover:scale-105 transition-transform"
+                    onClick={(e) => {
+                        if (p.user_id) {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.user_id } }));
+                        }
+                    }}
+                >
                     {p.profiles?.avatar_url ? (
                         <img src={p.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -47,7 +55,17 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                     )}
                 </div>
                 <div>
-                    <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
+                    <p 
+                        className="text-sm font-bold cursor-pointer hover:underline"
+                        onClick={(e) => {
+                            if (p.user_id) {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.user_id } }));
+                            }
+                        }}
+                    >
+                        {p.profiles?.username || 'Player'}
+                    </p>
                     <p className={`text-[9px] font-black uppercase ${pIsFinished ? 'text-gray-500' : 'text-yellow-500'}`}>
                         {isMarathon && p.status === 'playing' ? `${marathonCompletedCount}/5 Lengths` : p.status}
                     </p>
