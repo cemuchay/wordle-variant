@@ -217,6 +217,10 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
     const [customWord, setCustomWord] = useState('');
     const [customWords, setCustomWords] = useState<Record<number, string>>({ 3: '', 4: '', 5: '', 6: '', 7: '' });
 
+    // Marathon Custom Timer States
+    const [timerType, setTimerType] = useState<'same' | 'custom'>('same');
+    const [marathonTimers, setMarathonTimers] = useState<Record<number, number>>({ 3: 3, 4: 5, 5: 5, 6: 10, 7: 10 });
+
     // Handicap States
     const [isHandicap, setIsHandicap] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');

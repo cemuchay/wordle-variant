@@ -22,6 +22,7 @@ export interface Challenge {
     handicap_starter?: string | null;
     handicap_starters?: any;
     handicap_enforced?: boolean;
+    marathon_timers?: Record<number, number> | null;
 }
 
 export interface MarathonProgress {
