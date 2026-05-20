@@ -86,15 +86,11 @@ const GuessPreviewModal: React.FC<{
                     .from('scores')
                     .select('status')
                     .eq('user_id', profile.id)
-                    .eq('game_date', targetDate)
-                    .single();
+                    .eq('game_date', date) // 'date' here is literal today from AppContext
+                    .in('status', ['won', 'lost'])
+                    .maybeSingle();
 
-                if (data) {
-                    const finished = data.status === 'won' || data.status === 'lost';
-                    setViewerHasFinished(finished);
-                } else {
-                    setViewerHasFinished(false);
-                }
+                setViewerHasFinished(!!data);
             }
         };
 

@@ -39,24 +39,13 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
   const { date: currentDate } = useApp();
 
-  const getTargetDate = () => {
-    if (!currentDate) return undefined;
-    if (timeframe === 'today') return currentDate;
-    if (timeframe === 'yesterday') {
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
-    }
-    return undefined;
-  };
 
-  const targetDate = getTargetDate();
-
-  // Check if viewer has finished for the selected timeframe
+  // Check if viewer has finished TODAY's game specifically
   useEffect(() => {
-    if (!isOpen || !user || !targetDate) return;
+    if (!isOpen || !user || !currentDate) return;
 
-    if (timeframe === 'today' && isGameOver) {
+    // isGameOver prop refers to literal today's game
+    if (isGameOver) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewerHasFinished(true);
       return;
@@ -67,18 +56,15 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         .from('scores')
         .select('status')
         .eq('user_id', user.id)
-        .eq('game_date', targetDate)
-        .single();
+        .eq('game_date', currentDate)
+        .in('status', ['won', 'lost'])
+        .maybeSingle();
 
-      if (data) {
-        setViewerHasFinished(data.status === 'won' || data.status === 'lost');
-      } else {
-        setViewerHasFinished(false);
-      }
+      setViewerHasFinished(!!data);
     };
 
     checkStatus();
-  }, [isOpen, user, targetDate, timeframe, isGameOver]);
+  }, [isOpen, user, currentDate, isGameOver]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
@@ -140,7 +126,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     return () => { isMounted = false; };
   }, [isOpen, activeTab, timeframe]);
 
-  const canViewGuess = (timeframe === "today" || timeframe === "yesterday") && !!user && viewerHasFinished;
+  const canViewGuess = !!user && (timeframe === "yesterday" || (timeframe === "today" && viewerHasFinished));
   if (!isOpen) return null;
 
   return (
