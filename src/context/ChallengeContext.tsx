@@ -369,26 +369,31 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const handleCreate = useCallback(async (customParams?: any) => {
         if (!effectiveUser) return;
-        const challenge = await createMutation.mutateAsync({
-            creatorId: effectiveUser.id,
-            mode: mode,
-            length: length,
-            maxTime: mode === 'LIVE' ? maxTime : null,
-            invitedIds: invitedIds,
-            ...customParams
-        });
+        try {
+            const challenge = await createMutation.mutateAsync({
+                creatorId: effectiveUser.id,
+                mode: mode,
+                length: length,
+                maxTime: mode === 'LIVE' ? maxTime : null,
+                invitedIds: invitedIds,
+                ...customParams
+            });
 
-        if (challenge) {
-            const invitedUsernames = availableProfiles
-                .filter(p => invitedIds.includes(p.id))
-                .map(p => p.username);
+            if (challenge) {
+                const invitedUsernames = availableProfiles
+                    .filter(p => invitedIds.includes(p.id))
+                    .map(p => p.username);
 
-            if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
+                if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
 
-            resetForm();
-            handleViewChallenge(challenge.id);
+                resetForm();
+                handleViewChallenge(challenge.id);
+            }
+        } catch (err: any) {
+            console.error("Failed to create challenge:", err);
+            triggerToast(err?.message || "Failed to create challenge.", 4000);
         }
-    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge]);
+    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
