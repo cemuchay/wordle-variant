@@ -73,6 +73,7 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
     // Timeout & Retry Refs
     const connectionTimeoutRef = useRef<number | null>(null);
     const retryCountRef = useRef(0);
+    const setupAgoraRef = useRef<(() => Promise<boolean>) | undefined>(undefined);
 
     const activeEngineRef = useRef(activeEngine);
     useEffect(() => { activeEngineRef.current = activeEngine; }, [activeEngine]);
@@ -136,6 +137,18 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
             if (!isMounted.current) return;
             addLog('P2P Remote track received', 'success');
             setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+        };
+
+        pc.onnegotiationneeded = async () => {
+            try {
+                makingOffer.current = true;
+                await pc.setLocalDescription();
+                sendSignal({ type: 'description', description: pc.localDescription });
+            } catch (err: any) {
+                addLog(`Negotiation error: ${err.message || err}`, 'error');
+            } finally {
+                makingOffer.current = false;
+            }
         };
 
         pc.onconnectionstatechange = () => {
@@ -223,7 +236,7 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
                         if (retryCountRef.current < 3) {
                             retryCountRef.current++;
                             addLog(`Agora disconnected unexpectedly. Reconnecting retry ${retryCountRef.current}/3...`, 'warning');
-                            setupAgora();
+                            setupAgoraRef.current?.();
                         } else {
                             addLog('Agora disconnected. Max retries exceeded.', 'error');
                             setError('Connection failed');
@@ -283,6 +296,10 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
             isJoiningRef.current = false;
         }
     }, [activeCall, userId, addLog, sendSignal, onConnectionFailure, onConnectionSuccess, isConnected]);
+
+    useEffect(() => {
+        setupAgoraRef.current = setupAgora;
+    }, [setupAgora]);
 
     // --- Orchestration ---
     const startAudio = useCallback(async () => {
