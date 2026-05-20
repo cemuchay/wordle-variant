@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays } from 'lucide-react';
+import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -77,7 +77,7 @@ const getDatesInWeeksAndMonthsOf = (dates: string[]): string[] => {
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onClose }) => {
     const { user: currentUser } = useAuth();
-    const { onlineUsers } = useApp();
+    const { onlineUsers, initiatePrivateCall, activeCall, triggerToast } = useApp();
 
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -471,7 +471,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                         </div>
                     ) : (
                         profile && (
-                            <div className="flex items-center gap-5">
+                            <div className="flex items-center gap-5 w-full">
                                 <div className="relative">
                                     <img
                                         src={profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}`}
@@ -499,6 +499,27 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                         </span>
                                     </div>
                                 </div>
+
+                                {isOnline && currentUser && currentUser.id !== userId && (
+                                    <button
+                                        onClick={() => {
+                                            if (activeCall) {
+                                                triggerToast("You are already in a call.", 4000);
+                                                return;
+                                            }
+                                            initiatePrivateCall({
+                                                id: profile.id,
+                                                username: profile.username,
+                                                avatar_url: profile.avatar_url
+                                            });
+                                            onClose();
+                                        }}
+                                        className="flex items-center justify-center p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all mr-6"
+                                        title={`Call ${profile.username}`}
+                                    >
+                                        <Phone size={16} />
+                                    </button>
+                                )}
                             </div>
                         )
                     )}

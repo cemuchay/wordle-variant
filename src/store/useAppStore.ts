@@ -21,6 +21,14 @@ const INITIAL_STATS: GameStats = {
     guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, X: 0 },
 };
 
+export interface VoiceCallState {
+    channelId: string;
+    type: 'private' | 'group';
+    role: 'caller' | 'receiver' | 'participant';
+    targetUser?: { id: string; username: string; avatar_url: string };
+    status: 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected' | 'disconnected' | 'rejected' | 'busy' | 'failed';
+}
+
 interface AppState {
     // UI State
     toast: { show: boolean; message: string; duration?: number };
@@ -37,7 +45,7 @@ interface AppState {
     // Social / Real-time State
     unreadCount: number;
     challengeUnreadCount: number;
-    activeCall: { challengeId: string; userId: string; isInitiator?: boolean } | null;
+    activeCall: VoiceCallState | null;
 
     // Actions
     triggerToast: (message: string, duration?: number) => void;
@@ -47,7 +55,7 @@ interface AppState {
     setChatOpen: (val: boolean) => void;
     setUnreadCount: (val: number) => void;
     setChallengeUnreadCount: (val: number) => void;
-    setActiveCall: (call: { challengeId: string; userId: string; isInitiator?: boolean } | null) => void;
+    setActiveCall: (call: VoiceCallState | null) => void;
     setPreferences: (prefs: UserPreferences) => void;
     setStats: (stats: GameStats) => void;
     setMyParticipations: (ids: string[]) => void;

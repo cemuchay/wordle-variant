@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { createContext, useContext, useEffect, useState, type ReactNode, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useGlobalPresence, type PresenceUser } from '../hooks/useGlobalPresence';
 import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, type VoiceCallState } from '../store/useAppStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
 
@@ -25,14 +25,20 @@ interface AppContextType {
     setIsLoadingDate: any;
     stats: any;
     setStats: (stats: any) => void;
-    activeCall: any;
-    setActiveCall: (call: any) => void;
+    activeCall: VoiceCallState | null;
+    setActiveCall: (call: VoiceCallState | null) => void;
     isChallengeOpen: boolean;
     setIsChallengeOpen: (val: boolean) => void;
     isNotificationsOpen: boolean;
     setIsNotificationsOpen: (val: boolean) => void;
     isChatOpen: boolean;
     setIsChatOpen: (val: boolean) => void;
+
+    // Call Signaling Helpers
+    initiatePrivateCall: (targetUser: { id: string; username: string; avatar_url: string }) => void;
+    acceptCall: () => void;
+    rejectCall: () => void;
+    hangUpCall: () => void;
 
     // Global Presence & Audio Chat
     onlineUsers: PresenceUser[];
@@ -79,28 +85,289 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const myParticipations = useAppStore(s => s.myParticipations);
     const setMyParticipations = useAppStore(s => s.setMyParticipations);
 
+    // Refs for signaling
+    const signalingChannelRef = useRef<any>(null);
+
     // 3. Server-Side State (TanStack Query)
     const { data: serverDateResponse, isLoading: isLoadingDate } = useAuthoritativeDate();
     const { data: profile, isLoading: isProfileLoading } = useProfile(user?.id);
-
     const { data: challengeStatus } = useChallengeStatus(user?.id);
 
-    // 4. Presence & Audio Logic
-    const { onlineUsers, allProfiles } = useGlobalPresence(user?.id, activeCall?.challengeId || null);
+    // 4. Presence
+    const { onlineUsers, allProfiles } = useGlobalPresence(
+        user?.id,
+        (activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected')) ? activeCall.channelId : null
+    );
+
+    // Call Signaling Actions
+    const acceptCall = useCallback(() => {
+        const currentCall = useAppStore.getState().activeCall;
+        if (!currentCall || currentCall.role !== 'receiver' || !user?.id) return;
+
+        const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser?.id}`);
+        targetChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                targetChannel.send({
+                    type: 'broadcast',
+                    event: 'call_accepted',
+                    payload: { channelId: currentCall.channelId }
+                });
+                setTimeout(() => targetChannel.unsubscribe(), 1000);
+            }
+        });
+
+        setActiveCall({
+            ...currentCall,
+            status: 'connecting'
+        });
+    }, [user?.id, setActiveCall]);
+
+    const rejectCall = useCallback(() => {
+        const currentCall = useAppStore.getState().activeCall;
+        if (!currentCall || currentCall.role !== 'receiver' || !user?.id) return;
+
+        const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser?.id}`);
+        targetChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                targetChannel.send({
+                    type: 'broadcast',
+                    event: 'call_rejected',
+                    payload: { channelId: currentCall.channelId }
+                });
+                setTimeout(() => targetChannel.unsubscribe(), 1000);
+            }
+        });
+
+        setActiveCall(null);
+    }, [user?.id, setActiveCall]);
+
+    const hangUpCall = useCallback(() => {
+        const currentCall = useAppStore.getState().activeCall;
+        if (!currentCall || !user?.id) return;
+
+        if (currentCall.type === 'private' && currentCall.targetUser) {
+            const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser.id}`);
+            targetChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    targetChannel.send({
+                        type: 'broadcast',
+                        event: 'hang_up',
+                        payload: { channelId: currentCall.channelId }
+                    });
+                    setTimeout(() => targetChannel.unsubscribe(), 1000);
+                }
+            });
+        }
+
+        setActiveCall(null);
+    }, [user?.id, setActiveCall]);
+
+    const initiatePrivateCall = useCallback((targetUser: { id: string; username: string; avatar_url: string }) => {
+        if (!user?.id) return;
+        const minId = user.id < targetUser.id ? user.id : targetUser.id;
+        const maxId = user.id > targetUser.id ? user.id : targetUser.id;
+        const channelId = `private_call_${minId}_${maxId}`;
+
+        const callState: VoiceCallState = {
+            channelId,
+            type: 'private',
+            role: 'caller',
+            targetUser,
+            status: 'calling'
+        };
+
+        setActiveCall(callState);
+
+        const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
+        targetChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                targetChannel.send({
+                    type: 'broadcast',
+                    event: 'incoming_call',
+                    payload: {
+                        channelId,
+                        callerId: user.id,
+                        callerName: profile?.username || 'Someone',
+                        callerAvatar: profile?.avatar_url || ''
+                    }
+                });
+                setTimeout(() => targetChannel.unsubscribe(), 1000);
+            }
+        });
+
+        // 25 seconds ring timeout
+        const timeoutId = setTimeout(() => {
+            const currentCall = useAppStore.getState().activeCall;
+            if (currentCall && currentCall.channelId === channelId && currentCall.status === 'calling') {
+                triggerToast('No answer.', 4000);
+                const hangupChannel = supabase.channel(`user_signals_${targetUser.id}`);
+                hangupChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        hangupChannel.send({
+                            type: 'broadcast',
+                            event: 'hang_up',
+                            payload: { channelId }
+                        });
+                        setTimeout(() => hangupChannel.unsubscribe(), 1000);
+                    }
+                });
+                setActiveCall(null);
+            }
+        }, 25000);
+
+        return () => clearTimeout(timeoutId);
+    }, [user, profile, triggerToast, setActiveCall]);
+
+    // 5. Audio logic integration
     const audioChat = useAudioChat({
-        challengeId: activeCall?.challengeId || '',
+        activeCall,
         userId: user?.id || '',
-        enabled: !!activeCall
+        enabled: !!activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected'),
+        onConnectionFailure: (reason) => {
+            triggerToast(`Call failed: ${reason}`, 5000);
+            hangUpCall();
+        },
+        onConnectionSuccess: () => {
+            const currentCall = useAppStore.getState().activeCall;
+            if (currentCall) {
+                setActiveCall({
+                    ...currentCall,
+                    status: 'connected'
+                });
+
+                // Group call alert handling
+                if (currentCall.type === 'group') {
+                    const activeInRoom = onlineUsers.filter(u => u.activeVoiceRoomId === currentCall.channelId);
+                    if (activeInRoom.length <= 1) {
+                        const groupChannel = supabase.channel('group_call_signals');
+                        groupChannel.subscribe((status) => {
+                            if (status === 'SUBSCRIBED') {
+                                groupChannel.send({
+                                    type: 'broadcast',
+                                    event: 'group_call_alert',
+                                    payload: {
+                                        creatorId: user.id,
+                                        creatorName: profile?.username || 'Someone',
+                                        roomName: currentCall.channelId === 'global' ? 'General Chat' : 'Challenge Lobby',
+                                        challengeId: currentCall.channelId
+                                    }
+                                });
+                                setTimeout(() => groupChannel.unsubscribe(), 1000);
+                            }
+                        });
+                    }
+                }
+            }
+        }
     });
 
-    // 5. Computed State
+    // Subscriptions for signaling
+    useEffect(() => {
+        if (!user?.id) return;
+        const channel = supabase.channel(`user_signals_${user.id}`);
+
+        channel
+            .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
+                const currentCall = useAppStore.getState().activeCall;
+                if (currentCall && currentCall.status !== 'idle') {
+                    // Send call_busy to caller
+                    const busyChannel = supabase.channel(`user_signals_${payload.callerId}`);
+                    busyChannel.subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            busyChannel.send({
+                                type: 'broadcast',
+                                event: 'call_busy',
+                                payload: { channelId: payload.channelId }
+                            });
+                            setTimeout(() => busyChannel.unsubscribe(), 1000);
+                        }
+                    });
+                    return;
+                }
+
+                setActiveCall({
+                    channelId: payload.channelId,
+                    type: 'private',
+                    role: 'receiver',
+                    targetUser: { id: payload.callerId, username: payload.callerName, avatar_url: payload.callerAvatar },
+                    status: 'ringing'
+                });
+            })
+            .on('broadcast', { event: 'call_accepted' }, ({ payload }) => {
+                const currentCall = useAppStore.getState().activeCall;
+                if (currentCall && currentCall.channelId === payload.channelId && currentCall.status === 'calling') {
+                    setActiveCall({
+                        ...currentCall,
+                        status: 'connecting'
+                    });
+                }
+            })
+            .on('broadcast', { event: 'call_rejected' }, ({ payload }) => {
+                const currentCall = useAppStore.getState().activeCall;
+                if (currentCall && currentCall.channelId === payload.channelId) {
+                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} rejected the call.`, 4000);
+                    setActiveCall(null);
+                }
+            })
+            .on('broadcast', { event: 'call_busy' }, ({ payload }) => {
+                const currentCall = useAppStore.getState().activeCall;
+                if (currentCall && currentCall.channelId === payload.channelId) {
+                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} is busy.`, 4000);
+                    setActiveCall(null);
+                }
+            })
+            .on('broadcast', { event: 'hang_up' }, ({ payload }) => {
+                const currentCall = useAppStore.getState().activeCall;
+                if (currentCall && currentCall.channelId === payload.channelId) {
+                    triggerToast(`Call ended.`, 3000);
+                    setActiveCall(null);
+                }
+            })
+            .subscribe();
+
+        signalingChannelRef.current = channel;
+
+        return () => {
+            channel.unsubscribe();
+            signalingChannelRef.current = null;
+        };
+    }, [user?.id, triggerToast, setActiveCall]);
+
+    // Subscriptions for group call alerts
+    useEffect(() => {
+        if (!user?.id) return;
+        const channel = supabase.channel('group_call_signals');
+
+        channel
+            .on('broadcast', { event: 'group_call_alert' }, ({ payload }) => {
+                if (payload.creatorId === user.id) return;
+
+                let eligible = false;
+                if (payload.challengeId === 'global') {
+                    eligible = true;
+                } else if (myParticipations.includes(payload.challengeId)) {
+                    eligible = true;
+                }
+
+                if (eligible) {
+                    triggerToast(`${payload.creatorName} created a call in ${payload.roomName}! Join Voice to connect.`, 6000);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            channel.unsubscribe();
+        };
+    }, [user?.id, myParticipations, triggerToast]);
+
+    // 6. Computed State
     const activeVoiceRooms = useMemo(() => {
         return onlineUsers
             .filter(u => u.id !== user?.id && u.activeVoiceRoomId && (u.activeVoiceRoomId === 'global' || myParticipations.includes(u.activeVoiceRoomId)))
             .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
     }, [onlineUsers, user?.id, myParticipations]);
 
-    // 6. Sync Query data with Store (Bridge)
+    // Sync Query data with Store (Bridge)
     useEffect(() => {
         if (challengeStatus) {
             setChallengeUnreadCount(challengeStatus.unreadCount);
@@ -114,12 +381,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [profile, setPreferences]);
 
-    // 7. Context Bridge (Ensures existing components don't break)
+    // Context Bridge
     const contextValue: AppContextType = useMemo(() => ({
         profile,
         preferences,
         loading: isProfileLoading,
-        refreshProfile: async () => { /* Handled by cache invalidation in Init hook */ },
+        refreshProfile: async () => {},
         toast,
         triggerToast,
         setToast,
@@ -143,7 +410,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         onlineUsers,
         allProfiles,
         audioChat,
-        activeVoiceRooms
+        activeVoiceRooms,
+        initiatePrivateCall,
+        acceptCall,
+        rejectCall,
+        hangUpCall
     }), [
         profile, preferences, isProfileLoading, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
@@ -152,7 +423,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setActiveCall, isChallengeOpen, setIsChallengeOpen,
         isNotificationsOpen, setIsNotificationsOpen,
         isChatOpen, setIsChatOpen, onlineUsers, allProfiles,
-        audioChat, activeVoiceRooms
+        audioChat, activeVoiceRooms, initiatePrivateCall,
+        acceptCall, rejectCall, hangUpCall
     ]);
 
     return (

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { IAgoraRTCClient, ILocalAudioTrack, IRemoteAudioTrack } from 'agora-rtc-sdk-ng';
+import type { VoiceCallState } from '../store/useAppStore';
 
 const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID;
 
@@ -17,9 +18,11 @@ const getNumericUid = (uuid: string): number => {
 };
 
 interface UseAudioChatProps {
-    challengeId: string;
+    activeCall: VoiceCallState | null;
     userId: string;
     enabled: boolean;
+    onConnectionFailure?: (reason: string) => void;
+    onConnectionSuccess?: () => void;
 }
 
 export interface AudioLog {
@@ -44,7 +47,7 @@ export interface AudioChatState {
     addLog: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
-export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps): AudioChatState => {
+export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure, onConnectionSuccess }: UseAudioChatProps): AudioChatState => {
     // --- State ---
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -67,7 +70,10 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     const makingOffer = useRef(false);
     const ignoreOffer = useRef(false);
 
-    // Refs for stable access in event handlers
+    // Timeout & Retry Refs
+    const connectionTimeoutRef = useRef<number | null>(null);
+    const retryCountRef = useRef(0);
+
     const activeEngineRef = useRef(activeEngine);
     useEffect(() => { activeEngineRef.current = activeEngine; }, [activeEngine]);
 
@@ -83,7 +89,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
     useEffect(() => { micStatusRef.current = isMicOn; }, [isMicOn]);
     useEffect(() => { speakerStatusRef.current = isSpeakerOn; }, [isSpeakerOn]);
 
-    // --- Helpers ---
+    // Helpers
     const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
         if (!isMounted.current) return;
         setLogs(prev => [...prev.slice(-19), { message, type, timestamp: Date.now() }]);
@@ -137,6 +143,11 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             setIsConnected(pc.connectionState === 'connected');
             if (pc.connectionState === 'connected') {
                 sendSignal({ type: 'status', mic: micStatusRef.current, speaker: speakerStatusRef.current });
+                if (onConnectionSuccess) onConnectionSuccess();
+            }
+            if (pc.connectionState === 'failed') {
+                addLog('P2P connection state failed', 'error');
+                if (onConnectionFailure) onConnectionFailure('P2P connection failed');
             }
         };
 
@@ -146,12 +157,16 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
         pcRef.current = pc;
         return pc;
-    }, [sendSignal, addLog, ICE_SERVERS]);
+    }, [sendSignal, addLog, ICE_SERVERS, onConnectionFailure, onConnectionSuccess]);
 
     // --- Agora Engine Specifics ---
     const setupAgora = useCallback(async () => {
         if (!AGORA_APP_ID) {
             addLog('Agora App ID missing, skipping Agora...', 'warning');
+            return false;
+        }
+
+        if (!activeCall?.channelId) {
             return false;
         }
 
@@ -163,6 +178,7 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             isJoiningRef.current = true;
             addLog('Connecting via Agora...', 'info');
             const numericUid = getNumericUid(userId);
+            const channelId = activeCall.channelId;
 
             const { default: AgoraRTC } = await import('agora-rtc-sdk-ng');
             const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
@@ -188,26 +204,55 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                 }
             });
 
-            client.on('connection-state-change', (cur, _prev, reason) => {
+            client.on('connection-state-change', (cur, prev, reason) => {
                 if (isMounted.current) {
                     addLog(`Agora state: ${cur} (${reason || 'no reason'})`, 'info');
                     setIsConnected(cur === 'CONNECTED');
+                    
                     if (cur === 'CONNECTED') {
+                        retryCountRef.current = 0; // reset retries
+                        if (connectionTimeoutRef.current) {
+                            clearTimeout(connectionTimeoutRef.current);
+                            connectionTimeoutRef.current = null;
+                        }
                         sendSignal({ type: 'status', mic: micStatusRef.current, speaker: speakerStatusRef.current });
+                        if (onConnectionSuccess) onConnectionSuccess();
+                    }
+
+                    if (cur === 'DISCONNECTED' && prev === 'RECONNECTING') {
+                        if (retryCountRef.current < 3) {
+                            retryCountRef.current++;
+                            addLog(`Agora disconnected unexpectedly. Reconnecting retry ${retryCountRef.current}/3...`, 'warning');
+                            setupAgora();
+                        } else {
+                            addLog('Agora disconnected. Max retries exceeded.', 'error');
+                            setError('Connection failed');
+                            if (onConnectionFailure) onConnectionFailure('Agora call disconnected');
+                        }
                     }
                 }
             });
 
+            // Start connection timeout (15 seconds)
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = window.setTimeout(() => {
+                if (isMounted.current && !isConnected) {
+                    addLog('Agora connection timed out (15s)', 'error');
+                    setError('Connection timeout');
+                    if (onConnectionFailure) onConnectionFailure('Connection timed out');
+                }
+            }, 15000);
+
             addLog(`Fetching access token for UID: ${numericUid}...`, 'info');
             const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-agora-token', {
-                body: { channelName: challengeId, uid: numericUid }
+                body: { channelName: channelId, uid: numericUid }
             });
 
             if (tokenError || !tokenData?.token) {
                 throw new Error(tokenError?.message || 'Failed to retrieve access token');
             }
 
-            await client.join(AGORA_APP_ID, challengeId, tokenData.token, numericUid);
+            await client.join(AGORA_APP_ID, channelId, tokenData.token, numericUid);
 
             const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
                 encoderConfig: 'speech_standard',
@@ -224,16 +269,20 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
                 setLocalStream(ms);
                 setIsMicOn(true);
                 setActiveEngine('agora');
-                addLog('Agora connected successfully', 'success');
+                addLog('Agora joined. Tuning audio...', 'success');
             }
             return true;
         } catch (err: any) {
             addLog(`Agora error: ${err.message || err}`, 'error');
+            if (connectionTimeoutRef.current) {
+                clearTimeout(connectionTimeoutRef.current);
+                connectionTimeoutRef.current = null;
+            }
             return false;
         } finally {
             isJoiningRef.current = false;
         }
-    }, [challengeId, userId, addLog, sendSignal]);
+    }, [activeCall, userId, addLog, sendSignal, onConnectionFailure, onConnectionSuccess, isConnected]);
 
     // --- Orchestration ---
     const startAudio = useCallback(async () => {
@@ -259,11 +308,17 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
         } catch (err: any) {
             setError('Mic permission denied');
             addLog(`P2P error: ${err.message}`, 'error');
+            if (onConnectionFailure) onConnectionFailure('Microphone permission denied');
         }
-    }, [setupAgora, createPeerConnection, addLog, sendSignal]);
+    }, [setupAgora, createPeerConnection, addLog, sendSignal, onConnectionFailure]);
 
     const stopAudio = useCallback(async () => {
         addLog('Stopping audio...', 'info');
+
+        if (connectionTimeoutRef.current) {
+            clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = null;
+        }
 
         if (agoraLocalTrackRef.current) {
             agoraLocalTrackRef.current.stop();
@@ -295,12 +350,12 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
 
     // --- Lifecycle ---
     useEffect(() => {
-        if (!enabled) {
+        if (!enabled || !activeCall) {
             stopAudio();
             return;
         }
 
-        const channelIdStr = `audio_chat_${challengeId}`;
+        const channelIdStr = `audio_chat_${activeCall.channelId}`;
         const channel = supabase.channel(channelIdStr);
 
         channel
@@ -352,9 +407,8 @@ export const useAudioChat = ({ challengeId, userId, enabled }: UseAudioChatProps
             channel.unsubscribe();
             stopAudio();
         };
-        // We exclude startAudio/stopAudio/activeEngine to avoid the restart loop
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [challengeId, userId, enabled]);
+    }, [activeCall?.channelId, userId, enabled]);
 
     const toggleMic = useCallback(() => {
         if (activeEngine === 'agora' && agoraLocalTrackRef.current) {
