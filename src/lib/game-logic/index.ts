@@ -913,7 +913,7 @@ export const calculateSkillIndex = ({
                   oldAbsent.isChecked = true;
                   localDecisions.push({
                      letter: cell.letter,
-                     status: `${cell.status} [penalty for subsequent absent use at index ${oldAbsent.index}]`,
+                     status: `${cell.status} [penalty for repeated use of absent letter]`,
                      pointDeduction: -SCORING.REPEATED_ABSENT_PENALTY
                   })
 

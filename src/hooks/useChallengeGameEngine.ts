@@ -46,6 +46,8 @@ export const useChallengeGameEngine = ({
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const [syncFailed, setSyncFailed] = useState(false);
+    const lastPayloadRef = useRef<{ payload: any, wordLen?: number } | null>(null);
     const [retryCount, setRetryCount] = useState(0);
     const [networkLogs, setNetworkLogs] = useState<Array<{ id: string, msg: string, duration?: number }>>([]);
     const startTimerRef = useRef(false);
@@ -453,7 +455,12 @@ export const useChallengeGameEngine = ({
         setRetryCount(0);
 
         if (!success) {
-            triggerToast("Sync failed. Progress saved locally.", 5000);
+            setSyncFailed(true);
+            lastPayloadRef.current = { payload: resultPayload, wordLen: isMarathon ? wordLength : undefined };
+            triggerToast("Sync failed. Check connection.", 5000);
+        } else {
+            setSyncFailed(false);
+            lastPayloadRef.current = null;
         }
 
         if (won || lost) {
@@ -515,12 +522,32 @@ export const useChallengeGameEngine = ({
     }, [isGameOver, isSaving, usedHint, triggerToast, guesses, targetWord, isMarathon, selectedLength, wrappedSubmitResult]);
 
 
+    const retrySync = useCallback(async () => {
+        if (!syncFailed || !lastPayloadRef.current || isSaving) return;
+
+        setIsSaving(true);
+        setRetryCount(0);
+        
+        const { payload, wordLen } = lastPayloadRef.current;
+        const success = await wrappedSubmitResult(payload, wordLen);
+        
+        setIsSaving(false);
+        if (success) {
+            setSyncFailed(false);
+            lastPayloadRef.current = null;
+            triggerToast("Sync recovered!", 2000);
+        } else {
+            triggerToast("Sync failed again.", 3000);
+        }
+    }, [syncFailed, isSaving, wrappedSubmitResult, triggerToast]);
+
     const actions = useMemo(() => ({
         onChar,
         onDelete,
         onEnter,
-        handleHint
-    }), [onChar, onDelete, onEnter, handleHint]);
+        handleHint,
+        retrySync
+    }), [onChar, onDelete, onEnter, handleHint, retrySync]);
 
     const isHintBar1Restricted = useMemo(() => isHintDisabled(targetWord, guesses), [targetWord, guesses]);
 
@@ -528,6 +555,7 @@ export const useChallengeGameEngine = ({
         state: { ...state, isHintDisabled: isHintBar1Restricted },
         actions,
         isSaving,
+        syncFailed,
         retryCount,
         wordLength,
         targetWord,

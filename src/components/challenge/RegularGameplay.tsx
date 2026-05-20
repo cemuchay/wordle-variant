@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb, RefreshCw } from 'lucide-react';
+import { Lightbulb, RefreshCw, AlertTriangle } from 'lucide-react';
 import { memo, useEffect } from 'react';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
@@ -23,7 +23,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
 
-    const { state, actions, isSaving, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
+    const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
         challenge,
         participation,
         triggerToast,
@@ -54,14 +54,30 @@ export const RegularGameplay = memo(function RegularGameplay({
     return (
         <div className="flex-1 flex flex-col p-4 gap-6 relative">
             <NetworkLog logs={networkLogs} />
-            {isSaving && (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
-                    <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
-                        {retryCount > 0 ? `Retrying ${retryCount}/3...` : 'Syncing...'}
-                    </span>
-                </div>
-            )}
+            
+            {/* Sync Status Overlay */}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+                {isSaving && (
+                    <div className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+                        <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
+                            {retryCount > 0 ? `Retrying ${retryCount}/3...` : 'Syncing...'}
+                        </span>
+                    </div>
+                )}
+
+                {syncFailed && !isSaving && (
+                    <button 
+                        onClick={actions.retrySync}
+                        className="bg-red-500/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-red-400/50 flex items-center gap-2 animate-bounce shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                    >
+                        <AlertTriangle size={12} className="text-white" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                            Sync Failed - Retry?
+                        </span>
+                    </button>
+                )}
+            </div>
 
             <div className="flex items-center justify-between px-4">
                 <div className="flex items-center gap-3">
