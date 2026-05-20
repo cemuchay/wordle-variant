@@ -1,5 +1,5 @@
 import { MessageSquare, X } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
 import { DynamicIslandStatus } from './components/DynamicIslandStatus';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
@@ -16,8 +16,9 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
 import { type AppUser, type Challenge } from './types/game';
 import { useMyChallenges } from './hooks/queries/useChallengeQueries';
+import { safeLazy } from './utils/safeLazy';
 
-const ChatRoom = lazy(() => import('./components/chatRoom'));
+const ChatRoom = safeLazy(() => import('./components/chatRoom'));
 
 export default function App() {
     const { user } = useAuth();

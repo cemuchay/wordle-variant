@@ -1,16 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import type { AppUser, GuessResult } from '../../types/game';
+import { safeLazy } from '../../utils/safeLazy';
 
-const ChallengeModal = lazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
-const GameOverModal = lazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
-const InfoModal = lazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
-const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
-const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
-const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
-const NotificationModal = lazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
-const AuthModal = lazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
-const UserProfileModal = lazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
+const ChallengeModal = safeLazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
+const GameOverModal = safeLazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
+const InfoModal = safeLazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
+const SettingsModal = safeLazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
+const StatsModal = safeLazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
+const AnnouncementModal = safeLazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
+const NotificationModal = safeLazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
+const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
+const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
