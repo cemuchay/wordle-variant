@@ -159,7 +159,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                     </div>
                     <div>
                         <h2 className="text-xl font-black uppercase tracking-tighter">
-                            Challenges
+                            Challenges (Beta)
                         </h2>
                         <div className="flex items-center gap-2 min-h-5">
                             {isPlaying ? (
@@ -383,6 +383,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                     targetWord={selectedChallenge?.target_word}
                     salt={selectedChallenge?.salt}
                     lengthOfWord={selectedChallenge?.word_length}
+                    isCreator={selectedChallenge?.creator_id === user?.id && !!selectedChallenge?.is_custom_word}
                 />
             )}
         </div>
@@ -390,17 +391,22 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 });
 
 const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
-    if (!user) {
+    const { effectiveUser, selectedChallenge, loading } = useChallengeContext();
+    if (!user && !effectiveUser && !selectedChallenge && !loading) {
         return <GuestChallengeView onClose={onClose} />;
     }
-    return <AuthenticatedChallengeContent onClose={onClose} user={user} />;
+    return <AuthenticatedChallengeContent onClose={onClose} user={effectiveUser || user} />;
 });
 
 export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
     if (!isOpen) return null;
 
-    if (!user) {
-        return <GuestChallengeView onClose={onClose} />;
+    if (!user && !initialChallengeId) {
+        const id = localStorage.getItem('wordle_anon_id');
+        const username = localStorage.getItem('wordle_anon_username');
+        if (!id || !username) {
+            return <GuestChallengeView onClose={onClose} />;
+        }
     }
 
     return (

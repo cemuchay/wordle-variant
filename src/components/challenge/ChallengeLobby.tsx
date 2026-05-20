@@ -1,4 +1,4 @@
-import { Eye, Play, Share2, Clock } from 'lucide-react';
+import { Eye, Play, Share2, Clock, Copy, SlidersHorizontal, Shield, Sparkles, Globe, Lock, Hourglass } from 'lucide-react';
 import { memo, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
@@ -10,9 +10,10 @@ interface ParticipantItemProps {
     myHasFinished: boolean;
     isLive: boolean;
     onPreview: (p: ChallengeParticipant) => void;
+    canPreviewAll: boolean;
 }
 
-const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview }: ParticipantItemProps) {
+const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll }: ParticipantItemProps) {
     const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
     
     const marathonCompletedCount = useMemo(() => {
@@ -25,8 +26,8 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
         return count;
     }, [isMarathon, p.marathon_progress]);
 
-    const showScore = pIsFinished || (isMarathon && p.score > 0);
-    const canClick = myHasFinished || isMarathon;
+    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll;
+    const canClick = myHasFinished || isMarathon || canPreviewAll;
 
     return (
         <div
@@ -36,7 +37,15 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
             className={`flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 transition-all ${canClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20' : ''}`}
         >
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden bg-gray-800">
+                <div 
+                    className="w-10 h-10 rounded-full border-2 border-white/10 overflow-hidden bg-gray-800 cursor-pointer hover:scale-105 transition-transform"
+                    onClick={(e) => {
+                        if (p.user_id) {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.user_id } }));
+                        }
+                    }}
+                >
                     {p.profiles?.avatar_url ? (
                         <img src={p.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -46,7 +55,17 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                     )}
                 </div>
                 <div>
-                    <p className="text-sm font-bold">{p.profiles?.username || 'Player'}</p>
+                    <p 
+                        className="text-sm font-bold cursor-pointer hover:underline"
+                        onClick={(e) => {
+                            if (p.user_id) {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.user_id } }));
+                            }
+                        }}
+                    >
+                        {p.profiles?.username || 'Player'}
+                    </p>
                     <p className={`text-[9px] font-black uppercase ${pIsFinished ? 'text-gray-500' : 'text-yellow-500'}`}>
                         {isMarathon && p.status === 'playing' ? `${marathonCompletedCount}/5 Lengths` : p.status}
                     </p>
@@ -67,7 +86,7 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                         </div>
                     </div>
                 )}
-                {(myHasFinished || isMarathon) && (
+                {(myHasFinished || isMarathon || canPreviewAll) && (
                     <div className="text-gray-500">
                         <Eye size={16} />
                     </div>
@@ -77,12 +96,18 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
     );
 });
 
+import { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+
 export const ChallengeLobby = memo(function ChallengeLobby() {
     const {
         selectedChallenge, myParticipation, participants,
-        copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
-        loading
+        copyLink, shareLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
+        loading, registerAnonymousUser, effectiveUser
     } = useChallengeContext();
+    const { triggerToast } = useApp();
+
+    const [nicknameInput, setNicknameInput] = useState('');
 
     const handlePreview = useCallback((p: ChallengeParticipant) => {
         setPreviewParticipant(p);
@@ -93,6 +118,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const isMarathon = selectedChallenge.word_length === 1;
     const isLive = selectedChallenge.mode === 'LIVE';
     const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
+    const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser?.id && selectedChallenge.is_custom_word;
+
+    const maxParts = selectedChallenge.max_participants || 100;
+    const currentParts = participants.length;
+    const isFull = currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
 
     return (
         <div className="space-y-6">
@@ -109,13 +139,26 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 Marathon
                             </span>
                         )}
+                        {selectedChallenge.is_public && (
+                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-correct/20 text-correct">
+                                Public
+                            </span>
+                        )}
                     </div>
-                    <button
-                        onClick={() => copyLink(selectedChallenge)}
-                        className="text-gray-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase"
-                    >
-                        <Share2 size={14} /> Share Link
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => copyLink(selectedChallenge)}
+                            className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                        >
+                            <Copy size={12} /> Copy Link
+                        </button>
+                        <button
+                            onClick={() => shareLink(selectedChallenge)}
+                            className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                        >
+                            <Share2 size={12} /> Share
+                        </button>
+                    </div>
                 </div>
                 <h3 className="text-2xl font-black mb-1">
                     {isMarathon ? 'The Marathon' : `${selectedChallenge.word_length} Letter Word`}
@@ -125,7 +168,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes per word!` : 'Take your time, async play.'}`
                         : selectedChallenge.mode === 'LIVE'
                             ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
-                            : "Play anytime within 24 hours. Highest skill score wins!"}
+                            : "Play anytime within the lifespan. Highest skill score wins!"}
                 </p>
 
                 {selectedChallenge.max_time && selectedChallenge.mode === 'LIVE' && (
@@ -136,12 +179,158 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 )}
             </div>
 
+            {/* Challenge Configuration Details */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <SlidersHorizontal size={12} className="text-correct" />
+                        Challenge Configuration
+                    </h4>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase">
+                        Hosted by {selectedChallenge.profiles?.username || selectedChallenge.creator?.username || 'Host'}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Mode / Time Limit */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Timing & Mode</p>
+                        <div className="flex items-center gap-1.5">
+                            <Clock size={12} className={selectedChallenge.mode === 'LIVE' ? 'text-red-500' : 'text-blue-500'} />
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.mode === 'LIVE' ? 'Live Race' : 'Anytime (Async)'}
+                            </span>
+                        </div>
+                        {selectedChallenge.mode === 'LIVE' && (
+                            <p className="text-[9px] text-gray-400">
+                                {isMarathon && selectedChallenge.marathon_timers 
+                                    ? 'Custom per-word timers' 
+                                    : `${selectedChallenge.max_time}m per game limit`}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Word Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Word Rules</p>
+                        <div className="flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-yellow-500" />
+                            <span className="text-xs font-bold text-white">
+                                {isMarathon ? 'Marathon (3-7L)' : `${selectedChallenge.word_length || 'Random'} Letters`}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_custom_word ? 'Host Custom Word' : 'System Generated'}
+                        </p>
+                    </div>
+
+                    {/* Handicap Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <p className="text-[8px] font-black uppercase text-gray-500">Handicap Starter</p>
+                                <div className="flex items-center gap-1.5">
+                                    <Shield size={12} className={selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'text-correct' : 'text-gray-400'} />
+                                    <span className="text-xs font-bold text-white">
+                                        {selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                            </div>
+                            {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                                <div className="text-right">
+                                    <span className="text-[9px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-md uppercase">
+                                        {selectedChallenge.handicap_enforced ? 'Auto-Enforced' : 'Optional'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                            <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                                {isMarathon && selectedChallenge.handicap_starters ? (
+                                    <div className="grid grid-cols-5 gap-1 text-center font-black">
+                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => (
+                                            <div key={len} className="bg-white/5 p-1 rounded">
+                                                <span className="text-[7px] text-gray-500 block">{len}L</span>
+                                                <span className="text-white uppercase">{w as string || 'Rand'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="font-bold">
+                                        Starter Word:{' '}
+                                        <span className="text-white uppercase tracking-wider font-mono">
+                                            {selectedChallenge.handicap_starter === '__SYSTEM_RANDOM__'
+                                                ? 'Random System Word'
+                                                : selectedChallenge.handicap_starter}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Lifespan & Participants */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Privacy & Limits</p>
+                        <div className="flex items-center gap-1.5">
+                            {selectedChallenge.is_public ? (
+                                <Globe size={12} className="text-correct" />
+                            ) : (
+                                <Lock size={12} className="text-yellow-500" />
+                            )}
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.is_public ? 'Public Room' : 'Invite Only'}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_public 
+                                ? `Max ${selectedChallenge.max_participants || 100} players`
+                                : 'Direct shares only'}
+                        </p>
+                    </div>
+
+                    {/* Expiration Timer */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Room Lifespan</p>
+                        <div className="flex items-center gap-1.5">
+                            <Hourglass size={12} className="text-gray-400" />
+                            <span className="text-xs font-bold text-white">Expires in</span>
+                        </div>
+                        <p className="text-[9px] text-gray-400 tabular-nums">
+                            {new Date(selectedChallenge.expires_at).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </p>
+                    </div>
+
+                    {/* Custom Marathon Timers if active */}
+                    {isMarathon && selectedChallenge.mode === 'LIVE' && selectedChallenge.marathon_timers && (
+                        <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Marathon Per-Length Time Limits</p>
+                            <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
+                                {Object.entries(selectedChallenge.marathon_timers).map(([len, t]) => (
+                                    <div key={len} className="bg-black/30 p-1.5 rounded-lg border border-white/5">
+                                        <p className="text-[8px] font-bold text-gray-500">{len}L</p>
+                                        <p className="text-[10px] font-black text-white">{t}m</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div className="space-y-3">
                 <div className="flex items-center justify-between px-2">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">Participants ({participants.length})</h4>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">
+                        Participants ({currentParts} / {maxParts})
+                    </h4>
                 </div>
                 <div className="space-y-2">
-                    {loading ? (
+                    {loading && participants.length === 0 ? (
                         [1, 2].map(i => (
                             <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse border border-white/5" />
                         ))
@@ -154,6 +343,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 myHasFinished={myHasFinished}
                                 isLive={isLive}
                                 onPreview={handlePreview}
+                                canPreviewAll={selectedChallenge.creator_id === effectiveUser?.id && !!selectedChallenge.is_custom_word}
                             />
                         ))
                     )}
@@ -161,7 +351,54 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </div>
 
             <div className="pt-6 flex flex-col gap-3">
-                {!myHasFinished ? (
+                {isCreatorOfCustom ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
+                        <p className="text-xs font-black uppercase text-yellow-500">Host Mode Active 👑</p>
+                        <p className="text-[10px] text-yellow-500/80 font-bold">
+                            You created this custom word challenge. Watch your friends compete on the leaderboard above!
+                        </p>
+                    </div>
+                ) : isFull ? (
+                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center">
+                        <p className="text-xs font-black uppercase text-red-500">Challenge Full 🚫</p>
+                        <p className="text-[10px] text-red-400/80 font-bold mt-1">
+                            This challenge has reached its maximum participant limit of {maxParts}.
+                        </p>
+                    </div>
+                ) : !effectiveUser ? (
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 animate-in fade-in duration-300">
+                        <div className="text-center space-y-1">
+                            <p className="text-xs font-black uppercase tracking-wider text-white">Join the Challenge</p>
+                            <p className="text-[10px] text-gray-500">Choose a guest nickname to compete!</p>
+                        </div>
+                        <div className="space-y-3">
+                            <input
+                                type="text"
+                                maxLength={15}
+                                placeholder="Enter nickname..."
+                                value={nicknameInput}
+                                onChange={(e) => setNicknameInput(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                            />
+                            <button
+                                onClick={async () => {
+                                    const name = nicknameInput.trim();
+                                    if (name.length < 3) {
+                                        triggerToast("Nickname must be at least 3 characters.", 3000);
+                                        return;
+                                    }
+                                    const user = await registerAnonymousUser(name);
+                                    if (user) {
+                                        // Join will be triggered by useEffect in ChallengeContext
+                                        triggerToast("Guest profile created! Joining...", 2000);
+                                    }
+                                }}                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
+                            >
+                                Join Challenge
+                            </button>
+                        </div>
+                    </div>
+                ) : !myHasFinished ? (
                     <button
                         onClick={handleStartGame}
                         disabled={loading}

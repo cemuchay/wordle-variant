@@ -15,7 +15,15 @@ export interface Challenge {
     expires_at: string;
     created_at: string;
     creator_profile?: { username: string, avatar_url: string };
+    creator?: any;
     participants?: ChallengeParticipant[];
+    is_public?: boolean;
+    max_participants?: number | null;
+    is_custom_word?: boolean;
+    handicap_starter?: string | null;
+    handicap_starters?: any;
+    handicap_enforced?: boolean;
+    marathon_timers?: Record<number, number> | null;
 }
 
 export interface MarathonProgress {
@@ -37,7 +45,7 @@ export interface ChallengeParticipant {
     id: string;
     challenge_id: string;
     user_id: string;
-    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
+    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out' | 'host';
     score: number;
     attempts: number;
     guesses: any; 
@@ -54,6 +62,7 @@ export interface ChallengeParticipant {
  * Legacy hook for Real-time Challenge subscriptions.
  * Network requests have been migrated to TanStack Query (useChallengeQueries.ts).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useChallenge = (_user: AppUser | null) => {
     const [participants, setParticipants] = useState<ChallengeParticipant[]>([]);
 
@@ -73,6 +82,9 @@ export const useChallenge = (_user: AppUser | null) => {
 
     const subscribeToParticipants = useCallback((challengeId: string) => {
         const channelName = `challenge_participants_${challengeId}`;
+        
+        // Clear previous participants immediately to prevent stale data flash
+        setParticipants([]);
 
         // Remove existing channel if it exists
         const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
@@ -81,7 +93,9 @@ export const useChallenge = (_user: AppUser | null) => {
         }
 
         const fetchAndSet = async () => {
-            const { data: challenge } = await supabase
+            // Fetch challenge mode/max_time and participants in a single query by using join if possible, 
+            // but challenge mode is static mostly. Let's just fetch participants.
+            const { data: challengeData } = await supabase
                 .from('challenges')
                 .select('mode, max_time')
                 .eq('id', challengeId)
@@ -93,8 +107,8 @@ export const useChallenge = (_user: AppUser | null) => {
                 .eq('challenge_id', challengeId)
                 .order('score', { ascending: false });
 
-            if (parts && challenge) {
-                const normalized = parts.map((p: any) => normalizeParticipation(p, challenge));
+            if (parts && challengeData) {
+                const normalized = parts.map((p: any) => normalizeParticipation(p, challengeData));
                 setParticipants(normalized as ChallengeParticipant[]);
             }
         };
@@ -111,7 +125,10 @@ export const useChallenge = (_user: AppUser | null) => {
                 event: '*',
                 schema: 'public',
                 table: 'challenge_participants_marathon'
-            }, fetchAndSet)
+            }, () => {
+                // For marathon progress, we might need a more targeted update, but fetchAndSet is safe
+                fetchAndSet();
+            })
             .subscribe();
 
         // Initial fetch

@@ -95,8 +95,33 @@ export const RegularGameplay = memo(function RegularGameplay({
                             )}
                         </button>
                     )}
-
                 </div>
+
+                {/* Handicap Recommendation */}
+                {(() => {
+                    const starterWord = selectedLength
+                        ? challenge.handicap_starters?.[selectedLength]
+                        : challenge.handicap_starter;
+                    if (starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver) {
+                        return (
+                            <button
+                                onClick={() => {
+                                    const starter = starterWord.toUpperCase();
+                                    // Clear current input first
+                                    for (let i = 0; i < currentGuess.length; i++) {
+                                        actions.onDelete();
+                                    }
+                                    // Type it letter by letter
+                                    starter.split('').forEach((char: string) => actions.onChar(char));
+                                }}
+                                className="bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
+                            >
+                                💡 Recommended Starter: {starterWord.toUpperCase()}
+                            </button>
+                        );
+                    }
+                    return null;
+                })()}
 
 
             </div>

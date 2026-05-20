@@ -1,13 +1,14 @@
 import { SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
 }
 
 export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
-    const { user, signInWithGoogle, signOut } = useAuth();
+    const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
 
     const handleSignOut = async () => {
@@ -41,13 +42,19 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
 
                     {user ? (
                         <div className="flex items-center gap-2 bg-white/5 pl-1 pr-3 py-1 rounded-full border border-white/10 group relative">
-                            <img
-                                src={user.user_metadata.avatar_url}
-                                alt="Profile"
-                                className="w-6 h-6 rounded-full border border-white/10"
-                            />
+                            {user.user_metadata.avatar_url ? (
+                                <img
+                                    src={user.user_metadata.avatar_url}
+                                    alt="Profile"
+                                    className="w-6 h-6 rounded-full border border-white/10"
+                                />
+                            ) : (
+                                <div className="w-6 h-6 rounded-full border border-white/10 flex items-center justify-center bg-white/10 text-[9px] font-black uppercase text-white shrink-0">
+                                    {(user.user_metadata.full_name || user.email || '?').substring(0, 2)}
+                                </div>
+                            )}
                             <span className="text-[10px] font-black uppercase text-gray-400">
-                                {user.user_metadata.full_name?.split(' ')[0]}
+                                {user.user_metadata.full_name?.split(' ')[0] || user.email?.split('@')[0]}
                             </span>
                             <button
                                 onClick={handleSignOut}
@@ -58,12 +65,14 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                         </div>
                     ) : (
                         <button
-                            onClick={signInWithGoogle}
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal'))}
                             className="text-[10px] font-black bg-white text-black px-4 py-1.5 rounded-full uppercase tracking-widest hover:bg-gray-200 transition-colors"
                         >
                             Login
                         </button>
                     )}
+
+                    {user && <NotificationBell />}
 
                     <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors">
                         <SettingsIcon size={18} />

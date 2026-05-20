@@ -141,8 +141,28 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users }:
                 )}
 
                 <div className={`flex items-center gap-2 mb-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <img src={msg.profiles?.avatar_url} className="w-5 h-5 rounded-full border border-white/5" alt="avatar" />
-                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{msg.profiles?.username}</span>
+                    <img 
+                        src={msg.profiles?.avatar_url} 
+                        className="w-5 h-5 rounded-full border border-white/5 cursor-pointer hover:scale-105 transition-transform" 
+                        alt="avatar" 
+                        onClick={(e) => {
+                            if (msg.user_id) {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.user_id } }));
+                            }
+                        }}
+                    />
+                    <span 
+                        className="text-[9px] font-black text-gray-500 uppercase tracking-widest cursor-pointer hover:underline"
+                        onClick={(e) => {
+                            if (msg.user_id) {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.user_id } }));
+                            }
+                        }}
+                    >
+                        {msg.profiles?.username}
+                    </span>
 
                     {/* More prominent reply button on mobile (visible or prominent) */}
                     <button

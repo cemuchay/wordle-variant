@@ -5,6 +5,7 @@ export type LogLevel = 'info' | 'warn' | 'error' | 'fatal';
 interface LogEntry {
   level: LogLevel;
   message: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context?: any;
   timestamp: string;
 }
@@ -87,26 +88,26 @@ class Logger {
     }
   }
 
-  public info(message: string, context?: any) {
+  public info(message: string, context?: unknown) {
     const entry: LogEntry = { level: 'info', message, context, timestamp: new Date().toISOString() };
     this.addToBuffer(entry);
     console.log(`[INFO] ${message}`, context);
   }
 
-  public warn(message: string, context?: any) {
+  public warn(message: string, context?: unknown) {
     const entry: LogEntry = { level: 'warn', message, context, timestamp: new Date().toISOString() };
     this.addToBuffer(entry);
     console.warn(`[WARN] ${message}`, context);
   }
 
-  public error(message: string, context?: any) {
+  public error(message: string, context?: unknown) {
     const entry: LogEntry = { level: 'error', message, context, timestamp: new Date().toISOString() };
     this.addToBuffer(entry);
     console.error(`[ERROR] ${message}`, context);
     this.streamLog(entry);
   }
 
-  public fatal(message: string, context?: any) {
+  public fatal(message: string, context?: unknown) {
     const entry: LogEntry = { level: 'fatal', message, context, timestamp: new Date().toISOString() };
     this.addToBuffer(entry);
     console.error(`[FATAL] ${message}`, context);

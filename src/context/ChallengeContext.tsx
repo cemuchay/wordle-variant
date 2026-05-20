@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAvailableProfiles, useChallengeMutations, useMyChallenges } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
@@ -45,12 +45,14 @@ interface ChallengeContextType {
 
     // Actions
     handleViewChallenge: (id: string) => Promise<void>;
-    handleCreate: () => Promise<void>;
+    handleCreate: (params?: any) => Promise<void>;
     handleStartGame: () => Promise<void>;
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
+    shareLink: (challenge: Challenge) => Promise<void>;
     loadMyChallenges: () => Promise<void>;
     submitResult: (result: any, wordLength?: number) => Promise<boolean>;
+    registerAnonymousUser: (nickname: string) => Promise<any>;
 
     // Helpers
     loading: boolean;
@@ -64,6 +66,7 @@ interface ChallengeContextType {
     unplayedCount: number;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
+    effectiveUser: any;
 }
 
 const ChallengeContext = createContext<ChallengeContextType | undefined>(undefined);
@@ -76,6 +79,21 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 }) => {
     const { triggerToast, setChallengeUnreadCount } = useApp();
     const queryClient = useQueryClient();
+
+    // Anonymous / Guest User Support
+    const [anonUser, setAnonUser] = useState<any>(() => {
+        const id = localStorage.getItem('wordle_anon_id');
+        const username = localStorage.getItem('wordle_anon_username');
+        if (id && username) {
+            return { id, username, user_metadata: { full_name: username } };
+        }
+        return null;
+    });
+
+    const effectiveUser = useMemo(() => {
+        if (user) return user;
+        return anonUser;
+    }, [user, anonUser]);
 
     // 1. Store State & Actions (Destructured for stability)
     const activeTab = useChallengeStore(s => s.activeTab);
@@ -115,8 +133,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setBackAction = useChallengeStore(s => s.setBackAction);
 
     // 1. Server Data (TanStack Query)
-    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(user?.id);
-    const { data: profilesData } = useAvailableProfiles(user?.id);
+    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(effectiveUser?.id);
+    const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
         createChallenge: createMutation,
         submitResult: submitMutation,
@@ -145,28 +163,31 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setChallengeUnreadCount(unplayedCount);
     }, [unplayedCount, setChallengeUnreadCount]);
 
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const filteredChallenges = useMemo(() => {
         return myChallenges.filter((item: any) => {
             const challenge = item.challenge;
             const isExpired = new Date(challenge.expires_at) < new Date();
             const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            const isHost = item.status === 'host';
 
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+            if (statusFilter === 'ACTIVE' && (isFinished || isExpired) && !isHost) return false;
+            if (statusFilter === 'COMPLETED' && (!isFinished && !isExpired) && !isHost) return false;
+            // Hosts stay in active until expired
+            if (isHost && statusFilter === 'COMPLETED') return false;
+            if (isHost && isExpired && statusFilter === 'ACTIVE') return false;
             if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
             if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
 
             if (searchQuery) {
                 const opponentNames = challenge.participants
-                    ?.filter((p: any) => p.user_id !== user?.id)
+                    ?.filter((p: any) => p.user_id !== effectiveUser?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
                     .join(' ');
                 if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
             }
             return true;
         });
-    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, user?.id]);
+    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
 
     // 4. Action Wrappers
     const cleanupSubscription = useCallback(() => {
@@ -180,6 +201,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
+        if (p.status === 'host') return p;
         // Marathon mode uses per-word timers, bypass global LIVE timeout
         if (challenge.word_length === 1) return p;
 
@@ -196,73 +218,190 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, []);
 
     const handleViewChallenge = useCallback(async (id: string) => {
-        // Manual fetch using TanStack Query's queryClient to maintain cache and consistency
-        const challenge = await queryClient.fetchQuery({
-            queryKey: ['challenge', id],
-            queryFn: async () => {
-                const { data, error } = await supabase
-                    .from('challenges')
-                    .select(`
-                        *, 
-                        profiles!creator_id(username, avatar_url),
-                        participants:challenge_participants(
-                            *,
-                            profiles(username, avatar_url),
-                            marathon_progress:challenge_participants_marathon(*)
-                        )
-                    `)
-                    .eq('id', id)
-                    .maybeSingle();
+        // 1. Check local cache (myChallenges) for immediate display
+        const localMatch = myChallenges.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
 
-                if (error) throw error;
-                if (data) {
-                    const c = data as any;
-                    c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
-                    return c as Challenge;
-                }
-                return null;
+        if (localMatch && localMatch.challenge) {
+            const cachedChallenge = { ...localMatch.challenge };
+            cachedChallenge.participants = cachedChallenge.participants?.map((p: any) => normalizeParticipation(p, cachedChallenge)) || [];
+
+            setSelectedChallenge(cachedChallenge);
+            setMyParticipation(normalizeParticipation(localMatch, cachedChallenge));
+            setActiveTab('join');
+        } else {
+            if (selectedChallenge?.id !== id) {
+                setSelectedChallenge(null);
+                setMyParticipation(null);
             }
-        });
+        }
 
-        if (challenge) {
-            if (new Date(challenge.expires_at) < new Date()) {
-                triggerToast("This challenge has expired.", 4000);
+        // 2. Background Refresh / Fetch Detailed Data
+        try {
+            const challengePromise = queryClient.fetchQuery({
+                queryKey: ['challenge', id],
+                queryFn: async () => {
+                    const { data, error } = await supabase
+                        .from('challenges')
+                        .select(`
+                            *, 
+                            profiles!creator_id(username, avatar_url),
+                            participants:challenge_participants(
+                                *,
+                                profiles(username, avatar_url),
+                                marathon_progress:challenge_participants_marathon(*)
+                            )
+                        `)
+                        .eq('id', id)
+                        .maybeSingle();
+
+                    if (error) throw error;
+                    if (data) {
+                        const c = data as any;
+                        c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
+                        return c as Challenge;
+                    }
+                    return null;
+                }
+            });
+
+            let challenge = localMatch?.challenge;
+            if (!challenge) {
+                challenge = await challengePromise;
+            }
+
+            if (challenge) {
+                if (new Date(challenge.expires_at) < new Date()) {
+                    triggerToast("This challenge has expired.", 4000);
+                    return;
+                }
+
+                cleanupSubscription();
+                setSelectedChallenge(challenge);
+                setActiveTab('join');
+
+                // If user is authenticated or has guest ID, load/join participation
+                if (effectiveUser) {
+                    const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
+                    if (!isCreatorOfCustom) {
+                        const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id });
+
+                        let participation = localMatch;
+                        if (!participation) {
+                            participation = await participationPromise;
+                        } else {
+                            participationPromise.then(p => {
+                                setMyParticipation(normalizeParticipation(p, challenge));
+                            });
+                        }
+
+                        const normalizedPart = normalizeParticipation(participation, challenge);
+                        setMyParticipation(normalizedPart);
+                    } else {
+                        setMyParticipation(null);
+                    }
+                } else {
+                    setMyParticipation(null);
+                }
+
+                channelRef.current = subscribeToParticipants(challenge.id);
+            } else {
+                triggerToast("Invalid challenge link or code.", 4000);
+            }
+        } catch (err: any) {
+            console.error("Failed to load challenge details", err);
+            triggerToast(err?.message || "Failed to load challenge details.", 4000);
+        }
+    }, [myChallenges, normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, selectedChallenge?.id, queryClient, cleanupSubscription, joinMutation, effectiveUser, subscribeToParticipants, triggerToast]);
+
+    const joinSelectedChallenge = useCallback(async () => {
+        if (!selectedChallenge || !effectiveUser) return;
+        try {
+            const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            if (isCreatorOfCustom) {
+                setMyParticipation(null);
                 return;
             }
-            cleanupSubscription();
-            setSelectedChallenge(challenge);
 
-            const participation = await joinMutation.mutateAsync({ challengeId: challenge.id, userId: user.id });
-            const normalizedPart = normalizeParticipation(participation, challenge);
-
+            const participation = await joinMutation.mutateAsync({
+                challengeId: selectedChallenge.id,
+                userId: effectiveUser.id
+            });
+            const normalizedPart = normalizeParticipation(participation, selectedChallenge);
             setMyParticipation(normalizedPart);
-            setActiveTab('join');
-            channelRef.current = subscribeToParticipants(challenge.id);
-        } else {
-            triggerToast("Invalid challenge link or code.", 4000);
+        } catch (err: any) {
+            console.error("Failed to join challenge:", err);
+            triggerToast(err?.message || "Failed to join challenge.", 4000);
         }
-    }, [queryClient, normalizeParticipation, triggerToast, cleanupSubscription, setSelectedChallenge, setMyParticipation, setActiveTab, joinMutation, user.id, subscribeToParticipants]);
+    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation]);
 
-    const handleCreate = useCallback(async () => {
-        const challenge = await createMutation.mutateAsync({
-            creatorId: user.id,
-            mode: mode,
-            length: length,
-            maxTime: mode === 'LIVE' ? maxTime : null,
-            invitedIds: invitedIds
+    const registerAnonymousUser = useCallback(async (nickname: string) => {
+        let anonId = localStorage.getItem('wordle_anon_id');
+        if (!anonId) {
+            anonId = crypto.randomUUID();
+            localStorage.setItem('wordle_anon_id', anonId);
+        }
+        localStorage.setItem('wordle_anon_username', nickname);
+
+        // Insert/update profile in database
+        const { error } = await supabase.from('profiles').upsert({
+            id: anonId,
+            username: nickname,
+            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
         });
-
-        if (challenge) {
-            const invitedUsernames = availableProfiles
-                .filter(p => invitedIds.includes(p.id))
-                .map(p => p.username);
-
-            if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
-
-            resetForm();
-            handleViewChallenge(challenge.id);
+        
+        if (error) {
+            console.error("Error creating guest profile:", error);
+            triggerToast("Failed to create guest profile. Please try again.", 4000);
+            return null;
         }
-    }, [mode, length, maxTime, invitedIds, user.id, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge]);
+
+        const newUser = { id: anonId, username: nickname, user_metadata: { full_name: nickname } };
+        setAnonUser(newUser);
+        return newUser;
+    }, [triggerToast]);
+
+    // Auto-join when selectedChallenge is active and effectiveUser becomes available
+    useEffect(() => {
+        if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending) {
+            const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            if (!isCreatorOfCustom) {
+                const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id);
+                if (alreadyParticipant) {
+                    setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
+                } else {
+                    joinSelectedChallenge();
+                }
+            }
+        }
+    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation]);
+
+    const handleCreate = useCallback(async (customParams?: any) => {
+        if (!effectiveUser) return;
+        try {
+            const challenge = await createMutation.mutateAsync({
+                creatorId: effectiveUser.id,
+                mode: mode,
+                length: length,
+                maxTime: mode === 'LIVE' ? maxTime : null,
+                invitedIds: invitedIds,
+                ...customParams
+            });
+
+            if (challenge) {
+                const invitedUsernames = availableProfiles
+                    .filter(p => invitedIds.includes(p.id))
+                    .map(p => p.username);
+
+                if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
+
+                resetForm();
+                handleViewChallenge(challenge.id);
+            }
+        } catch (err: any) {
+            console.error("Failed to create challenge:", err);
+            triggerToast(err?.message || "Failed to create challenge.", 4000);
+        }
+    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
@@ -371,7 +510,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     useEffect(() => {
         if (initialChallengeId && !initialProcessed.current) {
             initialProcessed.current = true;
-            handleViewChallenge(initialChallengeId);
+            handleViewChallenge(initialChallengeId).then(() => {
+                // Clear the URL parameter after successful load to keep the URL clean
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('challenge')) {
+                    url.searchParams.delete('challenge');
+                    window.history.replaceState({}, '', url.pathname + url.search);
+                }
+            });
         }
     }, [initialChallengeId, handleViewChallenge]);
 
@@ -414,6 +560,29 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             navigator.clipboard.writeText(text);
             triggerToast('Challenge link copied to clipboard!', 2000);
         },
+        shareLink: async (c: Challenge) => {
+            const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
+            const title = `Wordle Challenge`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆`;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title,
+                        text,
+                        url
+                    });
+                } catch (err: any) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error sharing:', err);
+                        navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
+                        triggerToast('Copied to clipboard instead!', 2000);
+                    }
+                }
+            } else {
+                navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
+                triggerToast('Copied to clipboard!', 2000);
+            }
+        },
         loadMyChallenges: async () => { await refetchChallenges(); },
         submitResult,
         loading: isChallengesLoading || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending,
@@ -426,8 +595,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setPreviewMarathonLength,
         unplayedCount,
         backAction,
-        setBackAction
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, unplayedCount, backAction, setBackAction]);
+        setBackAction,
+        registerAnonymousUser,
+        effectiveUser
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

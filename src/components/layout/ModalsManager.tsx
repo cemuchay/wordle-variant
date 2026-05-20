@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import type { AppUser, GuessResult } from '../../types/game';
+import { safeLazy } from '../../utils/safeLazy';
 
-const ChallengeModal = lazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
-const GameOverModal = lazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
-const InfoModal = lazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
-const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
-const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
-const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
+const ChallengeModal = safeLazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
+const GameOverModal = safeLazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
+const InfoModal = safeLazy(() => import('../InfoModal').then(m => ({ default: m.InfoModal })));
+const SettingsModal = safeLazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
+const StatsModal = safeLazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
+const AnnouncementModal = safeLazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
+const NotificationModal = safeLazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
+const AuthModal = safeLazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
+const UserProfileModal = safeLazy(() => import('../UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
@@ -17,6 +21,8 @@ interface ModalsManagerProps {
         isInfoOpen: boolean;
         isStatsOpen: boolean;
         isChallengeOpen: boolean;
+        isNotificationsOpen: boolean;
+        isAuthOpen: boolean;
         isGameOverOpen: boolean;
     };
     actions: {
@@ -24,6 +30,8 @@ interface ModalsManagerProps {
         setInfoOpen: (open: boolean) => void;
         setStatsOpen: (open: boolean) => void;
         setChallengeOpen: (open: boolean) => void;
+        setNotificationsOpen: (open: boolean) => void;
+        setAuthOpen: (open: boolean) => void;
         setGameOverOpen: (open: boolean) => void;
     };
     gameContext: {
@@ -37,14 +45,20 @@ interface ModalsManagerProps {
         gameMessage: string;
         stats: any;
     };
+    statsActiveTab?: 'stats' | 'leaderboard';
     onChallengeCreated: (challenge: any, invitedUsernames: string[], invitedIds: string[]) => void;
+    viewedProfileId: string | null;
+    setViewedProfileId: (id: string | null) => void;
 }
 
 export const ModalsManager = ({
     modals,
     actions,
     gameContext,
-    onChallengeCreated
+    statsActiveTab = 'stats',
+    onChallengeCreated,
+    viewedProfileId,
+    setViewedProfileId
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
 
@@ -78,6 +92,7 @@ export const ModalsManager = ({
                     onClose={() => actions.setStatsOpen(false)}
                     user={gameContext.user}
                     isGameOver={gameContext.isGameOver}
+                    initialTab={statsActiveTab}
                 />
             )}
 
@@ -91,6 +106,17 @@ export const ModalsManager = ({
                 />
             )}
 
+            {modals.isNotificationsOpen && (
+                <NotificationModal />
+            )}
+
+            {modals.isAuthOpen && (
+                <AuthModal
+                    isOpen={modals.isAuthOpen}
+                    onClose={() => actions.setAuthOpen(false)}
+                />
+            )}
+
             {modals.isGameOverOpen && gameContext.guesses && gameContext.guesses.length > 0 && gameContext.config && (
                 <GameOverModal
                     isOpen={modals.isGameOverOpen}
@@ -101,6 +127,12 @@ export const ModalsManager = ({
                     usedHint={gameContext.usedHint}
                     gameMessage={gameContext.gameMessage}
                     stats={gameContext.stats}
+                />
+            )}
+            {viewedProfileId && (
+                <UserProfileModal
+                    userId={viewedProfileId}
+                    onClose={() => setViewedProfileId(null)}
                 />
             )}
         </Suspense>

@@ -37,10 +37,14 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
 
     useEffect(() => {
         fetchProfiles();
-        updateLastSeen();
 
+        if (!userId) {
+            setOnlineUsers([]);
+            return;
+        }
+
+        updateLastSeen();
         const heartbeat = setInterval(updateLastSeen, 2 * 60 * 1000);
-        if (!userId) return () => clearInterval(heartbeat);
 
         const channelId = 'global_presence';
         const channel = supabase.channel(channelId, {
@@ -92,6 +96,7 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
         return () => {
             clearInterval(heartbeat);
             channel.unsubscribe();
+            channelRef.current = null;
             updateLastSeen();
         };
     }, [userId, fetchProfiles, updateLastSeen, currentVoiceRoomId]);

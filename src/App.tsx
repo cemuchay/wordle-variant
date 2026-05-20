@@ -1,5 +1,5 @@
 import { MessageSquare, X } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { AudioConnectionLog } from './components/challenge/AudioConnectionLog';
 import { DynamicIslandStatus } from './components/DynamicIslandStatus';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
@@ -8,6 +8,7 @@ import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
+import { NotificationsManager } from './components/notifications/NotificationsManager';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -15,8 +16,9 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
 import { type AppUser, type Challenge } from './types/game';
 import { useMyChallenges } from './hooks/queries/useChallengeQueries';
+import { safeLazy } from './utils/safeLazy';
 
-const ChatRoom = lazy(() => import('./components/chatRoom'));
+const ChatRoom = safeLazy(() => import('./components/chatRoom'));
 
 export default function App() {
     const { user } = useAuth();
@@ -32,6 +34,8 @@ export default function App() {
         setIsChallengeOpen,
         isChatOpen,
         setIsChatOpen,
+        isNotificationsOpen,
+        setIsNotificationsOpen,
         setChallengeUnreadCount,
     } = useApp();
 
@@ -53,14 +57,56 @@ export default function App() {
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
+    const [statsActiveTab, setStatsActiveTab] = useState<'stats' | 'leaderboard'>('stats');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
+    const [isAuthOpen, setIsAuthOpen] = useState(false);
+    const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+
+    // Listen to custom event to open stats modal at a specific tab
+    useEffect(() => {
+        const handleOpenStats = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.tab) {
+                setStatsActiveTab(detail.tab);
+            } else {
+                setStatsActiveTab('stats');
+            }
+            setIsStatsOpen(true);
+        };
+        window.addEventListener('open-stats-modal', handleOpenStats);
+        return () => window.removeEventListener('open-stats-modal', handleOpenStats);
+    }, []);
+
+    // Listen to custom event to open auth modal
+    useEffect(() => {
+        const handleOpenAuth = () => setIsAuthOpen(true);
+        window.addEventListener('open-auth-modal', handleOpenAuth);
+        return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
+    }, []);
+
+    // Listen to custom event to open user profile modal
+    useEffect(() => {
+        const handleOpenProfile = (e: Event) => {
+            if (!user) {
+                triggerToast("Please log in to view user profiles.", 4000);
+                setIsAuthOpen(true);
+                return;
+            }
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.userId) {
+                setViewedProfileId(detail.userId);
+            }
+        };
+        window.addEventListener('open-user-profile', handleOpenProfile);
+        return () => window.removeEventListener('open-user-profile', handleOpenProfile);
+    }, [user, triggerToast]);
 
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen);
+    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen || isAuthOpen || !!viewedProfileId);
 
 
     const handleChallengeCreated = () => {
@@ -80,6 +126,7 @@ export default function App() {
             <DynamicIslandStatus />
             <AudioConnectionLog />
             <GlobalAudioPlayer />
+            <NotificationsManager />
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-12 sm:pt-4">
                     <Toast
@@ -93,7 +140,7 @@ export default function App() {
 
                     <GameToolbar
                         onOpenChallenge={() => setIsChallengeOpen(true)}
-                        onOpenStats={() => setIsStatsOpen(true)}
+                        onOpenStats={() => { setStatsActiveTab('stats'); setIsStatsOpen(true); }}
                         onOpenInfo={() => setIsInfoOpen(true)}
                         onHint={actions.handleHint}
                         onReset={() => window.location.reload()}
@@ -126,6 +173,8 @@ export default function App() {
                             isInfoOpen,
                             isStatsOpen,
                             isChallengeOpen,
+                            isNotificationsOpen,
+                            isAuthOpen,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
                         actions={{
@@ -133,6 +182,8 @@ export default function App() {
                             setInfoOpen: setIsInfoOpen,
                             setStatsOpen: setIsStatsOpen,
                             setChallengeOpen: setIsChallengeOpen,
+                            setNotificationsOpen: setIsNotificationsOpen,
+                            setAuthOpen: setIsAuthOpen,
                             setGameOverOpen: actions.setGameOverModalOpen
                         }}
                         gameContext={{
@@ -146,7 +197,10 @@ export default function App() {
                             isGameOver: state.isGameOver,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
+                        statsActiveTab={statsActiveTab}
                         onChallengeCreated={handleChallengeCreated}
+                        viewedProfileId={viewedProfileId}
+                        setViewedProfileId={setViewedProfileId}
                     />
 
 

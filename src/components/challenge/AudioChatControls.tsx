@@ -7,11 +7,12 @@ interface AudioChatControlsProps {
     userId: string;
 }
 
-export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProps) => {
-    const { triggerToast, activeCall, setActiveCall, audioChat, onlineUsers } = useApp();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatControlsProps) => {
+    const { triggerToast, activeCall, setActiveCall, audioChat, onlineUsers, hangUpCall } = useApp();
 
     // SYNC: This control is "enabled" if the GLOBAL active call matches this challenge
-    const isEnabled = activeCall?.challengeId === challengeId;
+    const isEnabled = activeCall?.channelId === challengeId;
 
     // Count participants in this specific room
     const participantsInCall = onlineUsers.filter(u => u.activeVoiceRoomId === challengeId);
@@ -19,14 +20,19 @@ export const AudioChatControls = ({ challengeId, userId }: AudioChatControlsProp
 
     const toggleCall = () => {
         if (isEnabled) {
-            setActiveCall(null);
+            hangUpCall();
         } else {
             // PREVENTION: Check if already in a DIFFERENT call
             if (activeCall) {
                 triggerToast("You are already in a call. Leave it first to join this one.", 4000);
                 return;
             }
-            setActiveCall({ challengeId, userId, isInitiator: true });
+            setActiveCall({
+                channelId: challengeId,
+                type: 'group',
+                role: 'participant',
+                status: 'connecting'
+            });
         }
     };
 
