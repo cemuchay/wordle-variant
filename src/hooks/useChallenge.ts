@@ -40,7 +40,7 @@ export interface ChallengeParticipant {
     status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
     score: number;
     attempts: number;
-    guesses: any;
+    guesses: any; 
     hints_used: boolean;
     hint_record: any | null;
     time_taken: number | null;
@@ -74,6 +74,9 @@ export const useChallenge = (_user: AppUser | null) => {
 
     const subscribeToParticipants = useCallback((challengeId: string) => {
         const channelName = `challenge_participants_${challengeId}`;
+        
+        // Clear previous participants immediately to prevent stale data flash
+        setParticipants([]);
 
         // Remove existing channel if it exists
         const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
@@ -82,7 +85,6 @@ export const useChallenge = (_user: AppUser | null) => {
         }
 
         const fetchAndSet = async () => {
-
             // Fetch challenge mode/max_time and participants in a single query by using join if possible, 
             // but challenge mode is static mostly. Let's just fetch participants.
             const { data: challengeData } = await supabase
@@ -121,9 +123,7 @@ export const useChallenge = (_user: AppUser | null) => {
             })
             .subscribe();
 
-        // DEFER initial fetch if needed, or just let it run once.
-        // Actually, we don't always need to fetch immediately if handleViewChallenge just fetched.
-        // But for safety, we keep it.
+        // Initial fetch
         fetchAndSet();
 
         return channel;
