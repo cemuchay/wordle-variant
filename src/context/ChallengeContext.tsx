@@ -343,14 +343,17 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
         });
+        
         if (error) {
             console.error("Error creating guest profile:", error);
+            triggerToast("Failed to create guest profile. Please try again.", 4000);
+            return null;
         }
 
         const newUser = { id: anonId, username: nickname, user_metadata: { full_name: nickname } };
         setAnonUser(newUser);
         return newUser;
-    }, []);
+    }, [triggerToast]);
 
     // Auto-join when selectedChallenge is active and effectiveUser becomes available
     useEffect(() => {

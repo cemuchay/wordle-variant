@@ -243,9 +243,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                         triggerToast("Nickname must be at least 3 characters.", 3000);
                                         return;
                                     }
-                                    await registerAnonymousUser(name);
-                                }}
-                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
+                                    const user = await registerAnonymousUser(name);
+                                    if (user) {
+                                        // Join will be triggered by useEffect in ChallengeContext
+                                        triggerToast("Guest profile created! Joining...", 2000);
+                                    }
+                                }}                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
                             >
                                 Join Challenge
                             </button>
