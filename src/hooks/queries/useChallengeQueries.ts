@@ -12,7 +12,9 @@ export const useMyChallenges = (userId: string | undefined) => {
         queryKey: ['my-challenges', userId],
         queryFn: async () => {
             if (!userId) return [];
-            const { data, error } = await supabase
+            
+            // 1. Fetch all challenges I am a participant in
+            const { data: participations, error: pError } = await supabase
                 .from('challenge_participants')
                 .select(`
                     *,
@@ -27,11 +29,51 @@ export const useMyChallenges = (userId: string | undefined) => {
                         )
                     )
                 `)
-                .eq('user_id', userId)
-                .order('started_at', { ascending: false, nullsFirst: true });
+                .eq('user_id', userId);
 
-            if (error) throw error;
-            return data || [];
+            if (pError) throw pError;
+
+            // 2. Fetch all challenges I created
+            const { data: createdChallenges, error: cError } = await supabase
+                .from('challenges')
+                .select(`
+                    *,
+                    creator:profiles!creator_id(username, avatar_url),
+                    participants:challenge_participants(
+                        *,
+                        profiles(username, avatar_url),
+                        marathon_progress:challenge_participants_marathon(*)
+                    )
+                `)
+                .eq('creator_id', userId);
+
+            if (cError) throw cError;
+
+            // 3. Merge them. If I'm both creator and participant, Query 1 has the full record.
+            const finalResults = participations ? [...participations] : [];
+            const participatedIds = new Set(finalResults.map(p => p.challenge_id));
+
+            createdChallenges?.forEach(challenge => {
+                if (!participatedIds.has(challenge.id)) {
+                    // Synthetic participation record for creators who aren't playing
+                    finalResults.push({
+                        id: `host-${challenge.id}`,
+                        challenge_id: challenge.id,
+                        user_id: userId,
+                        status: 'host', // Special frontend-only status
+                        score: 0,
+                        attempts: 0,
+                        guesses: [],
+                        challenge
+                    });
+                }
+            });
+
+            return finalResults.sort((a, b) => {
+                const dateA = new Date(a.challenge.created_at).getTime();
+                const dateB = new Date(b.challenge.created_at).getTime();
+                return dateB - dateA;
+            });
         },
         enabled: !!userId,
     });

@@ -44,7 +44,7 @@ export interface ChallengeParticipant {
     id: string;
     challenge_id: string;
     user_id: string;
-    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
+    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out' | 'host';
     score: number;
     attempts: number;
     guesses: any; 
