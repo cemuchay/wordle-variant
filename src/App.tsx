@@ -88,6 +88,11 @@ export default function App() {
     // Listen to custom event to open user profile modal
     useEffect(() => {
         const handleOpenProfile = (e: Event) => {
+            if (!user) {
+                triggerToast("Please log in to view user profiles.", 4000);
+                setIsAuthOpen(true);
+                return;
+            }
             const detail = (e as CustomEvent)?.detail;
             if (detail?.userId) {
                 setViewedProfileId(detail.userId);
@@ -95,7 +100,7 @@ export default function App() {
         };
         window.addEventListener('open-user-profile', handleOpenProfile);
         return () => window.removeEventListener('open-user-profile', handleOpenProfile);
-    }, []);
+    }, [user, triggerToast]);
 
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
