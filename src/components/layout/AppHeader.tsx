@@ -8,7 +8,7 @@ interface AppHeaderProps {
 }
 
 export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
-    const { user, signInWithGoogle, signOut } = useAuth();
+    const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
 
     const handleSignOut = async () => {
