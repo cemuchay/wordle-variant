@@ -1,4 +1,4 @@
-import { Eye, Play, Share2, Clock, Copy } from 'lucide-react';
+import { Eye, Play, Share2, Clock, Copy, SlidersHorizontal, Shield, Sparkles, Globe, Lock, Hourglass } from 'lucide-react';
 import { memo, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
@@ -177,6 +177,150 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         <span className="text-[10px] font-black text-red-500 uppercase">{selectedChallenge.max_time}m Limit</span>
                     </div>
                 )}
+            </div>
+
+            {/* Challenge Configuration Details */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <SlidersHorizontal size={12} className="text-correct" />
+                        Challenge Configuration
+                    </h4>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase">
+                        Hosted by {selectedChallenge.profiles?.username || selectedChallenge.creator?.username || 'Host'}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Mode / Time Limit */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Timing & Mode</p>
+                        <div className="flex items-center gap-1.5">
+                            <Clock size={12} className={selectedChallenge.mode === 'LIVE' ? 'text-red-500' : 'text-blue-500'} />
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.mode === 'LIVE' ? 'Live Race' : 'Anytime (Async)'}
+                            </span>
+                        </div>
+                        {selectedChallenge.mode === 'LIVE' && (
+                            <p className="text-[9px] text-gray-400">
+                                {isMarathon && selectedChallenge.marathon_timers 
+                                    ? 'Custom per-word timers' 
+                                    : `${selectedChallenge.max_time}m per game limit`}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Word Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Word Rules</p>
+                        <div className="flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-yellow-500" />
+                            <span className="text-xs font-bold text-white">
+                                {isMarathon ? 'Marathon (3-7L)' : `${selectedChallenge.word_length || 'Random'} Letters`}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_custom_word ? 'Host Custom Word' : 'System Generated'}
+                        </p>
+                    </div>
+
+                    {/* Handicap Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <p className="text-[8px] font-black uppercase text-gray-500">Handicap Starter</p>
+                                <div className="flex items-center gap-1.5">
+                                    <Shield size={12} className={selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'text-correct' : 'text-gray-400'} />
+                                    <span className="text-xs font-bold text-white">
+                                        {selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                            </div>
+                            {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                                <div className="text-right">
+                                    <span className="text-[9px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-md uppercase">
+                                        {selectedChallenge.handicap_enforced ? 'Auto-Enforced' : 'Optional'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                            <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                                {isMarathon && selectedChallenge.handicap_starters ? (
+                                    <div className="grid grid-cols-5 gap-1 text-center font-black">
+                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => (
+                                            <div key={len} className="bg-white/5 p-1 rounded">
+                                                <span className="text-[7px] text-gray-500 block">{len}L</span>
+                                                <span className="text-white uppercase">{w as string || 'Rand'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="font-bold">
+                                        Starter Word:{' '}
+                                        <span className="text-white uppercase tracking-wider font-mono">
+                                            {selectedChallenge.handicap_starter === '__SYSTEM_RANDOM__'
+                                                ? 'Random System Word'
+                                                : selectedChallenge.handicap_starter}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Lifespan & Participants */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Privacy & Limits</p>
+                        <div className="flex items-center gap-1.5">
+                            {selectedChallenge.is_public ? (
+                                <Globe size={12} className="text-correct" />
+                            ) : (
+                                <Lock size={12} className="text-yellow-500" />
+                            )}
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.is_public ? 'Public Room' : 'Invite Only'}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_public 
+                                ? `Max ${selectedChallenge.max_participants || 100} players`
+                                : 'Direct shares only'}
+                        </p>
+                    </div>
+
+                    {/* Expiration Timer */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Room Lifespan</p>
+                        <div className="flex items-center gap-1.5">
+                            <Hourglass size={12} className="text-gray-400" />
+                            <span className="text-xs font-bold text-white">Expires in</span>
+                        </div>
+                        <p className="text-[9px] text-gray-400 tabular-nums">
+                            {new Date(selectedChallenge.expires_at).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </p>
+                    </div>
+
+                    {/* Custom Marathon Timers if active */}
+                    {isMarathon && selectedChallenge.mode === 'LIVE' && selectedChallenge.marathon_timers && (
+                        <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Marathon Per-Length Time Limits</p>
+                            <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
+                                {Object.entries(selectedChallenge.marathon_timers).map(([len, t]) => (
+                                    <div key={len} className="bg-black/30 p-1.5 rounded-lg border border-white/5">
+                                        <p className="text-[8px] font-bold text-gray-500">{len}L</p>
+                                        <p className="text-[10px] font-black text-white">{t}m</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="space-y-3">
