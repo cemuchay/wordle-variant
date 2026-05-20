@@ -16,6 +16,9 @@ interface ProfileData {
     avatar_url: string;
     updated_at: string;
     last_seen_at: string;
+    daily_wins?: number;
+    weekly_wins?: number;
+    monthly_wins?: number;
 }
 
 interface DailyScore {
@@ -42,39 +45,6 @@ interface ChallengeParticipation {
     };
 }
 
-const getDatesInWeeksAndMonthsOf = (dates: string[]): string[] => {
-    const datesSet = new Set<string>();
-    
-    dates.forEach(dStr => {
-        // 1. Weekly: Get all 7 days of the week for this date (Mon-Sun)
-        const date = new Date(dStr);
-        const day = date.getDay(); // 0 = Sun, 1 = Mon, etc.
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        
-        for (let i = 0; i < 7; i++) {
-            const temp = new Date(date);
-            temp.setDate(diff + i);
-            datesSet.add(temp.toISOString().split('T')[0]);
-        }
-        
-        // 2. Monthly: Get all days of the month for this date
-        const parts = dStr.split('-');
-        if (parts.length >= 2) {
-            const year = parseInt(parts[0]);
-            const month = parseInt(parts[1]); // 1-based
-            const daysInMonth = new Date(year, month, 0).getDate();
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-                const formattedDay = i < 10 ? `0${i}` : `${i}`;
-                const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-                datesSet.add(`${year}-${formattedMonth}-${formattedDay}`);
-            }
-        }
-    });
-    
-    return Array.from(datesSet);
-};
-
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onClose }) => {
     const { user: currentUser } = useAuth();
     const { onlineUsers, initiatePrivateCall, activeCall, triggerToast } = useApp();
@@ -85,7 +55,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
     // Stats states
     const [dailyScores, setDailyScores] = useState<DailyScore[]>([]);
-    const [allTimeScores, setAllTimeScores] = useState<{ user_id: string; game_date: string; skill_score: number }[]>([]);
     const [challengeParticipations, setChallengeParticipations] = useState<ChallengeParticipation[]>([]);
     const [allChallengeParticipations, setAllChallengeParticipations] = useState<{ challenge_id: string; user_id: string; score: number; status: string }[]>([]);
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
@@ -113,26 +82,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     .eq('user_id', userId);
 
                 if (scoresData && isMounted) setDailyScores(scoresData);
-
-                // 3. Fetch all daily scores of all users for relevant dates (for awards calculations)
-                let allScoresData: { user_id: string; game_date: string; skill_score: number }[] = [];
-                if (scoresData && scoresData.length > 0) {
-                    const targetUserWonDates = scoresData.filter(s => s.status === 'won').map(s => s.game_date);
-                    if (targetUserWonDates.length > 0) {
-                        const relevantDates = getDatesInWeeksAndMonthsOf(targetUserWonDates);
-                        // Fetch only won scores that fall on these relevant dates
-                        const { data: fetchedAllScores } = await supabase
-                            .from('scores')
-                            .select('user_id, game_date, skill_score')
-                            .eq('status', 'won')
-                            .in('game_date', relevantDates);
-                        if (fetchedAllScores) {
-                            allScoresData = fetchedAllScores;
-                        }
-                    }
-                }
-
-                if (isMounted) setAllTimeScores(allScoresData);
 
                 // 4. Fetch challenge participations of target user
                 const { data: partsData } = await supabase
@@ -202,13 +151,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         return date.toLocaleDateString();
     };
 
-    const getMondayDateString = (dateStr: string): string => {
-        const date = new Date(dateStr);
-        const day = date.getDay(); // 0 is Sunday, 1 is Monday, etc.
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(date.setDate(diff));
-        return monday.toISOString().split('T')[0];
-    };
 
     // Computations
     const stats = useMemo(() => {
@@ -273,88 +215,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         const highestDailyScore = Math.max(...dailyScores.map(s => s.skill_score || 0), 0);
 
         // Awards (Daily, Weekly, Monthly Leaderboard Wins)
-        let dailyWins = 0;
-        let weeklyWins = 0;
-        let monthlyWins = 0;
-
-        if (allTimeScores.length > 0) {
-            // Group all scores by game_date
-            const scoresByDate: Record<string, { user_id: string; score: number }[]> = {};
-            const scoresByUserWeek: Record<string, Record<string, number>> = {}; // user_id -> weekKey -> sum
-            const scoresByUserMonth: Record<string, Record<string, number>> = {}; // user_id -> monthKey -> sum
-
-            allTimeScores.forEach(s => {
-                if (!scoresByDate[s.game_date]) scoresByDate[s.game_date] = [];
-                scoresByDate[s.game_date].push({ user_id: s.user_id, score: s.skill_score });
-
-                const weekKey = getMondayDateString(s.game_date);
-                const monthKey = s.game_date.substring(0, 7);
-
-                // Weekly tracking
-                if (!scoresByUserWeek[s.user_id]) scoresByUserWeek[s.user_id] = {};
-                scoresByUserWeek[s.user_id][weekKey] = (scoresByUserWeek[s.user_id][weekKey] || 0) + s.skill_score;
-
-                // Monthly tracking
-                if (!scoresByUserMonth[s.user_id]) scoresByUserMonth[s.user_id] = {};
-                scoresByUserMonth[s.user_id][monthKey] = (scoresByUserMonth[s.user_id][monthKey] || 0) + s.skill_score;
-            });
-
-            // Calculate Daily Wins
-            Object.keys(scoresByDate).forEach(date => {
-                const dayScores = scoresByDate[date];
-                const maxScore = Math.max(...dayScores.map(ds => ds.score));
-                const winners = dayScores.filter(ds => ds.score === maxScore).map(ds => ds.user_id);
-                if (winners.includes(userId)) dailyWins++;
-            });
-
-            // Calculate Weekly Wins
-            const allWeekKeys = new Set<string>();
-            Object.values(scoresByUserWeek).forEach(userWeeks => {
-                Object.keys(userWeeks).forEach(wk => allWeekKeys.add(wk));
-            });
-
-            allWeekKeys.forEach(weekKey => {
-                let maxWeeklyScore = -1;
-                const winners: string[] = [];
-
-                Object.keys(scoresByUserWeek).forEach(uId => {
-                    const weeklyScore = scoresByUserWeek[uId][weekKey] || 0;
-                    if (weeklyScore > maxWeeklyScore) {
-                        maxWeeklyScore = weeklyScore;
-                        winners.length = 0;
-                        winners.push(uId);
-                    } else if (weeklyScore === maxWeeklyScore && weeklyScore > 0) {
-                        winners.push(uId);
-                    }
-                });
-
-                if (winners.includes(userId)) weeklyWins++;
-            });
-
-            // Calculate Monthly Wins
-            const allMonthKeys = new Set<string>();
-            Object.values(scoresByUserMonth).forEach(userMonths => {
-                Object.keys(userMonths).forEach(mk => allMonthKeys.add(mk));
-            });
-
-            allMonthKeys.forEach(monthKey => {
-                let maxMonthlyScore = -1;
-                const winners: string[] = [];
-
-                Object.keys(scoresByUserMonth).forEach(uId => {
-                    const monthlyScore = scoresByUserMonth[uId][monthKey] || 0;
-                    if (monthlyScore > maxMonthlyScore) {
-                        maxMonthlyScore = monthlyScore;
-                        winners.length = 0;
-                        winners.push(uId);
-                    } else if (monthlyScore === maxMonthlyScore && monthlyScore > 0) {
-                        winners.push(uId);
-                    }
-                });
-
-                if (winners.includes(userId)) monthlyWins++;
-            });
-        }
+        const dailyWins = profile?.daily_wins || 0;
+        const weeklyWins = profile?.weekly_wins || 0;
+        const monthlyWins = profile?.monthly_wins || 0;
 
         // Challenge Calculations
         const completedChallenges = challengeParticipations.filter(p => p.status === 'completed' || p.status === 'timed_out');
@@ -440,7 +303,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
             memberSince
         };
 
-    }, [dailyScores, allTimeScores, challengeParticipations, allChallengeParticipations, currentUserChallenges, userId, currentUser, profile]);
+    }, [dailyScores, challengeParticipations, allChallengeParticipations, currentUserChallenges, userId, currentUser, profile]);
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-9999">
@@ -483,14 +346,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h2 className="text-xl font-black text-white truncate pr-6">{profile.username}</h2>
-                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-6">{profile.username}</h2>
+                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-2 sm:gap-x-3 text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
                                         <span className="flex items-center gap-1">
-                                            <Calendar size={12} className="text-correct" />
+                                            <Calendar size={11} className="text-correct" />
                                             Joined {stats.memberSince}
                                         </span>
                                         <span className="flex items-center gap-1">
-                                            <Clock size={12} className="text-correct" />
+                                            <Clock size={11} className="text-correct" />
                                             {isOnline ? (
                                                 <span className="text-emerald-400 font-black">Active Now</span>
                                             ) : (
@@ -514,10 +377,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                             });
                                             onClose();
                                         }}
-                                        className="flex items-center justify-center p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all mr-6"
+                                        className="flex items-center justify-center p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all mr-6 shrink-0"
                                         title={`Call ${profile.username}`}
                                     >
-                                        <Phone size={16} />
+                                        <Phone size={14} className="sm:w-4 sm:h-4" />
                                     </button>
                                 )}
                             </div>
@@ -532,94 +395,94 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 ) : (
                     <>
                         {/* Tab Selector */}
-                        <div className="flex border-b border-white/5 bg-gray-900/40 p-1">
+                        <div className="flex border-b border-white/5 bg-gray-900/40 p-1 shrink-0">
                             <button
                                 onClick={() => setActiveTab('daily')}
-                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'daily' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'daily' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
                             >
                                 Daily Stats
                             </button>
                             <button
                                 onClick={() => setActiveTab('challenge')}
-                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'challenge' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'challenge' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
                             >
                                 Challenge Stats
                             </button>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 scrollbar-hide">
 
                             {/* Head to Head (H2H) comparison - show only for other players */}
                             {currentUser && currentUser.id !== userId && stats.h2hPlayed > 0 && (
-                                <div className="bg-linear-to-r from-correct/10 to-emerald-950/20 border border-correct/20 rounded-2xl p-4">
+                                <div className="bg-linear-to-r from-correct/10 to-emerald-950/20 border border-correct/20 rounded-2xl p-3 sm:p-4">
                                     <div className="flex items-center justify-between mb-3">
-                                        <span className="text-[10px] font-black text-correct uppercase tracking-wider flex items-center gap-1.5">
-                                            <Target size={12} /> H2H Showdown
+                                        <span className="text-[9px] sm:text-[10px] font-black text-correct uppercase tracking-wider flex items-center gap-1.5">
+                                            <Target size={11} className="sm:w-3 sm:h-3" /> H2H Showdown
                                         </span>
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase">
                                             {stats.h2hPlayed} Shared Challenge{stats.h2hPlayed > 1 ? 's' : ''}
                                         </span>
                                     </div>
                                     <div className="grid grid-cols-3 gap-2 text-center">
-                                        <div className="bg-white/5 rounded-xl p-2.5">
-                                            <div className="text-xl font-black text-white">{stats.h2hWins}</div>
-                                            <div className="text-[9px] font-black uppercase text-gray-500">Wins</div>
+                                        <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
+                                            <div className="text-lg sm:text-xl font-black text-white">{stats.h2hWins}</div>
+                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Wins</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-xl p-2.5">
-                                            <div className="text-xl font-black text-gray-400">{stats.h2hTies}</div>
-                                            <div className="text-[9px] font-black uppercase text-gray-500">Ties</div>
+                                        <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
+                                            <div className="text-lg sm:text-xl font-black text-gray-400">{stats.h2hTies}</div>
+                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Ties</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-xl p-2.5">
-                                            <div className="text-xl font-black text-red-400">{stats.h2hLosses}</div>
-                                            <div className="text-[9px] font-black uppercase text-gray-500">Losses</div>
+                                        <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
+                                            <div className="text-lg sm:text-xl font-black text-red-400">{stats.h2hLosses}</div>
+                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Losses</div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {activeTab === 'daily' ? (
-                                <div className="space-y-6">
+                                <div className="space-y-5 sm:space-y-6">
                                     {/* Daily statistics grid */}
-                                    <div className="grid grid-cols-4 gap-3 text-center">
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-white">{stats.played}</div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-center">
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-white">{stats.played}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Played</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-white">{stats.winPct}%</div>
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-white">{stats.winPct}%</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Win Rate</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-correct flex items-center justify-center gap-1">
-                                                <Flame size={20} className="fill-correct" />
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-correct flex items-center justify-center gap-1">
+                                                <Flame size={16} className="fill-correct sm:w-5 sm:h-5" />
                                                 {stats.currentStreak}
                                             </div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Streak</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-yellow-500">{stats.maxStreak}</div>
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-yellow-500">{stats.maxStreak}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Max Streak</div>
                                         </div>
                                     </div>
 
                                     {/* Guess distribution */}
-                                    <div className="space-y-2.5">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Guess Distribution</h3>
-                                        <div className="space-y-2">
+                                    <div className="space-y-2">
+                                        <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">Guess Distribution</h3>
+                                        <div className="space-y-1.5 sm:space-y-2">
                                             {stats.guessDist.map((count, index) => {
                                                 const maxCount = Math.max(...stats.guessDist, 1);
                                                 const pct = (count / maxCount) * 100;
                                                 return (
-                                                    <div key={index} className="flex items-center gap-3 text-xs font-bold">
-                                                        <span className="w-2.5 text-gray-500">{index + 1}</span>
-                                                        <div className="flex-1 bg-white/5 h-6 rounded-md overflow-hidden relative border border-white/5">
+                                                    <div key={index} className="flex items-center gap-2.5 sm:gap-3 text-xs font-bold">
+                                                        <span className="w-2 text-gray-500 text-[10px] sm:text-xs">{index + 1}</span>
+                                                        <div className="flex-1 bg-white/5 h-5 sm:h-6 rounded-md overflow-hidden relative border border-white/5">
                                                             <motion.div
                                                                 initial={{ width: 0 }}
                                                                 animate={{ width: `${pct}%` }}
                                                                 transition={{ duration: 0.8, ease: 'easeOut' }}
-                                                                className={`h-full flex items-center justify-end pr-2 font-mono font-bold text-[10px] text-black ${count > 0 ? 'bg-correct' : 'bg-transparent text-gray-500'}`}
-                                                                style={{ minWidth: count > 0 ? '24px' : '0%' }}
+                                                                className={`h-full flex items-center justify-end pr-2 font-mono font-bold text-[9px] sm:text-[10px] text-black ${count > 0 ? 'bg-correct' : 'bg-transparent text-gray-500'}`}
+                                                                style={{ minWidth: count > 0 ? '20px' : '0%' }}
                                                             >
                                                                 {count}
                                                             </motion.div>
@@ -631,48 +494,48 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     </div>
 
                                     {/* Award system (badges) */}
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Leaderboard Awards</h3>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className={`rounded-2xl p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.dailyWins > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
+                                    <div className="space-y-2">
+                                        <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">Leaderboard Awards</h3>
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.dailyWins > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
                                                 <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Award size={28} className={stats.dailyWins > 0 ? 'text-yellow-400' : 'text-gray-600'} />
-                                                <div className="text-xl font-black text-white mt-1.5">{stats.dailyWins}</div>
-                                                <div className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Daily Champion</div>
+                                                <Award size={24} className={`${stats.dailyWins > 0 ? 'text-yellow-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
+                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.dailyWins}</div>
+                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Daily Champion</div>
                                             </div>
-                                            <div className={`rounded-2xl p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.weeklyWins > 0 ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
+                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.weeklyWins > 0 ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
                                                 <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={28} className={stats.weeklyWins > 0 ? 'text-blue-400' : 'text-gray-600'} />
-                                                <div className="text-xl font-black text-white mt-1.5">{stats.weeklyWins}</div>
-                                                <div className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Weekly Master</div>
+                                                <Trophy size={24} className={`${stats.weeklyWins > 0 ? 'text-blue-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
+                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.weeklyWins}</div>
+                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Weekly Master</div>
                                             </div>
-                                            <div className={`rounded-2xl p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.monthlyWins > 0 ? 'bg-purple-500/10 border-purple-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
+                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.monthlyWins > 0 ? 'bg-purple-500/10 border-purple-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
                                                 <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={28} className={stats.monthlyWins > 0 ? 'text-purple-400' : 'text-gray-600'} />
-                                                <div className="text-xl font-black text-white mt-1.5">{stats.monthlyWins}</div>
-                                                <div className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Monthly Dominator</div>
+                                                <Trophy size={24} className={`${stats.monthlyWins > 0 ? 'text-purple-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
+                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.monthlyWins}</div>
+                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Monthly Dominator</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300">
                                     {/* Challenge stats grid */}
-                                    <div className="grid grid-cols-4 gap-3 text-center">
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-white">{stats.challengesPlayed}</div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-center">
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-white">{stats.challengesPlayed}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Played</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-white">{stats.challengesWon}</div>
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-white">{stats.challengesWon}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Won</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-correct">{stats.totalChallengePoints}</div>
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-correct">{stats.totalChallengePoints}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">All-Time PTS</div>
                                         </div>
-                                        <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                                            <div className="text-2xl font-black text-yellow-500">{stats.weeklyChallengePoints}</div>
+                                        <div className="bg-white/5 rounded-2xl p-2.5 sm:p-3 border border-white/5">
+                                            <div className="text-xl sm:text-2xl font-black text-yellow-500">{stats.weeklyChallengePoints}</div>
                                             <div className="text-[8px] font-black uppercase text-gray-500 mt-1">Weekly PTS</div>
                                         </div>
                                     </div>
