@@ -58,6 +58,11 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    try {
+      await supabase.removeAllChannels();
+    } catch (e) {
+      console.warn("Presence cleanup during signout failed:", e);
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Logout error:", error.message);

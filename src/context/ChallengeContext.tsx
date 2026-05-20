@@ -337,8 +337,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
         localStorage.setItem('wordle_anon_username', nickname);
         
-        // Insert profile into database
-        const { error } = await supabase.from('profiles').insert({
+        // Insert/update profile in database
+        const { error } = await supabase.from('profiles').upsert({
             id: anonId,
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`

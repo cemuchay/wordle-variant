@@ -101,8 +101,8 @@ export const DynamicIslandStatus = () => {
                             : (currentVoiceSession 
                                 ? '180px' 
                                 : (otherOnlineUsers.length === 1 
-                                    ? '145px' 
-                                    : '125px'
+                                    ? '150px' 
+                                    : '135px'
                                   )
                               )
                           ),
@@ -113,7 +113,7 @@ export const DynamicIslandStatus = () => {
                 {!isExpanded ? (
                     <motion.div
                         layout
-                        className="flex items-center gap-2 px-3 h-full w-full justify-center"
+                        className="flex items-center gap-1.5 px-3 h-full w-full justify-center"
                     >
                         {activeCall ? (
                             <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export const DynamicIslandStatus = () => {
                                 </span>
                             </div>
                         ) : currentVoiceSession ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                                 <img
                                     src={currentVoiceSession.user.avatar_url}
                                     alt=""
@@ -140,7 +140,7 @@ export const DynamicIslandStatus = () => {
                                 <img
                                     src={otherOnlineUsers[0].avatar_url}
                                     alt=""
-                                    className="w-4.5 h-4.5 rounded-full border border-white/20 shrink-0"
+                                    className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                 />
                                 <span className="text-[9px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
                                     {otherOnlineUsers[0].username} online
@@ -148,13 +148,13 @@ export const DynamicIslandStatus = () => {
                             </>
                         ) : (
                             <>
-                                <div className="flex -space-x-1.5 shrink-0">
+                                <div className="flex -space-x-1 shrink-0">
                                     {otherOnlineUsers.slice(0, 2).map((u, i) => (
                                         <img
                                             key={u.id}
                                             src={u.avatar_url}
                                             alt=""
-                                            className="w-4.5 h-4.5 rounded-full border border-black shrink-0"
+                                            className="w-4 h-4 rounded-full border border-black shrink-0"
                                             style={{ zIndex: 2 - i }}
                                         />
                                     ))}
