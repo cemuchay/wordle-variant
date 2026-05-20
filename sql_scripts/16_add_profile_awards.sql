@@ -18,7 +18,8 @@ BEGIN
   UPDATE public.profiles
   SET daily_wins = 0,
       weekly_wins = 0,
-      monthly_wins = 0;
+      monthly_wins = 0
+  WHERE true;
 
   -- A. Daily Wins
   WITH daily_max AS (
