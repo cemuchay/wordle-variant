@@ -1,6 +1,7 @@
 import { SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -64,6 +65,8 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                             Login
                         </button>
                     )}
+
+                    {user && <NotificationBell />}
 
                     <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors">
                         <SettingsIcon size={18} />

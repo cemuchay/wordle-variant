@@ -8,6 +8,7 @@ import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
+import { NotificationsManager } from './components/notifications/NotificationsManager';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -32,6 +33,8 @@ export default function App() {
         setIsChallengeOpen,
         isChatOpen,
         setIsChatOpen,
+        isNotificationsOpen,
+        setIsNotificationsOpen,
         setChallengeUnreadCount,
     } = useApp();
 
@@ -60,7 +63,7 @@ export default function App() {
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen);
+    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen);
 
 
     const handleChallengeCreated = () => {
@@ -80,6 +83,7 @@ export default function App() {
             <DynamicIslandStatus />
             <AudioConnectionLog />
             <GlobalAudioPlayer />
+            <NotificationsManager />
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-12 sm:pt-4">
                     <Toast
@@ -126,6 +130,7 @@ export default function App() {
                             isInfoOpen,
                             isStatsOpen,
                             isChallengeOpen,
+                            isNotificationsOpen,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
                         actions={{
@@ -133,6 +138,7 @@ export default function App() {
                             setInfoOpen: setIsInfoOpen,
                             setStatsOpen: setIsStatsOpen,
                             setChallengeOpen: setIsChallengeOpen,
+                            setNotificationsOpen: setIsNotificationsOpen,
                             setGameOverOpen: actions.setGameOverModalOpen
                         }}
                         gameContext={{

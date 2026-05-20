@@ -11,6 +11,7 @@ export const Z_INDEX = {
     GUESS_PREVIEW: 130,
     ANNOUNCEMENT_MODAL: 150,
     AUTH_MODAL: 200,
+    TOAST: 300,
 } as const;
 
 export const ANIMATION_DURATION = {

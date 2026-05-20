@@ -25,6 +25,7 @@ interface AppState {
     // UI State
     toast: { show: boolean; message: string; duration?: number };
     isChallengeOpen: boolean;
+    isNotificationsOpen: boolean;
     isChatOpen: boolean;
     isLoadingDate: boolean;
     
@@ -42,6 +43,7 @@ interface AppState {
     triggerToast: (message: string, duration?: number) => void;
     setToast: (toast: { show: boolean; message: string; duration?: number }) => void;
     setChallengeOpen: (val: boolean) => void;
+    setNotificationsOpen: (val: boolean) => void;
     setChatOpen: (val: boolean) => void;
     setUnreadCount: (val: number) => void;
     setChallengeUnreadCount: (val: number) => void;
@@ -56,6 +58,7 @@ export const useAppStore = create<AppState>((set) => ({
     // Initial State
     toast: { show: false, message: "" },
     isChallengeOpen: new URLSearchParams(window.location.search).has('challenge'),
+    isNotificationsOpen: false,
     isChatOpen: false,
     isLoadingDate: true,
     preferences: defaultPreferences,
@@ -69,6 +72,7 @@ export const useAppStore = create<AppState>((set) => ({
     triggerToast: (message, duration) => set({ toast: { show: true, message, duration } }),
     setToast: (toast) => set({ toast }),
     setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),
+    setNotificationsOpen: (isNotificationsOpen) => set({ isNotificationsOpen }),
     setChatOpen: (isChatOpen) => set({ isChatOpen }),
     setUnreadCount: (unreadCount) => set({ unreadCount }),
     setChallengeUnreadCount: (challengeUnreadCount) => set({ challengeUnreadCount }),

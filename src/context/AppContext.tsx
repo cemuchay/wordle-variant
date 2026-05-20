@@ -29,6 +29,8 @@ interface AppContextType {
     setActiveCall: (call: any) => void;
     isChallengeOpen: boolean;
     setIsChallengeOpen: (val: boolean) => void;
+    isNotificationsOpen: boolean;
+    setIsNotificationsOpen: (val: boolean) => void;
     isChatOpen: boolean;
     setIsChatOpen: (val: boolean) => void;
 
@@ -69,6 +71,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const setActiveCall = useAppStore(s => s.setActiveCall);
     const isChallengeOpen = useAppStore(s => s.isChallengeOpen);
     const setIsChallengeOpen = useAppStore(s => s.setChallengeOpen);
+    const isNotificationsOpen = useAppStore(s => s.isNotificationsOpen);
+    const setIsNotificationsOpen = useAppStore(s => s.setNotificationsOpen);
     const isChatOpen = useAppStore(s => s.isChatOpen);
     const setIsChatOpen = useAppStore(s => s.setChatOpen);
     const setIsLoadingDate = useAppStore(s => s.setIsLoadingDate);
@@ -132,6 +136,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setActiveCall,
         isChallengeOpen,
         setIsChallengeOpen,
+        isNotificationsOpen,
+        setIsNotificationsOpen,
         isChatOpen,
         setIsChatOpen,
         onlineUsers,
@@ -144,6 +150,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setChallengeUnreadCount, serverDateResponse?.formatted, isLoadingDate,
         setIsLoadingDate, stats, setStats, activeCall,
         setActiveCall, isChallengeOpen, setIsChallengeOpen,
+        isNotificationsOpen, setIsNotificationsOpen,
         isChatOpen, setIsChatOpen, onlineUsers, allProfiles,
         audioChat, activeVoiceRooms
     ]);

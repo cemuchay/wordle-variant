@@ -8,6 +8,7 @@ const InfoModal = lazy(() => import('../InfoModal').then(m => ({ default: m.Info
 const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default: m.SettingsModal })));
 const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
 const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
+const NotificationModal = lazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
@@ -17,6 +18,7 @@ interface ModalsManagerProps {
         isInfoOpen: boolean;
         isStatsOpen: boolean;
         isChallengeOpen: boolean;
+        isNotificationsOpen: boolean;
         isGameOverOpen: boolean;
     };
     actions: {
@@ -24,6 +26,7 @@ interface ModalsManagerProps {
         setInfoOpen: (open: boolean) => void;
         setStatsOpen: (open: boolean) => void;
         setChallengeOpen: (open: boolean) => void;
+        setNotificationsOpen: (open: boolean) => void;
         setGameOverOpen: (open: boolean) => void;
     };
     gameContext: {
@@ -89,6 +92,10 @@ export const ModalsManager = ({
                     onChallengeCreated={onChallengeCreated}
                     initialChallengeId={new URLSearchParams(window.location.search).get('challenge')}
                 />
+            )}
+
+            {modals.isNotificationsOpen && (
+                <NotificationModal />
             )}
 
             {modals.isGameOverOpen && gameContext.guesses && gameContext.guesses.length > 0 && gameContext.config && (
