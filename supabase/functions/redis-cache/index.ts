@@ -148,7 +148,7 @@ serve(async (req) => {
       // Cache Miss: Query profiles table
       const { data: profile, error } = await supabaseClient
         .from("profiles")
-        .select("id, username, avatar_url, updated_at, last_seen_at")
+        .select("id, username, avatar_url, updated_at, last_seen_at, daily_wins, weekly_wins, monthly_wins")
         .eq("id", userId)
         .single();
 

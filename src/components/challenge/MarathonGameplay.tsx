@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useCallback, useMemo } from 'react';
+import { Clock } from 'lucide-react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
@@ -64,6 +65,13 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                         </p>
                     </div>
                 </div>
+                {!isFinished && challenge.mode === 'LIVE' && (
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-gray-500 uppercase flex items-center gap-1 justify-end">
+                            <Clock size={10} className="text-red-500/50" /> {challenge.marathon_timers?.[l] || challenge.max_time}m
+                        </p>
+                    </div>
+                )}
                 {prog && (
                     <div className="text-right">
                         <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/{MAX_ATTEMPTS} Tries</p>

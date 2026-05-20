@@ -146,33 +146,35 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-                {/* Me Row */}
+                {/* Me / Host Row */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-black text-xs ${isLeader ? 'border-correct bg-correct text-black' : 'border-white/10 text-white'}`}>
-                            Me
+                            {status === 'host' ? '👑' : 'Me'}
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase text-gray-500">My Progress</p>
-                            <p className={`text-xs font-black uppercase ${status === 'completed' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-400'}`}>
+                            <p className="text-[10px] font-black uppercase text-gray-500">{status === 'host' ? 'My Role' : 'My Progress'}</p>
+                            <p className={`text-xs font-black uppercase ${status === 'completed' || status === 'host' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-400'}`}>
                                 {status}
                             </p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-[10px] font-black uppercase text-gray-500">Score</p>
-                        <div className="flex flex-col items-end">
-                            <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
-                                {hasStarted ? myScore : '--'}
-                            </p>
-                            {hasStarted && mode === 'LIVE' && time_taken && (
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-white/40">
-                                    <Clock size={8} />
-                                    <span>{formatTime(time_taken)}</span>
-                                </div>
-                            )}
+                    {status !== 'host' && (
+                        <div className="text-right">
+                            <p className="text-[10px] font-black uppercase text-gray-500">Score</p>
+                            <div className="flex flex-col items-end">
+                                <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
+                                    {hasStarted ? myScore : '--'}
+                                </p>
+                                {hasStarted && mode === 'LIVE' && time_taken && (
+                                    <div className="flex items-center gap-1 text-[9px] font-bold text-white/40">
+                                        <Clock size={8} />
+                                        <span>{formatTime(time_taken)}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <div className="h-px bg-white/5 w-full" />

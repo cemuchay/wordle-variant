@@ -168,9 +168,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const challenge = item.challenge;
             const isExpired = new Date(challenge.expires_at) < new Date();
             const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            const isHost = item.status === 'host';
 
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+            if (statusFilter === 'ACTIVE' && (isFinished || isExpired) && !isHost) return false;
+            if (statusFilter === 'COMPLETED' && (!isFinished && !isExpired) && !isHost) return false;
+            // Hosts stay in active until expired
+            if (isHost && statusFilter === 'COMPLETED') return false;
+            if (isHost && isExpired && statusFilter === 'ACTIVE') return false;
             if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
             if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
 
@@ -197,6 +201,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
+        if (p.status === 'host') return p;
         // Marathon mode uses per-word timers, bypass global LIVE timeout
         if (challenge.word_length === 1) return p;
 
@@ -343,14 +348,17 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
         });
+        
         if (error) {
             console.error("Error creating guest profile:", error);
+            triggerToast("Failed to create guest profile. Please try again.", 4000);
+            return null;
         }
 
         const newUser = { id: anonId, username: nickname, user_metadata: { full_name: nickname } };
         setAnonUser(newUser);
         return newUser;
-    }, []);
+    }, [triggerToast]);
 
     // Auto-join when selectedChallenge is active and effectiveUser becomes available
     useEffect(() => {
