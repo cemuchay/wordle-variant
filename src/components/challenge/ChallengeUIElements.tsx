@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Clock } from 'lucide-react';
+import { Clock, Trophy, Shield, Globe, Lock, Sparkles, User, Users, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatTime } from './lib';
 
 export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
@@ -113,129 +113,233 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
         participants.filter((p: any) => p.user_id !== user?.id),
         [participants, user?.id]);
 
+    // Find the current leader profile
+    const leaderParticipant = useMemo(() => {
+        if (maxScore === 0) return null;
+        return participants.find((p: any) => p.score === maxScore);
+    }, [participants, maxScore]);
+
     const formattedDate = useMemo(() => {
         const d = new Date(created_at);
-        return `${d.toLocaleDateString()} - ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }, [created_at]);
+
+    const isMarathon = word_length === 1;
 
     return (
         <button
             onClick={handleSelect}
-            className={`w-full text-left bg-linear-to-br from-white/3 to-transparent border ${isLeader && !isExpired ? 'border-correct/20' : 'border-white/5'} p-5 rounded-4xl hover:border-white/20 transition-all group relative overflow-hidden`}
+            className={`w-full text-left bg-gradient-to-br from-white/5 to-transparent border ${
+                isLeader && !isExpired 
+                    ? 'border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)]' 
+                    : mode === 'LIVE' && !isExpired 
+                        ? 'border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/30' 
+                        : 'border-white/5 hover:border-white/15'
+            } p-5 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
         >
-            {/* Background Glow for Leader */}
+            {/* Ambient Background Glows */}
             {isLeader && !isExpired && (
                 <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-2xl -mr-16 -mt-16 pointer-events-none" />
             )}
+            {mode === 'LIVE' && !isExpired && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+            )}
 
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter ${mode === 'LIVE' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-correct/10 text-correct border border-correct/20'}`}>
-                        {mode}
-                    </div>
-                    <div className="bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
-                        <span className="text-[9px] font-black uppercase tracking-tighter text-white/50">
-                            {word_length === 1 ? 'Marathon' : `${word_length} Letters`}
-                        </span>
-                    </div>
+            {/* HEADER ROW */}
+            <div className="flex items-center justify-between w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Mode Pill */}
+                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                        mode === 'LIVE' 
+                            ? 'bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30' 
+                            : 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30'
+                    }`}>
+                        {mode === 'LIVE' ? (
+                            <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping inline-block mr-0.5" />
+                                <Zap size={10} className="fill-current text-red-400" />
+                                LIVE RACE
+                            </>
+                        ) : (
+                            <>
+                                <Clock size={10} />
+                                ASYNC PLAY
+                            </>
+                        )}
+                    </span>
+
+                    {/* Word Size / Mode Pill */}
+                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                        isMarathon 
+                            ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30' 
+                            : 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30'
+                    }`}>
+                        {isMarathon ? (
+                            <>
+                                <Trophy size={10} />
+                                MARATHON
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={10} />
+                                {word_length} LETTERS
+                            </>
+                        )}
+                    </span>
                 </div>
-                {!isExpired && !isFinished && (
-                    <ExpirationTimer expiresAt={expires_at} createdAt={created_at} />
-                )}
-                {isExpired && <span className="text-red-500 text-[10px] font-black uppercase tracking-widest">Expired</span>}
+
+                {/* Expiry Timer */}
+                <div className="flex items-center gap-1.5">
+                    {!isExpired && !isFinished ? (
+                        <ExpirationTimer expiresAt={expires_at} createdAt={created_at} />
+                    ) : isExpired ? (
+                        <span className="text-red-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                            <AlertCircle size={10} />
+                            Expired
+                        </span>
+                    ) : (
+                        <span className="text-correct text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle2 size={10} />
+                            Done
+                        </span>
+                    )}
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-                {/* Me / Host Row */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-black text-xs ${isLeader ? 'border-correct bg-correct text-black' : 'border-white/10 text-white'}`}>
-                            {status === 'host' ? '👑' : 'Me'}
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase text-gray-500">{status === 'host' ? 'My Role' : 'My Progress'}</p>
-                            <p className={`text-xs font-black uppercase ${status === 'completed' || status === 'host' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-400'}`}>
-                                {status}
-                            </p>
-                        </div>
+            {/* CONFIGURATION OPTIONS SUB-LINE */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[8px] font-bold text-gray-400 border-t border-b border-white/5 py-2 w-full">
+                {/* Privacy Badge */}
+                <span className="flex items-center gap-1">
+                    {challenge.is_public ? (
+                        <Globe size={9} className="text-emerald-400" />
+                    ) : (
+                        <Lock size={9} className="text-amber-400" />
+                    )}
+                    {challenge.is_public ? 'Public' : 'Private'}
+                </span>
+
+                {/* Custom Word Badge */}
+                {challenge.is_custom_word && (
+                    <span className="flex items-center gap-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded">
+                        <Sparkles size={9} />
+                        Custom Word
+                    </span>
+                )}
+
+                {/* Handicap Badge */}
+                {(challenge.handicap_starter || challenge.handicap_starters) && (
+                    <span className="flex items-center gap-1 bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded">
+                        <Shield size={9} />
+                        Handicap
+                    </span>
+                )}
+
+                {/* Host Creator Profile */}
+                <span className="flex items-center gap-1 ml-auto text-gray-500">
+                    <User size={9} />
+                    by @{challenge.creator?.username || 'Host'}
+                </span>
+            </div>
+
+            {/* PROGRESS SPLIT GRID */}
+            <div className="grid grid-cols-2 gap-3 w-full">
+                {/* My Stats Box */}
+                <div className="bg-black/15 border border-white/5 p-3 rounded-2xl flex flex-col gap-1.5 justify-between">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black uppercase text-gray-500 tracking-wider">My Status</span>
+                        {isLeader && !isExpired && (
+                            <span className="text-[7px] font-black text-correct bg-correct/10 border border-correct/20 px-1.5 py-0.2 rounded-full uppercase tracking-tighter">
+                                Leader
+                            </span>
+                        )}
                     </div>
-                    {status !== 'host' && (
-                        <div className="text-right">
-                            <p className="text-[10px] font-black uppercase text-gray-500">Score</p>
-                            <div className="flex flex-col items-end">
-                                <p className={`text-xl font-black ${isLeader ? 'text-correct' : hasStarted ? 'text-red-500' : 'text-white'}`}>
-                                    {hasStarted ? myScore : '--'}
-                                </p>
-                                {hasStarted && mode === 'LIVE' && time_taken && (
-                                    <div className="flex items-center gap-1 text-[9px] font-bold text-white/40">
-                                        <Clock size={8} />
-                                        <span>{formatTime(time_taken)}</span>
-                                    </div>
-                                )}
-                            </div>
+                    
+                    <div className="flex items-baseline justify-between">
+                        <span className={`text-[11px] font-black uppercase ${
+                            status === 'completed' || status === 'host' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-500'
+                        }`}>
+                            {status === 'host' ? 'Host (Spectating)' : status}
+                        </span>
+                        {status !== 'host' && hasStarted && (
+                            <span className="text-lg font-black text-white">{myScore} <span className="text-[9px] font-medium text-gray-500">pts</span></span>
+                        )}
+                    </div>
+
+                    {status !== 'host' && hasStarted && (
+                        <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-1 pt-1 border-t border-white/5">
+                            <span>{(item.attempts || item.guesses?.length || 0)} {(item.attempts || item.guesses?.length || 0) === 1 ? 'Guess' : 'Guesses'}</span>
+                            {mode === 'LIVE' && time_taken && (
+                                <span className="flex items-center gap-0.5 text-gray-400">
+                                    <Clock size={8} />
+                                    {formatTime(time_taken)}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
 
-                <div className="h-px bg-white/5 w-full" />
+                {/* Opponents Stats Box */}
+                <div className="bg-black/15 border border-white/5 p-3 rounded-2xl flex flex-col gap-1.5 justify-between">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black uppercase text-gray-500 tracking-wider">Opponents ({opponents.length})</span>
+                        <span className="flex items-center gap-0.5 text-[8px] font-bold text-gray-400">
+                            <Users size={9} />
+                            {participants.length} total
+                        </span>
+                    </div>
 
-                {/* Opponents Section */}
-                <div className="space-y-3">
                     {opponents.length > 0 ? (
-                        opponents.map((p: any) => {
-                            const pScore = p.score || 0;
-                            const isPLeader = pScore === maxScore && pScore > 0;
-                            const pStarted = p.status !== 'pending';
-
-                            return (
-                                <div key={p.id} className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 opacity-80">
-                                        <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 overflow-hidden">
+                        <div className="flex flex-col gap-1">
+                            {/* Avatar facepile */}
+                            <div className="flex items-center gap-1 mb-1">
+                                <div className="flex -space-x-2 overflow-hidden">
+                                    {opponents.slice(0, 3).map((p: any) => (
+                                        <div key={p.id} className="inline-block h-5 w-5 rounded-full ring-2 ring-black bg-white/5 overflow-hidden">
                                             {p.profiles?.avatar_url ? (
-                                                <img src={p.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                <img src={p.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-[10px] font-black">
+                                                <div className="h-full w-full flex items-center justify-center text-[7px] font-black uppercase text-white bg-white/10 ring-1 ring-white/20">
                                                     {p.profiles?.username?.substring(0, 2).toUpperCase() || '??'}
                                                 </div>
                                             )}
                                         </div>
-                                        <div>
-                                            <p className="text-[11px] font-black text-white truncate max-w-[100px]">
-                                                {p.profiles?.username || 'Unknown'}
-                                            </p>
-                                            <p className={`text-[9px] font-black uppercase ${p.status === 'completed' ? 'text-correct/60' : 'text-gray-500'}`}>
-                                                {p.status}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="flex flex-col items-end">
-                                            <p className={`text-base font-black ${isPLeader ? 'text-correct' : pStarted ? 'text-red-500' : 'text-white/20'}`}>
-                                                {pStarted ? pScore : '--'}
-                                            </p>
-                                            {pStarted && mode === 'LIVE' && p.time_taken && (
-                                                <div className="flex items-center gap-1 text-[8px] font-bold text-white/30">
-                                                    <Clock size={7} />
-                                                    <span>{formatTime(p.time_taken)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
-                            );
-                        })
+                                {opponents.length > 3 && (
+                                    <span className="text-[8px] font-bold text-gray-500 ml-1">+{opponents.length - 3} more</span>
+                                )}
+                            </div>
+
+                            {/* Top Opponent Text summary */}
+                            {leaderParticipant ? (
+                                <p className="text-[9px] font-bold text-gray-400 truncate">
+                                    Leader:{' '}
+                                    <span className="text-white">
+                                        @{leaderParticipant.profiles?.username || 'Player'}
+                                    </span>{' '}
+                                    ({leaderParticipant.score} pts)
+                                </p>
+                            ) : (
+                                <p className="text-[9px] font-bold text-gray-500 italic">No submissions yet</p>
+                            )}
+                        </div>
                     ) : (
-                        <p className="text-[10px] font-black uppercase text-gray-600 text-center py-2 italic">
-                            Waiting for opponents...
-                        </p>
+                        <div className="flex flex-col items-center justify-center py-1">
+                            <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest italic animate-pulse">
+                                Waiting for others
+                            </p>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* Footer Date */}
-            <div className="mt-4 pt-3 border-t border-white/5 flex justify-end">
-                <span className="text-[12px] font-black uppercase tracking-widest text-white">
-                    {formattedDate}
+            {/* Footer Row */}
+            <div className="flex items-center justify-between w-full border-t border-white/5 pt-2 mt-1">
+                <span className="text-[8px] font-bold text-gray-500 uppercase">
+                    Created {formattedDate}
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-correct group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                    Enter Lobby &rarr;
                 </span>
             </div>
         </button>

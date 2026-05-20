@@ -4,6 +4,7 @@ import { getWordLists } from '../data/words';
 import { calculateSkillIndex, checkGuess, deobfuscateWord, getHint, getLetterStatuses, isHintDisabled } from '../lib/game-logic';
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
 import { useChallengeStore } from '../store/useChallengeStore';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 interface UseChallengeGameEngineProps {
     challenge: any;
@@ -19,6 +20,7 @@ export const useChallengeGameEngine = ({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete
 }: UseChallengeGameEngineProps) => {
     const setTimeLeftStore = useChallengeStore(state => state.setTimeLeft);
+    const { ask } = useConfirmation();
     const isMarathon = challenge.word_length === 1;
 
     const effectiveMaxTime = useMemo(() => {
@@ -393,6 +395,22 @@ export const useChallengeGameEngine = ({
             return;
         }
 
+        const alreadyGuessed = guesses.some((guess: any) => {
+            const word = guess.map((charObj: any) => charObj.letter).join('').toUpperCase();
+            return word === upperGuess;
+        });
+
+        if (alreadyGuessed) {
+            const confirmSubmit = await ask({
+                title: "Duplicate Guess",
+                message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
+                confirmLabel: "Yes, submit",
+                cancelLabel: "No, cancel",
+                type: "info"
+            });
+            if (!confirmSubmit) return;
+        }
+
         const result = checkGuess(upperGuess, targetWord);
         const newGuesses = [...guesses, result];
         const newStatuses = getLetterStatuses(newGuesses);
@@ -505,7 +523,7 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, effectiveMaxTime, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish]);
+    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, effectiveMaxTime, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish, ask]);
 
     const handleHint = useCallback(async () => {
         if (isGameOver) return;
