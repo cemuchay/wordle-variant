@@ -9,6 +9,7 @@ const SettingsModal = lazy(() => import('../SettingsModal').then(m => ({ default
 const StatsModal = lazy(() => import('../StatsModal').then(m => ({ default: m.StatsModal })));
 const AnnouncementModal = lazy(() => import('../AnnouncementModal').then(m => ({ default: m.AnnouncementModal })));
 const NotificationModal = lazy(() => import('../notifications/NotificationModal').then(m => ({ default: m.NotificationModal })));
+const AuthModal = lazy(() => import('../AuthModal').then(m => ({ default: m.AuthModal })));
 
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 
@@ -19,6 +20,7 @@ interface ModalsManagerProps {
         isStatsOpen: boolean;
         isChallengeOpen: boolean;
         isNotificationsOpen: boolean;
+        isAuthOpen: boolean;
         isGameOverOpen: boolean;
     };
     actions: {
@@ -27,6 +29,7 @@ interface ModalsManagerProps {
         setStatsOpen: (open: boolean) => void;
         setChallengeOpen: (open: boolean) => void;
         setNotificationsOpen: (open: boolean) => void;
+        setAuthOpen: (open: boolean) => void;
         setGameOverOpen: (open: boolean) => void;
     };
     gameContext: {
@@ -99,6 +102,13 @@ export const ModalsManager = ({
 
             {modals.isNotificationsOpen && (
                 <NotificationModal />
+            )}
+
+            {modals.isAuthOpen && (
+                <AuthModal
+                    isOpen={modals.isAuthOpen}
+                    onClose={() => actions.setAuthOpen(false)}
+                />
             )}
 
             {modals.isGameOverOpen && gameContext.guesses && gameContext.guesses.length > 0 && gameContext.config && (

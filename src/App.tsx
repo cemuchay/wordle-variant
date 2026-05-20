@@ -59,6 +59,7 @@ export default function App() {
     const [statsActiveTab, setStatsActiveTab] = useState<'stats' | 'leaderboard'>('stats');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
+    const [isAuthOpen, setIsAuthOpen] = useState(false);
 
     // Listen to custom event to open stats modal at a specific tab
     useEffect(() => {
@@ -75,11 +76,18 @@ export default function App() {
         return () => window.removeEventListener('open-stats-modal', handleOpenStats);
     }, []);
 
+    // Listen to custom event to open auth modal
+    useEffect(() => {
+        const handleOpenAuth = () => setIsAuthOpen(true);
+        window.addEventListener('open-auth-modal', handleOpenAuth);
+        return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
+    }, []);
+
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
 
     // Keyboard Input
-    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen);
+    useKeyboard(actions, isChatOpen || !isHydrated || isChallengeOpen || isStatsOpen || isSettingsOpen || isInfoOpen || isNotificationsOpen || isAuthOpen);
 
 
     const handleChallengeCreated = () => {
@@ -147,6 +155,7 @@ export default function App() {
                             isStatsOpen,
                             isChallengeOpen,
                             isNotificationsOpen,
+                            isAuthOpen,
                             isGameOverOpen: state.isGameOverModalOpen
                         }}
                         actions={{
@@ -155,6 +164,7 @@ export default function App() {
                             setStatsOpen: setIsStatsOpen,
                             setChallengeOpen: setIsChallengeOpen,
                             setNotificationsOpen: setIsNotificationsOpen,
+                            setAuthOpen: setIsAuthOpen,
                             setGameOverOpen: actions.setGameOverModalOpen
                         }}
                         gameContext={{

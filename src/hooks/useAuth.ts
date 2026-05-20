@@ -25,14 +25,36 @@ export const useAuth = () => {
 
   const { triggerToast } = useApp();
 
-  const signInWithGoogle = async () => {
+  const signInWithProvider = async (provider: 'google' | 'apple' | 'facebook') => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: {
         redirectTo: window.location.origin,
       },
     });
-    if (error) console.error("Login error:", error.message);
+    if (error) {
+      console.error(`${provider} Login error:`, error.message);
+      triggerToast(error.message);
+    }
+    return { error };
+  };
+
+  const signInWithGoogle = async () => {
+    return signInWithProvider('google');
+  };
+
+  const signInWithEmail = async (email: string, pass: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pass,
+    });
+    if (error) {
+      console.error("Email Login error:", error.message);
+      triggerToast(error.message);
+    } else {
+      triggerToast("Signed in successfully!");
+    }
+    return { data, error };
   };
 
   const signOut = async () => {
@@ -51,5 +73,5 @@ export const useAuth = () => {
     }
   };
 
-  return { user, loading, signInWithGoogle, signOut };
+  return { user, loading, signInWithGoogle, signInWithProvider, signInWithEmail, signOut };
 };
