@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabaseClient';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
@@ -16,6 +17,7 @@ export const useGameEngine = (date: string) => {
     const [isHydrated, setIsHydrated] = useState(false);
     const { user, loading: isAuthLoading } = useAuth();
     const { triggerToast, preferences } = useApp();
+    const { ask } = useConfirmation();
     const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
     const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
@@ -162,6 +164,22 @@ export const useGameEngine = (date: string) => {
             return;
         }
 
+        const alreadyGuessed = state.guesses.some((guess: any) => {
+            const word = guess.map((charObj: any) => charObj.letter).join('').toUpperCase();
+            return word === upperGuess;
+        });
+
+        if (alreadyGuessed) {
+            const confirmSubmit = await ask({
+                title: "Duplicate Guess",
+                message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
+                confirmLabel: "Yes, submit",
+                cancelLabel: "No, cancel",
+                type: "info"
+            });
+            if (!confirmSubmit) return;
+        }
+
         const result = checkGuess(upperGuess, config.word);
         const won = upperGuess === config.word;
         const lost = (state.guesses.length + 1) === config.maxAttempts;
@@ -219,7 +237,7 @@ export const useGameEngine = (date: string) => {
                 triggerToast(message || state.gameMessage, TOAST_DURATION.LONG + 1000);
             }, revealDelay);
         }
-    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync]);
+    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync, ask]);
 
     const handleHint = useCallback(async () => {
         if (state.guesses.length < 2 || state.isGameOver) return;

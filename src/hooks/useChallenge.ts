@@ -15,6 +15,7 @@ export interface Challenge {
     expires_at: string;
     created_at: string;
     creator_profile?: { username: string, avatar_url: string };
+    creator?: any;
     participants?: ChallengeParticipant[];
     is_public?: boolean;
     max_participants?: number | null;
