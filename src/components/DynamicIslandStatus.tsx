@@ -113,7 +113,7 @@ export const DynamicIslandStatus = () => {
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={`
                     pointer-events-auto cursor-pointer overflow-hidden
-                    bg-black/70 backdrop-blur-xl border border-white/10
+                    bg-black/20 backdrop-blur-md border border-white/10
                     shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                     flex flex-col items-center justify-center
                     transition-all duration-500 ease-in-out
