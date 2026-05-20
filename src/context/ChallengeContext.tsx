@@ -196,52 +196,97 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, []);
 
     const handleViewChallenge = useCallback(async (id: string) => {
-        // Manual fetch using TanStack Query's queryClient to maintain cache and consistency
-        const challenge = await queryClient.fetchQuery({
-            queryKey: ['challenge', id],
-            queryFn: async () => {
-                const { data, error } = await supabase
-                    .from('challenges')
-                    .select(`
-                        *, 
-                        profiles!creator_id(username, avatar_url),
-                        participants:challenge_participants(
-                            *,
-                            profiles(username, avatar_url),
-                            marathon_progress:challenge_participants_marathon(*)
-                        )
-                    `)
-                    .eq('id', id)
-                    .maybeSingle();
+        // 1. Check local cache (myChallenges) for immediate display
+        const localMatch = myChallenges.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
 
-                if (error) throw error;
-                if (data) {
-                    const c = data as any;
-                    c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
-                    return c as Challenge;
-                }
-                return null;
-            }
-        });
+        if (localMatch && localMatch.challenge) {
+            const cachedChallenge = { ...localMatch.challenge };
+            // Ensure participants are correctly mapped
+            cachedChallenge.participants = cachedChallenge.participants?.map((p: any) => normalizeParticipation(p, cachedChallenge)) || [];
 
-        if (challenge) {
-            if (new Date(challenge.expires_at) < new Date()) {
-                triggerToast("This challenge has expired.", 4000);
-                return;
-            }
-            cleanupSubscription();
-            setSelectedChallenge(challenge);
-
-            const participation = await joinMutation.mutateAsync({ challengeId: challenge.id, userId: user.id });
-            const normalizedPart = normalizeParticipation(participation, challenge);
-
-            setMyParticipation(normalizedPart);
+            setSelectedChallenge(cachedChallenge);
+            setMyParticipation(normalizeParticipation(localMatch, cachedChallenge));
             setActiveTab('join');
-            channelRef.current = subscribeToParticipants(challenge.id);
         } else {
-            triggerToast("Invalid challenge link or code.", 4000);
+            // Only if not found in local cache, we might need a loading state
+            // But setSelectedChallenge(null) would cause a blank screen, 
+            // so we only do it if we are switching to a totally new ID
+            if (selectedChallenge?.id !== id) {
+                setSelectedChallenge(null);
+            }
         }
-    }, [queryClient, normalizeParticipation, triggerToast, cleanupSubscription, setSelectedChallenge, setMyParticipation, setActiveTab, joinMutation, user.id, subscribeToParticipants]);
+
+        // 2. Background Refresh / Fetch Detailed Data
+        try {
+            const challengePromise = queryClient.fetchQuery({
+                queryKey: ['challenge', id],
+                queryFn: async () => {
+                    const { data, error } = await supabase
+                        .from('challenges')
+                        .select(`
+                            *, 
+                            profiles!creator_id(username, avatar_url),
+                            participants:challenge_participants(
+                                *,
+                                profiles(username, avatar_url),
+                                marathon_progress:challenge_participants_marathon(*)
+                            )
+                        `)
+                        .eq('id', id)
+                        .maybeSingle();
+
+                    if (error) throw error;
+                    if (data) {
+                        const c = data as any;
+                        c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
+                        return c as Challenge;
+                    }
+                    return null;
+                }
+            });
+
+            // If we didn't have local data, we MUST wait for the challenge
+            let challenge = localMatch?.challenge;
+            if (!challenge) {
+                challenge = await challengePromise;
+            }
+
+            if (challenge) {
+                if (new Date(challenge.expires_at) < new Date()) {
+                    triggerToast("This challenge has expired.", 4000);
+                    return;
+                }
+
+                cleanupSubscription();
+                setSelectedChallenge(challenge);
+
+                // Join mutation in background or awaited if participation is missing
+                const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: user.id });
+
+                let participation = localMatch;
+                if (!participation) {
+                    participation = await participationPromise;
+                } else {
+                    // Refresh participation in background
+                    participationPromise.then(p => {
+                        setMyParticipation(normalizeParticipation(p, challenge));
+                    });
+                }
+
+                const normalizedPart = normalizeParticipation(participation, challenge);
+                setMyParticipation(normalizedPart);
+                setActiveTab('join');
+
+                // Subscription is fast, can stay here
+                channelRef.current = subscribeToParticipants(challenge.id);
+            } else {
+                triggerToast("Invalid challenge link or code.", 4000);
+            }
+        } catch (err) {
+            console.error("Failed to load challenge details", err);
+            triggerToast("Failed to load challenge details.", 4000);
+        }
+    }, [myChallenges, normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, selectedChallenge?.id, queryClient, cleanupSubscription, joinMutation, user.id, subscribeToParticipants, triggerToast]);
 
     const handleCreate = useCallback(async () => {
         const challenge = await createMutation.mutateAsync({

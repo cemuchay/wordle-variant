@@ -141,7 +141,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">Participants ({participants.length})</h4>
                 </div>
                 <div className="space-y-2">
-                    {loading ? (
+                    {loading && participants.length === 0 ? (
                         [1, 2].map(i => (
                             <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse border border-white/5" />
                         ))

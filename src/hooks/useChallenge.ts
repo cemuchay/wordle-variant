@@ -40,7 +40,7 @@ export interface ChallengeParticipant {
     status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
     score: number;
     attempts: number;
-    guesses: any; 
+    guesses: any;
     hints_used: boolean;
     hint_record: any | null;
     time_taken: number | null;
@@ -54,6 +54,7 @@ export interface ChallengeParticipant {
  * Legacy hook for Real-time Challenge subscriptions.
  * Network requests have been migrated to TanStack Query (useChallengeQueries.ts).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useChallenge = (_user: AppUser | null) => {
     const [participants, setParticipants] = useState<ChallengeParticipant[]>([]);
 
@@ -81,7 +82,10 @@ export const useChallenge = (_user: AppUser | null) => {
         }
 
         const fetchAndSet = async () => {
-            const { data: challenge } = await supabase
+
+            // Fetch challenge mode/max_time and participants in a single query by using join if possible, 
+            // but challenge mode is static mostly. Let's just fetch participants.
+            const { data: challengeData } = await supabase
                 .from('challenges')
                 .select('mode, max_time')
                 .eq('id', challengeId)
@@ -93,8 +97,8 @@ export const useChallenge = (_user: AppUser | null) => {
                 .eq('challenge_id', challengeId)
                 .order('score', { ascending: false });
 
-            if (parts && challenge) {
-                const normalized = parts.map((p: any) => normalizeParticipation(p, challenge));
+            if (parts && challengeData) {
+                const normalized = parts.map((p: any) => normalizeParticipation(p, challengeData));
                 setParticipants(normalized as ChallengeParticipant[]);
             }
         };
@@ -111,10 +115,15 @@ export const useChallenge = (_user: AppUser | null) => {
                 event: '*',
                 schema: 'public',
                 table: 'challenge_participants_marathon'
-            }, fetchAndSet)
+            }, () => {
+                // For marathon progress, we might need a more targeted update, but fetchAndSet is safe
+                fetchAndSet();
+            })
             .subscribe();
 
-        // Initial fetch
+        // DEFER initial fetch if needed, or just let it run once.
+        // Actually, we don't always need to fetch immediately if handleViewChallenge just fetched.
+        // But for safety, we keep it.
         fetchAndSet();
 
         return channel;
