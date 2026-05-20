@@ -16,6 +16,12 @@ export interface Challenge {
     created_at: string;
     creator_profile?: { username: string, avatar_url: string };
     participants?: ChallengeParticipant[];
+    is_public?: boolean;
+    max_participants?: number | null;
+    is_custom_word?: boolean;
+    handicap_starter?: string | null;
+    handicap_starters?: any;
+    handicap_enforced?: boolean;
 }
 
 export interface MarathonProgress {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAvailableProfiles, useChallengeMutations, useMyChallenges } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
@@ -45,12 +45,13 @@ interface ChallengeContextType {
 
     // Actions
     handleViewChallenge: (id: string) => Promise<void>;
-    handleCreate: () => Promise<void>;
+    handleCreate: (params?: any) => Promise<void>;
     handleStartGame: () => Promise<void>;
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
     loadMyChallenges: () => Promise<void>;
     submitResult: (result: any, wordLength?: number) => Promise<boolean>;
+    registerAnonymousUser: (nickname: string) => Promise<any>;
 
     // Helpers
     loading: boolean;
@@ -64,6 +65,7 @@ interface ChallengeContextType {
     unplayedCount: number;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
+    effectiveUser: any;
 }
 
 const ChallengeContext = createContext<ChallengeContextType | undefined>(undefined);
@@ -76,6 +78,21 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 }) => {
     const { triggerToast, setChallengeUnreadCount } = useApp();
     const queryClient = useQueryClient();
+
+    // Anonymous / Guest User Support
+    const [anonUser, setAnonUser] = useState<any>(() => {
+        const id = localStorage.getItem('wordle_anon_id');
+        const username = localStorage.getItem('wordle_anon_username');
+        if (id && username) {
+            return { id, username, user_metadata: { full_name: username } };
+        }
+        return null;
+    });
+
+    const effectiveUser = useMemo(() => {
+        if (user) return user;
+        return anonUser;
+    }, [user, anonUser]);
 
     // 1. Store State & Actions (Destructured for stability)
     const activeTab = useChallengeStore(s => s.activeTab);
@@ -115,8 +132,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setBackAction = useChallengeStore(s => s.setBackAction);
 
     // 1. Server Data (TanStack Query)
-    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(user?.id);
-    const { data: profilesData } = useAvailableProfiles(user?.id);
+    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(effectiveUser?.id);
+    const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
         createChallenge: createMutation,
         submitResult: submitMutation,
@@ -159,14 +176,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
             if (searchQuery) {
                 const opponentNames = challenge.participants
-                    ?.filter((p: any) => p.user_id !== user?.id)
+                    ?.filter((p: any) => p.user_id !== effectiveUser?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
                     .join(' ');
                 if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
             }
             return true;
         });
-    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, user?.id]);
+    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
 
     // 4. Action Wrappers
     const cleanupSubscription = useCallback(() => {
@@ -201,18 +218,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
         if (localMatch && localMatch.challenge) {
             const cachedChallenge = { ...localMatch.challenge };
-            // Ensure participants are correctly mapped
             cachedChallenge.participants = cachedChallenge.participants?.map((p: any) => normalizeParticipation(p, cachedChallenge)) || [];
 
             setSelectedChallenge(cachedChallenge);
             setMyParticipation(normalizeParticipation(localMatch, cachedChallenge));
             setActiveTab('join');
         } else {
-            // Only if not found in local cache, we might need a loading state
-            // But setSelectedChallenge(null) would cause a blank screen, 
-            // so we only do it if we are switching to a totally new ID
             if (selectedChallenge?.id !== id) {
                 setSelectedChallenge(null);
+                setMyParticipation(null);
             }
         }
 
@@ -245,7 +259,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             });
 
-            // If we didn't have local data, we MUST wait for the challenge
             let challenge = localMatch?.challenge;
             if (!challenge) {
                 challenge = await challengePromise;
@@ -259,42 +272,110 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
                 cleanupSubscription();
                 setSelectedChallenge(challenge);
-
-                // Join mutation in background or awaited if participation is missing
-                const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: user.id });
-
-                let participation = localMatch;
-                if (!participation) {
-                    participation = await participationPromise;
-                } else {
-                    // Refresh participation in background
-                    participationPromise.then(p => {
-                        setMyParticipation(normalizeParticipation(p, challenge));
-                    });
-                }
-
-                const normalizedPart = normalizeParticipation(participation, challenge);
-                setMyParticipation(normalizedPart);
                 setActiveTab('join');
 
-                // Subscription is fast, can stay here
+                // If user is authenticated or has guest ID, load/join participation
+                if (effectiveUser) {
+                    const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
+                    if (!isCreatorOfCustom) {
+                        const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id });
+
+                        let participation = localMatch;
+                        if (!participation) {
+                            participation = await participationPromise;
+                        } else {
+                            participationPromise.then(p => {
+                                setMyParticipation(normalizeParticipation(p, challenge));
+                            });
+                        }
+
+                        const normalizedPart = normalizeParticipation(participation, challenge);
+                        setMyParticipation(normalizedPart);
+                    } else {
+                        setMyParticipation(null);
+                    }
+                } else {
+                    setMyParticipation(null);
+                }
+
                 channelRef.current = subscribeToParticipants(challenge.id);
             } else {
                 triggerToast("Invalid challenge link or code.", 4000);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Failed to load challenge details", err);
-            triggerToast("Failed to load challenge details.", 4000);
+            triggerToast(err?.message || "Failed to load challenge details.", 4000);
         }
-    }, [myChallenges, normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, selectedChallenge?.id, queryClient, cleanupSubscription, joinMutation, user.id, subscribeToParticipants, triggerToast]);
+    }, [myChallenges, normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, selectedChallenge?.id, queryClient, cleanupSubscription, joinMutation, effectiveUser, subscribeToParticipants, triggerToast]);
 
-    const handleCreate = useCallback(async () => {
+    const joinSelectedChallenge = useCallback(async () => {
+        if (!selectedChallenge || !effectiveUser) return;
+        try {
+            const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            if (isCreatorOfCustom) {
+                setMyParticipation(null);
+                return;
+            }
+
+            const participation = await joinMutation.mutateAsync({ 
+                challengeId: selectedChallenge.id, 
+                userId: effectiveUser.id 
+            });
+            const normalizedPart = normalizeParticipation(participation, selectedChallenge);
+            setMyParticipation(normalizedPart);
+        } catch (err: any) {
+            console.error("Failed to join challenge:", err);
+            triggerToast(err?.message || "Failed to join challenge.", 4000);
+        }
+    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast]);
+
+    const registerAnonymousUser = useCallback(async (nickname: string) => {
+        let anonId = localStorage.getItem('wordle_anon_id');
+        if (!anonId) {
+            anonId = crypto.randomUUID();
+            localStorage.setItem('wordle_anon_id', anonId);
+        }
+        localStorage.setItem('wordle_anon_username', nickname);
+        
+        // Insert profile into database
+        const { error } = await supabase.from('profiles').insert({
+            id: anonId,
+            username: nickname,
+            avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
+        });
+        if (error) {
+            console.error("Error creating guest profile:", error);
+        }
+
+        const newUser = { id: anonId, username: nickname, user_metadata: { full_name: nickname } };
+        setAnonUser(newUser);
+        return newUser;
+    }, []);
+
+    // Auto-join when selectedChallenge is active and effectiveUser becomes available
+    useEffect(() => {
+        if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending) {
+            const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            if (!isCreatorOfCustom) {
+                const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id);
+                if (alreadyParticipant) {
+                    setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
+                } else {
+                    joinSelectedChallenge();
+                }
+            }
+        }
+    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending]);
+
+    const handleCreate = useCallback(async (customParams?: any) => {
+        if (!effectiveUser) return;
         const challenge = await createMutation.mutateAsync({
-            creatorId: user.id,
+            creatorId: effectiveUser.id,
             mode: mode,
             length: length,
             maxTime: mode === 'LIVE' ? maxTime : null,
-            invitedIds: invitedIds
+            invitedIds: invitedIds,
+            ...customParams
         });
 
         if (challenge) {
@@ -307,7 +388,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             resetForm();
             handleViewChallenge(challenge.id);
         }
-    }, [mode, length, maxTime, invitedIds, user.id, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge]);
+    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
@@ -478,8 +559,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setPreviewMarathonLength,
         unplayedCount,
         backAction,
-        setBackAction
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, unplayedCount, backAction, setBackAction]);
+        setBackAction,
+        registerAnonymousUser,
+        effectiveUser
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

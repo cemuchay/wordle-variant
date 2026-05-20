@@ -24,6 +24,7 @@ const GuessPreviewModal: React.FC<{
     myParticipation?: any;
     initialMarathonLength?: number;
     yesterday?: boolean;
+    isCreator?: boolean;
     initialData?: {
         guesses: any[] | null;
         hints_used?: boolean;
@@ -31,7 +32,7 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, yesterday, initialData }) => {
+}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, yesterday, isCreator, initialData }) => {
     const isMarathon = lengthOfWord === 1;
     const [marathonLength, setMarathonLength] = useState<number>(initialMarathonLength || 3);
     const [showTargetWord, setShowTargetWord] = useState(false);
@@ -95,7 +96,7 @@ const GuessPreviewModal: React.FC<{
         };
 
         checkViewerStatus();
-    }, [yesterday, isMarathon, marathonLength, myParticipation, profile?.id, targetDate]);
+    }, [yesterday, isMarathon, marathonLength, myParticipation, profile?.id, targetDate, date]);
 
     useEffect(() => {
         if (isMarathon) {
@@ -105,7 +106,7 @@ const GuessPreviewModal: React.FC<{
 
             const prog = entry.marathon_progress?.find((p: any) => p.word_length === marathonLength);
 
-            if (prog && (isMe || myFinished)) {
+            if (prog && (isMe || myFinished || isCreator)) {
                 // eslint-disable-next-line react-hooks/set-state-in-effect
                 setGameData({
                     guesses: prog.guesses || [],
@@ -148,7 +149,7 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [targetDate, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress]);
+    }, [targetDate, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress, isCreator]);
 
     const getTargetWordToUse = () => {
         let wordToUse = targetWord || getDailyConfig(!!profile, targetDate).word;
@@ -181,7 +182,7 @@ const GuessPreviewModal: React.FC<{
     const username = entry.username || entry.profiles?.username || 'Player';
     const entryUserId = entry.user_id || entry.profiles?.id;
     const isMe = profile?.id === entryUserId;
-    const canSeeDetails = isMe || viewerHasFinished;
+    const canSeeDetails = isMe || viewerHasFinished || isCreator;
 
     return (
 
@@ -203,7 +204,7 @@ const GuessPreviewModal: React.FC<{
                             const viewerFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
                             const isMe = profile?.id === (entry.user_id || entry.profiles?.id);
                             
-                            const canSelect = isMe || (targetPlayed && viewerFinished);
+                            const canSelect = isMe || (targetPlayed && viewerFinished) || isCreator;
 
                             return (
                                 <button

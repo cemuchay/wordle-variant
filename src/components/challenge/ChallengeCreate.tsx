@@ -187,12 +187,124 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite 
     );
 });
 
+import { getWordLists } from '../../data/words';
+import { Shield, Sparkles, Settings2 } from 'lucide-react';
+
+const validateCustomWord = (word: string, len: number) => {
+    const trimmed = word.trim();
+    if (!trimmed) return "Cannot be empty";
+    if (trimmed.length !== len) return `Must be exactly ${len} letters`;
+    const { valid } = getWordLists(len);
+    if (!valid.has(trimmed.toUpperCase())) return `"${trimmed.toUpperCase()}" is not a valid word`;
+    return null;
+};
+
 export const ChallengeCreate = memo(function ChallengeCreate() {
     const {
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
         joinId, setJoinId, handleViewChallenge, handleCreate, loading
     } = useChallengeContext();
+
+    // Advanced UI States
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
+    const [maxParticipants, setMaxParticipants] = useState<number>(10);
+    const [lifespanHours, setLifespanHours] = useState<number>(24);
+
+    // Custom Target Word States
+    const [isCustomWord, setIsCustomWord] = useState(false);
+    const [customWord, setCustomWord] = useState('');
+    const [customWords, setCustomWords] = useState<Record<number, string>>({ 3: '', 4: '', 5: '', 6: '', 7: '' });
+
+    // Handicap States
+    const [isHandicap, setIsHandicap] = useState(false);
+    const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
+    const [handicapEnforced, setHandicapEnforced] = useState(false);
+    const [handicapStarter, setHandicapStarter] = useState('');
+    const [handicapStarters, setHandicapStarters] = useState<Record<number, string>>({ 3: '', 4: '', 5: '', 6: '', 7: '' });
+
+    // Inline errors
+    const errors = useMemo(() => {
+        const errs: string[] = [];
+        const resolvedLength = length === 0 ? 5 : length;
+
+        if (isCustomWord) {
+            if (length === 1) {
+                [3, 4, 5, 6, 7].forEach(l => {
+                    const w = customWords[l];
+                    if (!w) {
+                        errs.push(`Marathon: ${l}-letter word is empty.`);
+                    } else {
+                        const valError = validateCustomWord(w, l);
+                        if (valError) errs.push(`Marathon ${l}-letter: ${valError}`);
+                    }
+                });
+            } else {
+                const valError = validateCustomWord(customWord, resolvedLength);
+                if (valError) errs.push(`Target Word: ${valError}`);
+            }
+        }
+
+        if (isHandicap && handicapMode === 'custom') {
+            if (length === 1) {
+                [3, 4, 5, 6, 7].forEach(l => {
+                    const w = handicapStarters[l];
+                    if (!w) {
+                        errs.push(`Handicap: ${l}-letter starter is empty.`);
+                    } else {
+                        const valError = validateCustomWord(w, l);
+                        if (valError) errs.push(`Handicap ${l}-letter: ${valError}`);
+                        if (isCustomWord && customWords[l] && w.toUpperCase() === customWords[l].toUpperCase()) {
+                            errs.push(`Handicap ${l}-letter starter cannot match target word.`);
+                        }
+                    }
+                });
+            } else {
+                const valError = validateCustomWord(handicapStarter, resolvedLength);
+                if (valError) errs.push(`Handicap Starter: ${valError}`);
+                if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
+                    errs.push(`Handicap starter cannot match target word.`);
+                }
+            }
+        }
+
+        return errs;
+    }, [length, isCustomWord, customWord, customWords, isHandicap, handicapMode, handicapStarter, handicapStarters]);
+
+    const handleCreateTrigger = useCallback(() => {
+        if (errors.length > 0) return;
+
+        const customParams: any = {
+            isPublic,
+            maxParticipants: isPublic ? maxParticipants : null,
+            isCustomWord,
+            lifespanHours
+        };
+
+        if (isCustomWord) {
+            if (length === 1) {
+                customParams.customWords = customWords;
+            } else {
+                customParams.customWord = customWord;
+            }
+        }
+
+        if (isHandicap) {
+            customParams.handicapEnforced = handicapEnforced;
+            if (handicapMode === 'random') {
+                customParams.handicapStarter = '__SYSTEM_RANDOM__';
+            } else {
+                if (length === 1) {
+                    customParams.handicapStarters = handicapStarters;
+                } else {
+                    customParams.handicapStarter = handicapStarter;
+                }
+            }
+        }
+
+        handleCreate(customParams);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStarters, lifespanHours, length, handleCreate]);
 
     return (
         <div className="space-y-6">
@@ -208,6 +320,212 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                 invitedIds={invitedIds} 
                 toggleInvite={toggleInvite} 
             />
+
+            {/* Advanced Settings Button */}
+            <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-between text-xs font-black uppercase tracking-wider text-gray-300 transition-all"
+            >
+                <span className="flex items-center gap-2"><Settings2 size={14} /> Advanced Settings</span>
+                <span className="text-gray-500">{showAdvanced ? 'Hide' : 'Show'}</span>
+            </button>
+
+            {showAdvanced && (
+                <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-5 animate-in fade-in duration-300">
+                    
+                    {/* Public Challenge Option */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase text-white">Public Challenge</p>
+                                <p className="text-[10px] text-gray-500">Anyone with the link can join</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={isPublic}
+                                onChange={(e) => setIsPublic(e.target.checked)}
+                                className="w-4 h-4 accent-correct"
+                            />
+                        </div>
+                        {isPublic && (
+                            <div className="space-y-2 pl-4 border-l border-white/10">
+                                <label className="text-[10px] font-black uppercase text-gray-400">Max Participants (2-100)</label>
+                                <input
+                                    type="number"
+                                    min={2}
+                                    max={100}
+                                    value={maxParticipants}
+                                    onChange={(e) => setMaxParticipants(Math.max(2, Math.min(100, Number(e.target.value))))}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:border-correct outline-none"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Lifespan Option */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                            Challenge Lifespan
+                        </label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                            {[1, 6, 12, 24].map(h => (
+                                <button
+                                    key={h}
+                                    onClick={() => setLifespanHours(h)}
+                                    className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
+                                >
+                                    {h}h
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Custom target word option */}
+                    <div className="space-y-3 border-t border-white/5 pt-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                                    <Sparkles size={12} className="text-yellow-500" /> Custom Word Challenge
+                                </p>
+                                <p className="text-[10px] text-gray-500">Pick target word. Creator cannot play.</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={isCustomWord}
+                                onChange={(e) => setIsCustomWord(e.target.checked)}
+                                className="w-4 h-4 accent-correct"
+                            />
+                        </div>
+                        {isCustomWord && (
+                            <div className="space-y-3 pl-4 border-l border-white/10">
+                                {length === 1 ? (
+                                    <div className="space-y-2.5">
+                                        {[3, 4, 5, 6, 7].map(l => (
+                                            <div key={l} className="flex flex-col gap-1">
+                                                <span className="text-[9px] font-black uppercase text-gray-400">{l}-letter Word:</span>
+                                                <input
+                                                    type="text"
+                                                    maxLength={l}
+                                                    placeholder={`Enter ${l}-letter word`}
+                                                    value={customWords[l]}
+                                                    onChange={(e) => setCustomWords({ ...customWords, [l]: e.target.value.replace(/[^A-Za-z]/g, '') })}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-gray-400">Target Word ({length === 0 ? '5-letter default' : `${length}-letter`}):</label>
+                                        <input
+                                            type="text"
+                                            maxLength={length === 0 ? 5 : length}
+                                            placeholder={`Enter ${length === 0 ? 5 : length}-letter word`}
+                                            value={customWord}
+                                            onChange={(e) => setCustomWord(e.target.value.replace(/[^A-Za-z]/g, ''))}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:border-correct outline-none uppercase"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Handicap Options */}
+                    <div className="space-y-3 border-t border-white/5 pt-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                                    <Shield size={12} className="text-yellow-500" /> Handicap Challenge
+                                </p>
+                                <p className="text-[10px] text-gray-500">Provide starter word(s) for players</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={isHandicap}
+                                onChange={(e) => setIsHandicap(e.target.checked)}
+                                className="w-4 h-4 accent-correct"
+                            />
+                        </div>
+                        {isHandicap && (
+                            <div className="space-y-3.5 pl-4 border-l border-white/10">
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-black uppercase text-gray-400">Starter Type:</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => setHandicapMode('random')}
+                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'random' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                        >
+                                            System Random
+                                        </button>
+                                        <button
+                                            onClick={() => setHandicapMode('custom')}
+                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'custom' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                        >
+                                            Custom Word
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-gray-300">Enforce Starter Word</p>
+                                        <p className="text-[8px] text-gray-500">True = automatically submitted first guess</p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={handicapEnforced}
+                                        onChange={(e) => setHandicapEnforced(e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-correct"
+                                    />
+                                </div>
+
+                                {handicapMode === 'custom' && (
+                                    <div className="space-y-2.5">
+                                        {length === 1 ? (
+                                            [3, 4, 5, 6, 7].map(l => (
+                                                <div key={l} className="flex flex-col gap-1">
+                                                    <span className="text-[9px] font-black uppercase text-gray-400">{l}-letter Starter:</span>
+                                                    <input
+                                                        type="text"
+                                                        maxLength={l}
+                                                        placeholder={`Enter ${l}-letter starter`}
+                                                        value={handicapStarters[l]}
+                                                        onChange={(e) => setHandicapStarters({ ...handicapStarters, [l]: e.target.value.replace(/[^A-Za-z]/g, '') })}
+                                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                    />
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-gray-400">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
+                                                <input
+                                                    type="text"
+                                                    maxLength={length === 0 ? 5 : length}
+                                                    placeholder={`Enter starter word`}
+                                                    value={handicapStarter}
+                                                    onChange={(e) => setHandicapStarter(e.target.value.replace(/[^A-Za-z]/g, ''))}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Inline Errors Display */}
+            {errors.length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/30 p-3.5 rounded-2xl space-y-1.5 animate-in fade-in duration-300">
+                    <p className="text-[10px] font-black uppercase text-red-500">Please correct the following errors:</p>
+                    <ul className="list-disc pl-4 text-[10px] text-red-400/90 font-bold space-y-1">
+                        {errors.map((e, idx) => <li key={idx}>{e}</li>)}
+                    </ul>
+                </div>
+            )}
 
             <div className="pt-4 border-t border-white/5 space-y-4">
                 <div className="flex items-center gap-3">
@@ -228,9 +546,9 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                 </div>
 
                 <button
-                    onClick={handleCreate}
-                    disabled={loading}
-                    className="w-full bg-correct text-black py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                    onClick={handleCreateTrigger}
+                    disabled={loading || errors.length > 0}
+                    className="w-full bg-correct text-black py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:brightness-50"
                 >
                     {loading ? 'Creating...' : <><Plus size={18} /> Create Challenge</>}
                 </button>

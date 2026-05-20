@@ -237,6 +237,19 @@ export const useChallengeGameEngine = ({
             console.error("Local recovery failed", e);
         }
 
+        let isStarterEnforced = false;
+        if (localGuesses.length === 0 && targetWord) {
+            const starter = isMarathon 
+                ? (challenge.handicap_starters?.[selectedLength!]) 
+                : challenge.handicap_starter;
+            if (starter && challenge.handicap_enforced) {
+                const upperStarter = starter.toUpperCase();
+                const result = checkGuess(upperStarter, targetWord);
+                localGuesses = [result];
+                isStarterEnforced = true;
+            }
+        }
+
         dispatch({
             type: 'START_GAME', payload: {
                 guesses: localGuesses,
@@ -251,6 +264,18 @@ export const useChallengeGameEngine = ({
 
         // Side Effects (Timer Start / Timeout Sync)
         const runSideEffects = async () => {
+            // Handle Enforced Starter Word Sync
+            if (isStarterEnforced && !startTimerRef.current) {
+                console.log("[Engine] Syncing enforced starter word to server...");
+                startTimerRef.current = true;
+                await wrappedSubmitResult({
+                    status: 'playing',
+                    attempts: 1,
+                    guesses: localGuesses,
+                    started_at: new Date().toISOString()
+                }, isMarathon ? selectedLength! : undefined);
+            }
+
             // Handle Offline Timeout Sync
             if (hasTimedOutOffline && !isSaving && !startTimerRef.current) {
                 console.log("[Engine] Offline timeout detected, syncing...");

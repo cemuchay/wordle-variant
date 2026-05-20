@@ -10,9 +10,10 @@ interface ParticipantItemProps {
     myHasFinished: boolean;
     isLive: boolean;
     onPreview: (p: ChallengeParticipant) => void;
+    canPreviewAll: boolean;
 }
 
-const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview }: ParticipantItemProps) {
+const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll }: ParticipantItemProps) {
     const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
     
     const marathonCompletedCount = useMemo(() => {
@@ -25,8 +26,8 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
         return count;
     }, [isMarathon, p.marathon_progress]);
 
-    const showScore = pIsFinished || (isMarathon && p.score > 0);
-    const canClick = myHasFinished || isMarathon;
+    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll;
+    const canClick = myHasFinished || isMarathon || canPreviewAll;
 
     return (
         <div
@@ -67,7 +68,7 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                         </div>
                     </div>
                 )}
-                {(myHasFinished || isMarathon) && (
+                {(myHasFinished || isMarathon || canPreviewAll) && (
                     <div className="text-gray-500">
                         <Eye size={16} />
                     </div>
@@ -77,12 +78,18 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
     );
 });
 
+import { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+
 export const ChallengeLobby = memo(function ChallengeLobby() {
     const {
         selectedChallenge, myParticipation, participants,
         copyLink, setPreviewParticipant, handleStartGame, setSelectedChallenge,
-        loading
+        loading, registerAnonymousUser, effectiveUser
     } = useChallengeContext();
+    const { triggerToast } = useApp();
+
+    const [nicknameInput, setNicknameInput] = useState('');
 
     const handlePreview = useCallback((p: ChallengeParticipant) => {
         setPreviewParticipant(p);
@@ -93,6 +100,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const isMarathon = selectedChallenge.word_length === 1;
     const isLive = selectedChallenge.mode === 'LIVE';
     const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
+    const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser?.id && selectedChallenge.is_custom_word;
+
+    const maxParts = selectedChallenge.max_participants || 100;
+    const currentParts = participants.length;
+    const isFull = currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
 
     return (
         <div className="space-y-6">
@@ -107,6 +119,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         {isMarathon && (
                             <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/20 text-yellow-500">
                                 Marathon
+                            </span>
+                        )}
+                        {selectedChallenge.is_public && (
+                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-correct/20 text-correct">
+                                Public
                             </span>
                         )}
                     </div>
@@ -125,7 +142,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes per word!` : 'Take your time, async play.'}`
                         : selectedChallenge.mode === 'LIVE'
                             ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
-                            : "Play anytime within 24 hours. Highest skill score wins!"}
+                            : "Play anytime within the lifespan. Highest skill score wins!"}
                 </p>
 
                 {selectedChallenge.max_time && selectedChallenge.mode === 'LIVE' && (
@@ -138,7 +155,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
             <div className="space-y-3">
                 <div className="flex items-center justify-between px-2">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">Participants ({participants.length})</h4>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">
+                        Participants ({currentParts} / {maxParts})
+                    </h4>
                 </div>
                 <div className="space-y-2">
                     {loading && participants.length === 0 ? (
@@ -154,6 +173,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 myHasFinished={myHasFinished}
                                 isLive={isLive}
                                 onPreview={handlePreview}
+                                canPreviewAll={selectedChallenge.creator_id === effectiveUser?.id && !!selectedChallenge.is_custom_word}
                             />
                         ))
                     )}
@@ -161,7 +181,51 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </div>
 
             <div className="pt-6 flex flex-col gap-3">
-                {!myHasFinished ? (
+                {isCreatorOfCustom ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
+                        <p className="text-xs font-black uppercase text-yellow-500">Host Mode Active 👑</p>
+                        <p className="text-[10px] text-yellow-500/80 font-bold">
+                            You created this custom word challenge. Watch your friends compete on the leaderboard above!
+                        </p>
+                    </div>
+                ) : isFull ? (
+                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center">
+                        <p className="text-xs font-black uppercase text-red-500">Challenge Full 🚫</p>
+                        <p className="text-[10px] text-red-400/80 font-bold mt-1">
+                            This challenge has reached its maximum participant limit of {maxParts}.
+                        </p>
+                    </div>
+                ) : !effectiveUser ? (
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 animate-in fade-in duration-300">
+                        <div className="text-center space-y-1">
+                            <p className="text-xs font-black uppercase tracking-wider text-white">Join the Challenge</p>
+                            <p className="text-[10px] text-gray-500">Choose a guest nickname to compete!</p>
+                        </div>
+                        <div className="space-y-3">
+                            <input
+                                type="text"
+                                maxLength={15}
+                                placeholder="Enter nickname..."
+                                value={nicknameInput}
+                                onChange={(e) => setNicknameInput(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                            />
+                            <button
+                                onClick={async () => {
+                                    const name = nicknameInput.trim();
+                                    if (name.length < 3) {
+                                        triggerToast("Nickname must be at least 3 characters.", 3000);
+                                        return;
+                                    }
+                                    await registerAnonymousUser(name);
+                                }}
+                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
+                            >
+                                Join Challenge
+                            </button>
+                        </div>
+                    </div>
+                ) : !myHasFinished ? (
                     <button
                         onClick={handleStartGame}
                         disabled={loading}
