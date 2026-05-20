@@ -416,7 +416,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     useEffect(() => {
         if (initialChallengeId && !initialProcessed.current) {
             initialProcessed.current = true;
-            handleViewChallenge(initialChallengeId);
+            handleViewChallenge(initialChallengeId).then(() => {
+                // Clear the URL parameter after successful load to keep the URL clean
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('challenge')) {
+                    url.searchParams.delete('challenge');
+                    window.history.replaceState({}, '', url.pathname + url.search);
+                }
+            });
         }
     }, [initialChallengeId, handleViewChallenge]);
 
