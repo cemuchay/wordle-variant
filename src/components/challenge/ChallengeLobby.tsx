@@ -248,20 +248,25 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                             <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
                                 {isMarathon && selectedChallenge.handicap_starters ? (
                                     <div className="grid grid-cols-5 gap-1 text-center font-black">
-                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => (
-                                            <div key={len} className="bg-white/5 p-1 rounded">
-                                                <span className="text-[7px] text-gray-500 block">{len}L</span>
-                                                <span className="text-white uppercase">{w as string || 'Rand'}</span>
-                                            </div>
-                                        ))}
+                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => {
+                                            const hasWord = !!w && w !== '__SYSTEM_RANDOM__';
+                                            return (
+                                                <div key={len} className="bg-white/5 p-1 rounded">
+                                                    <span className="text-[7px] text-gray-500 block">{len}L</span>
+                                                    <span className="text-white/60 uppercase text-[8px]">
+                                                        {hasWord ? 'Hidden' : 'Rand'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <p className="font-bold">
                                         Starter Word:{' '}
-                                        <span className="text-white uppercase tracking-wider font-mono">
+                                        <span className="text-white/60 uppercase tracking-wider font-mono">
                                             {selectedChallenge.handicap_starter === '__SYSTEM_RANDOM__'
-                                                ? 'Random System Word'
-                                                : selectedChallenge.handicap_starter}
+                                                ? 'Random (Hidden until start)'
+                                                : 'Hidden until start'}
                                         </span>
                                     </p>
                                 )}
