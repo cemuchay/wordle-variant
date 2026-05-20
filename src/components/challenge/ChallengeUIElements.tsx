@@ -129,13 +129,12 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
     return (
         <button
             onClick={handleSelect}
-            className={`w-full text-left bg-gradient-to-br from-white/5 to-transparent border ${
-                isLeader && !isExpired 
-                    ? 'border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)]' 
-                    : mode === 'LIVE' && !isExpired 
-                        ? 'border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/30' 
+            className={`w-full text-left bg-gradient-to-br from-white/5 to-transparent border ${isLeader && !isExpired
+                    ? 'border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)]'
+                    : mode === 'LIVE' && !isExpired
+                        ? 'border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/30'
                         : 'border-white/5 hover:border-white/15'
-            } p-5 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
+                } p-5 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
         >
             {/* Ambient Background Glows */}
             {isLeader && !isExpired && (
@@ -149,11 +148,10 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
             <div className="flex items-center justify-between w-full">
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Mode Pill */}
-                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                        mode === 'LIVE' 
-                            ? 'bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30' 
+                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${mode === 'LIVE'
+                            ? 'bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30'
                             : 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30'
-                    }`}>
+                        }`}>
                         {mode === 'LIVE' ? (
                             <>
                                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping inline-block mr-0.5" />
@@ -169,11 +167,10 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
                     </span>
 
                     {/* Word Size / Mode Pill */}
-                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                        isMarathon 
-                            ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30' 
+                    <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${isMarathon
+                            ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30'
                             : 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30'
-                    }`}>
+                        }`}>
                         {isMarathon ? (
                             <>
                                 <Trophy size={10} />
@@ -253,15 +250,14 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
                             </span>
                         )}
                     </div>
-                    
+
                     <div className="flex items-baseline justify-between">
-                        <span className={`text-[11px] font-black uppercase ${
-                            status === 'completed' || status === 'host' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-500'
-                        }`}>
+                        <span className={`text-[11px] font-black uppercase ${status === 'completed' || status === 'host' ? 'text-correct' : status === 'playing' ? 'text-yellow-500' : 'text-gray-500'
+                            }`}>
                             {status === 'host' ? 'Host (Spectating)' : status}
                         </span>
                         {status !== 'host' && hasStarted && (
-                            <span className="text-lg font-black text-white">{myScore} <span className="text-[9px] font-medium text-gray-500">pts</span></span>
+                            <span className="text-md sm:text-lg font-black text-white">{myScore} <span className="text-[9px] font-medium text-gray-500">pts</span></span>
                         )}
                     </div>
 
