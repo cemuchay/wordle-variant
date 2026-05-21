@@ -11,9 +11,10 @@ interface ParticipantItemProps {
     isLive: boolean;
     onPreview: (p: ChallengeParticipant) => void;
     canPreviewAll: boolean;
+    isExpired: boolean;
 }
 
-const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll }: ParticipantItemProps) {
+const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll, isExpired }: ParticipantItemProps) {
     const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
     
     const marathonCompletedCount = useMemo(() => {
@@ -26,8 +27,8 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
         return count;
     }, [isMarathon, p.marathon_progress]);
 
-    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll;
-    const canClick = myHasFinished || isMarathon || canPreviewAll;
+    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll || isExpired;
+    const canClick = myHasFinished || isMarathon || canPreviewAll || isExpired;
 
     return (
         <div
@@ -119,6 +120,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const isLive = selectedChallenge.mode === 'LIVE';
     const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
     const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser?.id && selectedChallenge.is_custom_word;
+    const isExpired = useMemo(() => new Date(selectedChallenge.expires_at) < new Date(), [selectedChallenge.expires_at]);
 
     const maxParts = selectedChallenge.max_participants || 100;
     const currentParts = participants.length;
@@ -349,6 +351,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 isLive={isLive}
                                 onPreview={handlePreview}
                                 canPreviewAll={selectedChallenge.creator_id === effectiveUser?.id && !!selectedChallenge.is_custom_word}
+                                isExpired={isExpired}
                             />
                         ))
                     )}
@@ -356,7 +359,16 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </div>
 
             <div className="pt-6 flex flex-col gap-3">
-                {isCreatorOfCustom ? (
+                {isExpired ? (
+                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
+                        <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
+                            <Hourglass size={14} /> Challenge Expired ⌛
+                        </p>
+                        <p className="text-[10px] text-red-400/80 font-bold leading-relaxed">
+                            This challenge has ended. You can view the final scores and details, but no more entries are allowed.
+                        </p>
+                    </div>
+                ) : isCreatorOfCustom ? (
                     <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
                         <p className="text-xs font-black uppercase text-yellow-500">Host Mode Active 👑</p>
                         <p className="text-[10px] text-yellow-500/80 font-bold">

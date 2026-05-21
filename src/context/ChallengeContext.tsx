@@ -270,9 +270,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
 
             if (challenge) {
-                if (new Date(challenge.expires_at) < new Date()) {
-                    triggerToast("This challenge has expired.", 4000);
-                    return;
+                const isExpired = new Date(challenge.expires_at) < new Date();
+                if (isExpired) {
+                    triggerToast("This challenge has expired. Viewing results.", 4000);
                 }
 
                 cleanupSubscription();
@@ -283,11 +283,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 if (effectiveUser) {
                     const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
                     if (!isCreatorOfCustom) {
-                        const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id });
+                        const participationPromise = !isExpired
+                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id })
+                            : Promise.resolve(localMatch || null);
 
                         let participation = localMatch;
-                        if (!participation) {
+                        if (!participation && !isExpired) {
                             participation = await participationPromise;
+                        } else if (isExpired) {
+                            participation = challenge.participants?.find((p: any) => p.user_id === effectiveUser.id) || null;
                         } else {
                             participationPromise.then(p => {
                                 setMyParticipation(normalizeParticipation(p, challenge));
@@ -315,6 +319,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const joinSelectedChallenge = useCallback(async () => {
         if (!selectedChallenge || !effectiveUser) return;
+        const isExpired = new Date(selectedChallenge.expires_at) < new Date();
+        if (isExpired) return;
         try {
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
             if (isCreatorOfCustom) {
@@ -364,11 +370,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     useEffect(() => {
         if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending) {
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            const isExpired = new Date(selectedChallenge.expires_at) < new Date();
             if (!isCreatorOfCustom) {
                 const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id);
                 if (alreadyParticipant) {
                     setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
-                } else {
+                } else if (!isExpired) {
                     joinSelectedChallenge();
                 }
             }
