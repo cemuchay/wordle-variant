@@ -1,0 +1,92 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { deobfuscateWord } from '../lib/game-logic';
+
+export interface MarathonGame {
+    gameIndex: number;
+    wordLength: number;
+    word: string;
+}
+
+/**
+ * Parses targetWord to normalize it to an array of MarathonGame.
+ * Handles both:
+ * 1) legacy dictionary: { "3": "obfuscated1", "4": "..." }
+ * 2) dynamic list: [{ "length": 5, "word": "..." }, { "length": 4, "word": "..." }]
+ */
+export function parseMarathonGames(targetWordField: string | any, salt?: string): MarathonGame[] {
+    if (!targetWordField) return [];
+    try {
+        const parsed = typeof targetWordField === 'string' ? JSON.parse(targetWordField) : targetWordField;
+        if (Array.isArray(parsed)) {
+            // New array format
+            return parsed.map((item: any, idx: number) => {
+                const obfuscatedWord = item.word || '';
+                const word = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
+                return {
+                    gameIndex: idx,
+                    wordLength: item.length,
+                    word: word
+                };
+            });
+        } else if (parsed && typeof parsed === 'object') {
+            // Legacy dictionary format: map keys 3-7 in order
+            const lengths = [3, 4, 5, 6, 7];
+            const games: MarathonGame[] = [];
+            lengths.forEach((l, idx) => {
+                const obfuscatedWord = parsed[String(l)] || parsed[l];
+                if (obfuscatedWord) {
+                    const word = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
+                    games.push({
+                        gameIndex: idx,
+                        wordLength: l,
+                        word: word
+                    });
+                }
+            });
+            // If empty or partial, fallback to default 3-7 mapping
+            if (games.length === 0) {
+                return lengths.map((l, idx) => ({
+                    gameIndex: idx,
+                    wordLength: l,
+                    word: ''
+                }));
+            }
+            return games;
+        }
+    } catch (e) {
+        console.error("Failed to parse marathon target words:", e);
+    }
+    return [];
+}
+
+/**
+ * Safely lookup timer by game index or fallback to length-based timer
+ */
+export function getMarathonTimer(challenge: any, gameIndex: number, wordLength: number): number {
+    if (!challenge) return 5;
+    const timers = challenge.marathon_timers;
+    if (!timers) return challenge.max_time || 5;
+
+    if (Array.isArray(timers)) {
+        return timers[gameIndex] !== undefined ? timers[gameIndex] : (challenge.max_time || 5);
+    } else if (typeof timers === 'object') {
+        return timers[String(wordLength)] ?? timers[wordLength] ?? (challenge.max_time || 5);
+    }
+    return challenge.max_time || 5;
+}
+
+/**
+ * Safely lookup handicap starter by game index or fallback to length-based starter
+ */
+export function getHandicapStarter(challenge: any, gameIndex: number, wordLength: number): string | null {
+    if (!challenge || !challenge.handicap_starters) {
+        return challenge?.handicap_starter || null;
+    }
+    const starters = challenge.handicap_starters;
+    if (Array.isArray(starters)) {
+        return starters[gameIndex] || null;
+    } else if (typeof starters === 'object') {
+        return starters[String(wordLength)] ?? starters[wordLength] ?? null;
+    }
+    return null;
+}

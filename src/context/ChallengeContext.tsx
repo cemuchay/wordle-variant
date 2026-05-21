@@ -6,6 +6,7 @@ import { useChallenge, type Challenge, type ChallengeParticipant } from '../hook
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
+import { parseMarathonGames } from '../utils/marathon';
 
 interface ChallengeContextType {
     // UI State
@@ -51,7 +52,7 @@ interface ChallengeContextType {
     copyLink: (challenge: Challenge) => void;
     shareLink: (challenge: Challenge) => Promise<void>;
     loadMyChallenges: () => Promise<void>;
-    submitResult: (result: any, wordLength?: number) => Promise<boolean>;
+    submitResult: (result: any, wordLength?: number, gameIndex?: number) => Promise<boolean>;
     registerAnonymousUser: (nickname: string) => Promise<any>;
 
     // Helpers
@@ -63,6 +64,8 @@ interface ChallengeContextType {
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     previewMarathonLength: number | null;
     setPreviewMarathonLength: (l: number | null) => void;
+    previewMarathonGameIndex: number | null;
+    setPreviewMarathonGameIndex: (idx: number | null) => void;
     unplayedCount: number;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
@@ -129,6 +132,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setPreviewParticipant = useChallengeStore(s => s.setPreviewParticipant);
     const previewMarathonLength = useChallengeStore(s => s.previewMarathonLength);
     const setPreviewMarathonLength = useChallengeStore(s => s.setPreviewMarathonLength);
+    const previewMarathonGameIndex = useChallengeStore(s => s.previewMarathonGameIndex);
+    const setPreviewMarathonGameIndex = useChallengeStore(s => s.setPreviewMarathonGameIndex);
     const backAction = useChallengeStore(s => s.backAction);
     const setBackAction = useChallengeStore(s => s.setBackAction);
 
@@ -419,18 +424,21 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setIsPlaying(true);
     }, [selectedChallenge, myParticipation, startMutation, setIsPlaying]);
 
-    const submitResult = useCallback(async (result: any, wordLength?: number) => {
+        const submitResult = useCallback(async (result: any, wordLength?: number, gameIndex?: number) => {
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
 
-        if (isMarathon && wordLength) {
+        if (isMarathon && (wordLength || gameIndex !== undefined)) {
             const isWordFinished = result.status !== 'playing';
+            const games = parseMarathonGames(selectedChallenge?.target_word, selectedChallenge?.salt);
+            const resolvedGameIndex = gameIndex !== undefined ? gameIndex : (wordLength ? games.findIndex(g => g.wordLength === wordLength) : 0);
 
             // 1. Always update the specific word progress
             const marathonPromise = marathonMutation.mutateAsync({
                 participationId: myParticipation.id,
-                wordLength,
+                gameIndex: resolvedGameIndex,
+                wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
                 result
             });
 
@@ -442,9 +450,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 // Update local state for immediate UI feedback without full re-fetch
                 const currentMarathon = myParticipation.marathon_progress || [];
                 const updatedMarathon = [...currentMarathon];
-                const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
-                if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], ...result };
-                else updatedMarathon.push({ word_length: wordLength, ...result } as any);
+                const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
+                if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
+                else updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
 
                 setMyParticipation({ ...myParticipation, marathon_progress: updatedMarathon });
                 return true;
@@ -453,22 +461,21 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             // 2. Word finished: Calculate aggregates and update main participation
             const currentMarathon = myParticipation.marathon_progress || [];
             const updatedMarathon = [...currentMarathon];
-            const idx = updatedMarathon.findIndex(p => p.word_length === wordLength);
+            const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
 
             if (idx > -1) {
-                updatedMarathon[idx] = { ...updatedMarathon[idx], ...result };
+                updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
             } else {
-                updatedMarathon.push({ word_length: wordLength, ...result } as any);
+                updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
             }
 
             let totalScore = 0;
             let totalAttempts = 0;
             let totalTimeTaken = 0;
             let completedCount = 0;
-            const lengths = [3, 4, 5, 6, 7];
 
-            lengths.forEach(l => {
-                const prog = updatedMarathon.find(p => p.word_length === l);
+            games.forEach(g => {
+                const prog = updatedMarathon.find(p => p.game_index === g.gameIndex || (p.game_index === undefined && p.word_length === g.wordLength));
                 if (prog) {
                     totalAttempts += prog.attempts || 0;
                     totalTimeTaken += prog.time_taken || 0;
@@ -479,7 +486,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             });
 
-            const allCompleted = completedCount === 5;
+            const allCompleted = completedCount === games.length;
             const finalUpdateData = {
                 score: totalScore,
                 attempts: totalAttempts,
@@ -600,12 +607,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setPreviewParticipant,
         previewMarathonLength,
         setPreviewMarathonLength,
+        previewMarathonGameIndex,
+        setPreviewMarathonGameIndex,
         unplayedCount,
         backAction,
         setBackAction,
         registerAnonymousUser,
         effectiveUser
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser]);
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

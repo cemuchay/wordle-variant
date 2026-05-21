@@ -206,27 +206,95 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
         joinId, setJoinId, handleViewChallenge, handleCreate, loading
     } = useChallengeContext();
 
+    // Marathon Mode States
+    const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
+    const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
+
     // Advanced UI States
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
     const [maxParticipants, setMaxParticipants] = useState<number>(10);
+    const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
     const [lifespanHours, setLifespanHours] = useState<number>(24);
 
     // Custom Target Word States
     const [isCustomWord, setIsCustomWord] = useState(false);
     const [customWord, setCustomWord] = useState('');
-    const [customWords, setCustomWords] = useState<Record<number, string>>({ 3: '', 4: '', 5: '', 6: '', 7: '' });
+    const [customMarathonWords, setCustomMarathonWords] = useState<string[]>(() => Array(5).fill(''));
 
     // Marathon Custom Timer States
     const [timerType, setTimerType] = useState<'same' | 'custom'>('same');
-    const [marathonTimers, setMarathonTimers] = useState<Record<number, number>>({ 3: 3, 4: 5, 5: 5, 6: 10, 7: 10 });
+    const [marathonTimersArray, setMarathonTimersArray] = useState<number[]>([3, 5, 5, 10, 10]);
+    const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(['3', '5', '5', '10', '10']);
 
     // Handicap States
     const [isHandicap, setIsHandicap] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
-    const [handicapStarters, setHandicapStarters] = useState<Record<number, string>>({ 3: '', 4: '', 5: '', 6: '', 7: '' });
+    const [handicapStartersArray, setHandicapStartersArray] = useState<string[]>(() => Array(5).fill(''));
+
+    const handleUpdateMarathonGames = useCallback((newGames: number[]) => {
+        setMarathonGames(newGames);
+        
+        // Adjust custom target words
+        setCustomMarathonWords(prev => {
+            const next = [...prev];
+            if (next.length < newGames.length) {
+                while (next.length < newGames.length) next.push('');
+            } else if (next.length > newGames.length) {
+                next.length = newGames.length;
+            }
+            return next;
+        });
+
+        // Adjust handicap starters
+        setHandicapStartersArray(prev => {
+            const next = [...prev];
+            if (next.length < newGames.length) {
+                while (next.length < newGames.length) next.push('');
+            } else if (next.length > newGames.length) {
+                next.length = newGames.length;
+            }
+            return next;
+        });
+
+        // Adjust marathon timers
+        setMarathonTimersArray(prev => {
+            const next = [...prev];
+            if (next.length < newGames.length) {
+                while (next.length < newGames.length) {
+                    const addedLen = newGames[next.length];
+                    const defaultTime = addedLen === 3 ? 3 : addedLen === 4 ? 5 : addedLen === 5 ? 5 : 10;
+                    next.push(defaultTime);
+                }
+            } else if (next.length > newGames.length) {
+                next.length = newGames.length;
+            }
+            return next;
+        });
+
+        setMarathonTimersInput(prev => {
+            const next = [...prev];
+            if (next.length < newGames.length) {
+                while (next.length < newGames.length) {
+                    const addedLen = newGames[next.length];
+                    const defaultTime = addedLen === 3 ? 3 : addedLen === 4 ? 5 : addedLen === 5 ? 5 : 10;
+                    next.push(String(defaultTime));
+                }
+            } else if (next.length > newGames.length) {
+                next.length = newGames.length;
+            }
+            return next;
+        });
+    }, []);
+
+    const handleSetMarathonType = useCallback((type: 'standard' | 'custom') => {
+        setMarathonType(type);
+        if (type === 'standard') {
+            handleUpdateMarathonGames([3, 4, 5, 6, 7]);
+        }
+    }, [handleUpdateMarathonGames]);
 
     // Inline errors
     const errors = useMemo(() => {
@@ -235,13 +303,13 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
 
         if (isCustomWord) {
             if (length === 1) {
-                [3, 4, 5, 6, 7].forEach(l => {
-                    const w = customWords[l];
+                marathonGames.forEach((l, idx) => {
+                    const w = customMarathonWords[idx];
                     if (!w) {
-                        errs.push(`Marathon: ${l}-letter word is empty.`);
+                        errs.push(`Game #${idx + 1} (${l}-letter): Target word is empty.`);
                     } else {
                         const valError = validateCustomWord(w, l);
-                        if (valError) errs.push(`Marathon ${l}-letter: ${valError}`);
+                        if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                     }
                 });
             } else {
@@ -252,15 +320,15 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
 
         if (isHandicap && handicapMode === 'custom') {
             if (length === 1) {
-                [3, 4, 5, 6, 7].forEach(l => {
-                    const w = handicapStarters[l];
+                marathonGames.forEach((l, idx) => {
+                    const w = handicapStartersArray[idx];
                     if (!w) {
-                        errs.push(`Handicap: ${l}-letter starter is empty.`);
+                        errs.push(`Game #${idx + 1} (${l}-letter): Starter word is empty.`);
                     } else {
                         const valError = validateCustomWord(w, l);
-                        if (valError) errs.push(`Handicap ${l}-letter: ${valError}`);
-                        if (isCustomWord && customWords[l] && w.toUpperCase() === customWords[l].toUpperCase()) {
-                            errs.push(`Handicap ${l}-letter starter cannot match target word.`);
+                        if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
+                        if (isCustomWord && customMarathonWords[idx] && w.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
+                            errs.push(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
                         }
                     }
                 });
@@ -273,8 +341,12 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
             }
         }
 
+        if (length === 1 && marathonGames.length === 0) {
+            errs.push("Marathon must have at least 1 game.");
+        }
+
         return errs;
-    }, [length, isCustomWord, customWord, customWords, isHandicap, handicapMode, handicapStarter, handicapStarters]);
+    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray]);
 
     const handleCreateTrigger = useCallback(() => {
         if (errors.length > 0) return;
@@ -288,7 +360,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
 
         if (isCustomWord) {
             if (length === 1) {
-                customParams.customWords = customWords;
+                customParams.customWords = customMarathonWords;
             } else {
                 customParams.customWord = customWord;
             }
@@ -300,24 +372,112 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                 customParams.handicapStarter = '__SYSTEM_RANDOM__';
             } else {
                 if (length === 1) {
-                    customParams.handicapStarters = handicapStarters;
+                    customParams.handicapStarters = handicapStartersArray;
                 } else {
                     customParams.handicapStarter = handicapStarter;
                 }
             }
         }
 
-        if (length === 1 && mode === 'LIVE' && timerType === 'custom') {
-            customParams.marathonTimers = marathonTimers;
+        if (length === 1) {
+            customParams.marathonGames = marathonGames;
+            if (mode === 'LIVE' && timerType === 'custom') {
+                customParams.marathonTimers = marathonTimersArray;
+            }
         }
 
         handleCreate(customParams);
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStarters, lifespanHours, length, handleCreate, mode, timerType, marathonTimers]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames]);
 
     return (
         <div className="space-y-6">
             <ModeSelector mode={mode} setMode={setMode} />
             <LengthSelector length={length} setLength={setLength} />
+
+            {length === 1 && (
+                <div className="p-4 rounded-2xl border border-yellow-500/25 bg-yellow-500/5 space-y-4 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-black uppercase text-white">Marathon Mode Setup</p>
+                            <p className="text-[10px] text-gray-400">Configure your marathon format</p>
+                        </div>
+                        
+                        <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                            <button
+                                onClick={() => handleSetMarathonType('standard')}
+                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'standard' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
+                            >
+                                Standard (3-7L)
+                            </button>
+                            <button
+                                onClick={() => handleSetMarathonType('custom')}
+                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'custom' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
+                            >
+                                Custom
+                            </button>
+                        </div>
+                    </div>
+
+                    {marathonType === 'custom' && (
+                        <div className="space-y-4 animate-in fade-in duration-200">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                    Current Game Sequence ({marathonGames.length}/20 Games)
+                                </label>
+                                
+                                {marathonGames.length === 0 ? (
+                                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase">No games added yet. Click lengths below to build your sequence.</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[150px] overflow-y-auto">
+                                        {marathonGames.map((l, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-black text-white group transition-colors"
+                                            >
+                                                <span>#{idx + 1}: <strong className="text-yellow-500">{l}L</strong></span>
+                                                <button
+                                                    onClick={() => {
+                                                        const next = [...marathonGames];
+                                                        next.splice(idx, 1);
+                                                        handleUpdateMarathonGames(next);
+                                                    }}
+                                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                    Add Game Length
+                                </label>
+                                <div className="flex gap-2">
+                                    {[3, 4, 5, 6, 7].map((l) => (
+                                        <button
+                                            key={l}
+                                            disabled={marathonGames.length >= 20}
+                                            onClick={() => {
+                                                if (marathonGames.length < 20) {
+                                                    handleUpdateMarathonGames([...marathonGames, l]);
+                                                }
+                                            }}
+                                            className="flex-1 py-2.5 rounded-xl border border-white/10 bg-black/20 hover:bg-white/5 text-xs font-black text-yellow-500 transition-all disabled:opacity-30 disabled:hover:bg-black/20"
+                                        >
+                                            +{l}L
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
             
             {mode === 'LIVE' && (
                 <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} />
@@ -360,10 +520,26 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                 <label className="text-[10px] font-black uppercase text-gray-400">Max Participants (2-100)</label>
                                 <input
                                     type="number"
+                                    inputMode="numeric"
                                     min={2}
                                     max={100}
-                                    value={maxParticipants}
-                                    onChange={(e) => setMaxParticipants(Math.max(2, Math.min(100, Number(e.target.value))))}
+                                    value={maxParticipantsInput}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMaxParticipantsInput(val);
+                                        const num = Number(val);
+                                        if (!isNaN(num) && num >= 2 && num <= 100) {
+                                            setMaxParticipants(num);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        let num = parseInt(maxParticipantsInput, 10);
+                                        if (isNaN(num)) num = 10;
+                                        else if (num < 2) num = 2;
+                                        else if (num > 100) num = 100;
+                                        setMaxParticipants(num);
+                                        setMaxParticipantsInput(String(num));
+                                    }}
                                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:border-correct outline-none"
                                 />
                             </div>
@@ -408,15 +584,22 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                             <div className="space-y-3 pl-4 border-l border-white/10">
                                 {length === 1 ? (
                                     <div className="space-y-2.5">
-                                        {[3, 4, 5, 6, 7].map(l => (
-                                            <div key={l} className="flex flex-col gap-1">
-                                                <span className="text-[9px] font-black uppercase text-gray-400">{l}-letter Word:</span>
+                                        {marathonGames.map((l, idx) => (
+                                            <div key={idx} className="flex flex-col gap-1">
+                                                <span className="text-[9px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Word):</span>
                                                 <input
                                                     type="text"
                                                     maxLength={l}
                                                     placeholder={`Enter ${l}-letter word`}
-                                                    value={customWords[l]}
-                                                    onChange={(e) => setCustomWords({ ...customWords, [l]: e.target.value.replace(/[^A-Za-z]/g, '') })}
+                                                    value={customMarathonWords[idx] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/[^A-Za-z]/g, '');
+                                                        setCustomMarathonWords(prev => {
+                                                            const next = [...prev];
+                                                            next[idx] = val;
+                                                            return next;
+                                                        });
+                                                    }}
                                                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
                                                 />
                                             </div>
@@ -491,15 +674,22 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                 {handicapMode === 'custom' && (
                                     <div className="space-y-2.5">
                                         {length === 1 ? (
-                                            [3, 4, 5, 6, 7].map(l => (
-                                                <div key={l} className="flex flex-col gap-1">
-                                                    <span className="text-[9px] font-black uppercase text-gray-400">{l}-letter Starter:</span>
+                                            marathonGames.map((l, idx) => (
+                                                <div key={idx} className="flex flex-col gap-1">
+                                                    <span className="text-[9px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Starter):</span>
                                                     <input
                                                         type="text"
                                                         maxLength={l}
                                                         placeholder={`Enter ${l}-letter starter`}
-                                                        value={handicapStarters[l]}
-                                                        onChange={(e) => setHandicapStarters({ ...handicapStarters, [l]: e.target.value.replace(/[^A-Za-z]/g, '') })}
+                                                        value={handicapStartersArray[idx] || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/[^A-Za-z]/g, '');
+                                                            setHandicapStartersArray(prev => {
+                                                                const next = [...prev];
+                                                                next[idx] = val;
+                                                                return next;
+                                                            });
+                                                        }}
                                                         className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
                                                     />
                                                 </div>
@@ -549,16 +739,49 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                 </div>
                             </div>
                             {timerType === 'custom' && (
-                                <div className="grid grid-cols-5 gap-2 pl-4 border-l border-white/10">
-                                    {[3, 4, 5, 6, 7].map(l => (
-                                        <div key={l} className="space-y-1">
-                                            <p className="text-[8px] font-black uppercase text-gray-500 text-center">{l}L</p>
+                                <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10">
+                                    {marathonGames.map((l, idx) => (
+                                        <div key={idx} className="space-y-1 min-w-[50px] flex-1">
+                                            <p className="text-[8px] font-black uppercase text-gray-500 text-center">#{idx + 1} ({l}L)</p>
                                             <input
                                                 type="number"
+                                                inputMode="numeric"
                                                 min={1}
                                                 max={60}
-                                                value={marathonTimers[l]}
-                                                onChange={(e) => setMarathonTimers({ ...marathonTimers, [l]: Math.max(1, Math.min(60, Number(e.target.value))) })}
+                                                value={marathonTimersInput[idx] || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setMarathonTimersInput(prev => {
+                                                        const next = [...prev];
+                                                        next[idx] = val;
+                                                        return next;
+                                                    });
+                                                    const num = Number(val);
+                                                    if (!isNaN(num) && num >= 1 && num <= 60) {
+                                                        setMarathonTimersArray(prev => {
+                                                            const next = [...prev];
+                                                            next[idx] = num;
+                                                            return next;
+                                                        });
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    let num = parseInt(marathonTimersInput[idx], 10);
+                                                    if (isNaN(num)) num = 5;
+                                                    else if (num < 1) num = 1;
+                                                    else if (num > 60) num = 60;
+                                                    
+                                                    setMarathonTimersArray(prev => {
+                                                        const next = [...prev];
+                                                        next[idx] = num;
+                                                        return next;
+                                                    });
+                                                    setMarathonTimersInput(prev => {
+                                                        const next = [...prev];
+                                                        next[idx] = String(num);
+                                                        return next;
+                                                    });
+                                                }}
                                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct outline-none"
                                             />
                                         </div>
