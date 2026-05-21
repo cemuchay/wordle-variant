@@ -85,7 +85,8 @@ export const RegularGameplay = memo(function RegularGameplay({
                     {guesses.length >= 2 && !isGameOver && (
                         <button
                             onClick={actions.handleHint}
-                            className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 animate-pulse')}`}
+                            disabled={usedHint || guesses.length >= 5 || state.isHintDisabled}
+                            className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
                             title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
                         >
                             <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />

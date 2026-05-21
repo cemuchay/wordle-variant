@@ -750,13 +750,13 @@ export const useChallengeGameEngine = ({
   ]);
 
   const handleHint = useCallback(async () => {
-    if (isGameOver) return;
+    if (isGameOver || usedHint) return;
 
-    if (guesses.length >= 5 && !usedHint) {
+    if (guesses.length >= 5) {
       triggerToast("Hint locked on last available guess.");
       return;
     }
-    if (isHintDisabled(targetWord, guesses) && !usedHint) {
+    if (isHintDisabled(targetWord, guesses)) {
       triggerToast("Hint disabled: Only one letter remains!");
       return;
     }

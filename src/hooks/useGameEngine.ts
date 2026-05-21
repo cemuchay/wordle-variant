@@ -240,12 +240,12 @@ export const useGameEngine = (date: string) => {
     }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync, ask]);
 
     const handleHint = useCallback(async () => {
-        if (state.guesses.length < 2 || state.isGameOver) return;
-        if (state.guesses.length >= (config.maxAttempts - 1) && !state.usedHint) {
+        if (state.guesses.length < 2 || state.isGameOver || state.usedHint) return;
+        if (state.guesses.length >= (config.maxAttempts - 1)) {
             triggerToast("Hint locked on last available guess.");
             return;
         }
-        if (isHintDisabled(config.word, state.guesses) && !state.usedHint) {
+        if (isHintDisabled(config.word, state.guesses)) {
             triggerToast("Hint disabled: Only one letter remains!");
             return;
         }
