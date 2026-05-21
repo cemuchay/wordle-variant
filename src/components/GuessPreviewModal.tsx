@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Loader2, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { CHALLENGE_CONFIG } from "../constants/challenge";
+import { useEffect, useState, useMemo } from "react";
 import { MAX_ATTEMPTS, } from "../constants/game";
 import { Z_INDEX } from "../constants/ui";
 import { useApp } from "../context/AppContext";
 import { calculateSkillIndex, deobfuscateWord, getDailyConfig } from "../lib/game-logic";
 import { supabase } from "../lib/supabaseClient";
+import { parseMarathonGames } from "../utils/marathon";
 
 const formatTime = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return null;
@@ -22,7 +22,7 @@ const GuessPreviewModal: React.FC<{
     salt?: string;
     lengthOfWord?: number;
     myParticipation?: any;
-    initialMarathonLength?: number;
+    initialMarathonGameIndex?: number;
     yesterday?: boolean;
     isCreator?: boolean;
     initialData?: {
@@ -32,10 +32,20 @@ const GuessPreviewModal: React.FC<{
         hint_record?: any | null;
         time_taken?: number | null;
     }
-}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonLength, yesterday, isCreator, initialData }) => {
+}> = ({ entry, onClose, targetWord, salt, lengthOfWord, myParticipation, initialMarathonGameIndex, yesterday, isCreator, initialData }) => {
     const isMarathon = lengthOfWord === 1;
-    const [marathonLength, setMarathonLength] = useState<number>(initialMarathonLength || 3);
+    const [marathonGameIndex, setMarathonGameIndex] = useState<number>(initialMarathonGameIndex ?? 0);
     const [showTargetWord, setShowTargetWord] = useState(false);
+
+    const marathonGames = useMemo(() => {
+        if (!isMarathon) return [];
+        return parseMarathonGames(targetWord, salt);
+    }, [isMarathon, targetWord, salt]);
+
+    const activeGame = useMemo(() => {
+        if (!isMarathon) return null;
+        return marathonGames[marathonGameIndex] || null;
+    }, [isMarathon, marathonGames, marathonGameIndex]);
 
     const [gameData, setGameData] = useState<{
         guesses: any[] | null;
@@ -69,7 +79,7 @@ const GuessPreviewModal: React.FC<{
             }
 
             if (isMarathon) {
-                const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+                const myProg = myParticipation?.marathon_progress?.find((p: any) => p.game_index === marathonGameIndex);
                 const myFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
                 setViewerHasFinished(myFinished);
                 return;
@@ -96,15 +106,15 @@ const GuessPreviewModal: React.FC<{
         };
 
         checkViewerStatus();
-    }, [yesterday, isMarathon, marathonLength, myParticipation, profile?.id, targetDate, date]);
+    }, [yesterday, isMarathon, marathonGameIndex, myParticipation, profile?.id, targetDate, date]);
 
     useEffect(() => {
         if (isMarathon) {
             const isMe = entry.user_id === myParticipation?.user_id;
-            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.game_index === marathonGameIndex);
             const myFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
 
-            const prog = entry.marathon_progress?.find((p: any) => p.word_length === marathonLength);
+            const prog = entry.marathon_progress?.find((p: any) => p.game_index === marathonGameIndex);
 
             if (prog && (isMe || myFinished || isCreator)) {
                 // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -149,16 +159,14 @@ const GuessPreviewModal: React.FC<{
         };
 
         fetchGuesses();
-    }, [targetDate, entry.user_id, initialData, marathonLength, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress, isCreator]);
+    }, [targetDate, entry.user_id, initialData, marathonGameIndex, isMarathon, entry.marathon_progress, myParticipation?.user_id, myParticipation?.marathon_progress, isCreator]);
 
     const getTargetWordToUse = () => {
         let wordToUse = targetWord || getDailyConfig(!!profile, targetDate).word;
 
         if (isMarathon && targetWord) {
             try {
-                const words = typeof targetWord === 'string' ? JSON.parse(targetWord) : targetWord;
-                const obfuscatedWord = words[marathonLength] || "";
-                wordToUse = salt ? deobfuscateWord(obfuscatedWord, salt) : obfuscatedWord;
+                wordToUse = activeGame ? activeGame.word : '';
             } catch (e) {
                 console.error("Failed to parse targetWord in marathon preview", e);
             }
@@ -195,12 +203,12 @@ const GuessPreviewModal: React.FC<{
                 <p className="text-sm uppercase tracking-tighter mb-2 text-center text-gray-100 font-bold">{username}'s Guesses</p>
 
                 {isMarathon && (
-                    <div className="flex justify-center gap-1 mb-4 border-b border-white/5 pb-4">
-                        {CHALLENGE_CONFIG.MARATHON_LENGTHS.map(l => {
-                            const prog = entry.marathon_progress?.find((p: any) => p.word_length === l);
+                    <div className="flex justify-center flex-wrap gap-1 mb-4 border-b border-white/5 pb-4 max-h-[100px] overflow-y-auto">
+                        {marathonGames.map((game, idx) => {
+                            const prog = entry.marathon_progress?.find((p: any) => p.game_index === idx);
                             const targetPlayed = !!prog;
                             
-                            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.word_length === l);
+                            const myProg = myParticipation?.marathon_progress?.find((p: any) => p.game_index === idx);
                             const viewerFinished = myProg?.status === 'completed' || myProg?.status === 'timed_out';
                             const isMe = profile?.id === (entry.user_id || entry.profiles?.id);
                             
@@ -208,15 +216,15 @@ const GuessPreviewModal: React.FC<{
 
                             return (
                                 <button
-                                    key={l}
+                                    key={idx}
                                     disabled={!canSelect}
                                     onClick={() => {
-                                        setMarathonLength(l);
+                                        setMarathonGameIndex(idx);
                                         setShowTargetWord(false);
                                     }}
-                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${marathonLength === l ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : canSelect ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
+                                    className={`px-2.5 h-8 rounded-lg text-[10px] font-black transition-all ${marathonGameIndex === idx ? 'bg-correct text-black scale-110 shadow-lg shadow-correct/20' : canSelect ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/5 text-gray-700 opacity-50 cursor-not-allowed'}`}
                                 >
-                                    {l}
+                                    #{idx + 1} ({game.wordLength}L)
                                 </button>
                             );
                         })}
@@ -303,7 +311,7 @@ const GuessPreviewModal: React.FC<{
                             )}
 
                             <div className="pt-2 mt-1 border-t border-gray-700 flex justify-between text-[11px] uppercase font-black text-gray-100">
-                                <span>{isMarathon ? `Length ${marathonLength} Score:` : 'Total Index:'}</span>
+                                <span>{isMarathon ? `Game #${marathonGameIndex + 1} (${activeGame?.wordLength || 5}L) Score:` : 'Total Index:'}</span>
                                 <span className="text-white bg-correct px-2 rounded-full">{gameData?.skill_score || 0}</span>
                             </div>
                         </div>

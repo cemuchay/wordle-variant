@@ -5,44 +5,41 @@ import { calculateSkillIndex, checkGuess, deobfuscateWord, getHint, getLetterSta
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useConfirmation } from '../context/ConfirmationContext';
+import { parseMarathonGames, getMarathonTimer, getHandicapStarter } from '../utils/marathon';
 
 interface UseChallengeGameEngineProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number, gameIndex?: number) => Promise<boolean>;
     onFinish: () => void;
-    selectedLength?: number | null; // For Marathon mode
+    gameIndex?: number | null; // For Marathon mode
     onLengthComplete?: () => void; // Callback for Marathon mode
 }
 
 export const useChallengeGameEngine = ({
-    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete
+    challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onLengthComplete
 }: UseChallengeGameEngineProps) => {
     const setTimeLeftStore = useChallengeStore(state => state.setTimeLeft);
     const { ask } = useConfirmation();
     const isMarathon = challenge.word_length === 1;
 
+    const marathonGames = useMemo(() => {
+        if (!isMarathon) return [];
+        return parseMarathonGames(challenge.target_word, challenge.salt);
+    }, [challenge.target_word, isMarathon, challenge.salt]);
+
+    const activeGame = useMemo(() => {
+        if (!isMarathon || gameIndex === undefined || gameIndex === null) return null;
+        return marathonGames[gameIndex] || null;
+    }, [isMarathon, marathonGames, gameIndex]);
+
     const effectiveMaxTime = useMemo(() => {
         if (challenge.mode !== 'LIVE') return null;
-        if (!isMarathon || !selectedLength || !challenge.marathon_timers) return challenge.max_time;
-        return challenge.marathon_timers[selectedLength] || challenge.max_time;
-    }, [challenge.mode, challenge.max_time, challenge.marathon_timers, isMarathon, selectedLength]);
-
-    const marathonWords = useMemo(() => {
-        if (!isMarathon) return null;
-        try {
-            const words = JSON.parse(challenge.target_word);
-            const decrypted: Record<number, string> = {};
-            Object.entries(words).forEach(([len, word]) => {
-                decrypted[Number(len)] = deobfuscateWord(word as string, challenge.salt);
-            });
-            return decrypted;
-        } catch (e) {
-            console.error("Failed to parse marathon words", e);
-            return null;
-        }
-    }, [challenge.target_word, isMarathon, challenge.salt]);
+        if (!isMarathon || gameIndex === undefined || gameIndex === null || !challenge.marathon_timers) return challenge.max_time;
+        const activeLength = activeGame ? activeGame.wordLength : 5;
+        return getMarathonTimer(challenge, gameIndex, activeLength);
+    }, [challenge.mode, challenge.max_time, challenge.marathon_timers, isMarathon, gameIndex, activeGame]);
 
     const [state, dispatch] = useReducer(challengeGameReducer, {
         ...initialChallengeState,
@@ -56,14 +53,14 @@ export const useChallengeGameEngine = ({
 
     const [isSaving, setIsSaving] = useState(false);
     const [syncFailed, setSyncFailed] = useState(false);
-    const lastPayloadRef = useRef<{ payload: any, wordLen?: number } | null>(null);
+    const lastPayloadRef = useRef<{ payload: any, wordLen?: number, gIdx?: number } | null>(null);
     const [retryCount, setRetryCount] = useState(0);
     const [networkLogs, setNetworkLogs] = useState<Array<{ id: string, msg: string, duration?: number }>>([]);
     const startTimerRef = useRef(false);
     const initializedRef = useRef<string>("");
     const { guesses, currentGuess, isGameOver, usedHint, hintRecord, timeLeft } = state;
 
-    const currentKey = isMarathon ? `m-${selectedLength}` : `r-${challenge.id}`;
+    const currentKey = isMarathon ? `m-idx-${gameIndex}` : `r-${challenge.id}`;
     const storageKey = `challenge-prog-${challenge.id}-${currentKey}`;
 
     const addLog = useCallback((msg: string, duration?: number) => {
@@ -81,14 +78,14 @@ export const useChallengeGameEngine = ({
         }
     }, [storageKey]);
 
-    const wrappedSubmitResult = useCallback(async (payload: any, wordLen?: number) => {
+    const wrappedSubmitResult = useCallback(async (payload: any, wordLen?: number, gIdx?: number) => {
         const start = Date.now();
         addLog(`Sync Start: ${payload.status}`);
         
         // Save to local mirror first
         saveToLocal(payload);
 
-        const success = await submitChallengeResult(payload, wordLen);
+        const success = await submitChallengeResult(payload, wordLen, gIdx);
         const duration = Date.now() - start;
         addLog(`Sync End: ${success ? 'Success' : 'Failed'}`, duration);
 
@@ -98,6 +95,11 @@ export const useChallengeGameEngine = ({
         if (success && (payload.status === 'completed' || payload.status === 'timed_out')) {
             try {
                 localStorage.removeItem(storageKey);
+                // Also clean up fallback legacy key if it exists
+                if (isMarathon && activeGame) {
+                    const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                    localStorage.removeItem(legacyKey);
+                }
                 console.log("[Engine] Local mirror cleaned up after successful completion sync.");
             } catch (e) {
                 console.error("Local cleanup failed", e);
@@ -105,9 +107,12 @@ export const useChallengeGameEngine = ({
         }
 
         return success;
-    }, [submitChallengeResult, addLog, saveToLocal, storageKey]);
+    }, [submitChallengeResult, addLog, saveToLocal, storageKey, isMarathon, activeGame, challenge.id]);
 
-
+    const wordLength = isMarathon ? (activeGame ? activeGame.wordLength : 5) : challenge.word_length;
+    const targetWord = useMemo(() => {
+        return isMarathon ? (activeGame ? activeGame.word : "") : deobfuscateWord(challenge.target_word, challenge.salt);
+    }, [isMarathon, activeGame, challenge.target_word, challenge.salt]);
 
     const handleTimeExpired = useCallback(async () => {
         if (isSaving) return;
@@ -130,7 +135,7 @@ export const useChallengeGameEngine = ({
                 hints_used: usedHint,
                 hint_record: hintRecord,
                 time_taken: timeTaken
-            }, selectedLength!);
+            }, wordLength, gameIndex!);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save progress.", 3000);
             if (onLengthComplete) onLengthComplete();
@@ -148,19 +153,13 @@ export const useChallengeGameEngine = ({
             if (!success) triggerToast("Failed to save result.", 4000);
             onFinish();
         }
-    }, [isSaving, challenge.mode, effectiveMaxTime, isMarathon, wrappedSubmitResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
+    }, [isSaving, challenge.mode, effectiveMaxTime, isMarathon, wrappedSubmitResult, guesses, usedHint, hintRecord, wordLength, gameIndex, onLengthComplete, onFinish, triggerToast]);
 
     // Sync timeLeft with Global Store
     useEffect(() => {
         setTimeLeftStore(timeLeft);
         return () => setTimeLeftStore(null);
     }, [timeLeft, setTimeLeftStore]);
-
-    // Word Length & Target Word Resolution
-    const wordLength = isMarathon ? selectedLength! : challenge.word_length;
-    const targetWord = useMemo(() => {
-        return isMarathon ? (marathonWords?.[selectedLength!] || "") : deobfuscateWord(challenge.target_word, challenge.salt);
-    }, [isMarathon, marathonWords, selectedLength, challenge.target_word, challenge.salt]);
 
     useEffect(() => {
         if (targetWord) {
@@ -174,8 +173,10 @@ export const useChallengeGameEngine = ({
         if (!participation) return [];
 
         if (isMarathon) {
-            if (!selectedLength) return [];
-            const progress = participation.marathon_progress?.find((p: any) => p.word_length === selectedLength);
+            if (gameIndex === undefined || gameIndex === null) return [];
+            const progress = participation.marathon_progress?.find((p: any) => 
+                p.game_index === gameIndex || (p.game_index === undefined && p.word_length === activeGame?.wordLength)
+            );
             return Array.isArray(progress?.guesses) ? progress.guesses : [];
         }
 
@@ -186,18 +187,20 @@ export const useChallengeGameEngine = ({
             try { g = JSON.parse(g); } catch (e) { return []; }
         }
         return Array.isArray(g) ? g : [];
-    }, [participation, isMarathon, selectedLength]);
+    }, [participation, isMarathon, gameIndex, activeGame]);
 
     // Initialization & State Sync
     useEffect(() => {
-        if (isMarathon && !selectedLength) return;
+        if (isMarathon && (gameIndex === undefined || gameIndex === null)) return;
         if (initializedRef.current === currentKey) return;
 
         const incoming = getIncomingGuesses();
-        const progress = isMarathon ? participation.marathon_progress?.find((p: any) => p.word_length === selectedLength) : null;
+        const progress = isMarathon ? participation.marathon_progress?.find((p: any) => 
+            p.game_index === gameIndex || (p.game_index === undefined && p.word_length === activeGame?.wordLength)
+        ) : null;
 
-        console.log(`[Engine] Initializing length ${wordLength}. Key: ${currentKey}`);
-        addLog(`Game Initialized: ${wordLength}L`);
+        console.log(`[Engine] Initializing game index ${gameIndex} (length ${wordLength}). Key: ${currentKey}`);
+        addLog(`Game Initialized: idx ${gameIndex} (${wordLength}L)`);
 
         const serverStatus = isMarathon ? (progress?.status || 'playing') : participation.status;
         const isFinishedStatus = serverStatus === 'completed' || serverStatus === 'timed_out';
@@ -231,7 +234,14 @@ export const useChallengeGameEngine = ({
         let localHintRecord = isMarathon ? (progress?.hint_record || null) : (participation.hint_record || null);
 
         try {
-            const saved = localStorage.getItem(storageKey);
+            let saved = localStorage.getItem(storageKey);
+            if (!saved && isMarathon && activeGame) {
+                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                saved = localStorage.getItem(legacyKey);
+                if (saved) {
+                    console.log("[Engine] Found legacy storage key, migrating/recovering from:", legacyKey);
+                }
+            }
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Only use local storage if it's MORE recent or has MORE guesses than server
@@ -249,7 +259,7 @@ export const useChallengeGameEngine = ({
         let isStarterEnforced = false;
         if (localGuesses.length === 0 && targetWord) {
             const starter = isMarathon 
-                ? (challenge.handicap_starters?.[selectedLength!]) 
+                ? getHandicapStarter(challenge, gameIndex!, wordLength)
                 : challenge.handicap_starter;
             if (starter && challenge.handicap_enforced) {
                 const upperStarter = starter.toUpperCase();
@@ -282,7 +292,7 @@ export const useChallengeGameEngine = ({
                     attempts: 1,
                     guesses: localGuesses,
                     started_at: new Date().toISOString()
-                }, isMarathon ? selectedLength! : undefined);
+                }, isMarathon ? wordLength : undefined, isMarathon ? gameIndex! : undefined);
             }
 
             // Handle Offline Timeout Sync
@@ -301,18 +311,18 @@ export const useChallengeGameEngine = ({
                     await wrappedSubmitResult({
                         status: 'playing',
                         started_at: new Date().toISOString()
-                    }, isMarathon ? selectedLength! : undefined);
+                    }, isMarathon ? wordLength : undefined, isMarathon ? gameIndex! : undefined);
                 }
             }
         };
 
         runSideEffects();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentKey, isMarathon, selectedLength, challenge, isSaving, effectiveMaxTime]);
+    }, [currentKey, isMarathon, gameIndex, challenge, isSaving, effectiveMaxTime]);
 
     // Sync guesses if they update in props while engine is mounted
     useEffect(() => {
-        if (isSaving || (isMarathon && !selectedLength)) return;
+        if (isSaving || (isMarathon && (gameIndex === undefined || gameIndex === null))) return;
 
         const incoming = getIncomingGuesses();
 
@@ -348,7 +358,7 @@ export const useChallengeGameEngine = ({
                 });
             }
         }
-    }, [getIncomingGuesses, guesses, isSaving, isMarathon, selectedLength, addLog]);
+    }, [getIncomingGuesses, guesses, isSaving, isMarathon, gameIndex, addLog]);
 
     // Timer Interval Management
     useEffect(() => {
@@ -359,8 +369,6 @@ export const useChallengeGameEngine = ({
             return () => clearInterval(interval);
         }
     }, [isGameOver, timeLeft]);
-
-
 
     useEffect(() => {
         if (timeLeft === 0 && !isGameOver) {
@@ -382,9 +390,6 @@ export const useChallengeGameEngine = ({
     const onEnter = useCallback(async () => {
         if (isGameOver || currentGuess.length !== wordLength) return;
         
-        // Prevent submitting if we are already saving this specific row
-        // We use a ref or state check here. For simplicity and robustness, 
-        // we can check if the currentGuess is already being processed.
         const upperGuess = currentGuess.toUpperCase();
         
         const { valid } = getWordLists(wordLength);
@@ -497,7 +502,7 @@ export const useChallengeGameEngine = ({
                 setRetryCount(attempt);
                 await new Promise(r => setTimeout(r, 1500));
             }
-            success = await wrappedSubmitResult(resultPayload, isMarathon ? wordLength : undefined);
+            success = await wrappedSubmitResult(resultPayload, isMarathon ? wordLength : undefined, isMarathon ? gameIndex! : undefined);
             attempt++;
         }
 
@@ -506,7 +511,7 @@ export const useChallengeGameEngine = ({
 
         if (!success) {
             setSyncFailed(true);
-            lastPayloadRef.current = { payload: resultPayload, wordLen: isMarathon ? wordLength : undefined };
+            lastPayloadRef.current = { payload: resultPayload, wordLen: isMarathon ? wordLength : undefined, gIdx: isMarathon ? gameIndex! : undefined };
             triggerToast("Sync failed. Check connection.", 5000);
         } else {
             setSyncFailed(false);
@@ -523,7 +528,7 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, effectiveMaxTime, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish, ask]);
+    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, effectiveMaxTime, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish, ask, gameIndex]);
 
     const handleHint = useCallback(async () => {
         if (isGameOver) return;
@@ -565,12 +570,11 @@ export const useChallengeGameEngine = ({
                     hint_record: hintWithRow
                 };
             }
-            const success = await wrappedSubmitResult(resultPayload, isMarathon ? selectedLength! : undefined);
+            const success = await wrappedSubmitResult(resultPayload, isMarathon ? wordLength : undefined, isMarathon ? gameIndex! : undefined);
             setIsSaving(false);
             if (!success) triggerToast("Failed to save hint usage.", 3000);
         }
-    }, [isGameOver, isSaving, usedHint, triggerToast, guesses, targetWord, isMarathon, selectedLength, wrappedSubmitResult]);
-
+    }, [isGameOver, isSaving, usedHint, triggerToast, guesses, targetWord, isMarathon, gameIndex, wordLength, wrappedSubmitResult]);
 
     const retrySync = useCallback(async () => {
         if (!syncFailed || !lastPayloadRef.current || isSaving) return;
@@ -578,8 +582,8 @@ export const useChallengeGameEngine = ({
         setIsSaving(true);
         setRetryCount(0);
         
-        const { payload, wordLen } = lastPayloadRef.current;
-        const success = await wrappedSubmitResult(payload, wordLen);
+        const { payload, wordLen, gIdx } = lastPayloadRef.current;
+        const success = await wrappedSubmitResult(payload, wordLen, gIdx);
         
         setIsSaving(false);
         if (success) {

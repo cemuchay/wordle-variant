@@ -8,6 +8,7 @@ interface ChallengeState {
     joinId: string;
     previewParticipant: ChallengeParticipant | null;
     previewMarathonLength: number | null;
+    previewMarathonGameIndex: number | null;
     timeLeft: number | null;
     backAction: (() => void) | null;
 
@@ -33,6 +34,7 @@ interface ChallengeState {
     setJoinId: (id: string) => void;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     setPreviewMarathonLength: (l: number | null) => void;
+    setPreviewMarathonGameIndex: (idx: number | null) => void;
     setTimeLeft: (t: number | null) => void;
     setBackAction: (fn: (() => void) | null) => void;
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
@@ -57,6 +59,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     joinId: '',
     previewParticipant: null,
     previewMarathonLength: null,
+    previewMarathonGameIndex: null,
     timeLeft: null,
     backAction: null,
     mode: 'ANYTIME',
@@ -76,6 +79,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     setJoinId: (joinId) => set({ joinId }),
     setPreviewParticipant: (previewParticipant) => set({ previewParticipant }),
     setPreviewMarathonLength: (previewMarathonLength) => set({ previewMarathonLength }),
+    setPreviewMarathonGameIndex: (previewMarathonGameIndex) => set({ previewMarathonGameIndex }),
     setTimeLeft: (timeLeft) => set({ timeLeft }),
     setBackAction: (fn) => set((state) => ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -168,7 +168,7 @@ export const useChallengeMutations = () => {
             isPublic = false, maxParticipants = null,
             isCustomWord = false, customWord = '', customWords = {},
             handicapStarter = null, handicapStarters = null, handicapEnforced = false,
-            lifespanHours = 24, marathonTimers = null
+            lifespanHours = 24, marathonTimers = null, marathonGames = null
         }: any) => {
             const salt = Math.random().toString(36).substring(2, 15);
             let actualLength = length;
@@ -177,46 +177,42 @@ export const useChallengeMutations = () => {
             const plainMarathonTargets: Record<number, string> = {};
             let plainRegularTarget = '';
 
-            if (isCustomWord) {
-                if (length === 1) { // Marathon custom word
-                    const marathonWords: Record<number, string> = {};
-                    [3, 4, 5, 6, 7].forEach(l => {
-                        const word = (customWords[l] || getRandomWord(l)).toUpperCase();
-                        plainMarathonTargets[l] = word;
-                        marathonWords[l] = obfuscateWord(word, salt);
+            const resolvedMarathonGames = marathonGames || (length === 1 ? [3, 4, 5, 6, 7] : null);
+
+            if (resolvedMarathonGames) {
+                const targetArray: { length: number; word: string }[] = [];
+                resolvedMarathonGames.forEach((l: number, idx: number) => {
+                    let rawWord = '';
+                    if (isCustomWord) {
+                        if (Array.isArray(customWords)) {
+                            rawWord = customWords[idx];
+                        } else if (customWords && typeof customWords === 'object') {
+                            rawWord = customWords[l];
+                        }
+                    }
+                    const word = (rawWord || getRandomWord(l)).toUpperCase();
+                    plainMarathonTargets[idx] = word;
+                    targetArray.push({
+                        length: l,
+                        word: obfuscateWord(word, salt)
                     });
-                    targetWord = JSON.stringify(marathonWords);
-                } else {
-                    actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
-                    const plainWord = (customWord || getRandomWord(actualLength)).toUpperCase();
-                    plainRegularTarget = plainWord;
-                    targetWord = obfuscateWord(plainWord, salt);
-                }
+                });
+                targetWord = JSON.stringify(targetArray);
             } else {
-                if (length === 1) { // Marathon
-                    const marathonWords: Record<number, string> = {};
-                    [3, 4, 5, 6, 7].forEach(l => {
-                        const word = getRandomWord(l).toUpperCase();
-                        plainMarathonTargets[l] = word;
-                        marathonWords[l] = obfuscateWord(word, salt);
-                    });
-                    targetWord = JSON.stringify(marathonWords);
-                } else {
-                    actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
-                    const plainWord = getRandomWord(actualLength).toUpperCase();
-                    plainRegularTarget = plainWord;
-                    targetWord = obfuscateWord(plainWord, salt);
-                }
+                actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
+                const plainWord = (customWord || getRandomWord(actualLength)).toUpperCase();
+                plainRegularTarget = plainWord;
+                targetWord = obfuscateWord(plainWord, salt);
             }
 
             let finalHandicapStarter = handicapStarter;
             let finalHandicapStarters = handicapStarters;
 
             if (handicapStarter === '__SYSTEM_RANDOM__') {
-                if (length === 1) { // Marathon
-                    const startersObj: Record<number, string> = {};
-                    [3, 4, 5, 6, 7].forEach(l => {
-                        const target = plainMarathonTargets[l] || getRandomWord(l).toUpperCase();
+                if (resolvedMarathonGames) { // Marathon
+                    const startersList: string[] = [];
+                    resolvedMarathonGames.forEach((l: number, idx: number) => {
+                        const target = plainMarathonTargets[idx] || getRandomWord(l).toUpperCase();
                         const maxAllowed = l <= 4 ? 1 : 3;
                         let starter = getRandomWord(l).toUpperCase();
                         let limit = 0;
@@ -227,9 +223,9 @@ export const useChallengeMutations = () => {
                             starter = getRandomWord(l).toUpperCase();
                             limit++;
                         }
-                        startersObj[l] = starter;
+                        startersList.push(starter);
                     });
-                    finalHandicapStarters = startersObj;
+                    finalHandicapStarters = startersList;
                     finalHandicapStarter = null;
                 } else {
                     const target = plainRegularTarget || getRandomWord(actualLength).toUpperCase();
@@ -393,9 +389,11 @@ export const useChallengeMutations = () => {
     });
 
     const submitMarathonResult = useMutation({
-        mutationFn: async ({ participationId, wordLength, result }: { participationId: string, wordLength: number, result: any }) => {
+        mutationFn: async ({ participationId, gameIndex, wordLength, result }: { participationId: string, gameIndex?: number, wordLength: number, result: any }) => {
+            const resolvedGameIndex = gameIndex !== undefined ? gameIndex : (wordLength - 3);
             const data: any = {
                 participation_id: participationId,
+                game_index: resolvedGameIndex,
                 word_length: wordLength,
                 ...result
             };
@@ -406,7 +404,7 @@ export const useChallengeMutations = () => {
 
             const { error } = await supabase
                 .from('challenge_participants_marathon')
-                .upsert(data, { onConflict: 'participation_id, word_length' });
+                .upsert(data, { onConflict: 'participation_id, game_index' });
 
             if (error) throw error;
             return true;
