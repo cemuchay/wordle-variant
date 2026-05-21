@@ -87,13 +87,13 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     let isMounted = true;
 
     const fetchLeaderboard = async () => {
-      if (!isOpen || activeTab !== 'leaderboard') return;
+      if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
 
       setLoading(true);
 
       try {
         const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
-          body: { action: 'get-leaderboard', timeframe }
+          body: { action: 'get-leaderboard', timeframe, date: currentDate }
         });
 
         if (error) throw error;
@@ -101,6 +101,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         if (isMounted && edgeRes && edgeRes.data) {
           setLeaderboard(edgeRes.data);
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error("Leaderboard fetch error:", err.message || err);
       } finally {
@@ -111,7 +112,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     fetchLeaderboard();
 
     return () => { isMounted = false; };
-  }, [isOpen, activeTab, timeframe]);
+  }, [isOpen, activeTab, timeframe, currentDate]);
 
   const canViewGuess = !!user && (timeframe === "yesterday" || (timeframe === "today" && viewerHasFinished));
   if (!isOpen) return null;
@@ -315,14 +316,20 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
 
   return (
     <div
-      onClick={() => canViewGuesses && onShowGuesses(entry)}
+      onClick={() => {
+        if (canViewGuesses) {
+          onShowGuesses(entry);
+        } else if (entry.user_id) {
+          window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
+        }
+      }}
       className={`
     flex items-center justify-between p-3 rounded-xl border transition-all duration-300
     ${isFirst
           ? 'bg-linear-to-r from-yellow-900/40 via-yellow-600/10 to-transparent border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]'
           : isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'
         } 
-    ${canViewGuesses ? 'cursor-pointer hover:brightness-110' : ''}
+    ${(canViewGuesses || entry.user_id) ? 'cursor-pointer hover:brightness-110' : ''}
   `}
     >
       <div className="flex items-center gap-3">
@@ -345,28 +352,30 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
 
         <img
           src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`}
-          className={`w-7 h-7 rounded-full border cursor-pointer hover:scale-105 transition-transform ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
+          className={`w-7 h-7 rounded-full border ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
           alt={entry.username}
-          onClick={(e) => {
-            if (entry.user_id) {
-              e.stopPropagation();
-              window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
-            }
-          }}
         />
 
         <div className="flex flex-col">
-          <span 
-            onClick={(e) => {
-              if (entry.user_id) {
-                e.stopPropagation();
-                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
-              }
-            }}
-            className={`text-xs font-bold truncate max-w-24 cursor-pointer hover:underline ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}
-          >
-            {entry.username}
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={`text-xs font-bold truncate max-w-20 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}
+            >
+              {entry.username}
+            </span>
+            {entry.user_id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
+                }}
+                title="View Profile"
+                className="text-gray-500 hover:text-white transition-colors p-0.5 rounded hover:bg-gray-800"
+              >
+                <User size={10} />
+              </button>
+            )}
+          </div>
           {canViewGuesses && (
             <div className="flex items-center gap-1 text-gray-500 text-[8px] font-black uppercase">
               <Eye size={10} /> Preview

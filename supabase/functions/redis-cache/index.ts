@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, timeframe, userId, key } = await req.json();
+    const { action, timeframe, userId, key, date } = await req.json();
 
     const upstashUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
     const upstashToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
@@ -22,8 +22,6 @@ serve(async (req) => {
       throw new Error("Upstash Redis secrets are not configured in Supabase env.");
     }
 
-    // Helper to query Upstash Redis
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const runRedisCommand = async (command: any[]) => {
       const res = await fetch(upstashUrl, {
         method: "POST",
@@ -37,6 +35,30 @@ serve(async (req) => {
         throw new Error(`Upstash API error: ${res.statusText}`);
       }
       return await res.json();
+    };
+
+    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
+      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+
+      if (offsetDays === 0) {
+        return lagosTodayStr;
+      }
+
+      const [year, month, day] = lagosTodayStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      d.setDate(d.getDate() + offsetDays);
+
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
     };
 
     // Initialize Supabase Client using caller's authentication headers (enforces RLS)
@@ -58,7 +80,13 @@ serve(async (req) => {
         });
       }
 
-      const cacheKey = `leaderboard:${timeframe}`;
+      let cacheKey = `leaderboard:${timeframe}`;
+      if (timeframe === "today") {
+        cacheKey = `leaderboard:daily:${getLagosDate(date, 0)}`;
+      } else if (timeframe === "yesterday") {
+        cacheKey = `leaderboard:daily:${getLagosDate(date, -1)}`;
+      }
+
       const cached = await runRedisCommand(["GET", cacheKey]);
 
       if (cached && cached.result) {
@@ -84,9 +112,9 @@ serve(async (req) => {
       }
 
       const isDailyView = timeframe === "today" || timeframe === "yesterday";
-      const baseSelect = "username, avatar_url, total_points";
+      const baseSelect = "username, avatar_url, total_points, user_id";
       const selectStr = isDailyView
-        ? `${baseSelect}, word_length, attempts, status, user_id`
+        ? `${baseSelect}, word_length, attempts, status`
         : `${baseSelect}, days_active`;
 
       const { data, error } = await supabaseClient
@@ -148,7 +176,7 @@ serve(async (req) => {
       // Cache Miss: Query profiles table
       const { data: profile, error } = await supabaseClient
         .from("profiles")
-        .select("id, username, avatar_url, updated_at, last_seen_at")
+        .select("id, username, avatar_url, updated_at, last_seen_at, daily_wins, weekly_wins, monthly_wins")
         .eq("id", userId)
         .single();
 
@@ -185,7 +213,14 @@ serve(async (req) => {
         });
       }
 
-      await runRedisCommand(["DEL", key]);
+      if (key === "leaderboard:today") {
+        const todayStr = getLagosDate(null, 0);
+        const yesterdayStr = getLagosDate(null, -1);
+        await runRedisCommand(["DEL", `leaderboard:daily:${todayStr}`]);
+        await runRedisCommand(["DEL", `leaderboard:daily:${yesterdayStr}`]);
+      } else {
+        await runRedisCommand(["DEL", key]);
+      }
 
       return new Response(JSON.stringify({ success: true, invalidated: key }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

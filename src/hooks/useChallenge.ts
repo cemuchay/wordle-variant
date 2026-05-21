@@ -15,6 +15,7 @@ export interface Challenge {
     expires_at: string;
     created_at: string;
     creator_profile?: { username: string, avatar_url: string };
+    creator?: any;
     participants?: ChallengeParticipant[];
     is_public?: boolean;
     max_participants?: number | null;
@@ -22,6 +23,7 @@ export interface Challenge {
     handicap_starter?: string | null;
     handicap_starters?: any;
     handicap_enforced?: boolean;
+    marathon_timers?: Record<number, number> | null;
 }
 
 export interface MarathonProgress {
@@ -43,7 +45,7 @@ export interface ChallengeParticipant {
     id: string;
     challenge_id: string;
     user_id: string;
-    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out';
+    status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out' | 'host';
     score: number;
     attempts: number;
     guesses: any; 

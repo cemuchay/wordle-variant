@@ -9,6 +9,7 @@ import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { NotificationsManager } from './components/notifications/NotificationsManager';
+import { LandscapeBlocker } from './components/LandscapeBlocker';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -90,6 +91,11 @@ export default function App() {
     // Listen to custom event to open user profile modal
     useEffect(() => {
         const handleOpenProfile = (e: Event) => {
+            if (!user) {
+                triggerToast("Please log in to view user profiles.", 4000);
+                setIsAuthOpen(true);
+                return;
+            }
             const detail = (e as CustomEvent)?.detail;
             if (detail?.userId) {
                 setViewedProfileId(detail.userId);
@@ -97,7 +103,7 @@ export default function App() {
         };
         window.addEventListener('open-user-profile', handleOpenProfile);
         return () => window.removeEventListener('open-user-profile', handleOpenProfile);
-    }, []);
+    }, [user, triggerToast]);
 
     // Stats Logic
     const { stats } = useWordleStats(user, isStatsOpen, date as string);
@@ -126,6 +132,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
+            <LandscapeBlocker />
             <DynamicIslandStatus />
             <AudioConnectionLog />
             <GlobalAudioPlayer />

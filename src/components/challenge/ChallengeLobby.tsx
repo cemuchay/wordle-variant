@@ -1,4 +1,4 @@
-import { Eye, Play, Share2, Clock, Copy } from 'lucide-react';
+import { Eye, Play, Share2, Clock, Copy, SlidersHorizontal, Shield, Sparkles, Globe, Lock, Hourglass } from 'lucide-react';
 import { memo, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
@@ -11,9 +11,10 @@ interface ParticipantItemProps {
     isLive: boolean;
     onPreview: (p: ChallengeParticipant) => void;
     canPreviewAll: boolean;
+    isExpired: boolean;
 }
 
-const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll }: ParticipantItemProps) {
+const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll, isExpired }: ParticipantItemProps) {
     const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
     
     const marathonCompletedCount = useMemo(() => {
@@ -26,8 +27,8 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
         return count;
     }, [isMarathon, p.marathon_progress]);
 
-    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll;
-    const canClick = myHasFinished || isMarathon || canPreviewAll;
+    const showScore = pIsFinished || (isMarathon && p.score > 0) || canPreviewAll || isExpired;
+    const canClick = myHasFinished || isMarathon || canPreviewAll || isExpired;
 
     return (
         <div
@@ -119,6 +120,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const isLive = selectedChallenge.mode === 'LIVE';
     const myHasFinished = myParticipation?.status === 'completed' || myParticipation?.status === 'timed_out';
     const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser?.id && selectedChallenge.is_custom_word;
+    const isExpired = useMemo(() => new Date(selectedChallenge.expires_at) < new Date(), [selectedChallenge.expires_at]);
 
     const maxParts = selectedChallenge.max_participants || 100;
     const currentParts = participants.length;
@@ -179,6 +181,155 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 )}
             </div>
 
+            {/* Challenge Configuration Details */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <SlidersHorizontal size={12} className="text-correct" />
+                        Challenge Configuration
+                    </h4>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase">
+                        Hosted by {selectedChallenge.profiles?.username || selectedChallenge.creator?.username || 'Host'}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Mode / Time Limit */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Timing & Mode</p>
+                        <div className="flex items-center gap-1.5">
+                            <Clock size={12} className={selectedChallenge.mode === 'LIVE' ? 'text-red-500' : 'text-blue-500'} />
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.mode === 'LIVE' ? 'Live Race' : 'Anytime (Async)'}
+                            </span>
+                        </div>
+                        {selectedChallenge.mode === 'LIVE' && (
+                            <p className="text-[9px] text-gray-400">
+                                {isMarathon && selectedChallenge.marathon_timers 
+                                    ? 'Custom per-word timers' 
+                                    : `${selectedChallenge.max_time}m per game limit`}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Word Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Word Rules</p>
+                        <div className="flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-yellow-500" />
+                            <span className="text-xs font-bold text-white">
+                                {isMarathon ? 'Marathon (3-7L)' : `${selectedChallenge.word_length || 'Random'} Letters`}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_custom_word ? 'Host Custom Word' : 'System Generated'}
+                        </p>
+                    </div>
+
+                    {/* Handicap Info */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <p className="text-[8px] font-black uppercase text-gray-500">Handicap Starter</p>
+                                <div className="flex items-center gap-1.5">
+                                    <Shield size={12} className={selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'text-correct' : 'text-gray-400'} />
+                                    <span className="text-xs font-bold text-white">
+                                        {selectedChallenge.handicap_starter || selectedChallenge.handicap_starters ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                            </div>
+                            {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                                <div className="text-right">
+                                    <span className="text-[9px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-md uppercase">
+                                        {selectedChallenge.handicap_enforced ? 'Auto-Enforced' : 'Optional'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
+                            <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                                {isMarathon && selectedChallenge.handicap_starters ? (
+                                    <div className="grid grid-cols-5 gap-1 text-center font-black">
+                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => {
+                                            const hasWord = !!w && w !== '__SYSTEM_RANDOM__';
+                                            return (
+                                                <div key={len} className="bg-white/5 p-1 rounded">
+                                                    <span className="text-[7px] text-gray-500 block">{len}L</span>
+                                                    <span className="text-white/60 uppercase text-[8px]">
+                                                        {hasWord ? 'Hidden' : 'Rand'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="font-bold">
+                                        Starter Word:{' '}
+                                        <span className="text-white/60 uppercase tracking-wider font-mono">
+                                            {selectedChallenge.handicap_starter === '__SYSTEM_RANDOM__'
+                                                ? 'Random (Hidden until start)'
+                                                : 'Hidden until start'}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Lifespan & Participants */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Privacy & Limits</p>
+                        <div className="flex items-center gap-1.5">
+                            {selectedChallenge.is_public ? (
+                                <Globe size={12} className="text-correct" />
+                            ) : (
+                                <Lock size={12} className="text-yellow-500" />
+                            )}
+                            <span className="text-xs font-bold text-white">
+                                {selectedChallenge.is_public ? 'Public Room' : 'Invite Only'}
+                            </span>
+                        </div>
+                        <p className="text-[9px] text-gray-400">
+                            {selectedChallenge.is_public 
+                                ? `Max ${selectedChallenge.max_participants || 100} players`
+                                : 'Direct shares only'}
+                        </p>
+                    </div>
+
+                    {/* Expiration Timer */}
+                    <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                        <p className="text-[8px] font-black uppercase text-gray-500">Room Lifespan</p>
+                        <div className="flex items-center gap-1.5">
+                            <Hourglass size={12} className="text-gray-400" />
+                            <span className="text-xs font-bold text-white">Expires in</span>
+                        </div>
+                        <p className="text-[9px] text-gray-400 tabular-nums">
+                            {new Date(selectedChallenge.expires_at).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </p>
+                    </div>
+
+                    {/* Custom Marathon Timers if active */}
+                    {isMarathon && selectedChallenge.mode === 'LIVE' && selectedChallenge.marathon_timers && (
+                        <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                            <p className="text-[8px] font-black uppercase text-gray-500">Marathon Per-Length Time Limits</p>
+                            <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
+                                {Object.entries(selectedChallenge.marathon_timers).map(([len, t]) => (
+                                    <div key={len} className="bg-black/30 p-1.5 rounded-lg border border-white/5">
+                                        <p className="text-[8px] font-bold text-gray-500">{len}L</p>
+                                        <p className="text-[10px] font-black text-white">{t}m</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div className="space-y-3">
                 <div className="flex items-center justify-between px-2">
                     <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">
@@ -200,6 +351,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 isLive={isLive}
                                 onPreview={handlePreview}
                                 canPreviewAll={selectedChallenge.creator_id === effectiveUser?.id && !!selectedChallenge.is_custom_word}
+                                isExpired={isExpired}
                             />
                         ))
                     )}
@@ -207,7 +359,16 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </div>
 
             <div className="pt-6 flex flex-col gap-3">
-                {isCreatorOfCustom ? (
+                {isExpired ? (
+                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
+                        <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
+                            <Hourglass size={14} /> Challenge Expired ⌛
+                        </p>
+                        <p className="text-[10px] text-red-400/80 font-bold leading-relaxed">
+                            This challenge has ended. You can view the final scores and details, but no more entries are allowed.
+                        </p>
+                    </div>
+                ) : isCreatorOfCustom ? (
                     <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
                         <p className="text-xs font-black uppercase text-yellow-500">Host Mode Active 👑</p>
                         <p className="text-[10px] text-yellow-500/80 font-bold">
@@ -243,9 +404,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                         triggerToast("Nickname must be at least 3 characters.", 3000);
                                         return;
                                     }
-                                    await registerAnonymousUser(name);
-                                }}
-                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
+                                    const user = await registerAnonymousUser(name);
+                                    if (user) {
+                                        // Join will be triggered by useEffect in ChallengeContext
+                                        triggerToast("Guest profile created! Joining...", 2000);
+                                    }
+                                }}                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
                             >
                                 Join Challenge
                             </button>

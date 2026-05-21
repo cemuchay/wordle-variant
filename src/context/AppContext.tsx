@@ -166,7 +166,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (!user?.id) return;
         const minId = user.id < targetUser.id ? user.id : targetUser.id;
         const maxId = user.id > targetUser.id ? user.id : targetUser.id;
-        const channelId = `private_call_${minId}_${maxId}`;
+        const cleanMin = minId.replace(/-/g, '');
+        const cleanMax = maxId.replace(/-/g, '');
+        const channelId = `call_${cleanMin.slice(0, 16)}_${cleanMax.slice(0, 16)}`;
+
 
         const callState: VoiceCallState = {
             channelId,

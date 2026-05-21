@@ -4,6 +4,7 @@ import { getWordLists } from '../data/words';
 import { calculateSkillIndex, checkGuess, deobfuscateWord, getHint, getLetterStatuses, isHintDisabled } from '../lib/game-logic';
 import { challengeGameReducer, initialChallengeState } from '../reducers/challengeReducer';
 import { useChallengeStore } from '../store/useChallengeStore';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 interface UseChallengeGameEngineProps {
     challenge: any;
@@ -19,7 +20,15 @@ export const useChallengeGameEngine = ({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onLengthComplete
 }: UseChallengeGameEngineProps) => {
     const setTimeLeftStore = useChallengeStore(state => state.setTimeLeft);
+    const { ask } = useConfirmation();
     const isMarathon = challenge.word_length === 1;
+
+    const effectiveMaxTime = useMemo(() => {
+        if (challenge.mode !== 'LIVE') return null;
+        if (!isMarathon || !selectedLength || !challenge.marathon_timers) return challenge.max_time;
+        return challenge.marathon_timers[selectedLength] || challenge.max_time;
+    }, [challenge.mode, challenge.max_time, challenge.marathon_timers, isMarathon, selectedLength]);
+
     const marathonWords = useMemo(() => {
         if (!isMarathon) return null;
         try {
@@ -107,8 +116,8 @@ export const useChallengeGameEngine = ({
         setIsSaving(true);
 
         let timeTaken: number | null = null;
-        if (challenge.mode === 'LIVE' && challenge.max_time) {
-            timeTaken = challenge.max_time * 60; // Max time used if expired
+        if (challenge.mode === 'LIVE' && effectiveMaxTime) {
+            timeTaken = effectiveMaxTime * 60; // Max time used if expired
         }
 
         if (isMarathon) {
@@ -139,7 +148,7 @@ export const useChallengeGameEngine = ({
             if (!success) triggerToast("Failed to save result.", 4000);
             onFinish();
         }
-    }, [isSaving, challenge.mode, challenge.max_time, isMarathon, wrappedSubmitResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
+    }, [isSaving, challenge.mode, effectiveMaxTime, isMarathon, wrappedSubmitResult, guesses, usedHint, hintRecord, selectedLength, onLengthComplete, onFinish, triggerToast]);
 
     // Sync timeLeft with Global Store
     useEffect(() => {
@@ -196,21 +205,21 @@ export const useChallengeGameEngine = ({
         let initialTimeLeft = null;
         let hasTimedOutOffline = false;
 
-        if (challenge.mode === 'LIVE' && challenge.max_time) {
+        if (challenge.mode === 'LIVE' && effectiveMaxTime) {
             // Marathon: use per-word startTime ONLY. Regular: use participation startTime.
             const startTime = isMarathon ? progress?.started_at : participation.started_at;
 
             if (isMarathon && !progress?.started_at) {
                 // Word hasn't started yet, give full time
-                initialTimeLeft = challenge.max_time * 60;
+                initialTimeLeft = effectiveMaxTime * 60;
             } else if (startTime) {
                 const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-                initialTimeLeft = Math.max(0, (challenge.max_time * 60) - elapsed);
+                initialTimeLeft = Math.max(0, (effectiveMaxTime * 60) - elapsed);
                 if (initialTimeLeft <= 0 && !isFinishedStatus) {
                     hasTimedOutOffline = true;
                 }
             } else {
-                initialTimeLeft = challenge.max_time * 60;
+                initialTimeLeft = effectiveMaxTime * 60;
             }
         }
 
@@ -284,7 +293,7 @@ export const useChallengeGameEngine = ({
             }
 
             // Handle Per-Game Timer Start for LIVE mode
-            if (challenge.mode === 'LIVE' && challenge.max_time && !isSaving && !hasTimedOutOffline && !startTimerRef.current) {
+            if (challenge.mode === 'LIVE' && effectiveMaxTime && !isSaving && !hasTimedOutOffline && !startTimerRef.current) {
                 const startTime = isMarathon ? progress?.started_at : participation.started_at;
                 if (!startTime) {
                     console.log("[Engine] Starting LIVE timer...");
@@ -299,7 +308,7 @@ export const useChallengeGameEngine = ({
 
         runSideEffects();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentKey, isMarathon, selectedLength, challenge, isSaving]);
+    }, [currentKey, isMarathon, selectedLength, challenge, isSaving, effectiveMaxTime]);
 
     // Sync guesses if they update in props while engine is mounted
     useEffect(() => {
@@ -386,6 +395,22 @@ export const useChallengeGameEngine = ({
             return;
         }
 
+        const alreadyGuessed = guesses.some((guess: any) => {
+            const word = guess.map((charObj: any) => charObj.letter).join('').toUpperCase();
+            return word === upperGuess;
+        });
+
+        if (alreadyGuessed) {
+            const confirmSubmit = await ask({
+                title: "Duplicate Guess",
+                message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
+                confirmLabel: "Yes, submit",
+                cancelLabel: "No, cancel",
+                type: "info"
+            });
+            if (!confirmSubmit) return;
+        }
+
         const result = checkGuess(upperGuess, targetWord);
         const newGuesses = [...guesses, result];
         const newStatuses = getLetterStatuses(newGuesses);
@@ -400,8 +425,8 @@ export const useChallengeGameEngine = ({
         setRetryCount(0);
 
         let timeTaken: number | null = null;
-        if (challenge.mode === 'LIVE' && challenge.max_time && timeLeft !== null) {
-            timeTaken = (challenge.max_time * 60) - timeLeft;
+        if (challenge.mode === 'LIVE' && effectiveMaxTime && timeLeft !== null) {
+            timeTaken = (effectiveMaxTime * 60) - timeLeft;
         }
 
         let resultPayload: any;
@@ -498,7 +523,7 @@ export const useChallengeGameEngine = ({
                 }
             }, 2000);
         }
-    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, challenge.max_time, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish]);
+    }, [isGameOver, currentGuess, wordLength, targetWord, guesses, challenge.mode, effectiveMaxTime, timeLeft, isMarathon, triggerToast, usedHint, hintRecord, wrappedSubmitResult, onLengthComplete, onFinish, ask]);
 
     const handleHint = useCallback(async () => {
         if (isGameOver) return;

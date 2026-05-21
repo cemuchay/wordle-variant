@@ -168,9 +168,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const challenge = item.challenge;
             const isExpired = new Date(challenge.expires_at) < new Date();
             const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            const isHost = item.status === 'host';
 
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired)) return false;
-            if (statusFilter === 'COMPLETED' && !isFinished && !isExpired) return false;
+            if (statusFilter === 'ACTIVE' && (isFinished || isExpired) && !isHost) return false;
+            if (statusFilter === 'COMPLETED' && (!isFinished && !isExpired) && !isHost) return false;
+            // Hosts stay in active until expired
+            if (isHost && statusFilter === 'COMPLETED') return false;
+            if (isHost && isExpired && statusFilter === 'ACTIVE') return false;
             if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
             if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
 
@@ -197,6 +201,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
+        if (p.status === 'host') return p;
         // Marathon mode uses per-word timers, bypass global LIVE timeout
         if (challenge.word_length === 1) return p;
 
@@ -265,9 +270,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
 
             if (challenge) {
-                if (new Date(challenge.expires_at) < new Date()) {
-                    triggerToast("This challenge has expired.", 4000);
-                    return;
+                const isExpired = new Date(challenge.expires_at) < new Date();
+                if (isExpired) {
+                    triggerToast("This challenge has expired. Viewing results.", 4000);
                 }
 
                 cleanupSubscription();
@@ -278,11 +283,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 if (effectiveUser) {
                     const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
                     if (!isCreatorOfCustom) {
-                        const participationPromise = joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id });
+                        const participationPromise = !isExpired
+                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id })
+                            : Promise.resolve(localMatch || null);
 
                         let participation = localMatch;
-                        if (!participation) {
+                        if (!participation && !isExpired) {
                             participation = await participationPromise;
+                        } else if (isExpired) {
+                            participation = challenge.participants?.find((p: any) => p.user_id === effectiveUser.id) || null;
                         } else {
                             participationPromise.then(p => {
                                 setMyParticipation(normalizeParticipation(p, challenge));
@@ -310,6 +319,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const joinSelectedChallenge = useCallback(async () => {
         if (!selectedChallenge || !effectiveUser) return;
+        const isExpired = new Date(selectedChallenge.expires_at) < new Date();
+        if (isExpired) return;
         try {
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
             if (isCreatorOfCustom) {
@@ -343,24 +354,28 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
         });
+        
         if (error) {
             console.error("Error creating guest profile:", error);
+            triggerToast("Failed to create guest profile. Please try again.", 4000);
+            return null;
         }
 
         const newUser = { id: anonId, username: nickname, user_metadata: { full_name: nickname } };
         setAnonUser(newUser);
         return newUser;
-    }, []);
+    }, [triggerToast]);
 
     // Auto-join when selectedChallenge is active and effectiveUser becomes available
     useEffect(() => {
         if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending) {
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
+            const isExpired = new Date(selectedChallenge.expires_at) < new Date();
             if (!isCreatorOfCustom) {
                 const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id);
                 if (alreadyParticipant) {
                     setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
-                } else {
+                } else if (!isExpired) {
                     joinSelectedChallenge();
                 }
             }
