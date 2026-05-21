@@ -1,7 +1,8 @@
-import { SettingsIcon } from 'lucide-react';
+import { SettingsIcon, Shield } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { NotificationBell } from '../notifications/NotificationBell';
+import { useAdminStatus } from '../../hooks/useAdminStatus';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -10,6 +11,7 @@ interface AppHeaderProps {
 export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
+    const { isAdmin } = useAdminStatus(user?.id);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -70,6 +72,16 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                         >
                             Login
                         </button>
+                    )}
+
+                    {isAdmin && (
+                        <a 
+                            href="/admin" 
+                            className="text-correct hover:text-correct/80 transition-colors p-1.5 bg-correct/10 hover:bg-correct/20 border border-correct/20 rounded-full shrink-0 flex items-center justify-center"
+                            title="Admin Vetting Portal"
+                        >
+                            <Shield size={15} />
+                        </a>
                     )}
 
                     {user && <NotificationBell />}
