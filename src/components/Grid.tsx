@@ -36,10 +36,10 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     if (status === 'correct') animationClass = 'animate-reveal-correct';
     else if (status === 'present') animationClass = 'animate-reveal-present';
     else if (status === 'absent') animationClass = 'animate-reveal-absent';
-  } else if (isPop) {
-    animationClass = 'animate-pop';
   } else if (isShake) {
     animationClass = 'animate-shake';
+  } else if (isPop) {
+    animationClass = 'animate-pop';
   } else if (isHinted) {
     animationClass = 'animate-pulse text-yellow-500/50 border-yellow-600/50';
   }

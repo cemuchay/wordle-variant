@@ -22,8 +22,6 @@ serve(async (req) => {
       throw new Error("Upstash Redis secrets are not configured in Supabase env.");
     }
 
-    // Helper to query Upstash Redis
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const runRedisCommand = async (command: any[]) => {
       const res = await fetch(upstashUrl, {
         method: "POST",
@@ -36,6 +34,30 @@ serve(async (req) => {
       if (!res.ok) {
         throw new Error(`Upstash API error: ${res.statusText}`);
       }
+    };
+
+    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
+      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+
+      if (offsetDays === 0) {
+        return lagosTodayStr;
+      }
+
+      const [year, month, day] = lagosTodayStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      d.setDate(d.getDate() + offsetDays);
+
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
     };
 
     const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
@@ -113,9 +135,9 @@ serve(async (req) => {
       }
 
       const isDailyView = timeframe === "today" || timeframe === "yesterday";
-      const baseSelect = "username, avatar_url, total_points";
+      const baseSelect = "username, avatar_url, total_points, user_id";
       const selectStr = isDailyView
-        ? `${baseSelect}, word_length, attempts, status, user_id`
+        ? `${baseSelect}, word_length, attempts, status`
         : `${baseSelect}, days_active`;
 
       const { data, error } = await supabaseClient
