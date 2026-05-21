@@ -20,6 +20,8 @@ import { useMyChallenges } from './hooks/queries/useChallengeQueries';
 import { safeLazy } from './utils/safeLazy';
 
 const ChatRoom = safeLazy(() => import('./components/chatRoom'));
+import { AdminPage } from './components/admin/AdminPage';
+
 
 export default function App() {
     const { user } = useAuth();
@@ -112,6 +114,12 @@ export default function App() {
 
     const handleChallengeCreated = () => {
         triggerToast(`Challenge created successfully`, 3000)
+    }
+
+    const isPageAdmin = window.location.pathname === '/admin';
+
+    if (isPageAdmin) {
+        return <AdminPage />;
     }
 
     if (isLoadingDate || !isHydrated) {

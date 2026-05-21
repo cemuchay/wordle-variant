@@ -84,6 +84,30 @@ serve(async (req) => {
       }).format(d);
     };
 
+    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
+      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+
+      if (offsetDays === 0) {
+        return lagosTodayStr;
+      }
+
+      const [year, month, day] = lagosTodayStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      d.setDate(d.getDate() + offsetDays);
+
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    };
+
     // Initialize Supabase Client using caller's authentication headers (enforces RLS)
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
