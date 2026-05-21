@@ -866,7 +866,6 @@ export const calculateSkillIndex = ({
   if (hintRecord && hintRecord?.row !== undefined) {
     const rowBonus = rows[hintRecord.row - 1];
     if (rowBonus !== undefined) {
-      totalBonus -= SCORING.HINT_PENALTY;
       localHint -= SCORING.HINT_PENALTY;
     }
   }
@@ -882,7 +881,7 @@ export const calculateSkillIndex = ({
           SCORING.BASE_SCORE_MAX,
       )
     : 0;
-  const finalScore: number = baseScore + totalBonus;
+  const finalScore: number = baseScore + totalBonus + localHint;
 
   return {
     rows,
