@@ -18,7 +18,7 @@ interface GameToolbarProps {
     syncStatus: SyncStatus;
 }
 
-const ICON_SIZE = 16;
+const ICON_SIZE = 18;
 
 export const GameToolbar = ({
     onOpenChallenge,

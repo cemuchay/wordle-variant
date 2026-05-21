@@ -9,6 +9,7 @@ import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
 import { Toast } from './components/Toast';
 import { NotificationsManager } from './components/notifications/NotificationsManager';
+import { LandscapeBlocker } from './components/LandscapeBlocker';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -123,6 +124,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
+            <LandscapeBlocker />
             <DynamicIslandStatus />
             <AudioConnectionLog />
             <GlobalAudioPlayer />

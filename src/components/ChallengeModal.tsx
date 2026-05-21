@@ -159,7 +159,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                     </div>
                     <div>
                         <h2 className="text-xl font-black uppercase tracking-tighter">
-                            Challenges (Beta)
+                            Challenges
                         </h2>
                         <div className="flex items-center gap-2 min-h-5">
                             {isPlaying ? (
