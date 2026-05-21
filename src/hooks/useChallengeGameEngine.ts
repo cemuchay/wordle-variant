@@ -125,9 +125,12 @@ export const useChallengeGameEngine = ({
   const saveToLocal = useCallback(
     (payload: any) => {
       try {
+        const existing = localStorage.getItem(storageKey);
+        const existingParsed = existing ? JSON.parse(existing) : {};
         localStorage.setItem(
           storageKey,
           JSON.stringify({
+            ...existingParsed,
             ...payload,
             timestamp: Date.now(),
           }),
@@ -375,12 +378,17 @@ export const useChallengeGameEngine = ({
       }
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Only use local storage if it's MORE recent or has MORE guesses than server
-        if (parsed.guesses?.length > incoming.length) {
+        const hasMoreGuesses = parsed.guesses?.length > incoming.length;
+        const hasNewHint = parsed.hints_used && !localUsedHint;
+
+        if (hasMoreGuesses || hasNewHint) {
           console.log(
-            "[Engine] Recovering more advanced progress from localStorage",
+            "[Engine] Recovering advanced progress or hint from localStorage",
+            { hasMoreGuesses, hasNewHint }
           );
-          localGuesses = parsed.guesses;
+          if (parsed.guesses && parsed.guesses.length >= incoming.length) {
+            localGuesses = parsed.guesses;
+          }
           localUsedHint = parsed.hints_used || localUsedHint;
           localHintRecord = parsed.hint_record || localHintRecord;
         }
@@ -649,6 +657,8 @@ export const useChallengeGameEngine = ({
           status: "playing",
           guesses: newGuesses,
           attempts: newGuesses.length,
+          hints_used: usedHint,
+          hint_record: hintRecord,
         };
       }
     } else {
@@ -779,6 +789,8 @@ export const useChallengeGameEngine = ({
       if (isMarathon) {
         resultPayload = {
           status: "playing",
+          guesses: guesses,
+          attempts: guesses.length,
           hints_used: true,
           hint_record: hintWithRow,
         };
