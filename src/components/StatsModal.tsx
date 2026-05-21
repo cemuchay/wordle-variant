@@ -316,14 +316,20 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
 
   return (
     <div
-      onClick={() => canViewGuesses && onShowGuesses(entry)}
+      onClick={() => {
+        if (canViewGuesses) {
+          onShowGuesses(entry);
+        } else if (entry.user_id) {
+          window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: entry.user_id } }));
+        }
+      }}
       className={`
     flex items-center justify-between p-3 rounded-xl border transition-all duration-300
     ${isFirst
           ? 'bg-linear-to-r from-yellow-900/40 via-yellow-600/10 to-transparent border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]'
           : isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'
         } 
-    ${canViewGuesses ? 'cursor-pointer hover:brightness-110' : ''}
+    ${(canViewGuesses || entry.user_id) ? 'cursor-pointer hover:brightness-110' : ''}
   `}
     >
       <div className="flex items-center gap-3">
