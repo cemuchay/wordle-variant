@@ -7,19 +7,20 @@ import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { NetworkLog } from './ChallengeUIElements';
+import { getHandicapStarter } from '../../utils/marathon';
 
 interface RegularGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number, gameIndex?: number) => Promise<boolean>;
     onFinish: () => void;
-    selectedLength?: number; // Optional override for Marathon mode
+    gameIndex?: number | null; // Optional override for Marathon mode
     onBack?: () => void; // Optional back handler
 }
 
 export const RegularGameplay = memo(function RegularGameplay({
-    challenge, participation, triggerToast, submitChallengeResult, onFinish, selectedLength, onBack
+    challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onBack
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
 
@@ -29,7 +30,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         triggerToast,
         submitChallengeResult,
         onFinish,
-        selectedLength,
+        gameIndex,
         onLengthComplete: onBack
     });
 
@@ -99,8 +100,8 @@ export const RegularGameplay = memo(function RegularGameplay({
 
                 {/* Handicap Recommendation */}
                 {(() => {
-                    const starterWord = selectedLength
-                        ? challenge.handicap_starters?.[selectedLength]
+                    const starterWord = (gameIndex !== undefined && gameIndex !== null)
+                        ? getHandicapStarter(challenge, gameIndex, wordLength)
                         : challenge.handicap_starter;
                     if (starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver) {
                         return (

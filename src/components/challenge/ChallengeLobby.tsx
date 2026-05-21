@@ -3,10 +3,12 @@ import { memo, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { formatTime } from './lib';
 import { type ChallengeParticipant } from '../../hooks/useChallenge';
+import { parseMarathonGames, getMarathonTimer, getHandicapStarter } from '../../utils/marathon';
 
 interface ParticipantItemProps {
     p: ChallengeParticipant;
     isMarathon: boolean;
+    totalMarathonGames: number;
     myHasFinished: boolean;
     isLive: boolean;
     onPreview: (p: ChallengeParticipant) => void;
@@ -14,7 +16,9 @@ interface ParticipantItemProps {
     isExpired: boolean;
 }
 
-const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFinished, isLive, onPreview, canPreviewAll, isExpired }: ParticipantItemProps) {
+const ParticipantItem = memo(function ParticipantItem({ 
+    p, isMarathon, totalMarathonGames, myHasFinished, isLive, onPreview, canPreviewAll, isExpired 
+}: ParticipantItemProps) {
     const pIsFinished = p.status === 'completed' || p.status === 'timed_out';
     
     const marathonCompletedCount = useMemo(() => {
@@ -68,7 +72,7 @@ const ParticipantItem = memo(function ParticipantItem({ p, isMarathon, myHasFini
                         {p.profiles?.username || 'Player'}
                     </p>
                     <p className={`text-[9px] font-black uppercase ${pIsFinished ? 'text-gray-500' : 'text-yellow-500'}`}>
-                        {isMarathon && p.status === 'playing' ? `${marathonCompletedCount}/5 Lengths` : p.status}
+                        {isMarathon && p.status === 'playing' ? `${marathonCompletedCount}/${totalMarathonGames} Games` : p.status}
                     </p>
                 </div>
             </div>
@@ -122,6 +126,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser?.id && selectedChallenge.is_custom_word;
     const isExpired = useMemo(() => new Date(selectedChallenge.expires_at) < new Date(), [selectedChallenge.expires_at]);
 
+    const marathonGamesList = useMemo(() => {
+        if (!isMarathon) return [];
+        return parseMarathonGames(selectedChallenge.target_word, selectedChallenge.salt);
+    }, [isMarathon, selectedChallenge.target_word, selectedChallenge.salt]);
+
     const maxParts = selectedChallenge.max_participants || 100;
     const currentParts = participants.length;
     const isFull = currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
@@ -163,11 +172,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     </div>
                 </div>
                 <h3 className="text-2xl font-black mb-1">
-                    {isMarathon ? 'The Marathon' : `${selectedChallenge.word_length} Letter Word`}
+                    {isMarathon ? `The Marathon (${marathonGamesList.length} Games)` : `${selectedChallenge.word_length} Letter Word`}
                 </h3>
                 <p className="text-gray-400 text-sm mb-4">
                     {isMarathon
-                        ? `Solve all lengths (3-7). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes per word!` : 'Take your time, async play.'}`
+                        ? `Solve sequence (${marathonGamesList.map(g => g.wordLength).join('-')}). ${selectedChallenge.mode === 'LIVE' ? `You have ${selectedChallenge.max_time} minutes per word!` : 'Take your time, async play.'}`
                         : selectedChallenge.mode === 'LIVE'
                             ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
                             : "Play anytime within the lifespan. Highest skill score wins!"}
@@ -218,7 +227,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         <div className="flex items-center gap-1.5">
                             <Sparkles size={12} className="text-yellow-500" />
                             <span className="text-xs font-bold text-white">
-                                {isMarathon ? 'Marathon (3-7L)' : `${selectedChallenge.word_length || 'Random'} Letters`}
+                                {isMarathon ? `Marathon (${marathonGamesList.length} Games)` : `${selectedChallenge.word_length || 'Random'} Letters`}
                             </span>
                         </div>
                         <p className="text-[9px] text-gray-400">
@@ -249,12 +258,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         {(selectedChallenge.handicap_starter || selectedChallenge.handicap_starters) && (
                             <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
                                 {isMarathon && selectedChallenge.handicap_starters ? (
-                                    <div className="grid grid-cols-5 gap-1 text-center font-black">
-                                        {Object.entries(selectedChallenge.handicap_starters).map(([len, w]) => {
+                                    <div className="flex flex-wrap gap-1 justify-center text-center font-black max-h-[100px] overflow-y-auto animate-in fade-in duration-200">
+                                        {marathonGamesList.map((game, idx) => {
+                                            const w = getHandicapStarter(selectedChallenge, idx, game.wordLength);
                                             const hasWord = !!w && w !== '__SYSTEM_RANDOM__';
                                             return (
-                                                <div key={len} className="bg-white/5 p-1 rounded">
-                                                    <span className="text-[7px] text-gray-500 block">{len}L</span>
+                                                <div key={idx} className="bg-white/5 p-1 rounded min-w-[45px]">
+                                                    <span className="text-[7px] text-gray-500 block">#{idx + 1} ({game.wordLength}L)</span>
                                                     <span className="text-white/60 uppercase text-[8px]">
                                                         {hasWord ? 'Hidden' : 'Rand'}
                                                     </span>
@@ -317,13 +327,16 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     {isMarathon && selectedChallenge.mode === 'LIVE' && selectedChallenge.marathon_timers && (
                         <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
                             <p className="text-[8px] font-black uppercase text-gray-500">Marathon Per-Length Time Limits</p>
-                            <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
-                                {Object.entries(selectedChallenge.marathon_timers).map(([len, t]) => (
-                                    <div key={len} className="bg-black/30 p-1.5 rounded-lg border border-white/5">
-                                        <p className="text-[8px] font-bold text-gray-500">{len}L</p>
-                                        <p className="text-[10px] font-black text-white">{t}m</p>
-                                    </div>
-                                ))}
+                            <div className="flex flex-wrap gap-1.5 justify-center pt-1 max-h-[120px] overflow-y-auto animate-in fade-in duration-200">
+                                {marathonGamesList.map((game, idx) => {
+                                    const t = getMarathonTimer(selectedChallenge, idx, game.wordLength);
+                                    return (
+                                        <div key={idx} className="bg-black/30 p-1.5 rounded-lg border border-white/5 text-center min-w-[50px]">
+                                            <p className="text-[8px] font-bold text-gray-500">#{idx + 1} ({game.wordLength}L)</p>
+                                            <p className="text-[10px] font-black text-white">{t}m</p>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -347,6 +360,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                                 key={p.id}
                                 p={p}
                                 isMarathon={isMarathon}
+                                totalMarathonGames={marathonGamesList.length}
                                 myHasFinished={myHasFinished}
                                 isLive={isLive}
                                 onPreview={handlePreview}

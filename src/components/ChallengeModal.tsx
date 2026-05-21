@@ -140,7 +140,8 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         lengthFilter, setLengthFilter,
         clearFilters,
         previewParticipant, setPreviewParticipant,
-        previewMarathonLength, setPreviewMarathonLength,
+        setPreviewMarathonLength,
+        previewMarathonGameIndex, setPreviewMarathonGameIndex,
         unplayedCount,
         backAction
     } = useChallengeContext();
@@ -370,9 +371,10 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                     onClose={() => {
                         setPreviewParticipant(null);
                         setPreviewMarathonLength(null);
+                        setPreviewMarathonGameIndex(null);
                     }}
                     myParticipation={myParticipation}
-                    initialMarathonLength={previewMarathonLength || undefined}
+                    initialMarathonGameIndex={previewMarathonGameIndex ?? undefined}
                     initialData={{
                         guesses: previewParticipant.guesses,
                         skill_score: previewParticipant.score,

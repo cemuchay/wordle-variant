@@ -29,6 +29,7 @@ export interface Challenge {
 export interface MarathonProgress {
     id: string;
     participation_id: string;
+    game_index: number;
     word_length: number;
     status: 'playing' | 'completed' | 'timed_out';
     score: number;

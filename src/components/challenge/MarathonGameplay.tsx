@@ -4,21 +4,21 @@ import { Clock } from 'lucide-react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
-import { CHALLENGE_CONFIG } from '../../constants/challenge';
 import { MAX_ATTEMPTS } from '../../constants/game';
+import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
 
 interface MarathonGameplayProps {
     challenge: any;
     participation: any;
     triggerToast: (msg: string, duration?: number) => void;
-    submitChallengeResult: (result: any, wordLength?: number) => Promise<boolean>;
+    submitChallengeResult: (result: any, wordLength?: number, gameIndex?: number) => Promise<boolean>;
     onFinish: () => void;
 }
 
-const FinisherAvatar = memo(function FinisherAvatar({ p, length, onPreview }: { p: any, length: number, onPreview: (p: any, l: number) => void }) {
+const FinisherAvatar = memo(function FinisherAvatar({ p, index, onPreview }: { p: any, index: number, onPreview: (p: any, index: number) => void }) {
     return (
         <button
-            onClick={() => onPreview(p, length)}
+            onClick={() => onPreview(p, index)}
             className="w-6 h-6 rounded-full border-2 border-gray-900 bg-gray-800 overflow-hidden hover:scale-110 hover:z-10 transition-transform relative group"
         >
             {p.profiles?.avatar_url ? (
@@ -35,13 +35,19 @@ const FinisherAvatar = memo(function FinisherAvatar({ p, length, onPreview }: { 
     );
 });
 
+interface MarathonLengthItemProps {
+    game: MarathonGame;
+    index: number;
+    prog: any;
+    challenge: any;
+    finishers: any[];
+    onSelect: (index: number, isFinished: boolean) => void;
+    onPreview: (p: any, index: number) => void;
+}
+
 const MarathonLengthItem = memo(function MarathonLengthItem({
-    l, prog, challenge, finishers, onSelect, onPreview
-}: {
-    l: number, prog: any, challenge: any, finishers: any[],
-    onSelect: (l: number, isFinished: boolean) => void,
-    onPreview: (p: any, l: number) => void
-}) {
+    game, index, prog, challenge, finishers, onSelect, onPreview
+}: MarathonLengthItemProps) {
     const isCompleted = prog?.status === 'completed';
     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
     const isFinished = isCompleted || isFailed;
@@ -49,15 +55,15 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
     return (
         <div className="flex flex-col gap-2">
             <button
-                onClick={() => onSelect(l, isFinished)}
+                onClick={() => onSelect(index, isFinished)}
                 className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isFinished ? 'bg-white/5 border-white/10 hover:border-correct/50 hover:bg-correct/5' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
             >
                 <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
-                        {l}
+                        {game.wordLength}
                     </div>
                     <div className="text-left">
-                        <p className="text-xs font-black uppercase">{l} Letters</p>
+                        <p className="text-xs font-black uppercase">Game #{index + 1} ({game.wordLength}L)</p>
                         <p className="text-[10px] text-gray-500">
                             {isFinished
                                 ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
@@ -68,7 +74,7 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                 {!isFinished && challenge.mode === 'LIVE' && (
                     <div className="text-right">
                         <p className="text-[9px] font-black text-gray-500 uppercase flex items-center gap-1 justify-end">
-                            <Clock size={10} className="text-red-500/50" /> {challenge.marathon_timers?.[l] || challenge.max_time}m
+                            <Clock size={10} className="text-red-500/50" /> {getMarathonTimer(challenge, index, game.wordLength)}m
                         </p>
                     </div>
                 )}
@@ -87,7 +93,7 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                     <p className="text-[9px] font-black uppercase text-gray-600">Compare Results:</p>
                     <div className="flex -space-x-2">
                         {finishers.map(p => (
-                            <FinisherAvatar key={p.id} p={p} length={l} onPreview={onPreview} />
+                            <FinisherAvatar key={p.id} p={p} index={index} onPreview={onPreview} />
                         ))}
                     </div>
                 </div>
@@ -99,28 +105,35 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
 export const MarathonGameplay = memo(function MarathonGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: MarathonGameplayProps) {
-    const { participants, setPreviewParticipant, setPreviewMarathonLength } = useChallengeContext();
-    const [selectedLength, setSelectedLength] = useState<number | null>(null);
+    const { participants, setPreviewParticipant, setPreviewMarathonGameIndex } = useChallengeContext();
+    const [selectedGameIndex, setSelectedGameIndex] = useState<number | null>(null);
 
-    const onBack = useCallback(() => setSelectedLength(null), []);
+    const onBack = useCallback(() => setSelectedGameIndex(null), []);
 
-    const handleSelect = useCallback((l: number, isFinished: boolean) => {
+    const handleSelect = useCallback((index: number, isFinished: boolean) => {
         if (isFinished) {
-            setPreviewMarathonLength(l);
+            setPreviewMarathonGameIndex(index);
             setPreviewParticipant(participation);
         } else {
-            setSelectedLength(l);
+            setSelectedGameIndex(index);
         }
-    }, [participation, setPreviewMarathonLength, setPreviewParticipant]);
+    }, [participation, setPreviewMarathonGameIndex, setPreviewParticipant]);
 
-    const handlePreview = useCallback((p: any, l: number) => {
-        setPreviewMarathonLength(l);
+    const handlePreview = useCallback((p: any, index: number) => {
+        setPreviewMarathonGameIndex(index);
         setPreviewParticipant(p);
-    }, [setPreviewMarathonLength, setPreviewParticipant]);
+    }, [setPreviewMarathonGameIndex, setPreviewParticipant]);
 
-    // Pre-calculate finishers for each length in a single pass O(P) instead of O(L*P)
-    const finishersByLength = useMemo(() => {
-        const map: Record<number, any[]> = { 3: [], 4: [], 5: [], 6: [], 7: [] };
+    const marathonGames = useMemo(() => {
+        return parseMarathonGames(challenge.target_word, challenge.salt);
+    }, [challenge.target_word, challenge.salt]);
+
+    // Pre-calculate finishers for each game index in a single pass O(P)
+    const finishersByGameIndex = useMemo(() => {
+        const map: Record<number, any[]> = {};
+        marathonGames.forEach((_, idx) => {
+            map[idx] = [];
+        });
         if (!participants) return map;
 
         for (const p of participants) {
@@ -129,16 +142,17 @@ export const MarathonGameplay = memo(function MarathonGameplay({
 
             for (const mp of p.marathon_progress) {
                 if (mp.status === 'completed' || mp.status === 'timed_out') {
-                    if (map[mp.word_length]) {
-                        map[mp.word_length].push(p);
+                    const idx = mp.game_index;
+                    if (map[idx]) {
+                        map[idx].push(p);
                     }
                 }
             }
         }
         return map;
-    }, [participants, participation.user_id]);
+    }, [participants, participation.user_id, marathonGames]);
 
-    if (selectedLength) {
+    if (selectedGameIndex !== null) {
         return (
             <RegularGameplay
                 challenge={challenge}
@@ -146,13 +160,11 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 triggerToast={triggerToast}
                 submitChallengeResult={submitChallengeResult}
                 onFinish={onFinish}
-                selectedLength={selectedLength}
+                gameIndex={selectedGameIndex}
                 onBack={onBack}
             />
         );
     }
-
-    const allLengths = CHALLENGE_CONFIG.MARATHON_LENGTHS;
 
     return (
         <div className="flex-1 p-6 flex flex-col gap-8">
@@ -162,15 +174,16 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             </div>
 
             <div className="grid grid-cols-1 gap-3">
-                {allLengths.map(l => {
-                    const prog = participation.marathon_progress?.find((p: any) => p.word_length === l);
+                {marathonGames.map((game, idx) => {
+                    const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
                     return (
                         <MarathonLengthItem
-                            key={l}
-                            l={l}
+                            key={idx}
+                            game={game}
+                            index={idx}
                             prog={prog}
                             challenge={challenge}
-                            finishers={finishersByLength[l]}
+                            finishers={finishersByGameIndex[idx] || []}
                             onSelect={handleSelect}
                             onPreview={handlePreview}
                         />
