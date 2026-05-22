@@ -55,7 +55,7 @@ export const ModalsManager = ({
     modals,
     actions,
     gameContext,
-    statsActiveTab = 'stats',
+    statsActiveTab = 'leaderboard',
     onChallengeCreated,
     viewedProfileId,
     setViewedProfileId

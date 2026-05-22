@@ -60,7 +60,7 @@ export default function App() {
 
     // UI State
     const [isStatsOpen, setIsStatsOpen] = useState(false);
-    const [statsActiveTab, setStatsActiveTab] = useState<'stats' | 'leaderboard'>('stats');
+    const [statsActiveTab, setStatsActiveTab] = useState<'stats' | 'leaderboard'>('leaderboard');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -73,7 +73,7 @@ export default function App() {
             if (detail?.tab) {
                 setStatsActiveTab(detail.tab);
             } else {
-                setStatsActiveTab('stats');
+                setStatsActiveTab('leaderboard');
             }
             setIsStatsOpen(true);
         };
@@ -150,7 +150,7 @@ export default function App() {
 
                     <GameToolbar
                         onOpenChallenge={() => setIsChallengeOpen(true)}
-                        onOpenStats={() => { setStatsActiveTab('stats'); setIsStatsOpen(true); }}
+                        onOpenStats={() => { setStatsActiveTab('leaderboard'); setIsStatsOpen(true); }}
                         onOpenInfo={() => setIsInfoOpen(true)}
                         onHint={actions.handleHint}
                         onReset={() => window.location.reload()}
