@@ -30,7 +30,7 @@ interface Props {
 
 // --- Component ---
 
-export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver, initialTab = 'stats' }) => {
+export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGameOver, initialTab = 'leaderboard' }) => {
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(initialTab);
