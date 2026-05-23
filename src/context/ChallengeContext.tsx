@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAvailableProfiles, useChallengeMutations, useMyChallenges } from '../hooks/queries/useChallengeQueries';
+import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
@@ -71,6 +71,24 @@ interface ChallengeContextType {
     setBackAction: (fn: (() => void) | null) => void;
     effectiveUser: any;
 }
+
+const addRecentChallenge = (id: string) => {
+    try {
+        const stored = localStorage.getItem('wordle_recent_challenges');
+        let ids: string[] = [];
+        if (stored) {
+            ids = JSON.parse(stored);
+        }
+        ids = ids.filter(i => i !== id);
+        ids.unshift(id);
+        if (ids.length > 20) {
+            ids = ids.slice(0, 20);
+        }
+        localStorage.setItem('wordle_recent_challenges', JSON.stringify(ids));
+    } catch (e) {
+        console.error('Failed to add recent challenge', e);
+    }
+};
 
 const ChallengeContext = createContext<ChallengeContextType | undefined>(undefined);
 
@@ -185,7 +203,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
             if (searchQuery) {
                 const opponentNames = challenge.participants
-                    ?.filter((p: any) => p.user_id !== effectiveUser?.id)
+                    ?.filter((p: any) => p.user_id !== effectiveUser?.id && p.guest_id !== effectiveUser?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
                     .join(' ');
                 if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
@@ -253,6 +271,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                             participants:challenge_participants(
                                 *,
                                 profiles(username, avatar_url),
+                                guest_profiles(username, avatar_url),
                                 marathon_progress:challenge_participants_marathon(*)
                             )
                         `)
@@ -261,7 +280,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
                     if (error) throw error;
                     if (data) {
-                        const c = data as any;
+                        const c = mapChallenge(data) as any;
                         c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
                         return c as Challenge;
                     }
@@ -280,6 +299,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     triggerToast("This challenge has expired. Viewing results.", 4000);
                 }
 
+                // Add to recent challenges in localStorage
+                addRecentChallenge(challenge.id);
+                queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+
                 cleanupSubscription();
                 setSelectedChallenge(challenge);
                 setActiveTab('join');
@@ -289,14 +312,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
                     if (!isCreatorOfCustom) {
                         const participationPromise = !isExpired
-                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id })
+                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id, isGuest: !user })
                             : Promise.resolve(localMatch || null);
 
                         let participation = localMatch;
                         if (!participation && !isExpired) {
                             participation = await participationPromise;
                         } else if (isExpired) {
-                            participation = challenge.participants?.find((p: any) => p.user_id === effectiveUser.id) || null;
+                            participation = challenge.participants?.find((p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id) || null;
                         } else {
                             participationPromise.then(p => {
                                 setMyParticipation(normalizeParticipation(p, challenge));
@@ -335,7 +358,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
             const participation = await joinMutation.mutateAsync({
                 challengeId: selectedChallenge.id,
-                userId: effectiveUser.id
+                userId: effectiveUser.id,
+                isGuest: !user
             });
             const normalizedPart = normalizeParticipation(participation, selectedChallenge);
             setMyParticipation(normalizedPart);
@@ -343,7 +367,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             console.error("Failed to join challenge:", err);
             triggerToast(err?.message || "Failed to join challenge.", 4000);
         }
-    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation]);
+    }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation, user]);
 
     const registerAnonymousUser = useCallback(async (nickname: string) => {
         let anonId = localStorage.getItem('wordle_anon_id');
@@ -353,8 +377,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
         localStorage.setItem('wordle_anon_username', nickname);
 
-        // Insert/update profile in database
-        const { error } = await supabase.from('profiles').upsert({
+        // Insert/update guest profile in database
+        const { error } = await supabase.from('guest_profiles').upsert({
             id: anonId,
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
@@ -377,7 +401,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
             const isExpired = new Date(selectedChallenge.expires_at) < new Date();
             if (!isCreatorOfCustom) {
-                const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id);
+                const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id);
                 if (alreadyParticipant) {
                     setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
                 } else if (!isExpired) {

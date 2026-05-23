@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
-import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncWithRetry, updateStats } from '../lib/game-logic';
+import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncWithRetry, updateStats, obfuscateWord, deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
 import { getLossMessage, getWinMessage } from '../lib/messages';
 import { gameReducer, initialState } from '../reducers/gameReducer';
@@ -11,6 +11,16 @@ import { useConfirmation } from '../context/ConfirmationContext';
 
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
+
+const getLocalSalt = (date: string, userId: string | undefined) => {
+    const base = `local_salt_${date}_${userId || 'guest'}`;
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) {
+        hash = (hash << 5) - hash + base.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash).toString(16);
+};
 
 export const useGameEngine = (date: string) => {
     const [state, dispatch] = useReducer(gameReducer, initialState);
@@ -63,8 +73,12 @@ export const useGameEngine = (date: string) => {
 
     // Hydration & Authentication Swap Logic
     useEffect(() => {
-        if (!date || isAuthLoading) return;
+        if (!date || isAuthLoading) {
+            setIsHydrated(false);
+            return;
+        }
 
+        setIsHydrated(false);
         const saved = localStorage.getItem(`wordle-${date}`);
 
         const loadFromCloud = async () => {
@@ -99,6 +113,12 @@ export const useGameEngine = (date: string) => {
                 try {
                     const payload = JSON.parse(saved);
 
+                    // Deobfuscate target word for local in-memory gameplay state
+                    if (payload.config && payload.config.word) {
+                        const localSalt = getLocalSalt(date, user?.id);
+                        payload.config.word = deobfuscateWord(payload.config.word, localSalt);
+                    }
+
                     // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY: 
                     // Only perform mismatch check once auth state is stable.
                     if (payload.config && payload.config.word !== config.word) {
@@ -111,7 +131,25 @@ export const useGameEngine = (date: string) => {
                             triggerToast("Logged in: Starting today's official word fresh.");
                         }
 
-                        dispatch({ type: 'LOAD_STATE', payload: initialState });
+                        if (user) {
+                            const cloudPayload = await loadFromCloud();
+                            if (cloudPayload) {
+                                dispatch({ type: 'LOAD_STATE', payload: cloudPayload });
+                                const localSalt = getLocalSalt(date, user.id);
+                                const savedPayload = {
+                                    ...cloudPayload,
+                                    config: {
+                                        ...cloudPayload.config,
+                                        word: obfuscateWord(cloudPayload.config.word, localSalt)
+                                    }
+                                };
+                                localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+                            } else {
+                                dispatch({ type: 'LOAD_STATE', payload: initialState });
+                            }
+                        } else {
+                            dispatch({ type: 'LOAD_STATE', payload: initialState });
+                        }
                     } else {
                         dispatch({ type: 'LOAD_STATE', payload });
 
@@ -129,7 +167,16 @@ export const useGameEngine = (date: string) => {
                 const cloudPayload = await loadFromCloud();
                 if (cloudPayload) {
                     dispatch({ type: 'LOAD_STATE', payload: cloudPayload });
-                    localStorage.setItem(`wordle-${date}`, JSON.stringify(cloudPayload));
+                    // Obfuscate config.word before saving to localStorage
+                    const localSalt = getLocalSalt(date, user.id);
+                    const savedPayload = {
+                        ...cloudPayload,
+                        config: {
+                            ...cloudPayload.config,
+                            word: obfuscateWord(cloudPayload.config.word, localSalt)
+                        }
+                    };
+                    localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
                 } else {
                     dispatch({ type: 'LOAD_STATE', payload: initialState });
                 }
@@ -199,8 +246,17 @@ export const useGameEngine = (date: string) => {
             gameMessage: message
         };
 
-        // 1. Save locally FIRST to ensure data integrity
-        localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+
+        // 1. Save locally FIRST with obfuscation to ensure data integrity
+        const localSalt = getLocalSalt(date, user?.id);
+        const savedPayload = {
+            ...payload,
+            config: {
+                ...payload.config,
+                word: obfuscateWord(payload.config.word, localSalt)
+            }
+        };
+        localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
 
         if (user) {
             const success = await performSync(payload);
@@ -265,8 +321,16 @@ export const useGameEngine = (date: string) => {
                 config
             };
 
-            // 1. Save locally FIRST
-            localStorage.setItem(`wordle-${date}`, JSON.stringify(payload));
+            // 1. Save locally FIRST with obfuscation
+            const localSalt = getLocalSalt(date, user?.id);
+            const savedPayload = {
+                ...payload,
+                config: {
+                    ...payload.config,
+                    word: obfuscateWord(payload.config.word, localSalt)
+                }
+            };
+            localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
 
             // 2. Update UI
             dispatch({ type: 'SET_HINT', hint: hintWithRow });
