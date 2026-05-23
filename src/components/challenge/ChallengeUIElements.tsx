@@ -110,7 +110,7 @@ export const ChallengeItem = memo(function ChallengeItem({ item, user, onSelect 
     }, [onSelect, challenge_id]);
 
     const opponents = useMemo(() =>
-        participants.filter((p: any) => p.user_id !== user?.id),
+        participants.filter((p: any) => p.user_id !== user?.id && p.guest_id !== user?.id),
         [participants, user?.id]);
 
     // Find the current leader profile

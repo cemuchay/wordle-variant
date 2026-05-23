@@ -4,6 +4,31 @@ import { supabase } from '../../lib/supabaseClient';
 import { getRandomWord, obfuscateWord } from '../../lib/game-logic';
 import { type Challenge, } from '../useChallenge';
 
+export const mapParticipant = (p: any) => {
+    if (!p) return p;
+    return {
+        ...p,
+        profiles: p.profiles || p.guest_profiles || null
+    };
+};
+
+export const mapChallenge = (challenge: any) => {
+    if (!challenge) return challenge;
+    return {
+        ...challenge,
+        creator: challenge.creator || challenge.guest_creator || null,
+        participants: challenge.participants?.map(mapParticipant) || []
+    };
+};
+
+export const mapParticipation = (participation: any) => {
+    if (!participation) return participation;
+    return {
+        ...mapParticipant(participation),
+        challenge: mapChallenge(participation.challenge)
+    };
+};
+
 /**
  * Hook to fetch all challenges a user is participating in.
  */
@@ -11,63 +36,120 @@ export const useMyChallenges = (userId: string | undefined) => {
     return useQuery({
         queryKey: ['my-challenges', userId],
         queryFn: async () => {
-            if (!userId) return [];
+            // Retrieve recent challenges from localStorage
+            let recentIds: string[] = [];
+            try {
+                const stored = localStorage.getItem('wordle_recent_challenges');
+                if (stored) {
+                    recentIds = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Failed to parse recent challenges', e);
+            }
+
+            if (!userId && recentIds.length === 0) return [];
             
-            // 1. Fetch all challenges I am a participant in
-            const { data: participations, error: pError } = await supabase
-                .from('challenge_participants')
-                .select(`
-                    *,
-                    marathon_progress:challenge_participants_marathon(*),
-                    challenge:challenges(
+            let participations: any[] = [];
+            let createdChallenges: any[] = [];
+
+            if (userId) {
+                // 1. Fetch all challenges I am a participant in
+                const { data: pData, error: pError } = await supabase
+                    .from('challenge_participants')
+                    .select(`
+                        *,
+                        guest_profiles(username, avatar_url),
+                        profiles(username, avatar_url),
+                        marathon_progress:challenge_participants_marathon(*),
+                        challenge:challenges(
+                            *,
+                            creator:profiles!creator_id(username, avatar_url),
+                            participants:challenge_participants(
+                                *,
+                                profiles(username, avatar_url),
+                                guest_profiles(username, avatar_url),
+                                marathon_progress:challenge_participants_marathon(*)
+                            )
+                        )
+                    `)
+                    .or(`user_id.eq.${userId},guest_id.eq.${userId}`);
+
+                if (pError) throw pError;
+                participations = pData || [];
+
+                // 2. Fetch all challenges I created
+                const { data: cData, error: cError } = await supabase
+                    .from('challenges')
+                    .select(`
                         *,
                         creator:profiles!creator_id(username, avatar_url),
                         participants:challenge_participants(
                             *,
                             profiles(username, avatar_url),
+                            guest_profiles(username, avatar_url),
                             marathon_progress:challenge_participants_marathon(*)
                         )
-                    )
-                `)
-                .eq('user_id', userId);
+                    `)
+                    .eq('creator_id', userId);
 
-            if (pError) throw pError;
-
-            // 2. Fetch all challenges I created
-            const { data: createdChallenges, error: cError } = await supabase
-                .from('challenges')
-                .select(`
-                    *,
-                    creator:profiles!creator_id(username, avatar_url),
-                    participants:challenge_participants(
-                        *,
-                        profiles(username, avatar_url),
-                        marathon_progress:challenge_participants_marathon(*)
-                    )
-                `)
-                .eq('creator_id', userId);
-
-            if (cError) throw cError;
+                if (cError) throw cError;
+                createdChallenges = cData || [];
+            }
 
             // 3. Merge them. If I'm both creator and participant, Query 1 has the full record.
-            const finalResults = participations ? [...participations] : [];
+            const finalResults = participations.map(mapParticipation);
             const participatedIds = new Set(finalResults.map(p => p.challenge_id));
 
             createdChallenges?.forEach(challenge => {
-                if (!participatedIds.has(challenge.id)) {
+                const mappedChallenge = mapChallenge(challenge);
+                if (!participatedIds.has(mappedChallenge.id)) {
                     // Synthetic participation record for creators who aren't playing
                     finalResults.push({
-                        id: `host-${challenge.id}`,
-                        challenge_id: challenge.id,
-                        user_id: userId,
+                        id: `host-${mappedChallenge.id}`,
+                        challenge_id: mappedChallenge.id,
+                        user_id: userId || null,
                         status: 'host', // Special frontend-only status
                         score: 0,
                         attempts: 0,
                         guesses: [],
-                        challenge
+                        challenge: mappedChallenge
                     });
                 }
             });
+
+            // 4. Fetch details for missing recently viewed challenges
+            const missingIds = recentIds.filter(id => !participatedIds.has(id));
+            if (missingIds.length > 0) {
+                const { data: recentChallenges, error: rError } = await supabase
+                    .from('challenges')
+                    .select(`
+                        *,
+                        creator:profiles!creator_id(username, avatar_url),
+                        participants:challenge_participants(
+                            *,
+                            profiles(username, avatar_url),
+                            guest_profiles(username, avatar_url),
+                            marathon_progress:challenge_participants_marathon(*)
+                        )
+                    `)
+                    .in('id', missingIds);
+
+                if (!rError && recentChallenges) {
+                    recentChallenges.forEach(challenge => {
+                        const mappedChallenge = mapChallenge(challenge);
+                        finalResults.push({
+                            id: `viewed-${challenge.id}`,
+                            challenge_id: challenge.id,
+                            user_id: userId || null,
+                            status: 'viewed', // Special status for viewed-only challenges
+                            score: 0,
+                            attempts: 0,
+                            guesses: [],
+                            challenge: mappedChallenge
+                        });
+                    });
+                }
+            }
 
             return finalResults.sort((a, b) => {
                 const dateA = new Date(a.challenge.created_at).getTime();
@@ -75,7 +157,7 @@ export const useMyChallenges = (userId: string | undefined) => {
                 return dateB - dateA;
             });
         },
-        enabled: !!userId,
+        enabled: true,
     });
 };
 
@@ -112,6 +194,7 @@ export const useChallengeData = (challengeId: string | null) => {
                     participants:challenge_participants(
                         *,
                         profiles(username, avatar_url),
+                        guest_profiles(username, avatar_url),
                         marathon_progress:challenge_participants_marathon(*)
                     )
                 `)
@@ -119,7 +202,7 @@ export const useChallengeData = (challengeId: string | null) => {
                 .maybeSingle();
 
             if (error) throw error;
-            return data as Challenge;
+            return mapChallenge(data) as Challenge;
         },
         enabled: !!challengeId,
     });
@@ -306,8 +389,6 @@ export const useChallengeMutations = () => {
             return true;
         },
         onSuccess: (_, variables) => {
-            // Only invalidate if the game is actually finished or timed out
-            // This avoids heavy re-fetches on every single guess
             if (variables.result.status !== 'playing') {
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
                 queryClient.invalidateQueries({ queryKey: ['challenge'] });
@@ -316,13 +397,13 @@ export const useChallengeMutations = () => {
     });
 
     const joinChallenge = useMutation({
-        mutationFn: async ({ challengeId, userId }: { challengeId: string, userId: string }) => {
+        mutationFn: async ({ challengeId, userId, isGuest = false }: { challengeId: string, userId: string, isGuest?: boolean }) => {
             // First check if already participating
             const { data: existing, error: fetchError } = await supabase
                 .from('challenge_participants')
                 .select('*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)')
                 .eq('challenge_id', challengeId)
-                .eq('user_id', userId)
+                .eq(isGuest ? 'guest_id' : 'user_id', userId)
                 .maybeSingle();
 
             if (fetchError) throw fetchError;
@@ -351,13 +432,19 @@ export const useChallengeMutations = () => {
             }
 
             // If not, then join as pending
+            const insertData: any = {
+                challenge_id: challengeId,
+                status: 'pending'
+            };
+            if (isGuest) {
+                insertData.guest_id = userId;
+            } else {
+                insertData.user_id = userId;
+            }
+
             const { data, error } = await supabase
                 .from('challenge_participants')
-                .insert([{
-                    challenge_id: challengeId,
-                    user_id: userId,
-                    status: 'pending'
-                }])
+                .insert([insertData])
                 .select('*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)')
                 .single();
 
@@ -410,7 +497,6 @@ export const useChallengeMutations = () => {
             return true;
         },
         onSuccess: (_, variables) => {
-            // Only invalidate if this specific length is finished
             if (variables.result.status !== 'playing') {
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
                 queryClient.invalidateQueries({ queryKey: ['challenge'] });

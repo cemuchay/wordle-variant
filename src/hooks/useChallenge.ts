@@ -45,7 +45,8 @@ export interface MarathonProgress {
 export interface ChallengeParticipant {
     id: string;
     challenge_id: string;
-    user_id: string;
+    user_id?: string | null;
+    guest_id?: string | null;
     status: 'pending' | 'playing' | 'completed' | 'declined' | 'timed_out' | 'host';
     score: number;
     attempts: number;
@@ -56,6 +57,7 @@ export interface ChallengeParticipant {
     started_at: string | null;
     completed_at: string | null;
     profiles?: { username: string, avatar_url: string };
+    guest_profiles?: { username: string, avatar_url: string };
     marathon_progress?: MarathonProgress[];
 }
 
@@ -104,12 +106,16 @@ export const useChallenge = (_user: AppUser | null) => {
 
             const { data: parts } = await supabase
                 .from('challenge_participants')
-                .select('*, profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
+                .select('*, profiles(username, avatar_url), guest_profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
                 .eq('challenge_id', challengeId)
                 .order('score', { ascending: false });
 
             if (parts && challengeData) {
-                const normalized = parts.map((p: any) => normalizeParticipation(p, challengeData));
+                const mappedParts = parts.map((p: any) => ({
+                    ...p,
+                    profiles: p.profiles || p.guest_profiles || null
+                }));
+                const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
                 setParticipants(normalized as ChallengeParticipant[]);
             }
         };
