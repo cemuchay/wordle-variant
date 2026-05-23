@@ -175,7 +175,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                     {selectedChallenge && myParticipation && (
                                         <AudioChatControls
                                             challengeId={selectedChallenge.id}
-                                            userId={myParticipation.user_id}
+                                            userId={myParticipation.user_id || myParticipation.guest_id || ""}
                                         />
                                     )}
                                 </>
@@ -392,9 +392,22 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
     );
 });
 
+const hasRecentChallenges = (): boolean => {
+    try {
+        const stored = localStorage.getItem('wordle_recent_challenges');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            return Array.isArray(parsed) && parsed.length > 0;
+        }
+    } catch (e) {
+        console.error('Failed to read recent challenges', e);
+    }
+    return false;
+};
+
 const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
     const { effectiveUser, selectedChallenge, loading } = useChallengeContext();
-    if (!user && !effectiveUser && !selectedChallenge && !loading) {
+    if (!user && !effectiveUser && !selectedChallenge && !loading && !hasRecentChallenges()) {
         return <GuestChallengeView onClose={onClose} />;
     }
     return <AuthenticatedChallengeContent onClose={onClose} user={effectiveUser || user} />;
@@ -403,7 +416,7 @@ const ChallengeModalContent = memo(({ onClose, user }: { onClose: () => void, us
 export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, initialChallengeId }: ChallengeModalProps) => {
     if (!isOpen) return null;
 
-    if (!user && !initialChallengeId) {
+    if (!user && !initialChallengeId && !hasRecentChallenges()) {
         const id = localStorage.getItem('wordle_anon_id');
         const username = localStorage.getItem('wordle_anon_username');
         if (!id || !username) {

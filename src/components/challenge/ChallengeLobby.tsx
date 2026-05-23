@@ -113,6 +113,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     const { triggerToast } = useApp();
 
     const [nicknameInput, setNicknameInput] = useState('');
+    const [showGuestInput, setShowGuestInput] = useState(false);
 
     const handlePreview = useCallback((p: ChallengeParticipant) => {
         setPreviewParticipant(p);
@@ -400,34 +401,62 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 animate-in fade-in duration-300">
                         <div className="text-center space-y-1">
                             <p className="text-xs font-black uppercase tracking-wider text-white">Join the Challenge</p>
-                            <p className="text-[10px] text-gray-500">Choose a guest nickname to compete!</p>
+                            <p className="text-[10px] text-gray-500">Log in to save stats permanently, or play now as a guest.</p>
                         </div>
-                        <div className="space-y-3">
-                            <input
-                                type="text"
-                                maxLength={15}
-                                placeholder="Enter nickname..."
-                                value={nicknameInput}
-                                onChange={(e) => setNicknameInput(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))}
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
-                            />
-                            <button
-                                onClick={async () => {
-                                    const name = nicknameInput.trim();
-                                    if (name.length < 3) {
-                                        triggerToast("Nickname must be at least 3 characters.", 3000);
-                                        return;
-                                    }
-                                    const user = await registerAnonymousUser(name);
-                                    if (user) {
-                                        // Join will be triggered by useEffect in ChallengeContext
-                                        triggerToast("Guest profile created! Joining...", 2000);
-                                    }
-                                }}                                className="w-full bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all"
-                            >
-                                Join Challenge
-                            </button>
-                        </div>
+                        
+                        {!showGuestInput ? (
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('open-auth-modal'));
+                                    }}
+                                    className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
+                                >
+                                    Log In / Sign Up
+                                </button>
+                                <button
+                                    onClick={() => setShowGuestInput(true)}
+                                    className="bg-white/10 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center border border-white/5 cursor-pointer"
+                                >
+                                    Play as Guest
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    maxLength={15}
+                                    placeholder="Enter nickname..."
+                                    value={nicknameInput}
+                                    onChange={(e) => setNicknameInput(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                                />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setShowGuestInput(false)}
+                                        className="bg-white/5 text-gray-400 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            const name = nicknameInput.trim();
+                                            if (name.length < 3) {
+                                                triggerToast("Nickname must be at least 3 characters.", 3000);
+                                                return;
+                                            }
+                                            const user = await registerAnonymousUser(name);
+                                            if (user) {
+                                                triggerToast("Guest profile created! Joining...", 2000);
+                                            }
+                                        }}
+                                        className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
+                                    >
+                                        Join
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : !myHasFinished ? (
                     <button
