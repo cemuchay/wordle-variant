@@ -41,7 +41,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
     return (
         <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: Z_INDEX.MODAL_BACKDROP }}>
             <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-                <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="p-4 pt-[calc(2rem+env(safe-area-inset-top,0px))] sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="bg-correct/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
                             <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
@@ -59,7 +59,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
                     </button>
                 </div>
 
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6 overflow-y-auto">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] text-center space-y-6 overflow-y-auto">
                     <div className="bg-correct/10 p-6 rounded-3xl border border-correct/20">
                         <Trophy className="w-12 h-12 text-correct mx-auto" />
                     </div>
@@ -547,12 +547,12 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
 
     return (
         <ChallengeProvider user={user} onChallengeCreated={onChallengeCreated} initialChallengeId={initialChallengeId}>
-            <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" style={{ zIndex: Z_INDEX.MODAL_CONTENT }}>
+            <div className="fixed inset-0 flex items-center justify-center p-4 pt-[calc(2rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-black/80 backdrop-blur-sm" style={{ zIndex: Z_INDEX.MODAL_CONTENT }}>
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-                    className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+                    className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-full sm:max-h-[90vh]"
                 >
                     <ChallengeModalContent onClose={onClose} user={user} />
                 </motion.div>
