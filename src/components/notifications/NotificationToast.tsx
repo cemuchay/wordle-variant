@@ -10,20 +10,26 @@ export const NotificationToast = memo(() => {
     const { setIsNotificationsOpen } = useApp();
 
     useEffect(() => {
+        let timer: any = null;
+
         const handleNewNotification = (event: any) => {
+            if (timer) clearTimeout(timer);
+
             const notification = event.detail as AppNotification;
             setCurrentNotification(notification);
 
             // Auto-hide after 5 seconds
-            const timer = setTimeout(() => {
+            timer = setTimeout(() => {
                 setCurrentNotification(null);
+                timer = null;
             }, 5000);
-
-            return () => clearTimeout(timer);
         };
 
         window.addEventListener('new-notification', handleNewNotification);
-        return () => window.removeEventListener('new-notification', handleNewNotification);
+        return () => {
+            window.removeEventListener('new-notification', handleNewNotification);
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     return (
