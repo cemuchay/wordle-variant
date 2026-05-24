@@ -199,7 +199,7 @@ const validateCustomWord = (word: string, len: number) => {
     return null;
 };
 
-export const ChallengeCreate = memo(function ChallengeCreate() {
+export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { onSuccess?: () => void }) {
     const {
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
@@ -348,7 +348,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
         return errs;
     }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray]);
 
-    const handleCreateTrigger = useCallback(() => {
+    const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
 
         const customParams: any = {
@@ -386,8 +386,12 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
             }
         }
 
-        handleCreate(customParams);
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames]);
+        await handleCreate(customParams, !onSuccess);
+        
+        if (onSuccess) {
+            onSuccess();
+        }
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames, onSuccess]);
 
     return (
         <div className="space-y-6">
