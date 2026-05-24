@@ -106,6 +106,19 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
         }
     });
 
+    const markAsUnread = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: false })
+                .eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        }
+    });
+
     const markAllAsRead = useMutation({
         mutationFn: async () => {
             if (!userId) return;
@@ -139,6 +152,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
         unreadCount,
         isLoading,
         markAsRead: markAsRead.mutate,
+        markAsUnread: markAsUnread.mutate,
         markAllAsRead: markAllAsRead.mutate,
         deleteNotification: deleteNotification.mutate
     };

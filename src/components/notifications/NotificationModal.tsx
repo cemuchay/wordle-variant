@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useMemo } from 'react';
-import { X, Bell, CheckCircle2, Trash2, BellOff } from 'lucide-react';
+import { memo, useMemo, useState, useEffect } from 'react';
+import { X, Bell, Trash2, BellOff, Mail, MailOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
@@ -10,14 +10,21 @@ import { type AppNotification } from '../../types/notifications';
 const NotificationItem = memo(({ 
     notification, 
     onMarkRead, 
+    onMarkUnread,
     onDelete,
-    onClick
+    onClick,
+    isSessionNew
 }: { 
     notification: AppNotification, 
     onMarkRead: (id: string) => void, 
+    onMarkUnread: (id: string) => void, 
     onDelete: (id: string) => void,
-    onClick?: () => void
+    onClick?: () => void,
+    isSessionNew: boolean
 }) => {
+    const isUnread = !notification.is_read;
+    const isNew = isSessionNew;
+
     return (
         <motion.div
             layout
@@ -25,36 +32,56 @@ const NotificationItem = memo(({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             onClick={onClick}
-            className={`p-4 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''} ${notification.is_read ? 'bg-white/2 border-white/5 opacity-60' : 'bg-white/5 border-white/10 shadow-lg shadow-black/20'}`}
+            className={`p-4 rounded-2xl border transition-all ${
+                onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
+            } ${
+                isNew
+                    ? 'bg-white/[0.08] border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
+                    : isUnread
+                    ? 'bg-white/[0.06] border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
+                    : 'bg-white/[0.03] border-white/5 opacity-90'
+            }`}
         >
             <div className="flex justify-between items-start gap-3">
                 <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                        {!notification.is_read && <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />}
-                        <h4 className="text-xs font-black uppercase tracking-tight text-white">{notification.title}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {isNew ? (
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-correct text-black rounded-md uppercase tracking-wider">New</span>
+                        ) : isUnread ? (
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-blue-500 text-white rounded-md uppercase tracking-wider">Reminder</span>
+                        ) : null}
+                        <h4 className="text-sm font-extrabold uppercase tracking-tight text-white">{notification.title}</h4>
                     </div>
-                    <p className="text-[11px] text-gray-400 leading-relaxed">{notification.message}</p>
-                    <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest block pt-1">
+                    <p className="text-xs text-white leading-relaxed pt-0.5">{notification.message}</p>
+                    <span className="text-[10px] font-semibold text-white/50 block pt-1.5">
                         {new Date(notification.created_at).toLocaleString()}
                     </span>
                 </div>
                 
                 <div className="flex items-center gap-1 shrink-0">
-                    {!notification.is_read && (
+                    {isUnread ? (
                         <button
                             onClick={(e) => { e.stopPropagation(); onMarkRead(notification.id); }}
-                            className="p-2 hover:bg-correct/10 text-gray-500 hover:text-correct rounded-xl transition-all"
+                            className="p-2 hover:bg-correct/10 text-correct hover:text-white rounded-xl transition-all"
                             title="Mark as read"
                         >
-                            <CheckCircle2 size={14} />
+                            <MailOpen size={16} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onMarkUnread(notification.id); }}
+                            className="p-2 hover:bg-blue-500/10 text-gray-400 hover:text-blue-400 rounded-xl transition-all"
+                            title="Mark as unread (Reminder)"
+                        >
+                            <Mail size={16} />
                         </button>
                     )}
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(notification.id); }}
-                        className="p-2 hover:bg-red-500/10 text-gray-500 hover:text-red-500 rounded-xl transition-all"
+                        className="p-2 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-xl transition-all"
                         title="Delete"
                     >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                     </button>
                 </div>
             </div>
@@ -64,7 +91,30 @@ const NotificationItem = memo(({
 
 export const NotificationModal = memo(() => {
     const { profile, isNotificationsOpen, setIsNotificationsOpen, setIsChallengeOpen } = useApp();
-    const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, isLoading } = useNotifications(profile?.id, { enableRealtime: false });
+    const { notifications, unreadCount, markAsRead, markAsUnread, markAllAsRead, deleteNotification, isLoading } = useNotifications(profile?.id, { enableRealtime: false });
+
+    const [sessionNewIds, setSessionNewIds] = useState<Set<string>>(new Set());
+    const [hasAutoMarked, setHasAutoMarked] = useState(false);
+
+    // Reset session tracking when modal opens/closes
+    useEffect(() => {
+        if (!isNotificationsOpen) {
+            setSessionNewIds(new Set());
+            setHasAutoMarked(false);
+        }
+    }, [isNotificationsOpen]);
+
+    // Automatically mark all as read once notifications load when the modal is open
+    useEffect(() => {
+        if (isNotificationsOpen && !isLoading && notifications.length > 0 && !hasAutoMarked) {
+            const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+            if (unreadIds.length > 0) {
+                setSessionNewIds(new Set(unreadIds));
+                markAllAsRead();
+            }
+            setHasAutoMarked(true);
+        }
+    }, [isNotificationsOpen, isLoading, notifications, hasAutoMarked, markAllAsRead]);
 
     const handleNotificationClick = (n: AppNotification) => {
         if (!n.is_read) {
@@ -166,11 +216,14 @@ export const NotificationModal = memo(() => {
                                                      n.type === 'CHALLENGE_COMPLETED' || 
                                                      n.type === 'MARATHON_GAME_COMPLETED' || 
                                                      n.type === 'LEADERBOARD_OVERTAKEN';
+                                const isSessionNew = sessionNewIds.has(n.id);
                                 return (
                                     <NotificationItem 
                                         key={n.id} 
                                         notification={n} 
+                                        isSessionNew={isSessionNew}
                                         onMarkRead={markAsRead} 
+                                        onMarkUnread={markAsUnread}
                                         onDelete={deleteNotification} 
                                         onClick={isInteractive ? () => handleNotificationClick(n) : undefined}
                                     />
@@ -193,3 +246,4 @@ export const NotificationModal = memo(() => {
         </div>
     );
 });
+
