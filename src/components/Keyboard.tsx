@@ -12,9 +12,10 @@ interface KeyProps {
   char: string;
   status?: LetterStatus;
   onClick: (char: string) => void;
+  compact?: boolean;
 }
 
-const Key = memo(({ char, status, onClick }: KeyProps) => {
+const Key = memo(({ char, status, onClick, compact }: KeyProps) => {
   const isWide = char === 'ENTER' || char === 'DELETE';
   
   const getStyle = () => {
@@ -26,12 +27,16 @@ const Key = memo(({ char, status, onClick }: KeyProps) => {
     }
   };
 
+  const dynamicClass = compact
+    ? `${isWide ? 'px-1.5 text-[9px] min-w-[50px] sm:min-w-[58px]' : 'flex-1 min-w-[24px] sm:min-w-[28px]'} h-10 sm:h-11`
+    : `${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-12 sm:h-13`;
+
   return (
     <button
       type="button"
       className={`
-        ${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'}
-        h-12 sm:h-13 rounded-md font-bold transition-all border-b-2
+        ${dynamicClass}
+        rounded-md font-bold transition-all border-b-2
         flex items-center justify-center uppercase
         cursor-pointer hover:brightness-110 active:translate-y-0.5 active:border-b-0
         ${getStyle()}
@@ -53,9 +58,10 @@ interface Props {
   onDelete: () => void;
   onEnter: () => void;
   letterStatuses: Record<string, LetterStatus>;
+  compact?: boolean;
 }
 
-export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses }) => {
+export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact }) => {
   const handleKeyClick = React.useCallback((key: string) => {
     if (key === 'ENTER') onEnter();
     else if (key === 'DELETE') onDelete();
@@ -63,15 +69,16 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
   }, [onEnter, onDelete, onChar]);
 
   return (
-    <div className="w-full max-w-[500px] mx-auto px-1 select-none shrink-0 pb-2">
+    <div className={`w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${compact ? 'pb-0.5' : 'pb-2'}`}>
       {ROWS.map((row, i) => (
-        <div key={i} className="flex justify-center mb-1.5 gap-1 sm:gap-1.5">
+        <div key={i} className={`flex justify-center ${compact ? 'mb-1 gap-0.5 sm:gap-1' : 'mb-1.5 gap-1 sm:gap-1.5'}`}>
           {row.map((key) => (
             <Key
               key={key}
               char={key}
               status={letterStatuses[key]}
               onClick={handleKeyClick}
+              compact={compact}
             />
           ))}
         </div>

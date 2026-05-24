@@ -153,7 +153,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+            <div className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? 'p-3 sm:p-4' : 'p-6'}`}>
                 <div className="flex items-center gap-3">
                     <div className="bg-correct/20 p-2 rounded-xl">
                         <Trophy className="text-correct w-6 h-6" />
@@ -203,7 +203,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         className="flex flex-col h-full overflow-hidden"
                     >
                         {isPlaying ? (
-                            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                                 <ChallengeGameplayContainer />
                             </div>
                         ) : (
@@ -431,7 +431,7 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-                    className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                    className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
                 >
                     <ChallengeModalContent onClose={onClose} user={user} />
                 </motion.div>

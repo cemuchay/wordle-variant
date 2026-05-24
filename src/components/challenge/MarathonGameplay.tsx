@@ -167,13 +167,13 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     }
 
     return (
-        <div className="flex-1 p-6 flex flex-col gap-8">
-            <div className="text-center space-y-2">
+        <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
+            <div className="text-center space-y-1.5 shrink-0">
                 <h3 className="text-xl font-black uppercase tracking-tighter">Marathon Mode</h3>
                 <p className="text-gray-500 text-xs">Complete all lengths to finish the challenge.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-2.5">
                 {marathonGames.map((game, idx) => {
                     const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
                     return (
@@ -191,14 +191,14 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 })}
             </div>
 
-            <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
+            <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between shrink-0">
                 <div>
                     <p className="text-[10px] text-gray-500 uppercase font-black">Total Score</p>
                     <p className="text-2xl font-black text-correct">{participation.score || 0}</p>
                 </div>
                 <button
                     onClick={onFinish}
-                    className="bg-white/5 border border-white/10 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors"
+                    className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors"
                 >
                     Exit to Lobby
                 </button>
