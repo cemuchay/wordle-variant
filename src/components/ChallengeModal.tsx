@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState } from 'react';
-import { X, Trophy, Search, ArrowLeft, SlidersHorizontal, Plus } from 'lucide-react';
+import { X, Trophy, Search, ArrowLeft, SlidersHorizontal, Plus, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type Challenge } from '../hooks/useChallenge';
 import { ChallengeProvider, useChallengeContext } from '../context/ChallengeContext';
@@ -124,6 +124,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
 const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => void, user: any }) => {
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
     const {
         setActiveTab,
         isPlaying, setIsPlaying,
@@ -200,6 +201,13 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                             Create
                         </button>
                     )}
+                    <button
+                        onClick={() => setIsHelpOpen(true)}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                        title="Challenge Guide"
+                    >
+                        <HelpCircle size={20} />
+                    </button>
                     <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
                         <X size={20} />
                     </button>
@@ -381,6 +389,98 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10">
                             <ChallengeCreate onSuccess={() => setIsCreatingChallenge(false)} />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Help/Guide Modal Sheet overlay */}
+            <AnimatePresence>
+                {isHelpOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 15 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-gray-950/98 backdrop-blur-md z-[60] flex flex-col"
+                    >
+                        <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-correct/20 p-2 rounded-xl text-correct flex items-center justify-center">
+                                    <HelpCircle size={20} />
+                                </div>
+                                <h3 className="text-lg font-black uppercase tracking-tighter text-white">
+                                    Challenge Mode Guide
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setIsHelpOpen(false)}
+                                className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10 space-y-6 text-sm text-gray-300">
+                            <section className="space-y-2">
+                                <h4 className="text-sm font-black uppercase text-white tracking-wide">🏆 What is Challenge Mode?</h4>
+                                <p className="text-xs leading-relaxed text-gray-400">
+                                    Challenge Mode allows you to create custom Wordle games and compete directly against friends or players globally. You can play live in real-time or asynchronously at your own pace.
+                                </p>
+                            </section>
+
+                            <section className="space-y-3">
+                                <h4 className="text-sm font-black uppercase text-white tracking-wide">🎮 Game Modes</h4>
+                                <div className="grid gap-3">
+                                    <div className="bg-white/5 border border-white/5 p-3.5 rounded-2xl">
+                                        <h5 className="text-xs font-black uppercase text-correct">Anytime (Asynchronous)</h5>
+                                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                                            Create a challenge that remains open for up to 24 hours. Participants play at their own leisure. The leaderboard updates in real-time as scores are submitted.
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/5 p-3.5 rounded-2xl">
+                                        <h5 className="text-xs font-black uppercase text-red-500">Live (Real-time Race)</h5>
+                                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                                            A synchronous race against time. All players compete concurrently. Has a strict time limit per game. Includes high-fidelity built-in audio chat for in-game banter!
+                                        </p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="space-y-2">
+                                <h4 className="text-sm font-black uppercase text-white tracking-wide">⚡ Marathon Mode</h4>
+                                <p className="text-xs leading-relaxed text-gray-400">
+                                    Instead of a single word, compete over a sequence of words of different lengths (e.g. 3-letter up to 7-letter words). 
+                                </p>
+                                <ul className="list-disc pl-4 space-y-2 text-xs text-gray-400">
+                                    <li><strong className="text-yellow-500">Sequence Customization:</strong> Reorder games to build custom progressions (e.g., 5L {"->"} 3L {"->"} 7L).</li>
+                                    <li><strong className="text-yellow-500">Force Game Order:</strong> Force sequential unlocking. Players must play game #1 to unlock game #2, and so on.</li>
+                                    <li><strong className="text-yellow-500">Per-Word Timers:</strong> Set unique duration limits for each individual word length in Live mode.</li>
+                                </ul>
+                            </section>
+
+                            <section className="space-y-3">
+                                <h4 className="text-sm font-black uppercase text-white tracking-wide">🛠️ Advanced Rules</h4>
+                                <div className="space-y-2 text-xs text-gray-400">
+                                    <p>
+                                        <strong className="text-white">Custom Word Challenges:</strong> Create hand-crafted challenges with words of your own choice. (Note: Creators of custom-word challenges cannot play).
+                                    </p>
+                                    <p>
+                                        <strong className="text-white">Handicap Starters:</strong> Pre-assign starter words to restrict players' first guesses. Can be randomly chosen by the system or hardcoded by the creator. You can enforce these starter words so they are automatically entered as the first guess.
+                                    </p>
+                                    <p>
+                                        <strong className="text-white">Public Challenges:</strong> Open the lobby to anyone with the shareable link and customize the maximum player limit (up to 100 participants).
+                                    </p>
+                                </div>
+                            </section>
+                            
+                            <div className="pt-2">
+                                <button
+                                    onClick={() => setIsHelpOpen(false)}
+                                    className="w-full bg-correct text-black font-black uppercase py-4 rounded-2xl text-xs hover:brightness-110 transition-all font-extrabold"
+                                >
+                                    Got It, Let's Play!
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 )}
