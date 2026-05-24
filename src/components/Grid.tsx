@@ -11,18 +11,29 @@ interface CellProps {
   isPop?: boolean;
   isHinted?: boolean;
   isSaving?: boolean;
+  compact?: boolean;
 }
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted }: CellProps) => {
-  const tileClass = `
-    w-[11vw] h-[11vw] 
-    max-w-[55px] max-h-[55px] 
-    sm:w-[6vh] sm:h-[6vh] 
-    sm:max-w-[62px] sm:max-h-[62px] 
-    flex items-center justify-center 
-    text-xl sm:text-2xl font-bold uppercase transition-colors duration-300
-    border-2 text-white
-  `;
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact }: CellProps) => {
+  const tileClass = compact
+    ? `
+      w-[9vw] h-[9vw] 
+      max-w-[40px] max-h-[40px] 
+      sm:w-[5vh] sm:h-[5vh] 
+      sm:max-w-[46px] sm:max-h-[46px] 
+      flex items-center justify-center 
+      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
+      border-2 text-white
+    `
+    : `
+      w-[11vw] h-[11vw] 
+      max-w-[55px] max-h-[55px] 
+      sm:w-[6vh] sm:h-[6vh] 
+      sm:max-w-[62px] sm:max-h-[62px] 
+      flex items-center justify-center 
+      text-xl sm:text-2xl font-bold uppercase transition-colors duration-300
+      border-2 text-white
+    `;
 
   let statusClass = 'border-gray-800';
   let animationClass = '';
@@ -66,9 +77,10 @@ interface GridProps {
   isChallengeMode?: boolean;
   isShake?: boolean;
   isSaving?: boolean;
+  compact?: boolean;
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving }) => {
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact }) => {
   const [revealingRowIndex, setRevealingRowIndex] = useState<number | null>(null);
   const prevGuessesLength = useRef(guesses.length);
 
@@ -87,7 +99,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
 
   return (
     <div
-      className={`grid gap-1.5 sm:gap-2 mx-auto h-full items-center content-center p-4 rounded-3xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_40px_rgba(0,255,0,0.1)] border border-correct/20' : ''}`}
+      className={`grid mx-auto h-full items-center content-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
       style={{
         gridTemplateColumns: `repeat(${wordLength}, minmax(0, 1fr))`,
         width: 'max-content'
@@ -103,6 +115,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
             status={res.status}
             isRevealing={isRevealing}
             revealIndex={j}
+            compact={compact}
           />
         ));
       })}
@@ -120,6 +133,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
               isPop={!!currentGuess[i]}
               isShake={isShake}
               isHinted={isHinted}
+              compact={compact}
             />
           );
         })
@@ -135,6 +149,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                 key={`empty-${i}-${j}`}
                 letter={isHinted ? hintRecord?.letter : ''}
                 isHinted={isHinted}
+                compact={compact}
               />
             );
           })}

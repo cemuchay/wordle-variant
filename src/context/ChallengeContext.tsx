@@ -46,7 +46,7 @@ interface ChallengeContextType {
 
     // Actions
     handleViewChallenge: (id: string) => Promise<void>;
-    handleCreate: (params?: any) => Promise<void>;
+    handleCreate: (params?: any, viewAfterCreate?: boolean) => Promise<void>;
     handleStartGame: () => Promise<void>;
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
@@ -411,7 +411,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation]);
 
-    const handleCreate = useCallback(async (customParams?: any) => {
+    const handleCreate = useCallback(async (customParams?: any, viewAfterCreate = true) => {
         if (!effectiveUser) return;
         try {
             const challenge = await createMutation.mutateAsync({
@@ -431,13 +431,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
 
                 resetForm();
-                handleViewChallenge(challenge.id);
+                
+                if (viewAfterCreate) {
+                    handleViewChallenge(challenge.id);
+                } else {
+                    await refetchChallenges();
+                }
             }
         } catch (err: any) {
             console.error("Failed to create challenge:", err);
             triggerToast(err?.message || "Failed to create challenge.", 4000);
         }
-    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast]);
+    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast, refetchChallenges]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;

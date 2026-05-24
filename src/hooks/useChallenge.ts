@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser } from '../types/game';
 
@@ -24,6 +24,7 @@ export interface Challenge {
     handicap_starters?: any;
     handicap_enforced?: boolean;
     marathon_timers?: Record<number, number> | null;
+    marathon_force_order?: boolean;
 }
 
 export interface MarathonProgress {
@@ -68,6 +69,7 @@ export interface ChallengeParticipant {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useChallenge = (_user: AppUser | null) => {
     const [participants, setParticipants] = useState<ChallengeParticipant[]>([]);
+    const participantsRef = useRef<ChallengeParticipant[]>([]);
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
@@ -117,6 +119,7 @@ export const useChallenge = (_user: AppUser | null) => {
                 }));
                 const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
                 setParticipants(normalized as ChallengeParticipant[]);
+                participantsRef.current = normalized;
             }
         };
 
@@ -132,9 +135,11 @@ export const useChallenge = (_user: AppUser | null) => {
                 event: '*',
                 schema: 'public',
                 table: 'challenge_participants_marathon'
-            }, () => {
-                // For marathon progress, we might need a more targeted update, but fetchAndSet is safe
-                fetchAndSet();
+            }, (payload) => {
+                const updatedPartId = (payload.new as any)?.participation_id;
+                if (!updatedPartId || participantsRef.current.some(p => p.id === updatedPartId)) {
+                    fetchAndSet();
+                }
             })
             .subscribe();
 

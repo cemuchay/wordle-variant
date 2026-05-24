@@ -1,60 +1,130 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Clock, Play, Plus, Search, X, UserPlus } from 'lucide-react';
+import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2 } from 'lucide-react';
 import { memo, useState, useMemo, useCallback } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 
-const ModeSelector = memo(({ mode, setMode }: { mode: 'LIVE' | 'ANYTIME', setMode: (m: 'LIVE' | 'ANYTIME') => void }) => (
-    <div className="space-y-4">
-        <label className="text-xs font-black uppercase tracking-widest text-gray-500">Mode</label>
-        <div className="grid grid-cols-2 gap-2">
+const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
+    label: string;
+    tooltip: string;
+    activeTooltip: string | null;
+    setActiveTooltip: (id: string | null) => void;
+    tooltipId: string;
+    className?: string;
+}) => {
+    const isOpen = activeTooltip === tooltipId;
+    return (
+        <div className={`flex items-center gap-1.5 relative select-none ${className}`}>
+            <span className="text-xs font-black uppercase tracking-widest text-gray-300">
+                {label}
+            </span>
             <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTooltip(isOpen ? null : tooltipId);
+                }}
+                className="text-gray-400 hover:text-white p-0.5 rounded-full transition-colors flex items-center justify-center focus:outline-none animate-pulse hover:animate-none"
+                title="What is this?"
+            >
+                <HelpCircle size={13} />
+            </button>
+            {isOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 z-40 pointer-events-auto"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveTooltip(null);
+                        }}
+                    />
+                    <div className="absolute left-0 top-6 z-50 bg-gray-950 border border-white/20 p-3.5 rounded-2xl shadow-2xl text-[11px] leading-relaxed text-gray-200 font-medium normal-case tracking-normal w-64 max-w-[85vw] animate-in fade-in zoom-in duration-150">
+                        {tooltip}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+});
+
+const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: { 
+    mode: 'LIVE' | 'ANYTIME', 
+    setMode: (m: 'LIVE' | 'ANYTIME') => void,
+    activeTooltip: string | null,
+    setActiveTooltip: (id: string | null) => void
+}) => (
+    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
+        <OptionLabel 
+            label="Mode" 
+            tooltip="Choose between 'Anytime' (play at your own pace within 24h, results updated async) and 'Live' (synchronous race against other players with a timer, and real-time audio chat)." 
+            activeTooltip={activeTooltip} 
+            setActiveTooltip={setActiveTooltip} 
+            tooltipId="mode" 
+        />
+        <div className="grid grid-cols-2 gap-3">
+            <button
+                type="button"
                 onClick={() => setMode('ANYTIME')}
-                className={`p-3 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                className={`p-4 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/15 border-2 shadow-lg shadow-correct/5' : 'border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
             >
                 <div className="flex items-center justify-between mb-2">
                     <Clock className={mode === 'ANYTIME' ? 'text-correct' : 'text-gray-400'} size={18} />
                     {mode === 'ANYTIME' && <div className="w-2 h-2 bg-correct rounded-full" />}
                 </div>
-                <p className="text-[10px] font-black uppercase">Anytime</p>
-                <p className="text-[8px] text-gray-500">24h async</p>
+                <p className="text-xs font-black uppercase text-white">Anytime</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">24h async play</p>
             </button>
             <button
+                type="button"
                 onClick={() => setMode('LIVE')}
-                className={`p-3 rounded-2xl border transition-all text-left ${mode === 'LIVE' ? 'border-red-500 bg-red-500/10' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                className={`p-4 rounded-2xl border transition-all text-left ${mode === 'LIVE' ? 'border-red-500 bg-red-500/15 border-2 shadow-lg shadow-red-500/5' : 'border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
             >
                 <div className="flex items-center justify-between mb-2">
                     <Play className={mode === 'LIVE' ? 'text-red-500' : 'text-gray-400'} size={18} />
                     {mode === 'LIVE' && <div className="w-2 h-2 bg-red-500 rounded-full" />}
                 </div>
-                <p className="text-[10px] font-black uppercase">Live</p>
-                <p className="text-[8px] text-gray-500">Timed play</p>
+                <p className="text-xs font-black uppercase text-white">Live</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Timed race & voice</p>
             </button>
         </div>
     </div>
 ));
 
-const LengthSelector = memo(({ length, setLength }: { length: number, setLength: (l: number) => void }) => (
-    <div className="space-y-4">
-        <label className="text-xs font-black uppercase tracking-widest text-gray-500">Word Length</label>
+const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveTooltip }: { 
+    length: number, 
+    setLength: (l: number) => void,
+    activeTooltip: string | null,
+    setActiveTooltip: (id: string | null) => void
+}) => (
+    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
+        <OptionLabel 
+            label="Word Length" 
+            tooltip="Select word length for the challenge. Choose 'Random' for a surprise length, or 'Marathon' to compete across a sequence of multiple word lengths." 
+            activeTooltip={activeTooltip} 
+            setActiveTooltip={setActiveTooltip} 
+            tooltipId="length" 
+        />
         <div className="flex gap-2 flex-wrap">
             {[3, 4, 5, 6, 7].map((l) => (
                 <button
                     key={l}
+                    type="button"
                     onClick={() => setLength(l)}
-                    className={`w-10 h-10 rounded-xl border font-black text-xs transition-all ${length === l ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                    className={`w-11 h-11 rounded-xl border font-black transition-all ${length === l ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10 text-xs'}`}
                 >
                     {l}
                 </button>
             ))}
             <button
+                type="button"
                 onClick={() => setLength(0)} // 0 for random
-                className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 0 ? 'border-correct bg-correct text-black' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 0 ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
             >
                 Random
             </button>
             <button
+                type="button"
                 onClick={() => setLength(1)} // 1 for marathon
-                className={`px-3 h-10 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${length === 1 ? 'border-yellow-500 bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}
+                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 1 ? 'border-yellow-500 bg-yellow-500 text-black border-2 shadow-lg shadow-yellow-500/20' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
             >
                 Marathon
             </button>
@@ -62,17 +132,27 @@ const LengthSelector = memo(({ length, setLength }: { length: number, setLength:
     </div>
 ));
 
-const TimeLimitSelector = memo(({ maxTime, setMaxTime }: { maxTime: number | null, setMaxTime: (t: number) => void }) => (
-    <div className="space-y-4">
-        <label className="text-xs font-black uppercase tracking-widest text-gray-500">
-            Time Limit (Per Game)
-        </label>
+const TimeLimitSelector = memo(({ maxTime, setMaxTime, activeTooltip, setActiveTooltip }: { 
+    maxTime: number | null, 
+    setMaxTime: (t: number) => void,
+    activeTooltip: string | null,
+    setActiveTooltip: (id: string | null) => void
+}) => (
+    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
+        <OptionLabel 
+            label="Time Limit (Per Game)" 
+            tooltip="The maximum duration allowed for each participant to guess the word (Only applies to Live mode)." 
+            activeTooltip={activeTooltip} 
+            setActiveTooltip={setActiveTooltip} 
+            tooltipId="timeLimit" 
+        />
         <div className="flex gap-3">
             {[3, 5, 10].map((t) => (
                 <button
                     key={t}
+                    type="button"
                     onClick={() => setMaxTime(t)}
-                    className={`flex-1 p-3 rounded-xl border text-sm font-black transition-all ${maxTime === t ? 'border-red-500 bg-red-500 text-white' : 'border-white/10 bg-white/5'}`}
+                    className={`flex-1 p-3.5 rounded-xl border text-sm font-black transition-all ${maxTime === t ? 'border-2 border-red-500 bg-red-500/20 text-red-400 shadow-lg shadow-red-500/10' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
                 >
                     {t}m
                 </button>
@@ -81,7 +161,13 @@ const TimeLimitSelector = memo(({ maxTime, setMaxTime }: { maxTime: number | nul
     </div>
 ));
 
-const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite }: { availableProfiles: any[], invitedIds: string[], toggleInvite: (id: string) => void }) => {
+const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite, activeTooltip, setActiveTooltip }: { 
+    availableProfiles: any[], 
+    invitedIds: string[], 
+    toggleInvite: (id: string) => void,
+    activeTooltip: string | null,
+    setActiveTooltip: (id: string | null) => void
+}) => {
     const [profileSearch, setProfileSearch] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -105,10 +191,14 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite 
     }, [toggleInvite]);
 
     return (
-        <div className="space-y-4 relative">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
-                <UserPlus size={14} /> Invite Friends
-            </label>
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all relative">
+            <OptionLabel 
+                label="Invite Friends" 
+                tooltip="Search and invite other registered players to join this challenge lobby." 
+                activeTooltip={activeTooltip} 
+                setActiveTooltip={setActiveTooltip} 
+                tooltipId="inviteFriends" 
+            />
             
             <div className="space-y-3">
                 {/* Selected Users Chips */}
@@ -136,7 +226,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite 
                             value={profileSearch}
                             onFocus={() => setIsDropdownOpen(true)}
                             onChange={(e) => setProfileSearch(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/50 focus:bg-white/10 transition-all"
+                            className="w-full bg-white/5 border border-white/15 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/60 focus:bg-white/10 focus:ring-1 focus:ring-correct/30 transition-all text-white placeholder-gray-500"
                         />
                         {profileSearch && (
                             <button 
@@ -188,7 +278,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite 
 });
 
 import { getWordLists } from '../../data/words';
-import { Shield, Sparkles, Settings2 } from 'lucide-react';
+
 
 const validateCustomWord = (word: string, len: number) => {
     const trimmed = word.trim();
@@ -199,12 +289,16 @@ const validateCustomWord = (word: string, len: number) => {
     return null;
 };
 
-export const ChallengeCreate = memo(function ChallengeCreate() {
+export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { onSuccess?: () => void }) {
     const {
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
         joinId, setJoinId, handleViewChallenge, handleCreate, loading
     } = useChallengeContext();
+
+    // Tooltip & Rule States
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+    const [marathonForceOrder, setMarathonForceOrder] = useState(false);
 
     // Marathon Mode States
     const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
@@ -296,6 +390,16 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
         }
     }, [handleUpdateMarathonGames]);
 
+    const handleMoveGame = useCallback((idx: number, direction: 'up' | 'down') => {
+        const next = [...marathonGames];
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= next.length) return;
+        const temp = next[idx];
+        next[idx] = next[targetIdx];
+        next[targetIdx] = temp;
+        handleUpdateMarathonGames(next);
+    }, [marathonGames, handleUpdateMarathonGames]);
+
     // Inline errors
     const errors = useMemo(() => {
         const errs: string[] = [];
@@ -348,7 +452,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
         return errs;
     }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray]);
 
-    const handleCreateTrigger = useCallback(() => {
+    const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
 
         const customParams: any = {
@@ -381,21 +485,26 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
 
         if (length === 1) {
             customParams.marathonGames = marathonGames;
+            customParams.marathonForceOrder = marathonForceOrder;
             if (mode === 'LIVE' && timerType === 'custom') {
                 customParams.marathonTimers = marathonTimersArray;
             }
         }
 
-        handleCreate(customParams);
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames]);
+        await handleCreate(customParams, !onSuccess);
+        
+        if (onSuccess) {
+            onSuccess();
+        }
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess]);
 
     return (
         <div className="space-y-6">
-            <ModeSelector mode={mode} setMode={setMode} />
-            <LengthSelector length={length} setLength={setLength} />
+            <ModeSelector mode={mode} setMode={setMode} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
+            <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
 
             {length === 1 && (
-                <div className="p-4 rounded-2xl border border-yellow-500/25 bg-yellow-500/5 space-y-4 animate-in fade-in duration-300">
+                <div className="p-5 rounded-2xl border border-yellow-500/25 bg-yellow-500/5 space-y-4 animate-in fade-in duration-300">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-black uppercase text-white">Marathon Mode Setup</p>
@@ -404,12 +513,14 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                         
                         <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                             <button
+                                type="button"
                                 onClick={() => handleSetMarathonType('standard')}
                                 className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'standard' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
                             >
                                 Standard (3-7L)
                             </button>
                             <button
+                                type="button"
                                 onClick={() => handleSetMarathonType('custom')}
                                 className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'custom' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
                             >
@@ -430,23 +541,42 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                         <p className="text-[10px] text-gray-500 font-bold uppercase">No games added yet. Click lengths below to build your sequence.</p>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-wrap gap-2 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[150px] overflow-y-auto">
+                                    <div className="space-y-2 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[220px] overflow-y-auto">
                                         {marathonGames.map((l, idx) => (
                                             <div 
                                                 key={idx} 
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-black text-white group transition-colors"
+                                                className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-white transition-colors"
                                             >
-                                                <span>#{idx + 1}: <strong className="text-yellow-500">{l}L</strong></span>
-                                                <button
-                                                    onClick={() => {
-                                                        const next = [...marathonGames];
-                                                        next.splice(idx, 1);
-                                                        handleUpdateMarathonGames(next);
-                                                    }}
-                                                    className="text-gray-500 hover:text-red-500 transition-colors"
-                                                >
-                                                    <X size={10} />
-                                                </button>
+                                                <span className="text-gray-300">Game #{idx + 1}: <strong className="text-yellow-500 ml-1">{l}L Word</strong></span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMoveGame(idx, 'up')}
+                                                        disabled={idx === 0}
+                                                        className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                                    >
+                                                        <ChevronUp size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMoveGame(idx, 'down')}
+                                                        disabled={idx === marathonGames.length - 1}
+                                                        className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                                    >
+                                                        <ChevronDown size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const next = [...marathonGames];
+                                                            next.splice(idx, 1);
+                                                            handleUpdateMarathonGames(next);
+                                                        }}
+                                                        className="p-1 text-gray-400 hover:text-red-500 transition-colors ml-1"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -461,6 +591,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                     {[3, 4, 5, 6, 7].map((l) => (
                                         <button
                                             key={l}
+                                            type="button"
                                             disabled={marathonGames.length >= 20}
                                             onClick={() => {
                                                 if (marathonGames.length < 20) {
@@ -476,48 +607,76 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                             </div>
                         </div>
                     )}
+
+                    {/* Force Game Order Option */}
+                    <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-2">
+                        <OptionLabel 
+                            label="Force Game Order" 
+                            tooltip="Forces players to play games sequentially. Game #N must be completed/failed to unlock Game #(N+1)." 
+                            activeTooltip={activeTooltip} 
+                            setActiveTooltip={setActiveTooltip} 
+                            tooltipId="forceOrder" 
+                        />
+                        <input
+                            type="checkbox"
+                            checked={marathonForceOrder}
+                            onChange={(e) => setMarathonForceOrder(e.target.checked)}
+                            className="w-5 h-5 accent-yellow-500 cursor-pointer"
+                        />
+                    </div>
                 </div>
             )}
             
             {mode === 'LIVE' && (
-                <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} />
+                <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
             )}
 
             <ProfileInviteSystem 
                 availableProfiles={availableProfiles} 
                 invitedIds={invitedIds} 
                 toggleInvite={toggleInvite} 
+                activeTooltip={activeTooltip}
+                setActiveTooltip={setActiveTooltip}
             />
 
             {/* Advanced Settings Button */}
             <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-between text-xs font-black uppercase tracking-wider text-gray-300 transition-all"
+                className="w-full py-3.5 px-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl flex items-center justify-between text-xs font-black uppercase tracking-wider text-white transition-all shadow-md"
             >
                 <span className="flex items-center gap-2"><Settings2 size={14} /> Advanced Settings</span>
-                <span className="text-gray-500">{showAdvanced ? 'Hide' : 'Show'}</span>
+                <span className="text-gray-400">{showAdvanced ? 'Hide' : 'Show'}</span>
             </button>
 
             {showAdvanced && (
-                <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-5 animate-in fade-in duration-300">
+                <div className="p-5 rounded-2xl border border-white/15 bg-white/5 space-y-5 animate-in fade-in duration-300">
                     
                     {/* Public Challenge Option */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase text-white">Public Challenge</p>
-                                <p className="text-[10px] text-gray-500">Anyone with the link can join</p>
-                            </div>
+                            <OptionLabel 
+                                label="Public Challenge" 
+                                tooltip="When enabled, anyone with the challenge link can join. Otherwise, only explicitly invited players can enter." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="publicChallenge" 
+                            />
                             <input
                                 type="checkbox"
                                 checked={isPublic}
                                 onChange={(e) => setIsPublic(e.target.checked)}
-                                className="w-4 h-4 accent-correct"
+                                className="w-5 h-5 accent-correct cursor-pointer"
                             />
                         </div>
                         {isPublic && (
-                            <div className="space-y-2 pl-4 border-l border-white/10">
-                                <label className="text-[10px] font-black uppercase text-gray-400">Max Participants (2-100)</label>
+                            <div className="space-y-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
+                                <OptionLabel 
+                                    label="Max Participants" 
+                                    tooltip="Limit the total number of players allowed in this public lobby (between 2 and 100)." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="maxParticipants" 
+                                />
                                 <input
                                     type="number"
                                     inputMode="numeric"
@@ -540,23 +699,28 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                         setMaxParticipants(num);
                                         setMaxParticipantsInput(String(num));
                                     }}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:border-correct outline-none"
+                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
                                 />
                             </div>
                         )}
                     </div>
 
                     {/* Lifespan Option */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                            Challenge Lifespan
-                        </label>
-                        <div className="grid grid-cols-4 gap-1.5">
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <OptionLabel 
+                            label="Challenge Lifespan" 
+                            tooltip="The number of hours this challenge lobby will remain open before automatically expiring." 
+                            activeTooltip={activeTooltip} 
+                            setActiveTooltip={setActiveTooltip} 
+                            tooltipId="lifespan" 
+                        />
+                        <div className="grid grid-cols-4 gap-2">
                             {[1, 6, 12, 24].map(h => (
                                 <button
                                     key={h}
+                                    type="button"
                                     onClick={() => setLifespanHours(h)}
-                                    className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
+                                    className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
                                 >
                                     {h}h
                                 </button>
@@ -565,28 +729,29 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                     </div>
 
                     {/* Custom target word option */}
-                    <div className="space-y-3 border-t border-white/5 pt-3">
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                                    <Sparkles size={12} className="text-yellow-500" /> Custom Word Challenge
-                                </p>
-                                <p className="text-[10px] text-gray-500">Pick target word. Creator cannot play.</p>
-                            </div>
+                            <OptionLabel 
+                                label="Custom Word Challenge" 
+                                tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="customWord" 
+                            />
                             <input
                                 type="checkbox"
                                 checked={isCustomWord}
                                 onChange={(e) => setIsCustomWord(e.target.checked)}
-                                className="w-4 h-4 accent-correct"
+                                className="w-5 h-5 accent-correct cursor-pointer"
                             />
                         </div>
                         {isCustomWord && (
-                            <div className="space-y-3 pl-4 border-l border-white/10">
+                            <div className="space-y-3 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
                                 {length === 1 ? (
                                     <div className="space-y-2.5">
                                         {marathonGames.map((l, idx) => (
                                             <div key={idx} className="flex flex-col gap-1">
-                                                <span className="text-[9px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Word):</span>
+                                                <span className="text-[10px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Word):</span>
                                                 <input
                                                     type="text"
                                                     maxLength={l}
@@ -600,7 +765,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                                             return next;
                                                         });
                                                     }}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
                                                 />
                                             </div>
                                         ))}
@@ -614,7 +779,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                             placeholder={`Enter ${length === 0 ? 5 : length}-letter word`}
                                             value={customWord}
                                             onChange={(e) => setCustomWord(e.target.value.replace(/[^A-Za-z]/g, ''))}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:border-correct outline-none uppercase"
+                                            className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-3 text-sm focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
                                         />
                                     </div>
                                 )}
@@ -623,60 +788,72 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                     </div>
 
                     {/* Handicap Options */}
-                    <div className="space-y-3 border-t border-white/5 pt-3">
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                                    <Shield size={12} className="text-yellow-500" /> Handicap Challenge
-                                </p>
-                                <p className="text-[10px] text-gray-500">Provide starter word(s) for players</p>
-                            </div>
+                            <OptionLabel 
+                                label="Handicap Challenge" 
+                                tooltip="Set a designated starter word for all players, which limits their opening guesses." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="handicap" 
+                            />
                             <input
                                 type="checkbox"
                                 checked={isHandicap}
                                 onChange={(e) => setIsHandicap(e.target.checked)}
-                                className="w-4 h-4 accent-correct"
+                                className="w-5 h-5 accent-correct cursor-pointer"
                             />
                         </div>
                         {isHandicap && (
-                            <div className="space-y-3.5 pl-4 border-l border-white/10">
+                            <div className="space-y-3.5 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
                                 <div className="space-y-2">
-                                    <p className="text-[10px] font-black uppercase text-gray-400">Starter Type:</p>
+                                    <OptionLabel 
+                                        label="Starter Type" 
+                                        tooltip="Choose whether the starter word is selected randomly by the system or explicitly typed by the creator." 
+                                        activeTooltip={activeTooltip} 
+                                        setActiveTooltip={setActiveTooltip} 
+                                        tooltipId="starterType" 
+                                    />
                                     <div className="grid grid-cols-2 gap-2">
                                         <button
+                                            type="button"
                                             onClick={() => setHandicapMode('random')}
-                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'random' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'random' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
                                         >
                                             System Random
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setHandicapMode('custom')}
-                                            className={`py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'custom' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'custom' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
                                         >
                                             Custom Word
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase text-gray-300">Enforce Starter Word</p>
-                                        <p className="text-[8px] text-gray-500">True = automatically submitted first guess</p>
-                                    </div>
+                                <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                                    <OptionLabel 
+                                        label="Enforce Starter Word" 
+                                        tooltip="If enabled, the starter word is automatically submitted as the player's first guess." 
+                                        activeTooltip={activeTooltip} 
+                                        setActiveTooltip={setActiveTooltip} 
+                                        tooltipId="enforceStarter" 
+                                    />
                                     <input
                                         type="checkbox"
                                         checked={handicapEnforced}
                                         onChange={(e) => setHandicapEnforced(e.target.checked)}
-                                        className="w-3.5 h-3.5 accent-correct"
+                                        className="w-5 h-5 accent-correct cursor-pointer"
                                     />
                                 </div>
 
                                 {handicapMode === 'custom' && (
-                                    <div className="space-y-2.5">
+                                    <div className="space-y-2.5 border-t border-white/5 pt-3">
                                         {length === 1 ? (
                                             marathonGames.map((l, idx) => (
                                                 <div key={idx} className="flex flex-col gap-1">
-                                                    <span className="text-[9px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Starter):</span>
+                                                    <span className="text-[10px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Starter):</span>
                                                     <input
                                                         type="text"
                                                         maxLength={l}
@@ -690,7 +867,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                                                 return next;
                                                             });
                                                         }}
-                                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
                                                     />
                                                 </div>
                                             ))
@@ -703,7 +880,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                                     placeholder={`Enter starter word`}
                                                     value={handicapStarter}
                                                     onChange={(e) => setHandicapStarter(e.target.value.replace(/[^A-Za-z]/g, ''))}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none uppercase"
+                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
                                                 />
                                             </div>
                                         )}
@@ -715,22 +892,25 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
 
                     {/* Marathon Custom Timers */}
                     {length === 1 && mode === 'LIVE' && (
-                        <div className="space-y-3 border-t border-white/5 pt-3">
+                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                                        <Clock size={12} className="text-yellow-500" /> Per-Word Timers
-                                    </p>
-                                    <p className="text-[10px] text-gray-500">Set different times for each length</p>
-                                </div>
+                                <OptionLabel 
+                                    label="Per-Word Timers" 
+                                    tooltip="Specify a different timer duration for each game in the Marathon mode sequence." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="perWordTimers" 
+                                />
                                 <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                                     <button
+                                        type="button"
                                         onClick={() => setTimerType('same')}
                                         className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-gray-500'}`}
                                     >
                                         Same
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => setTimerType('custom')}
                                         className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-gray-500'}`}
                                     >
@@ -739,7 +919,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                 </div>
                             </div>
                             {timerType === 'custom' && (
-                                <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10">
+                                <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
                                     {marathonGames.map((l, idx) => (
                                         <div key={idx} className="space-y-1 min-w-[50px] flex-1">
                                             <p className="text-[8px] font-black uppercase text-gray-500 text-center">#{idx + 1} ({l}L)</p>
@@ -782,7 +962,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                                                         return next;
                                                     });
                                                 }}
-                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct outline-none"
+                                                className="w-full bg-black/40 border border-white/15 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
                                             />
                                         </div>
                                     ))}
@@ -810,9 +990,10 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                         placeholder="Or Enter Challenge ID..."
                         value={joinId}
                         onChange={(e) => setJoinId(e.target.value)}
-                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors"
+                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white"
                     />
                     <button
+                        type="button"
                         onClick={() => joinId && handleViewChallenge(joinId)}
                         disabled={!joinId}
                         className="bg-white text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50"
@@ -822,6 +1003,7 @@ export const ChallengeCreate = memo(function ChallengeCreate() {
                 </div>
 
                 <button
+                    type="button"
                     onClick={handleCreateTrigger}
                     disabled={loading || errors.length > 0}
                     className="w-full bg-correct text-black py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:brightness-50"

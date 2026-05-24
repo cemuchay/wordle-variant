@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useCallback, useMemo } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Lock } from 'lucide-react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
@@ -43,10 +43,11 @@ interface MarathonLengthItemProps {
     finishers: any[];
     onSelect: (index: number, isFinished: boolean) => void;
     onPreview: (p: any, index: number) => void;
+    isUnlocked: boolean;
 }
 
 const MarathonLengthItem = memo(function MarathonLengthItem({
-    game, index, prog, challenge, finishers, onSelect, onPreview
+    game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked
 }: MarathonLengthItemProps) {
     const isCompleted = prog?.status === 'completed';
     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
@@ -55,30 +56,33 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
     return (
         <div className="flex flex-col gap-2">
             <button
+                disabled={!isUnlocked}
                 onClick={() => onSelect(index, isFinished)}
-                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isFinished ? 'bg-white/5 border-white/10 hover:border-correct/50 hover:bg-correct/5' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
+                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${!isUnlocked ? 'bg-white/2 border-white/5 opacity-40 cursor-not-allowed' : isFinished ? 'bg-white/5 border-white/10 hover:border-correct/50 hover:bg-correct/5' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
             >
                 <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
-                        {game.wordLength}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${!isUnlocked ? 'bg-white/5 text-gray-600' : isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
+                        {!isUnlocked ? <Lock size={16} /> : game.wordLength}
                     </div>
                     <div className="text-left">
                         <p className="text-xs font-black uppercase">Game #{index + 1} ({game.wordLength}L)</p>
                         <p className="text-[10px] text-gray-500">
-                            {isFinished
-                                ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
-                                : (prog ? 'In Progress' : 'Not Started')}
+                            {!isUnlocked 
+                                ? 'Locked (Play games in order)'
+                                : isFinished
+                                    ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
+                                    : (prog ? 'In Progress' : 'Not Started')}
                         </p>
                     </div>
                 </div>
-                {!isFinished && challenge.mode === 'LIVE' && (
+                {isUnlocked && !isFinished && challenge.mode === 'LIVE' && (
                     <div className="text-right">
                         <p className="text-[9px] font-black text-gray-500 uppercase flex items-center gap-1 justify-end">
                             <Clock size={10} className="text-red-500/50" /> {getMarathonTimer(challenge, index, game.wordLength)}m
                         </p>
                     </div>
                 )}
-                {prog && (
+                {isUnlocked && prog && (
                     <div className="text-right">
                         <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/{MAX_ATTEMPTS} Tries</p>
                         {challenge.mode === 'LIVE' && prog.time_taken && (
@@ -167,15 +171,28 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     }
 
     return (
-        <div className="flex-1 p-6 flex flex-col gap-8">
-            <div className="text-center space-y-2">
+        <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
+            <div className="text-center space-y-1.5 shrink-0">
                 <h3 className="text-xl font-black uppercase tracking-tighter">Marathon Mode</h3>
                 <p className="text-gray-500 text-xs">Complete all lengths to finish the challenge.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-2.5">
                 {marathonGames.map((game, idx) => {
                     const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+                    
+                    let isUnlocked = true;
+                    if (challenge.marathon_force_order && idx > 0) {
+                        const prevProg = participation.marathon_progress?.find((p: any) => p.game_index === idx - 1);
+                        if (!prevProg) {
+                            isUnlocked = false;
+                        } else {
+                            const prevCompleted = prevProg.status === 'completed';
+                            const prevFailed = prevProg.status === 'timed_out' || (prevProg.attempts >= MAX_ATTEMPTS && !prevCompleted);
+                            isUnlocked = prevCompleted || prevFailed;
+                        }
+                    }
+
                     return (
                         <MarathonLengthItem
                             key={idx}
@@ -186,19 +203,20 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                             finishers={finishersByGameIndex[idx] || []}
                             onSelect={handleSelect}
                             onPreview={handlePreview}
+                            isUnlocked={isUnlocked}
                         />
                     );
                 })}
             </div>
 
-            <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
+            <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between shrink-0">
                 <div>
                     <p className="text-[10px] text-gray-500 uppercase font-black">Total Score</p>
                     <p className="text-2xl font-black text-correct">{participation.score || 0}</p>
                 </div>
                 <button
                     onClick={onFinish}
-                    className="bg-white/5 border border-white/10 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors"
+                    className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors"
                 >
                     Exit to Lobby
                 </button>
