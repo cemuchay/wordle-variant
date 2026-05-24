@@ -21,6 +21,7 @@ import { safeLazy } from './utils/safeLazy';
 
 const ChatRoom = safeLazy(() => import('./components/chatRoom'));
 import { AdminPage } from './components/admin/AdminPage';
+import { UnsubscribePage } from './components/UnsubscribePage';
 
 
 export default function App() {
@@ -120,6 +121,12 @@ export default function App() {
 
     if (isPageAdmin) {
         return <AdminPage />;
+    }
+
+    const isPageUnsubscribe = window.location.pathname === '/unsubscribe';
+
+    if (isPageUnsubscribe) {
+        return <UnsubscribePage />;
     }
 
     if (isLoadingDate || !isHydrated) {

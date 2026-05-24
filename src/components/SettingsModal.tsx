@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -18,6 +18,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [loading, setLoading] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
+    const [receiveEmails, setReceiveEmails] = useState(true);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -45,9 +46,22 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user?.email) setUserEmail(user.email);
             };
+            const fetchEmailPreferences = async () => {
+                if (profile?.id) {
+                    const { data, error } = await supabase
+                        .from('email_preferences')
+                        .select('receive_emails')
+                        .eq('user_id', profile.id)
+                        .maybeSingle();
+                    if (!error && data) {
+                        setReceiveEmails(data.receive_emails);
+                    }
+                }
+            };
             fetchAuthData();
+            fetchEmailPreferences();
         }
-    }, [isOpen]);
+    }, [isOpen, profile?.id]);
 
     const handleSave = async () => {
         setLoading(true);
@@ -60,6 +74,16 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 }
             })
             .eq('id', profile.id);
+
+        if (profile?.id) {
+            await supabase
+                .from('email_preferences')
+                .upsert({
+                    user_id: profile.id,
+                    receive_emails: receiveEmails,
+                    updated_at: new Date().toISOString(),
+                });
+        }
 
         if (!error) {
             await refreshProfile();
@@ -136,6 +160,33 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                     }`}
                             >
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
+                                    }`} />
+                            </button>
+                        </div>
+                    </section>
+
+                    {/* Email Notifications Preferences */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Mail size={14} className="text-indigo-400" />
+                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                Email Notifications
+                            </label>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                            <div className="flex-1 pr-4">
+                                <p className="text-sm font-bold text-gray-100">Updates & Reminders</p>
+                                <p className="text-[11px] text-gray-500 leading-relaxed">
+                                    Receive streak reminders, inactivity nudges, and weekly leaderboard reports.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setReceiveEmails(!receiveEmails)}
+                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${receiveEmails ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                    }`}
+                            >
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${receiveEmails ? 'left-7' : 'left-1'
                                     }`} />
                             </button>
                         </div>
