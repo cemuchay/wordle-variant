@@ -12,9 +12,15 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Index for performance
+-- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
+
+-- Composite index for fast fetching and sorting by user
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON public.notifications(user_id, created_at DESC);
+
+-- Partial index for fast unread count lookups and mark-all-as-read updates
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(user_id) WHERE is_read = false;
 
 -- RLS Policies
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;

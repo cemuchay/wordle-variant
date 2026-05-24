@@ -52,8 +52,14 @@ export const RegularGameplay = memo(function RegularGameplay({
         };
     }, [onBack, onFinish, setBackAction]);
 
+    const starterWord = (gameIndex !== undefined && gameIndex !== null)
+        ? getHandicapStarter(challenge, gameIndex, wordLength)
+        : challenge.handicap_starter;
+    const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
+    const showHint = guesses.length >= 2 && !isGameOver;
+
     return (
-        <div className="flex-1 flex flex-col p-4 gap-6 relative">
+        <div className="flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
             
             {/* Sync Status Overlay */}
@@ -80,76 +86,67 @@ export const RegularGameplay = memo(function RegularGameplay({
                 )}
             </div>
 
-            <div className="flex items-center justify-between px-4">
-                <div className="flex items-center gap-3">
-                    {guesses.length >= 2 && !isGameOver && (
+            {(showHint || showStarter) && (
+                <div className="flex items-center justify-between px-4 shrink-0">
+                    <div className="flex items-center gap-3">
+                        {showHint && (
+                            <button
+                                onClick={actions.handleHint}
+                                disabled={usedHint || guesses.length >= 5 || state.isHintDisabled}
+                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                            >
+                                <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
+                                {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
+                                    </div>
+                                )}
+                            </button>
+                        )}
+                    </div>
+
+                    {showStarter && (
                         <button
-                            onClick={actions.handleHint}
-                            disabled={usedHint || guesses.length >= 5 || state.isHintDisabled}
-                            className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                            title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                            onClick={() => {
+                                const starter = starterWord.toUpperCase();
+                                // Clear current input first
+                                for (let i = 0; i < currentGuess.length; i++) {
+                                    actions.onDelete();
+                                }
+                                // Type it letter by letter
+                                starter.split('').forEach((char: string) => actions.onChar(char));
+                            }}
+                            className="bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
                         >
-                            <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                            {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
-                                </div>
-                            )}
+                            💡 Recommended Starter: {starterWord.toUpperCase()}
                         </button>
                     )}
                 </div>
+            )}
 
-                {/* Handicap Recommendation */}
-                {(() => {
-                    const starterWord = (gameIndex !== undefined && gameIndex !== null)
-                        ? getHandicapStarter(challenge, gameIndex, wordLength)
-                        : challenge.handicap_starter;
-                    if (starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver) {
-                        return (
-                            <button
-                                onClick={() => {
-                                    const starter = starterWord.toUpperCase();
-                                    // Clear current input first
-                                    for (let i = 0; i < currentGuess.length; i++) {
-                                        actions.onDelete();
-                                    }
-                                    // Type it letter by letter
-                                    starter.split('').forEach((char: string) => actions.onChar(char));
-                                }}
-                                className="bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
-                            >
-                                💡 Recommended Starter: {starterWord.toUpperCase()}
-                            </button>
-                        );
-                    }
-                    return null;
-                })()}
-
-
-            </div>
-
-            <div className="flex-1 flex items-center justify-center min-h-0">
-                <div className="scale-[0.8] sm:scale-100 origin-center">
-                    <Grid
-                        wordLength={wordLength}
-                        maxAttempts={6}
-                        guesses={guesses}
-                        currentGuess={currentGuess}
-                        hintRecord={hintRecord}
-                        isChallengeMode={true}
-                        isShake={isShake}
-                        isSaving={isSaving}
-                    />
-                </div>
+            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+                <Grid
+                    wordLength={wordLength}
+                    maxAttempts={6}
+                    guesses={guesses}
+                    currentGuess={currentGuess}
+                    hintRecord={hintRecord}
+                    isChallengeMode={true}
+                    isShake={isShake}
+                    isSaving={isSaving}
+                    compact={true}
+                />
             </div>
 
             {!isGameOver && (
-                <div className="w-full max-w-lg mx-auto pb-1">
+                <div className="w-full max-w-lg mx-auto pb-0.5 shrink-0">
                     <Keyboard
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                         letterStatuses={letterStatuses}
+                        compact={true}
                     />
                 </div>
             )}

@@ -251,7 +251,8 @@ export const useChallengeMutations = () => {
             isPublic = false, maxParticipants = null,
             isCustomWord = false, customWord = '', customWords = {},
             handicapStarter = null, handicapStarters = null, handicapEnforced = false,
-            lifespanHours = 24, marathonTimers = null, marathonGames = null
+            lifespanHours = 24, marathonTimers = null, marathonGames = null,
+            marathonForceOrder = false
         }: any) => {
             const salt = Math.random().toString(36).substring(2, 15);
             let actualLength = length;
@@ -346,7 +347,8 @@ export const useChallengeMutations = () => {
                     handicap_starter: finalHandicapStarter,
                     handicap_starters: finalHandicapStarters,
                     handicap_enforced: handicapEnforced,
-                    marathon_timers: marathonTimers
+                    marathon_timers: marathonTimers,
+                    marathon_force_order: marathonForceOrder
                 }])
                 .select()
                 .single();
