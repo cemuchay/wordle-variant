@@ -41,21 +41,21 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
     return (
         <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: Z_INDEX.MODAL_BACKDROP }}>
             <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-                <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-correct/20 p-2 rounded-xl">
-                            <Trophy className="text-correct w-6 h-6" />
+                <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="bg-correct/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
+                            <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <h2 className="text-xl font-black uppercase tracking-tighter">
+                        <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
                             Challenges
                         </h2>
                     </div>
 
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
                     >
-                        <X size={20} />
+                        <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                     </button>
                 </div>
 
@@ -154,16 +154,16 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 
     return (
         <div className="flex flex-col h-full overflow-hidden relative">
-            <div className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? 'p-3 sm:p-4' : 'p-6'}`}>
-                <div className="flex items-center gap-3">
-                    <div className="bg-correct/20 p-2 rounded-xl">
-                        <Trophy className="text-correct w-6 h-6" />
+            <div className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? 'p-3 sm:p-4' : 'p-4 sm:p-6'}`}>
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-correct/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
+                        <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black uppercase tracking-tighter">
+                        <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
                             Challenges
                         </h2>
-                        <div className="flex items-center gap-2 min-h-5">
+                        <div className="flex items-center gap-1.5 sm:gap-2 min-h-5">
                             {isPlaying ? (
                                 <>
                                     <button
@@ -181,35 +181,35 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                     )}
                                 </>
                             ) : (
-                                <p className="text-gray-400 text-xs">
+                                <p className="text-gray-400 text-[10px] sm:text-xs">
                                     Compete with friends
                                 </p>
                             )}
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                     {!isPlaying && !selectedChallenge && (
                         <button
                             onClick={() => {
                                 setActiveTab('my');
                                 setIsCreatingChallenge(true);
                             }}
-                            className="bg-correct hover:bg-correct/90 text-black px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98] mr-2"
+                            className="bg-correct hover:bg-correct/90 text-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98] mr-1 sm:mr-2"
                         >
-                            <Plus size={14} strokeWidth={3} />
+                            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={3} />
                             Create
                         </button>
                     )}
                     <button
                         onClick={() => setIsHelpOpen(true)}
-                        className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                        className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
                         title="Challenge Guide"
                     >
-                        <HelpCircle size={20} />
+                        <HelpCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                     </button>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white">
+                        <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                     </button>
                 </div>
             </div>
