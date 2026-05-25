@@ -1,6 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import App from './App.tsx'
+import { Analytics } from '@vercel/analytics/react'
+import { AppProvider } from './context/AppContext'
+import { ConfirmationProvider } from './context/ConfirmationContext'
+import GlobalErrorBoundary from './components/GlobalErrorBoundary.tsx'
+import { logger } from './lib/logger.ts'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 // ==========================================
 // 🚀 DOMAIN MIGRATION & LOCAL STORAGE SYNC
@@ -80,46 +88,29 @@ if (OLD_PRODUCTION_DOMAINS.includes(window.location.hostname)) {
       }
     }
 
-    // Define globally accessible trigger function
-    let intervalId: any = null;
-    (window as any).triggerMigration = () => {
-      if (intervalId) clearInterval(intervalId);
-      localStorage.setItem('wordle_migrated_v1', 'true');
-      window.location.replace(redirectUrl);
-    };
+    // Mark as migrated in LocalStorage immediately before redirect
+    localStorage.setItem('wordle_migrated_v1', 'true');
 
-    // Render interactive transfer screen
+    // Render loading transition screen
     const rootElement = document.getElementById('root');
     if (rootElement) {
       rootElement.innerHTML = `
         <div style="background:#030712; color:#ffffff; font-family:'Outfit',system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; box-sizing:border-box;">
-          <div style="font-size: 40px; margin-bottom: 16px;">🧩</div>
-          <h1 style="font-size:26px; font-weight:900; letter-spacing:-0.05em; text-transform:uppercase; margin:0 0 12px 0;">We have moved!</h1>
-          <p style="color:#9ca3af; font-size:15px; margin:0 0 28px 0; max-width:460px; line-height:1.6;">
-            Wordle Variant is now hosted on our custom domain: <strong style="color:#ffffff;">${targetDomain}</strong>.<br/>
-            We will securely transfer your game statistics, active streaks, and login session so you don't lose any progress.
-          </p>
-          <button id="proceed-btn" onclick="window.triggerMigration()" style="padding: 14px 28px; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border: none; color: white; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 12px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3); transition: all 0.2s ease;">
-            PROCEED TO NEW SITE
-          </button>
-          <div id="countdown-text" style="color:#6b7280; font-size:12px; margin-top:16px;">Auto-redirecting in 20 seconds...</div>
+          <div style="font-size: 32px; margin-bottom: 12px;">🧩</div>
+          <h1 style="font-size:24px; font-weight:900; letter-spacing:-0.05em; text-transform:uppercase; margin:0 0 12px 0;">We have moved!</h1>
+          <p style="color:#9ca3af; font-size:14px; margin:0 0 24px 0; max-width:400px; line-height:1.6;">Transferring your game stats, streaks, and login session securely to the new domain...</p>
+          <div style="width:32px; height:32px; border:3px solid #1f2937; border-top-color:#6366f1; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+          <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+          </style>
         </div>
       `;
     }
 
-    // Initialize the countdown timer
-    let secondsLeft = 20;
-    intervalId = setInterval(() => {
-      secondsLeft--;
-      const textElem = document.getElementById('countdown-text');
-      if (textElem) {
-        textElem.textContent = `Auto-redirecting in ${secondsLeft} second${secondsLeft !== 1 ? 's' : ''}...`;
-      }
-      if (secondsLeft <= 0) {
-        clearInterval(intervalId);
-        (window as any).triggerMigration();
-      }
-    }, 1000);
+    // Redirect after 800ms
+    setTimeout(() => {
+      window.location.replace(redirectUrl);
+    }, 800);
   }
 } else {
   // We are on the target domain: check if we arrived with a migration payload
@@ -144,43 +135,35 @@ if (OLD_PRODUCTION_DOMAINS.includes(window.location.hostname)) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }
-}
-// ==========================================
 
-import App from './App.tsx'
-import { Analytics } from "@vercel/analytics/react";
-import { AppProvider } from './context/AppContext';
-import { ConfirmationProvider } from './context/ConfirmationContext';
-import GlobalErrorBoundary from './components/GlobalErrorBoundary.tsx';
-import { logger } from './lib/logger.ts';
+  // ==========================================
+  // Mount the React Application (only on the new domain)
+  // ==========================================
+  logger.info('Application starting...');
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-
-// Initialize logger early
-logger.info('Application starting...');
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
     },
-  },
-});
+  });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <GlobalErrorBoundary>
-        <AppProvider>
-          <ConfirmationProvider>
-            <App />
-          </ConfirmationProvider>
-        </AppProvider>
-        <Analytics />
-      </GlobalErrorBoundary>
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
-  </StrictMode>,
-)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <GlobalErrorBoundary>
+          <AppProvider>
+            <ConfirmationProvider>
+              <App />
+            </ConfirmationProvider>
+          </AppProvider>
+          <Analytics />
+        </GlobalErrorBoundary>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </StrictMode>
+  );
+}
+
