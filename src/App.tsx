@@ -256,9 +256,19 @@ export default function App() {
                 </Suspense>
             )}
 
-            <a href="/privacy.html" className="fixed bottom-2 left-2 text-[10px] text-gray-600 hover:underline">
-                Privacy Policy
-            </a>
+            <div className="fixed bottom-2 left-2 flex items-center gap-2 text-[10px] text-gray-600 z-40">
+                <a href="/privacy.html" className="hover:underline">
+                    Privacy Policy
+                </a>
+                <span>•</span>
+                <a href="/tos.html" className="hover:underline">
+                    Terms of Service
+                </a>
+                <span>•</span>
+                <a href="/deletion.html" className="hover:underline">
+                    User Data Deletion
+                </a>
+            </div>
         </div>
     );
 }

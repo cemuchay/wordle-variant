@@ -15,6 +15,7 @@ DECLARE
   body_json JSONB;
 BEGIN
   -- Get base Edge Function URL and secret from cache_settings
+  -- (Note: In production, these must be updated to your actual Supabase URL and shared secret)
   SELECT value INTO ef_url FROM public.cache_settings WHERE key = 'edge_function_url';
   SELECT value INTO ef_secret FROM public.cache_settings WHERE key = 'internal_secret';
 

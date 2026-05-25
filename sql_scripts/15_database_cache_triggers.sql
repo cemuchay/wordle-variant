@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS public.cache_settings (
   value TEXT NOT NULL
 );
 
--- Pre-populate defaults (User can update in Supabase SQL editor as needed)
+-- Pre-populate defaults (WARNING: For production, you must update these values in your Supabase SQL editor to match your production URL and secret)
 INSERT INTO public.cache_settings (key, value) VALUES
-('edge_function_url', 'http://kong:8000/functions/v1/redis-cache'), -- default internal local kong url
-('internal_secret', 'my-shared-secret-token')
+('edge_function_url', 'http://kong:8000/functions/v1/redis-cache'), -- default internal local kong url (update to 'https://<project-ref>.supabase.co/functions/v1/redis-cache' in production)
+('internal_secret', 'my-shared-secret-token') -- default local internal secret (update to match the INTERNAL_SECRET env var in production)
 ON CONFLICT (key) DO NOTHING;
 
 -- Enable pg_net extension for network calls
