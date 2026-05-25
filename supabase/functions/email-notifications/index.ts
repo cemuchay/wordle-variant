@@ -151,10 +151,10 @@ serve(async (req) => {
 
     const sendResendEmail = async (to: string, subject: string, html: string) => {
       if (!RESEND_API_KEY) {
-        console.warn("RESEND_API_KEY not configured. Skipping email send.");
+        console.warn("RESEND_API_KEY not configured. Skipping Resend email send.");
         return null;
       }
-      return await fetch("https://api.resend.com/emails", {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -167,6 +167,73 @@ serve(async (req) => {
           html,
         }),
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`Resend email delivery failed to ${to}. Status: ${res.status}. Error: ${errText}`);
+      } else {
+        console.log(`Successfully queued email to ${to} via Resend`);
+      }
+      return res;
+    };
+
+    const sendZohoEmail = async (to: string, subject: string, html: string) => {
+      const smtpHost = Deno.env.get("ZOHO_SMTP_HOST") || "smtp.zoho.com";
+      const smtpPort = parseInt(Deno.env.get("ZOHO_SMTP_PORT") || "465");
+      const smtpUser = Deno.env.get("ZOHO_SMTP_USER");
+      const smtpPass = Deno.env.get("ZOHO_SMTP_PASS");
+
+      if (!smtpUser || !smtpPass) {
+        console.warn("Zoho SMTP credentials not fully configured. Skipping fallback.");
+        return false;
+      }
+
+      try {
+        const nodemailer = await import("https://esm.sh/nodemailer@6.9.9");
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+
+        const mailOptions = {
+          from: `Wordle Variant <${smtpUser}>`,
+          to,
+          subject,
+          html,
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`Successfully sent fallback email via Zoho SMTP to ${to}`);
+        return true;
+      } catch (err) {
+        console.error(`Failed to send fallback email via Zoho SMTP to ${to}:`, err.message);
+        return false;
+      }
+    };
+
+    const sendEmailWithFallback = async (to: string, subject: string, html: string) => {
+      // 1. Try Resend
+      try {
+        const res = await sendResendEmail(to, subject, html);
+        if (res && res.ok) {
+          return true;
+        }
+        if (res) {
+          const errText = await res.text();
+          console.warn(`Resend failed with status ${res.status}: ${errText}. Attempting Zoho fallback...`);
+        } else {
+          console.warn(`Resend skipped. Attempting Zoho fallback...`);
+        }
+      } catch (err) {
+        console.warn(`Resend failed with error: ${err.message}. Attempting Zoho fallback...`);
+      }
+
+      // 2. Fallback to Zoho
+      return await sendZohoEmail(to, subject, html);
     };
 
     let sentCount = 0;
@@ -187,8 +254,8 @@ serve(async (req) => {
             </div>
           `;
           const html = getEmailHtml(recipient.username, recipient.user_id, "Resume your play today! ⚡", content);
-          await sendResendEmail(recipient.email, "Resume your play today! ⚡", html);
-          sentCount++;
+          const success = await sendEmailWithFallback(recipient.email, "Resume your play today! ⚡", html);
+          if (success) sentCount++;
         }
       }
 
@@ -210,8 +277,8 @@ serve(async (req) => {
               </div>
             `;
             const html = getEmailHtml(recipient.username, recipient.user_id, "The Leaderboard Misses You! 🧩", content);
-            await sendResendEmail(recipient.email, "The Leaderboard Misses You! 🧩", html);
-            sentCount++;
+            const success = await sendEmailWithFallback(recipient.email, "The Leaderboard Misses You! 🧩", html);
+            if (success) sentCount++;
           }
         }
       }
@@ -236,8 +303,8 @@ serve(async (req) => {
             </div>
           `;
           const html = getEmailHtml(recipient.username, recipient.user_id, "⚠️ Streak Warning!", content);
-          await sendResendEmail(recipient.email, `⚠️ Streak Warning: Save your ${recipient.current_streak}-day streak!`, html);
-          sentCount++;
+          const success = await sendEmailWithFallback(recipient.email, `⚠️ Streak Warning: Save your ${recipient.current_streak}-day streak!`, html);
+          if (success) sentCount++;
         }
       }
 
@@ -357,8 +424,8 @@ serve(async (req) => {
           `;
 
           const html = getEmailHtml(recipient.username, recipient.user_id, "Your Weekly Report 📊", content);
-          await sendResendEmail(recipient.email, "Your Wordle Variant Weekly Report 📊", html);
-          sentCount++;
+          const success = await sendEmailWithFallback(recipient.email, "Your Wordle Variant Weekly Report 📊", html);
+          if (success) sentCount++;
         }
       }
 

@@ -155,20 +155,16 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 8. Helper function to get recipients of the weekly report (everyone who had at least 1 game in the previous week)
+-- 8. Helper function to get recipients of the weekly report (everyone who hasn't opted out)
 CREATE OR REPLACE FUNCTION public.get_weekly_report_recipients()
 RETURNS TABLE (user_id UUID, username TEXT, email TEXT) AS $$
 BEGIN
   RETURN QUERY
-  SELECT DISTINCT p.id, p.username, u.email::text
-  FROM public.scores s
-  JOIN public.profiles p ON s.user_id = p.id
+  SELECT p.id, p.username, u.email::text
+  FROM public.profiles p
   JOIN auth.users u ON p.id = u.id
   LEFT JOIN public.email_preferences ep ON p.id = ep.user_id
-  WHERE COALESCE(ep.receive_emails, true) = true
-    -- Played at least 1 game in the previous week
-    AND s.game_date::date >= (timezone('Africa/Lagos', now())::date - EXTRACT(ISODOW FROM timezone('Africa/Lagos', now()))::integer - 6)::date
-    AND s.game_date::date <= (timezone('Africa/Lagos', now())::date - EXTRACT(ISODOW FROM timezone('Africa/Lagos', now()))::integer)::date;
+  WHERE COALESCE(ep.receive_emails, true) = true;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
