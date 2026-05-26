@@ -302,17 +302,33 @@ export function checkGuess(guess: string, answer: string): GuessResult[] {
 export const isHintDisabled = (word: string, guesses: GuessResult[][]) => {
   const targetWord = word.toUpperCase();
   const correctIndices = new Set<number>();
+  const foundLetters = new Set<string>();
 
   guesses.forEach((row) => {
     row.forEach((cell, index) => {
       if (cell.status === "correct") {
         correctIndices.add(index);
       }
+      if (cell.status === "correct" || cell.status === "present") {
+        foundLetters.add(cell.letter.toUpperCase());
+      }
     });
   });
 
-  const remainingCount = targetWord.length - correctIndices.size;
-  return remainingCount <= 1;
+  const remainingIndices = targetWord
+    .split("")
+    .map((_, i) => i)
+    .filter((i) => !correctIndices.has(i));
+
+  const remainingCount = remainingIndices.length;
+  const undiscoveredCount = remainingIndices.filter(
+    (i) => !foundLetters.has(targetWord[i])
+  ).length;
+
+  if (remainingCount <= 1) return true;
+  if (remainingCount === 2 && undiscoveredCount <= 1) return true;
+
+  return false;
 };
 
 /**
@@ -328,11 +344,15 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
 
   const targetWord = word.toUpperCase();
   const correctIndices = new Set<number>();
+  const foundLetters = new Set<string>();
 
   guesses.forEach((row) => {
     row.forEach((cell, index) => {
       if (cell.status === "correct") {
         correctIndices.add(index);
+      }
+      if (cell.status === "correct" || cell.status === "present") {
+        foundLetters.add(cell.letter.toUpperCase());
       }
     });
   });
@@ -342,8 +362,16 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
     .map((_, i) => i)
     .filter((i) => !correctIndices.has(i));
 
+  // Prioritize revealing new letters (not yet discovered/guessed in target word)
+  // over correct positions of yellow letters.
+  const newLetterIndices = remainingIndices.filter(
+    (i) => !foundLetters.has(targetWord[i])
+  );
+
+  const candidateIndices = newLetterIndices.length > 0 ? newLetterIndices : remainingIndices;
+
   const randomIndex =
-    remainingIndices[Math.floor(Math.random() * remainingIndices.length)];
+    candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
 
   return {
     letter: targetWord[randomIndex],
