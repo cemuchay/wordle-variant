@@ -240,7 +240,7 @@ export const useChallengeMutations = () => {
             isCustomWord = false, customWord = '', customWords = {},
             handicapStarter = null, handicapStarters = null, handicapEnforced = false,
             lifespanHours = 24, marathonTimers = null, marathonGames = null,
-            marathonForceOrder = false
+            marathonForceOrder = false, disableHints = false
         }: any) => {
             const salt = Math.random().toString(36).substring(2, 15);
             let actualLength = length;
@@ -339,6 +339,7 @@ export const useChallengeMutations = () => {
                     handicap_starters: finalHandicapStarters,
                     handicap_enforced: handicapEnforced,
                     handicap_starter_is_random: isHandicapRandom,
+                    disable_hints: disableHints,
                     marathon_timers: marathonTimers,
                     marathon_force_order: marathonForceOrder
                 }])
@@ -504,7 +505,7 @@ export const useChallengeMutations = () => {
                 mode, length, maxTime, isPublic, maxParticipants, isCustomWord,
                 customWord, customWords, handicapStarter, handicapStarters,
                 handicacpEnforced, handicapEnforced, marathonTimers, marathonGames,
-                marathonForceOrder, lifespanHours
+                marathonForceOrder, lifespanHours, disableHints
             } = params;
 
             // 1. Double check in client logic if anyone has played
@@ -656,6 +657,7 @@ export const useChallengeMutations = () => {
                 handicap_starters: finalHandicapStarters,
                 handicap_starter_is_random: finalHandicapIsRandom,
                 handicap_enforced: (handicapEnforced || handicacpEnforced) && isHandicap,
+                disable_hints: disableHints !== undefined ? disableHints : existing.disable_hints,
                 marathon_timers: marathonTimers,
                 marathon_force_order: marathonForceOrder
             };

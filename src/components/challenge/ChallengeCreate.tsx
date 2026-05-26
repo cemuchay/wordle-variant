@@ -335,6 +335,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 setMaxParticipantsInput(String(editingChallenge.max_participants));
             }
             setIsCustomWord(!!editingChallenge.is_custom_word);
+            setDisableHints(!!editingChallenge.disable_hints);
 
             const hasHandicap = !!editingChallenge.handicap_starter || !!editingChallenge.handicap_starters;
             setIsHandicap(hasHandicap);
@@ -406,6 +407,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     // Handicap States
     const [isHandicap, setIsHandicap] = useState(false);
+    const [disableHints, setDisableHints] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
@@ -559,7 +561,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             maxParticipants: isPublic ? maxParticipants : null,
             isCustomWord,
             lifespanHours,
-            invitedIds
+            invitedIds,
+            disableHints
         };
 
         if (isCustomWord) {
@@ -761,6 +764,25 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             {showAdvanced && (
                 <div className="p-5 rounded-2xl border border-white/15 bg-white/5 space-y-5 animate-in fade-in duration-300">
                     
+                    {/* Disable Hints Option */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <OptionLabel 
+                                label="Disable Hints" 
+                                tooltip="If enabled, players will not be allowed to use lightbulb hints during gameplay." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="disableHints" 
+                            />
+                            <input
+                                type="checkbox"
+                                checked={disableHints}
+                                onChange={(e) => setDisableHints(e.target.checked)}
+                                className="w-5 h-5 accent-correct cursor-pointer"
+                            />
+                        </div>
+                    </div>
+
                     {/* Public Challenge Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">

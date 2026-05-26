@@ -24,6 +24,7 @@ export interface Challenge {
     handicap_starters?: any;
     handicap_enforced?: boolean;
     handicap_starter_is_random?: boolean;
+    disable_hints?: boolean;
     marathon_timers?: Record<number, number> | null;
     marathon_force_order?: boolean;
 }

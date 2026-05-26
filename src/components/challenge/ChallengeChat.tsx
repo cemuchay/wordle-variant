@@ -1,24 +1,155 @@
-import { useEffect, useRef, useState, memo } from "react";
+import { useEffect, useRef, useState, memo, useMemo, useCallback } from "react";
 import { Send, MessageSquare } from "lucide-react";
-import { useChallengeChat } from "../../hooks/useChallengeChat";
+import { type ChallengeMessage } from "../../hooks/useChallengeChat";
+import { type ChallengeParticipant } from "../../hooks/useChallenge";
 
 interface ChallengeChatProps {
-  challengeId: string;
+  messages: ChallengeMessage[];
+  sendMessage: (content: string) => Promise<void>;
+  typingUsers: string[];
+  setTyping: (isTyping: boolean) => void;
   effectiveUser: any;
-  isGuest: boolean;
+  loading?: boolean;
+  participants: ChallengeParticipant[];
 }
 
+const formatMessageContent = (content: string, isMe: boolean, usernames: string[]) => {
+  if (!content) return [];
+  let parts: (string | React.JSX.Element)[] = [content];
+
+  // 1. Match exact participant usernames (including those with spaces)
+  usernames.forEach((username) => {
+    const mention = `@${username}`;
+    const newParts: (string | React.JSX.Element)[] = [];
+
+    parts.forEach((part, pIdx) => {
+      if (typeof part !== 'string') {
+        newParts.push(part);
+        return;
+      }
+
+      const escapedMention = mention.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const subParts = part.split(new RegExp(`(${escapedMention}(?:\\s|$))`, 'g'));
+
+      subParts.forEach((subPart, sIdx) => {
+        if (subPart.startsWith(mention)) {
+          const endsWithSpace = subPart.endsWith(' ');
+          const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
+
+          newParts.push(
+            <span
+              key={`mention-${username}-${pIdx}-${sIdx}`}
+              className={`px-1.5 py-0.5 rounded font-black whitespace-nowrap inline-block ${
+                isMe
+                  ? "bg-black/15 text-black border border-black/10"
+                  : "bg-correct/20 text-correct border border-correct/10"
+              }`}
+            >
+              {cleanMention}
+            </span>
+          );
+          if (endsWithSpace) newParts.push(' ');
+        } else if (subPart !== '') {
+          newParts.push(subPart);
+        }
+      });
+    });
+    parts = newParts;
+  });
+
+  // 2. Fallback: Match any remaining standard @username mentions (without spaces)
+  const finalParts: (string | React.JSX.Element)[] = [];
+  parts.forEach((part, pIdx) => {
+    if (typeof part !== 'string') {
+      finalParts.push(part);
+      return;
+    }
+
+    const subParts = part.split(/(@[A-Za-z0-9_]+)/g);
+    subParts.forEach((subPart, sIdx) => {
+      if (subPart.startsWith('@')) {
+        finalParts.push(
+          <span
+            key={`fallback-${pIdx}-${sIdx}`}
+            className={`px-1.5 py-0.5 rounded font-black whitespace-nowrap inline-block ${
+              isMe
+                ? "bg-black/15 text-black border border-black/10"
+                : "bg-correct/20 text-correct border border-correct/10"
+            }`}
+          >
+            {subPart}
+          </span>
+        );
+      } else if (subPart !== '') {
+        finalParts.push(subPart);
+      }
+    });
+  });
+
+  return finalParts;
+};
+
 export const ChallengeChat = memo(function ChallengeChat({
-  challengeId,
+  messages,
+  sendMessage,
+  typingUsers,
+  setTyping,
   effectiveUser,
-  isGuest,
+  loading = false,
+  participants,
 }: ChallengeChatProps) {
-  const { messages, sendMessage, loading } = useChallengeChat(
-    challengeId,
-    effectiveUser,
-    isGuest
-  );
   const [inputText, setInputText] = useState("");
+
+  // Extract all unique usernames in this challenge room (including ourselves)
+  const usernames = useMemo(() => {
+    const set = new Set<string>();
+    if (participants) {
+      participants.forEach(p => {
+        const username = p.profiles?.username || p.guest_profiles?.username || '';
+        if (username) set.add(username);
+      });
+    }
+    const myName = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+    if (myName) set.add(myName);
+    return Array.from(set).sort((a, b) => b.length - a.length);
+  }, [participants, effectiveUser]);
+
+  // Consolidate input regex matches into a single computation
+  const mentionMatch = useMemo(() => {
+    const match = inputText.match(/@(\w*)$/);
+    return match ? { show: true, query: match[1].toLowerCase() } : { show: false, query: "" };
+  }, [inputText]);
+
+  const showMentionsDropdown = mentionMatch.show;
+  const mentionSearchQuery = mentionMatch.query;
+
+  const mentionSuggestions = useMemo(() => {
+    if (!showMentionsDropdown || !participants) return [];
+    
+    const suggestionsSet = new Set<string>();
+    const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+
+    participants.forEach(p => {
+      const username = p.profiles?.username || p.guest_profiles?.username || '';
+      if (username && username !== myUsername && username.toLowerCase().includes(mentionSearchQuery)) {
+        suggestionsSet.add(username);
+      }
+    });
+
+    return Array.from(suggestionsSet);
+  }, [participants, showMentionsDropdown, mentionSearchQuery, effectiveUser]);
+
+  const handleSelectMention = useCallback((username: string) => {
+    setInputText(prev => {
+      const match = prev.match(/@(\w*)$/);
+      if (match) {
+        const index = match.index!;
+        return prev.substring(0, index) + `@${username} `;
+      }
+      return prev;
+    });
+  }, []);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new messages
@@ -28,13 +159,13 @@ export const ChallengeChat = memo(function ChallengeChat({
     }
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     const textToSend = inputText.trim();
     setInputText("");
     await sendMessage(textToSend);
-  };
+  }, [inputText, sendMessage]);
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-[450px] space-y-3 relative overflow-hidden">
@@ -67,9 +198,10 @@ export const ChallengeChat = memo(function ChallengeChat({
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe =
+            const isMe = !!(
               (msg.sender_id && msg.sender_id === effectiveUser?.id) ||
-              (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id);
+              (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id)
+            );
 
             return (
               <div
@@ -86,7 +218,7 @@ export const ChallengeChat = memo(function ChallengeChat({
                       : "bg-white/10 text-white rounded-tl-none border border-white/5"
                   }`}
                 >
-                  {msg.content}
+                  {formatMessageContent(msg.content, isMe, usernames)}
                 </div>
                 <span className="text-[7px] text-white/20 px-1 mt-0.5 font-bold tabular-nums">
                   {new Date(msg.created_at).toLocaleTimeString(undefined, {
@@ -100,6 +232,30 @@ export const ChallengeChat = memo(function ChallengeChat({
         )}
       </div>
 
+      {/* Mention Suggestions Dropdown */}
+      {mentionSuggestions.length > 0 && (
+        <div className={`absolute left-4 right-4 ${typingUsers.length > 0 ? 'bottom-[72px]' : 'bottom-[55px]'} bg-gray-950/98 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[150px] overflow-y-auto z-50 divide-y divide-white/5 animate-in fade-in slide-in-from-bottom-2 duration-150`}>
+          {mentionSuggestions.map((username) => (
+            <button
+              key={username}
+              type="button"
+              onClick={() => handleSelectMention(username)}
+              className="w-full px-4 py-2.5 text-left text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+            >
+              <span className="text-correct">@</span>
+              <span>{username}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Typing Indicator */}
+      {typingUsers.length > 0 && (
+        <div className="text-[10px] text-gray-500 italic px-1 shrink-0 animate-pulse">
+          {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+        </div>
+      )}
+
       {/* Input Form */}
       <form onSubmit={handleSend} className="flex gap-2 border-t border-white/5 pt-3 shrink-0">
         <input
@@ -107,7 +263,10 @@ export const ChallengeChat = memo(function ChallengeChat({
           maxLength={300}
           placeholder="Type a message..."
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            setTyping(true);
+          }}
           className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium"
         />
         <button

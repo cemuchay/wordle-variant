@@ -15,7 +15,11 @@ export interface ChallengeMessage {
 export const useChallengeChat = (challengeId: string | undefined, effectiveUser: any, isGuest: boolean) => {
     const [messages, setMessages] = useState<ChallengeMessage[]>([]);
     const [loading, setLoading] = useState(false);
+    const [typingUsers, setTypingUsers] = useState<string[]>([]);
+    
     const channelRef = useRef<any>(null);
+    const typingTimeoutRef = useRef<any>(null);
+    const isCurrentlyTypingLocally = useRef(false);
 
     const fetchMessages = useCallback(async () => {
         if (!challengeId) return;
@@ -59,6 +63,20 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
                     return [...prev, newMsg];
                 });
             })
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
+                const typingNames = new Set<string>();
+                const currentUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || 'Player';
+
+                Object.keys(state).forEach((key) => {
+                    const sessions = state[key] as any[];
+                    const latest = sessions.sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+                    if (latest?.isTyping && latest?.username && latest?.username !== currentUsername) {
+                        typingNames.add(latest.username);
+                    }
+                });
+                setTypingUsers(Array.from(typingNames));
+            })
             .subscribe();
 
         channelRef.current = channel;
@@ -66,8 +84,32 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         return () => {
             channel.unsubscribe();
             supabase.removeChannel(channel);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };
-    }, [challengeId, fetchMessages]);
+    }, [challengeId, fetchMessages, effectiveUser]);
+
+    const setTyping = useCallback((isTyping: boolean) => {
+        if (!channelRef.current || !effectiveUser) return;
+        const username = effectiveUser.username || effectiveUser.user_metadata?.full_name || 'Player';
+
+        if (!isTyping) {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            isCurrentlyTypingLocally.current = false;
+            channelRef.current.track({ isTyping: false, username, ts: Date.now() });
+            return;
+        }
+
+        if (!isCurrentlyTypingLocally.current) {
+            isCurrentlyTypingLocally.current = true;
+            channelRef.current.track({ isTyping: true, username, ts: Date.now() });
+        }
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            isCurrentlyTypingLocally.current = false;
+            channelRef.current?.track({ isTyping: false, username, ts: Date.now() });
+        }, 2000);
+    }, [effectiveUser]);
 
     const sendMessage = useCallback(async (content: string) => {
         if (!content.trim() || !challengeId || !effectiveUser) return;
@@ -105,5 +147,5 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         }
     }, [challengeId, effectiveUser, isGuest]);
 
-    return { messages, sendMessage, loading };
+    return { messages, sendMessage, loading, typingUsers, setTyping };
 };

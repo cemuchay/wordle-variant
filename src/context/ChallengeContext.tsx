@@ -597,8 +597,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Initial Load Logic
     useEffect(() => {
-        if (initialChallengeId && !initialProcessed.current) {
-            initialProcessed.current = true;
+        if (initialProcessed.current) return;
+        initialProcessed.current = true;
+
+        if (initialChallengeId) {
             handleViewChallenge(initialChallengeId).then(() => {
                 // Clear the URL parameter after successful load to keep the URL clean
                 const url = new URL(window.location.href);
@@ -607,8 +609,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     window.history.replaceState({}, '', url.pathname + url.search);
                 }
             });
+        } else {
+            setSelectedChallenge(null);
+            setMyParticipation(null);
         }
-    }, [initialChallengeId, handleViewChallenge]);
+    }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
 
     // Context Value (Bridge)
     const contextValue: ChallengeContextType = useMemo(() => ({

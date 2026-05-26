@@ -12,13 +12,14 @@ import {
   Hourglass,
   Trash2,
 } from "lucide-react";
-import { memo, useMemo, useCallback, useState } from "react";
+import { memo, useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useChallengeContext } from "../../context/ChallengeContext";
 import { formatTime } from "./lib";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useApp } from "../../context/AppContext";
 import { ConfirmationModal } from "../ConfirmationModal";
 import { ChallengeChat } from "./ChallengeChat";
+import { useChallengeChat } from "../../hooks/useChallengeChat";
 import {
   parseMarathonGames,
   getMarathonTimer,
@@ -172,6 +173,84 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
   const [lobbyTab, setLobbyTab] = useState<'lobby' | 'chat'>('lobby');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const isGuest = useMemo(() => {
+    if (!effectiveUser) return false;
+    return effectiveUser.id === localStorage.getItem('wordle_anon_id');
+  }, [effectiveUser]);
+
+  const { messages, sendMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(
+    selectedChallenge?.id,
+    effectiveUser,
+    isGuest
+  );
+
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const lastProcessedMessageIdRef = useRef<string | null>(null);
+
+  // Clear unread count when switching to chat tab
+  useEffect(() => {
+    if (lobbyTab === 'chat') {
+      setUnreadChatCount(0);
+    }
+  }, [lobbyTab]);
+
+  // Handle new messages for unread count and mentions
+  useEffect(() => {
+    if (!messages || messages.length === 0) {
+      lastProcessedMessageIdRef.current = null;
+      return;
+    }
+
+    const isInitialLoad = lastProcessedMessageIdRef.current === null;
+
+    let startIdx = 0;
+    if (!isInitialLoad) {
+      const idx = messages.findIndex(m => m.id === lastProcessedMessageIdRef.current);
+      if (idx !== -1) {
+        startIdx = idx + 1;
+      }
+    }
+
+    const newMessages = messages.slice(startIdx);
+    lastProcessedMessageIdRef.current = messages[messages.length - 1].id;
+
+    if (isInitialLoad || newMessages.length === 0) return;
+
+    let newUnreadCount = 0;
+    let gotMention = false;
+
+    newMessages.forEach(msg => {
+      const isMe =
+        (msg.sender_id && msg.sender_id === effectiveUser?.id) ||
+        (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id);
+
+      if (!isMe) {
+        if (lobbyTab !== 'chat') {
+          newUnreadCount++;
+        }
+        
+        // Scan for mention of the current user: @username
+        const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+        if (myUsername) {
+          const escapedUsername = myUsername.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const mentionRegex = new RegExp(`@${escapedUsername}\\b`, 'i');
+          if (mentionRegex.test(msg.content)) {
+            gotMention = true;
+          }
+        }
+      }
+    });
+
+    if (newUnreadCount > 0) {
+      setUnreadChatCount(prev => prev + newUnreadCount);
+    }
+
+    if (gotMention) {
+      const lastMsg = newMessages[newMessages.length - 1];
+      triggerToast(`@${lastMsg.sender_name} mentioned you in chat!`, 4000);
+    }
+  }, [messages, lobbyTab, effectiveUser, triggerToast]);
+
   const handlePreview = useCallback(
     (p: ChallengeParticipant) => {
       setPreviewParticipant(p);
@@ -284,17 +363,26 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         </button>
         <button
           onClick={() => setLobbyTab('chat')}
-          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
         >
-          Chat Room
+          <span>Chat Room</span>
+          {unreadChatCount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-bounce shrink-0">
+              {unreadChatCount}
+            </span>
+          )}
         </button>
       </div>
 
       {lobbyTab === 'chat' ? (
         <ChallengeChat 
-          challengeId={selectedChallenge.id} 
+          messages={messages}
+          sendMessage={sendMessage}
+          typingUsers={typingUsers}
+          setTyping={setTyping}
           effectiveUser={effectiveUser}
-          isGuest={effectiveUser?.id === localStorage.getItem('wordle_anon_id')}
+          loading={chatLoading}
+          participants={participants}
         />
       ) : (
         <>
