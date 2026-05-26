@@ -186,23 +186,11 @@ export const useChallengeData = (challengeId: string | null) => {
         queryKey: ['challenge', challengeId],
         queryFn: async () => {
             if (!challengeId) return null;
-            const { data, error } = await supabase
-                .from('challenges')
-                .select(`
-                    *, 
-                    profiles!creator_id(username, avatar_url),
-                    participants:challenge_participants(
-                        *,
-                        profiles(username, avatar_url),
-                        guest_profiles(username, avatar_url),
-                        marathon_progress:challenge_participants_marathon(*)
-                    )
-                `)
-                .eq('id', challengeId)
-                .maybeSingle();
-
+            const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
+                body: { action: 'get-challenge', challengeId }
+            });
             if (error) throw error;
-            return mapChallenge(data) as Challenge;
+            return mapChallenge(edgeRes?.data) as Challenge;
         },
         enabled: !!challengeId,
     });
