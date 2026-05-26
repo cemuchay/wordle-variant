@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, timeframe, userId, key, date } = await req.json();
+    const body = await req.json();
+    const { action, timeframe, userId, key, date, challengeId } = body;
 
     const upstashUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
     const upstashToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
@@ -34,78 +35,7 @@ serve(async (req) => {
       if (!res.ok) {
         throw new Error(`Upstash API error: ${res.statusText}`);
       }
-    };
-
-    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
-      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-      if (offsetDays === 0) {
-        return lagosTodayStr;
-      }
-
-      const [year, month, day] = lagosTodayStr.split('-').map(Number);
-      const d = new Date(year, month - 1, day);
-      d.setDate(d.getDate() + offsetDays);
-
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(d);
-    };
-
-    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
-      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-      if (offsetDays === 0) {
-        return lagosTodayStr;
-      }
-
-      const [year, month, day] = lagosTodayStr.split('-').map(Number);
-      const d = new Date(year, month - 1, day);
-      d.setDate(d.getDate() + offsetDays);
-
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(d);
-    };
-
-    const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
-      const lagosTodayStr = baseDateStr || new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-      if (offsetDays === 0) {
-        return lagosTodayStr;
-      }
-
-      const [year, month, day] = lagosTodayStr.split('-').map(Number);
-      const d = new Date(year, month - 1, day);
-      d.setDate(d.getDate() + offsetDays);
-
-      return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Africa/Lagos",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(d);
+      return await res.json();
     };
 
     const getLagosDate = (baseDateStr: string | null, offsetDays = 0) => {
@@ -259,6 +189,135 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ data: profile, cached: false }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "get-user-score") {
+      if (!userId || !date) {
+        return new Response(JSON.stringify({ error: "userId and date are required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Authorization Check:
+      // 1. Get caller info from JWT
+      const { data: { user: caller } } = authHeader ? await supabaseClient.auth.getUser() : { data: { user: null } };
+
+      if (!caller) {
+        return new Response(JSON.stringify({ error: "Unauthorized: Please log in" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // 2. If caller is requesting their own score, it's always allowed
+      let isAllowed = userId === caller.id;
+
+      if (!isAllowed) {
+        // 3. Check if target date is in the past (yesterday or earlier)
+        const lagosTodayStr = getLagosDate(null, 0);
+        const isPastDate = date < lagosTodayStr;
+
+        if (isPastDate) {
+          isAllowed = true;
+        } else {
+          // 4. Otherwise (today or future), caller must have finished today's game (status 'won' or 'lost')
+          const { data: callerScore, error: callerScoreErr } = await supabaseClient
+            .from("scores")
+            .select("status")
+            .eq("user_id", caller.id)
+            .eq("game_date", date)
+            .maybeSingle();
+
+          if (!callerScoreErr && callerScore && (callerScore.status === "won" || callerScore.status === "lost")) {
+            isAllowed = true;
+          }
+        }
+      }
+
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: "Access Denied: You must complete today's game before viewing other players' guesses." }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const cacheKey = `score:${userId}:${date}`;
+      const cached = await runRedisCommand(["GET", cacheKey]);
+
+      if (cached && cached.result) {
+        return new Response(JSON.stringify({ data: JSON.parse(cached.result), cached: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Cache Miss: Query Database
+      const { data: score, error } = await supabaseClient
+        .from("scores")
+        .select("guesses, hints_used, skill_score, hint_record, time_taken")
+        .eq("user_id", userId)
+        .eq("game_date", date)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (score) {
+        // Cache for 48 hours (172800 seconds)
+        await runRedisCommand(["SET", cacheKey, JSON.stringify(score), "EX", 172800]);
+      }
+
+      return new Response(JSON.stringify({ data: score, cached: false }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "get-challenge") {
+      if (!challengeId) {
+        return new Response(JSON.stringify({ error: "challengeId is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const cacheKey = `challenge:lobby:${challengeId}`;
+      const cached = await runRedisCommand(["GET", cacheKey]);
+
+      if (cached && cached.result) {
+        return new Response(JSON.stringify({ data: JSON.parse(cached.result), cached: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Cache Miss: Query Database
+      const { data: challenge, error } = await supabaseClient
+        .from("challenges")
+        .select(`
+          *,
+          creator:profiles!creator_id(username, avatar_url),
+          participants:challenge_participants(
+            *,
+            profiles(username, avatar_url),
+            guest_profiles(username, avatar_url),
+            marathon_progress:challenge_participants_marathon(*)
+          )
+        `)
+        .eq("id", challengeId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (challenge) {
+        // Check if expired
+        const isExpired = new Date(challenge.expires_at) < new Date();
+        // Expired challenges cached for 30 days (2592000s). Active challenges cached for 5 seconds (5s).
+        const ttl = isExpired ? 2592000 : 5;
+
+        await runRedisCommand(["SET", cacheKey, JSON.stringify(challenge), "EX", ttl]);
+      }
+
+      return new Response(JSON.stringify({ data: challenge, cached: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

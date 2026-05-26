@@ -62,6 +62,10 @@ BEGIN
   PERFORM public.request_cache_invalidation('leaderboard:today');
   PERFORM public.request_cache_invalidation('leaderboard:weekly');
   PERFORM public.request_cache_invalidation('leaderboard:monthly');
+  
+  -- Also invalidate the specific user's cached score for that day
+  PERFORM public.request_cache_invalidation('score:' || NEW.user_id || ':' || NEW.game_date);
+  
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

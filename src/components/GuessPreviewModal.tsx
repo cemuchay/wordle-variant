@@ -185,16 +185,20 @@ const GuessPreviewModal: React.FC<{
 
     const fetchGuesses = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("scores")
-        .select("guesses, hints_used, skill_score, hint_record")
-        .eq("user_id", entry.user_id)
-        .eq("game_date", targetDate)
-        .single();
-
-      if (data) setGameData(data);
-      if (error) console.log(error);
-      setLoading(false);
+      try {
+        const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
+          body: { action: "get-user-score", userId: entry.user_id, date: targetDate },
+        });
+        if (edgeRes && edgeRes.data) {
+          setGameData(edgeRes.data);
+        } else if (error) {
+          console.error("Failed to fetch guesses from redis-cache:", error);
+        }
+      } catch (err) {
+        console.error("Error invoking redis-cache for guesses:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchGuesses();
