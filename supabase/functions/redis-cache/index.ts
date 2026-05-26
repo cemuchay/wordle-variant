@@ -201,6 +201,49 @@ serve(async (req) => {
         });
       }
 
+      // Authorization Check:
+      // 1. Get caller info from JWT
+      const { data: { user: caller } } = authHeader ? await supabaseClient.auth.getUser() : { data: { user: null } };
+
+      if (!caller) {
+        return new Response(JSON.stringify({ error: "Unauthorized: Please log in" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // 2. If caller is requesting their own score, it's always allowed
+      let isAllowed = userId === caller.id;
+
+      if (!isAllowed) {
+        // 3. Check if target date is in the past (yesterday or earlier)
+        const lagosTodayStr = getLagosDate(null, 0);
+        const isPastDate = date < lagosTodayStr;
+
+        if (isPastDate) {
+          isAllowed = true;
+        } else {
+          // 4. Otherwise (today or future), caller must have finished today's game (status 'won' or 'lost')
+          const { data: callerScore, error: callerScoreErr } = await supabaseClient
+            .from("scores")
+            .select("status")
+            .eq("user_id", caller.id)
+            .eq("game_date", date)
+            .maybeSingle();
+
+          if (!callerScoreErr && callerScore && (callerScore.status === "won" || callerScore.status === "lost")) {
+            isAllowed = true;
+          }
+        }
+      }
+
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: "Access Denied: You must complete today's game before viewing other players' guesses." }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const cacheKey = `score:${userId}:${date}`;
       const cached = await runRedisCommand(["GET", cacheKey]);
 
@@ -268,8 +311,8 @@ serve(async (req) => {
       if (challenge) {
         // Check if expired
         const isExpired = new Date(challenge.expires_at) < new Date();
-        // Expired challenges cached for 30 days (2592000s). Active challenges cached for 5 minutes (300s).
-        const ttl = isExpired ? 2592000 : 300;
+        // Expired challenges cached for 30 days (2592000s). Active challenges cached for 5 seconds (5s).
+        const ttl = isExpired ? 2592000 : 5;
 
         await runRedisCommand(["SET", cacheKey, JSON.stringify(challenge), "EX", ttl]);
       }
