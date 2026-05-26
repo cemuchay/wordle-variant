@@ -14,6 +14,8 @@ interface ChallengeContextType {
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
+    isEditingChallenge: boolean;
+    setIsEditingChallenge: (editing: boolean) => void;
 
     // Form State
     mode: 'LIVE' | 'ANYTIME';
@@ -27,10 +29,12 @@ interface ChallengeContextType {
     selectedChallenge: Challenge | null;
     setSelectedChallenge: (c: Challenge | null) => void;
     myParticipation: ChallengeParticipant | null;
+    setMyParticipation: (p: ChallengeParticipant | null) => void;
     participants: ChallengeParticipant[];
     myChallenges: any[];
     availableProfiles: any[];
     invitedIds: string[];
+    setInvitedIds: (ids: string[]) => void;
 
     // Filter State
     searchQuery: string;
@@ -47,6 +51,8 @@ interface ChallengeContextType {
     // Actions
     handleViewChallenge: (id: string) => Promise<void>;
     handleCreate: (params?: any, viewAfterCreate?: boolean) => Promise<void>;
+    handleEdit: (challengeId: string, params: any) => Promise<void>;
+    handleDelete: (challengeId: string) => Promise<void>;
     handleStartGame: () => Promise<void>;
     toggleInvite: (id: string) => void;
     copyLink: (challenge: Challenge) => void;
@@ -132,7 +138,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const myParticipation = useChallengeStore(s => s.myParticipation);
     const setMyParticipation = useChallengeStore(s => s.setMyParticipation);
     const invitedIds = useChallengeStore(s => s.invitedIds);
-    // const setInvitedIds = useChallengeStore(s => s.setInvitedIds);
+    const setInvitedIds = useChallengeStore(s => s.setInvitedIds);
     const toggleInvite = useChallengeStore(s => s.toggleInvite);
     const searchQuery = useChallengeStore(s => s.searchQuery);
     const setSearchQuery = useChallengeStore(s => s.setSearchQuery);
@@ -155,6 +161,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const backAction = useChallengeStore(s => s.backAction);
     const setBackAction = useChallengeStore(s => s.setBackAction);
 
+    const [isEditingChallenge, setIsEditingChallenge] = useState(false);
+
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(effectiveUser?.id);
     const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
@@ -163,7 +171,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         submitResult: submitMutation,
         joinChallenge: joinMutation,
         startChallenge: startMutation,
-        submitMarathonResult: marathonMutation
+        submitMarathonResult: marathonMutation,
+        updateChallenge: updateMutation,
+        deleteChallenge: deleteMutation
     } = useChallengeMutations();
 
     // 2. Legacy Hook (Keep for real-time logic only)
@@ -411,6 +421,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation]);
 
+    // Reset challenge state on unmount (when closing ChallengeModal)
+    useEffect(() => {
+        return () => {
+            setSelectedChallenge(null);
+            setMyParticipation(null);
+            setIsPlaying(false);
+            setPreviewParticipant(null);
+            setPreviewMarathonLength(null);
+            setPreviewMarathonGameIndex(null);
+        };
+    }, [setSelectedChallenge, setMyParticipation, setIsPlaying, setPreviewParticipant, setPreviewMarathonLength, setPreviewMarathonGameIndex]);
+
     const handleCreate = useCallback(async (customParams?: any, viewAfterCreate = true) => {
         if (!effectiveUser) return;
         try {
@@ -443,6 +465,30 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             triggerToast(err?.message || "Failed to create challenge.", 4000);
         }
     }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast, refetchChallenges]);
+
+    const handleEdit = useCallback(async (challengeId: string, params: any) => {
+        try {
+            await updateMutation.mutateAsync({ challengeId, params });
+            triggerToast("Challenge updated successfully!", 3000);
+            setIsEditingChallenge(false);
+        } catch (err: any) {
+            console.error("Failed to update challenge:", err);
+            triggerToast(err?.message || "Failed to update challenge.", 4000);
+            throw err;
+        }
+    }, [updateMutation, triggerToast]);
+
+    const handleDelete = useCallback(async (challengeId: string) => {
+        try {
+            await deleteMutation.mutateAsync(challengeId);
+            setSelectedChallenge(null);
+            triggerToast("Challenge deleted successfully.", 3000);
+        } catch (err: any) {
+            console.error("Failed to delete challenge:", err);
+            triggerToast(err?.message || "Failed to delete challenge.", 4000);
+            throw err;
+        }
+    }, [deleteMutation, setSelectedChallenge, triggerToast]);
 
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
@@ -551,8 +597,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Initial Load Logic
     useEffect(() => {
-        if (initialChallengeId && !initialProcessed.current) {
-            initialProcessed.current = true;
+        if (initialProcessed.current) return;
+        initialProcessed.current = true;
+
+        if (initialChallengeId) {
             handleViewChallenge(initialChallengeId).then(() => {
                 // Clear the URL parameter after successful load to keep the URL clean
                 const url = new URL(window.location.href);
@@ -561,8 +609,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     window.history.replaceState({}, '', url.pathname + url.search);
                 }
             });
+        } else {
+            setSelectedChallenge(null);
+            setMyParticipation(null);
         }
-    }, [initialChallengeId, handleViewChallenge]);
+    }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
 
     // Context Value (Bridge)
     const contextValue: ChallengeContextType = useMemo(() => ({
@@ -579,10 +630,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         selectedChallenge,
         setSelectedChallenge,
         myParticipation,
+        setMyParticipation,
         participants,
         myChallenges,
         availableProfiles,
         invitedIds,
+        setInvitedIds,
         searchQuery,
         setSearchQuery,
         statusFilter,
@@ -595,6 +648,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         filteredChallenges,
         handleViewChallenge,
         handleCreate,
+        handleEdit,
+        handleDelete,
         handleStartGame,
         toggleInvite,
         copyLink: (c: Challenge) => {
@@ -628,7 +683,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         },
         loadMyChallenges: async () => { await refetchChallenges(); },
         submitResult,
-        loading: isChallengesLoading || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending,
+        loading: isChallengesLoading || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
         error: null,
         joinId,
         setJoinId,
@@ -642,8 +697,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         backAction,
         setBackAction,
         registerAnonymousUser,
-        effectiveUser
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, participants, myChallenges, availableProfiles, invitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser]);
+        effectiveUser,
+        isEditingChallenge,
+        setIsEditingChallenge
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

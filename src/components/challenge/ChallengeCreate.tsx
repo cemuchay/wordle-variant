@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2 } from 'lucide-react';
-import { memo, useState, useMemo, useCallback } from 'react';
+import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
@@ -289,12 +289,96 @@ const validateCustomWord = (word: string, len: number) => {
     return null;
 };
 
-export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { onSuccess?: () => void }) {
+const resolveNewStarterInput = (newVal: string, prevVal: string) => {
+    if (prevVal === '__MASKED__') {
+        if (newVal.startsWith('__MASKED__')) {
+            return newVal.substring(10).replace(/[^A-Za-z]/g, '');
+        }
+        if ('__MASKED__'.startsWith(newVal)) {
+            return '';
+        }
+        return newVal.replace(/[^A-Za-z]/g, '');
+    }
+    return newVal.replace(/[^A-Za-z]/g, '');
+};
+
+export interface ChallengeCreateProps {
+    onSuccess?: () => void;
+    editingChallenge?: any;
+}
+
+export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editingChallenge }: ChallengeCreateProps) {
     const {
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
-        joinId, setJoinId, handleViewChallenge, handleCreate, loading
+        joinId, setJoinId, handleViewChallenge, handleCreate, loading,
+        handleEdit, setInvitedIds
     } = useChallengeContext();
+
+    // Initialize edit fields
+    useEffect(() => {
+        if (editingChallenge) {
+            setMode(editingChallenge.mode);
+            setLength(editingChallenge.word_length);
+            setMaxTime(editingChallenge.max_time);
+
+            const invites = editingChallenge.participants
+                ?.filter((p: any) => p.user_id !== editingChallenge.creator_id)
+                .map((p: any) => p.user_id || p.guest_id || '')
+                .filter(Boolean) || [];
+            setInvitedIds(invites);
+
+            setMarathonForceOrder(!!editingChallenge.marathon_force_order);
+            setIsPublic(!!editingChallenge.is_public);
+            if (editingChallenge.max_participants !== undefined && editingChallenge.max_participants !== null) {
+                setMaxParticipants(editingChallenge.max_participants);
+                setMaxParticipantsInput(String(editingChallenge.max_participants));
+            }
+            setIsCustomWord(!!editingChallenge.is_custom_word);
+            setDisableHints(!!editingChallenge.disable_hints);
+
+            const hasHandicap = !!editingChallenge.handicap_starter || !!editingChallenge.handicap_starters;
+            setIsHandicap(hasHandicap);
+            if (hasHandicap) {
+                const isRandom = !!editingChallenge.handicap_starter_is_random;
+                setHandicapMode(isRandom ? 'random' : 'custom');
+                setHandicapEnforced(!!editingChallenge.handicap_enforced);
+
+                if (!isRandom) {
+                    const isCreatorPlayer = !editingChallenge.is_custom_word;
+                    if (editingChallenge.word_length === 1 && Array.isArray(editingChallenge.handicap_starters)) {
+                        setHandicapStartersArray(
+                            isCreatorPlayer 
+                                ? Array(editingChallenge.handicap_starters.length).fill('__MASKED__')
+                                : editingChallenge.handicap_starters
+                        );
+                    } else if (editingChallenge.handicap_starter) {
+                        setHandicapStarter(isCreatorPlayer ? '__MASKED__' : editingChallenge.handicap_starter);
+                    }
+                }
+            }
+
+            if (editingChallenge.word_length === 1) {
+                try {
+                    const parsed = JSON.parse(editingChallenge.target_word);
+                    if (Array.isArray(parsed)) {
+                        const lengths = parsed.map((g: any) => g.length);
+                        setMarathonGames(lengths);
+                        setMarathonType('custom');
+                    }
+                } catch (e) {
+                    console.error('Failed to parse marathon sequence', e);
+                }
+
+                if (editingChallenge.marathon_timers) {
+                    setTimerType('custom');
+                    const timers = Object.values(editingChallenge.marathon_timers).map(Number);
+                    setMarathonTimersArray(timers);
+                    setMarathonTimersInput(timers.map(String));
+                }
+            }
+        }
+    }, [editingChallenge, setMode, setLength, setMaxTime, setInvitedIds]);
 
     // Tooltip & Rule States
     const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
@@ -323,6 +407,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
 
     // Handicap States
     const [isHandicap, setIsHandicap] = useState(false);
+    const [disableHints, setDisableHints] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
@@ -410,15 +495,23 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                 marathonGames.forEach((l, idx) => {
                     const w = customMarathonWords[idx];
                     if (!w) {
-                        errs.push(`Game #${idx + 1} (${l}-letter): Target word is empty.`);
+                        if (!editingChallenge) {
+                            errs.push(`Game #${idx + 1} (${l}-letter): Target word is empty.`);
+                        }
                     } else {
                         const valError = validateCustomWord(w, l);
                         if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                     }
                 });
             } else {
-                const valError = validateCustomWord(customWord, resolvedLength);
-                if (valError) errs.push(`Target Word: ${valError}`);
+                if (!customWord) {
+                    if (!editingChallenge) {
+                        errs.push(`Target Word: Cannot be empty.`);
+                    }
+                } else {
+                    const valError = validateCustomWord(customWord, resolvedLength);
+                    if (valError) errs.push(`Target Word: ${valError}`);
+                }
             }
         }
 
@@ -427,8 +520,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                 marathonGames.forEach((l, idx) => {
                     const w = handicapStartersArray[idx];
                     if (!w) {
-                        errs.push(`Game #${idx + 1} (${l}-letter): Starter word is empty.`);
-                    } else {
+                        if (!editingChallenge) {
+                            errs.push(`Game #${idx + 1} (${l}-letter): Starter word is empty.`);
+                        }
+                    } else if (w !== '__MASKED__') {
                         const valError = validateCustomWord(w, l);
                         if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                         if (isCustomWord && customMarathonWords[idx] && w.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
@@ -437,10 +532,16 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                     }
                 });
             } else {
-                const valError = validateCustomWord(handicapStarter, resolvedLength);
-                if (valError) errs.push(`Handicap Starter: ${valError}`);
-                if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
-                    errs.push(`Handicap starter cannot match target word.`);
+                if (!handicapStarter) {
+                    if (!editingChallenge) {
+                        errs.push(`Handicap Starter: Cannot be empty.`);
+                    }
+                } else if (handicapStarter !== '__MASKED__') {
+                    const valError = validateCustomWord(handicapStarter, resolvedLength);
+                    if (valError) errs.push(`Handicap Starter: ${valError}`);
+                    if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
+                        errs.push(`Handicap starter cannot match target word.`);
+                    }
                 }
             }
         }
@@ -450,7 +551,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
         }
 
         return errs;
-    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray]);
+    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge]);
 
     const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
@@ -459,17 +560,25 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
             isPublic,
             maxParticipants: isPublic ? maxParticipants : null,
             isCustomWord,
-            lifespanHours
+            lifespanHours,
+            invitedIds,
+            disableHints
         };
 
         if (isCustomWord) {
             if (length === 1) {
-                customParams.customWords = customMarathonWords;
+                const wordsList = customMarathonWords.filter(Boolean);
+                if (wordsList.length > 0) {
+                    customParams.customWords = customMarathonWords;
+                }
             } else {
-                customParams.customWord = customWord;
+                if (customWord) {
+                    customParams.customWord = customWord;
+                }
             }
         }
 
+        customParams.isHandicap = isHandicap;
         if (isHandicap) {
             customParams.handicapEnforced = handicapEnforced;
             if (handicapMode === 'random') {
@@ -491,12 +600,16 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
             }
         }
 
-        await handleCreate(customParams, !onSuccess);
+        if (editingChallenge) {
+            await handleEdit(editingChallenge.id, customParams);
+        } else {
+            await handleCreate(customParams, !onSuccess);
+        }
         
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds]);
 
     return (
         <div className="space-y-6">
@@ -651,6 +764,25 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
             {showAdvanced && (
                 <div className="p-5 rounded-2xl border border-white/15 bg-white/5 space-y-5 animate-in fade-in duration-300">
                     
+                    {/* Disable Hints Option */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <OptionLabel 
+                                label="Disable Hints" 
+                                tooltip="If enabled, players will not be allowed to use lightbulb hints during gameplay." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="disableHints" 
+                            />
+                            <input
+                                type="checkbox"
+                                checked={disableHints}
+                                onChange={(e) => setDisableHints(e.target.checked)}
+                                className="w-5 h-5 accent-correct cursor-pointer"
+                            />
+                        </div>
+                    </div>
+
                     {/* Public Challenge Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -855,14 +987,15 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                                                 <div key={idx} className="flex flex-col gap-1">
                                                     <span className="text-[10px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Starter):</span>
                                                     <input
-                                                        type="text"
-                                                        maxLength={l}
+                                                        type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"}
+                                                        maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l}
                                                         placeholder={`Enter ${l}-letter starter`}
                                                         value={handicapStartersArray[idx] || ''}
                                                         onChange={(e) => {
-                                                            const val = e.target.value.replace(/[^A-Za-z]/g, '');
-                                                            setHandicapStartersArray(prev => {
-                                                                const next = [...prev];
+                                                            const prev = handicapStartersArray[idx] || '';
+                                                            const val = resolveNewStarterInput(e.target.value, prev);
+                                                            setHandicapStartersArray(prevArr => {
+                                                                const next = [...prevArr];
                                                                 next[idx] = val;
                                                                 return next;
                                                             });
@@ -875,11 +1008,14 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-black uppercase text-gray-400">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
                                                 <input
-                                                    type="text"
-                                                    maxLength={length === 0 ? 5 : length}
+                                                    type={handicapStarter === '__MASKED__' ? "password" : "text"}
+                                                    maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)}
                                                     placeholder={`Enter starter word`}
                                                     value={handicapStarter}
-                                                    onChange={(e) => setHandicapStarter(e.target.value.replace(/[^A-Za-z]/g, ''))}
+                                                    onChange={(e) => {
+                                                        const val = resolveNewStarterInput(e.target.value, handicapStarter);
+                                                        setHandicapStarter(val);
+                                                    }}
                                                     className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
                                                 />
                                             </div>
@@ -984,23 +1120,25 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
             )}
 
             <div className="pt-4 border-t border-white/5 space-y-4">
-                <div className="flex items-center gap-3">
-                    <input
-                        type="text"
-                        placeholder="Or Enter Challenge ID..."
-                        value={joinId}
-                        onChange={(e) => setJoinId(e.target.value)}
-                        className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => joinId && handleViewChallenge(joinId)}
-                        disabled={!joinId}
-                        className="bg-white text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50"
-                    >
-                        Join
-                    </button>
-                </div>
+                {!editingChallenge && (
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            placeholder="Or Enter Challenge ID..."
+                            value={joinId}
+                            onChange={(e) => setJoinId(e.target.value)}
+                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => joinId && handleViewChallenge(joinId)}
+                            disabled={!joinId}
+                            className="bg-white text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        >
+                            Join
+                        </button>
+                    </div>
+                )}
 
                 <button
                     type="button"
@@ -1008,7 +1146,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess }: { on
                     disabled={loading || errors.length > 0}
                     className="w-full bg-correct text-black py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:brightness-50"
                 >
-                    {loading ? 'Creating...' : <><Plus size={18} /> Create Challenge</>}
+                    {loading ? (editingChallenge ? 'Saving...' : 'Creating...') : (editingChallenge ? 'Save Changes' : <><Plus size={18} /> Create Challenge</>)}
                 </button>
             </div>
         </div>
