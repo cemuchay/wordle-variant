@@ -56,7 +56,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         ? getHandicapStarter(challenge, gameIndex, wordLength)
         : challenge.handicap_starter;
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
-    const showHint = guesses.length >= 2 && !isGameOver;
+    const showHint = guesses.length >= 2 && !isGameOver && !challenge.disable_hints;
 
     return (
         <div className="flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">

@@ -56,7 +56,7 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                                 </div>
                             )}
                             <span className="text-[10px] font-black uppercase text-gray-400">
-                                {user.user_metadata.full_name?.split(' ')[0] || user.email?.split('@')[0]}
+                                {user.user_metadata.full_name || user.email?.split('@')[0]}
                             </span>
                             <button
                                 onClick={handleSignOut}

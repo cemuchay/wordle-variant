@@ -762,6 +762,11 @@ export const useChallengeGameEngine = ({
   const handleHint = useCallback(async () => {
     if (isGameOver || usedHint) return;
 
+    if (challenge.disable_hints) {
+      triggerToast("Hints are disabled for this challenge.");
+      return;
+    }
+
     if (guesses.length >= 5) {
       triggerToast("Hint locked on last available guess.");
       return;
@@ -823,6 +828,7 @@ export const useChallengeGameEngine = ({
     gameIndex,
     wordLength,
     wrappedSubmitResult,
+    challenge.disable_hints,
   ]);
 
   const retrySync = useCallback(async () => {
