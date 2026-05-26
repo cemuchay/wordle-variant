@@ -10,11 +10,15 @@ import {
   Globe,
   Lock,
   Hourglass,
+  Trash2,
 } from "lucide-react";
-import { memo, useMemo, useCallback } from "react";
+import { memo, useMemo, useCallback, useState } from "react";
 import { useChallengeContext } from "../../context/ChallengeContext";
 import { formatTime } from "./lib";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
+import { useApp } from "../../context/AppContext";
+import { ConfirmationModal } from "../ConfirmationModal";
+import { ChallengeChat } from "./ChallengeChat";
 import {
   parseMarathonGames,
   getMarathonTimer,
@@ -145,9 +149,6 @@ const ParticipantItem = memo(function ParticipantItem({
   );
 });
 
-import { useState } from "react";
-import { useApp } from "../../context/AppContext";
-
 export const ChallengeLobby = memo(function ChallengeLobby() {
   const {
     selectedChallenge,
@@ -161,11 +162,15 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     loading,
     registerAnonymousUser,
     effectiveUser,
+    setIsEditingChallenge,
+    handleDelete,
   } = useChallengeContext();
   const { triggerToast } = useApp();
 
   const [nicknameInput, setNicknameInput] = useState("");
   const [showGuestInput, setShowGuestInput] = useState(false);
+  const [lobbyTab, setLobbyTab] = useState<'lobby' | 'chat'>('lobby');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handlePreview = useCallback(
     (p: ChallengeParticipant) => {
@@ -173,6 +178,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     },
     [setPreviewParticipant],
   );
+
+  const isHost = selectedChallenge?.creator_id === effectiveUser?.id;
+  const canEditOrDelete = useMemo(() => {
+    if (!selectedChallenge || !participants) return false;
+    return !participants.some(p => p.status !== 'pending' && p.status !== 'host');
+  }, [selectedChallenge, participants]);
 
   if (!selectedChallenge) return null;
 
@@ -263,20 +274,44 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         )}
       </div>
 
-      {/* Challenge Configuration Details */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-white/5 pb-2">
-          <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-            <SlidersHorizontal size={12} className="text-correct" />
-            Challenge Configuration
-          </h4>
-          <span className="text-[8px] font-bold text-gray-500 uppercase">
-            Hosted by{" "}
-            {selectedChallenge.profiles?.username ||
-              selectedChallenge.creator?.username ||
-              "Host"}
-          </span>
-        </div>
+      {/* Tab Switcher */}
+      <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1">
+        <button
+          onClick={() => setLobbyTab('lobby')}
+          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+        >
+          Lobby
+        </button>
+        <button
+          onClick={() => setLobbyTab('chat')}
+          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+        >
+          Chat Room
+        </button>
+      </div>
+
+      {lobbyTab === 'chat' ? (
+        <ChallengeChat 
+          challengeId={selectedChallenge.id} 
+          effectiveUser={effectiveUser}
+          isGuest={effectiveUser?.id === localStorage.getItem('wordle_anon_id')}
+        />
+      ) : (
+        <>
+          {/* Challenge Configuration Details */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                <SlidersHorizontal size={12} className="text-correct" />
+                Challenge Configuration
+              </h4>
+              <span className="text-[8px] font-bold text-gray-500 uppercase">
+                Hosted by{" "}
+                {selectedChallenge.profiles?.username ||
+                  selectedChallenge.creator?.username ||
+                  "Host"}
+              </span>
+            </div>
 
         <div className="grid grid-cols-2 gap-3">
           {/* Mode / Time Limit */}
@@ -637,14 +672,49 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             Challenge Completed 🎉
           </div>
         )}
+      </div>
+    </>
+  )}
+
+      <div className="pt-6 flex flex-col gap-3">
+        {/* Host Edit/Delete Actions (Only in Lobby tab and if unplayed) */}
+        {lobbyTab === 'lobby' && isHost && canEditOrDelete && (
+          <div className="grid grid-cols-2 gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl">
+            <button
+              onClick={() => setIsEditingChallenge(true)}
+              className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <SlidersHorizontal size={14} /> Edit Challenge
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          </div>
+        )}
 
         <button
           onClick={() => setSelectedChallenge(null)}
-          className="w-full bg-white/5 border border-white/10 text-white/50 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
+          className="w-full bg-white/5 border border-white/10 text-white/50 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
         >
           Back to List
         </button>
       </div>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          setShowDeleteConfirm(false);
+          await handleDelete(selectedChallenge.id);
+        }}
+        title="Delete Challenge"
+        message="Are you sure you want to delete this challenge? This action is permanent and will remove all lobby information."
+        confirmLabel="Delete"
+        type="danger"
+      />
     </div>
   );
 });

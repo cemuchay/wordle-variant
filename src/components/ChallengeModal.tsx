@@ -144,7 +144,9 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         previewParticipant, setPreviewParticipant,
         setPreviewMarathonLength,
         previewMarathonGameIndex, setPreviewMarathonGameIndex,
-        backAction
+        backAction,
+        isEditingChallenge,
+        setIsEditingChallenge
     } = useChallengeContext();
 
     const toggleFilters = () => {
@@ -389,6 +391,42 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10">
                             <ChallengeCreate onSuccess={() => setIsCreatingChallenge(false)} />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit Challenge Modal Sheet overlay */}
+            <AnimatePresence>
+                {isEditingChallenge && selectedChallenge && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 15 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute inset-0 bg-gray-950/98 backdrop-blur-md z-50 flex flex-col"
+                    >
+                        <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-correct/20 p-2 rounded-xl text-correct flex items-center justify-center">
+                                    <SlidersHorizontal size={20} />
+                                </div>
+                                <h3 className="text-lg font-black uppercase tracking-tighter text-white">
+                                    Edit Challenge
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setIsEditingChallenge(false)}
+                                className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10">
+                            <ChallengeCreate 
+                                editingChallenge={selectedChallenge} 
+                                onSuccess={() => setIsEditingChallenge(false)} 
+                            />
                         </div>
                     </motion.div>
                 )}

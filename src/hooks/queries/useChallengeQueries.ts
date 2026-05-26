@@ -277,6 +277,9 @@ export const useChallengeMutations = () => {
                 targetWord = obfuscateWord(plainWord, salt);
             }
 
+            const isHandicapRandom = handicapStarter === '__SYSTEM_RANDOM__' || 
+                (Array.isArray(handicapStarters) && handicapStarters[0] === '__SYSTEM_RANDOM__');
+
             let finalHandicapStarter = handicapStarter;
             let finalHandicapStarters = handicapStarters;
 
@@ -290,7 +293,7 @@ export const useChallengeMutations = () => {
                         let limit = 0;
                         while (limit < 200) {
                             if (starter !== target && getMatchCount(starter, target) <= maxAllowed) {
-                                break;
+                                  break;
                             }
                             starter = getRandomWord(l).toUpperCase();
                             limit++;
@@ -335,6 +338,7 @@ export const useChallengeMutations = () => {
                     handicap_starter: finalHandicapStarter,
                     handicap_starters: finalHandicapStarters,
                     handicap_enforced: handicapEnforced,
+                    handicap_starter_is_random: isHandicapRandom,
                     marathon_timers: marathonTimers,
                     marathon_force_order: marathonForceOrder
                 }])
@@ -494,5 +498,237 @@ export const useChallengeMutations = () => {
         }
     });
 
-    return { createChallenge, submitResult, joinChallenge, startChallenge, submitMarathonResult };
+    const updateChallenge = useMutation({
+        mutationFn: async ({ challengeId, params }: { challengeId: string, params: any }) => {
+            const {
+                mode, length, maxTime, isPublic, maxParticipants, isCustomWord,
+                customWord, customWords, handicapStarter, handicapStarters,
+                handicacpEnforced, handicapEnforced, marathonTimers, marathonGames,
+                marathonForceOrder, lifespanHours
+            } = params;
+
+            // 1. Double check in client logic if anyone has played
+            const { data: parts, error: partsError } = await supabase
+                .from('challenge_participants')
+                .select('id, status, attempts')
+                .eq('challenge_id', challengeId);
+
+            if (partsError) throw partsError;
+            if (parts.some(p => p.status !== 'pending' && p.status !== 'host')) {
+                throw new Error("Cannot edit challenge: a participant has already started playing.");
+            }
+
+            // Fetch the existing challenge to compare length/custom/target word
+            const { data: existing, error: existError } = await supabase
+                .from('challenges')
+                .select('*')
+                .eq('id', challengeId)
+                .single();
+
+            if (existError) throw existError;
+
+            let actualLength = length;
+            let targetWord = existing.target_word;
+            let salt = existing.salt;
+            const lengthChanged = existing.word_length !== length;
+            const customChanged = existing.is_custom_word !== isCustomWord;
+            const resolvedMarathonGames = marathonGames || (length === 1 ? [3, 4, 5, 6, 7] : null);
+
+            const plainMarathonTargets: Record<number, string> = {};
+            let plainRegularTarget = '';
+
+            // If length changed, custom status changed, or new custom word is provided:
+            const shouldRegenerateTarget = lengthChanged || customChanged || (isCustomWord && (length === 1 ? !!customWords : !!customWord));
+
+            if (shouldRegenerateTarget) {
+                salt = Math.random().toString(36).substring(2, 15);
+                if (resolvedMarathonGames) {
+                    const targetArray: { length: number; word: string }[] = [];
+                    resolvedMarathonGames.forEach((l: number, idx: number) => {
+                        let rawWord = '';
+                        if (isCustomWord) {
+                            if (Array.isArray(customWords)) {
+                                rawWord = customWords[idx];
+                            } else if (customWords && typeof customWords === 'object') {
+                                rawWord = customWords[l];
+                            }
+                        }
+                        const word = (rawWord || getRandomWord(l)).toUpperCase();
+                        plainMarathonTargets[idx] = word;
+                        targetArray.push({
+                            length: l,
+                            word: obfuscateWord(word, salt)
+                        });
+                    });
+                    targetWord = JSON.stringify(targetArray);
+                } else {
+                    actualLength = length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
+                    const plainWord = (customWord || getRandomWord(actualLength)).toUpperCase();
+                    plainRegularTarget = plainWord;
+                    targetWord = obfuscateWord(plainWord, salt);
+                }
+            }
+
+            let finalHandicapStarter = handicapStarter;
+            let finalHandicapStarters = handicapStarters;
+            let finalHandicapIsRandom = existing.handicap_starter_is_random;
+
+            const isHandicap = params.isHandicap;
+
+            if (isHandicap) {
+                const isRandomRequest = handicapStarter === '__SYSTEM_RANDOM__' || 
+                    (Array.isArray(handicapStarters) && handicapStarters[0] === '__SYSTEM_RANDOM__');
+
+                const isSingleMasked = handicapStarter === '__MASKED__';
+                const isMultiMasked = Array.isArray(handicapStarters) && handicapStarters[0] === '__MASKED__';
+
+                if (isRandomRequest) {
+                    finalHandicapIsRandom = true;
+                    // Only generate new random starter if target word changed, or it wasn't random before
+                    const needsNewRandom = shouldRegenerateTarget || !existing.handicap_starter_is_random || 
+                        (!existing.handicap_starter && !existing.handicap_starters);
+
+                    if (needsNewRandom) {
+                        if (resolvedMarathonGames) {
+                            const startersList: string[] = [];
+                            resolvedMarathonGames.forEach((l: number, idx: number) => {
+                                const target = plainMarathonTargets[idx] || getRandomWord(l).toUpperCase();
+                                const maxAllowed = l <= 4 ? 1 : 3;
+                                let starter = getRandomWord(l).toUpperCase();
+                                let limit = 0;
+                                while (limit < 200) {
+                                    if (starter !== target && getMatchCount(starter, target) <= maxAllowed) {
+                                        break;
+                                    }
+                                    starter = getRandomWord(l).toUpperCase();
+                                    limit++;
+                                }
+                                startersList.push(starter);
+                            });
+                            finalHandicapStarters = startersList;
+                            finalHandicapStarter = null;
+                        } else {
+                            let target = plainRegularTarget || getRandomWord(actualLength).toUpperCase();
+                            const maxAllowed = actualLength <= 4 ? 1 : 3;
+                            let starter = getRandomWord(actualLength).toUpperCase();
+                            let limit = 0;
+                            while (limit < 200) {
+                                if (starter !== target && getMatchCount(starter, target) <= maxAllowed) {
+                                    break;
+                                }
+                                starter = getRandomWord(actualLength).toUpperCase();
+                                limit++;
+                            }
+                            finalHandicapStarter = starter;
+                            finalHandicapStarters = null;
+                        }
+                    } else {
+                        // Keep existing random ones
+                        finalHandicapStarter = existing.handicap_starter;
+                        finalHandicapStarters = existing.handicap_starters;
+                    }
+                } else {
+                    // Custom word starter
+                    finalHandicapIsRandom = false;
+                    if (isSingleMasked) {
+                        finalHandicapStarter = existing.handicap_starter;
+                    }
+                    if (isMultiMasked) {
+                        finalHandicapStarters = existing.handicap_starters;
+                    }
+                }
+            } else {
+                finalHandicapStarter = null;
+                finalHandicapStarters = null;
+                finalHandicapIsRandom = false;
+            }
+
+            const updateData: any = {
+                mode,
+                word_length: actualLength,
+                target_word: targetWord,
+                salt,
+                max_time: maxTime,
+                is_public: isPublic,
+                max_participants: maxParticipants,
+                is_custom_word: isCustomWord,
+                handicap_starter: finalHandicapStarter,
+                handicap_starters: finalHandicapStarters,
+                handicap_starter_is_random: finalHandicapIsRandom,
+                handicap_enforced: (handicapEnforced || handicacpEnforced) && isHandicap,
+                marathon_timers: marathonTimers,
+                marathon_force_order: marathonForceOrder
+            };
+
+            if (lifespanHours) {
+                const expiresAt = new Date();
+                expiresAt.setHours(expiresAt.getHours() + lifespanHours);
+                updateData.expires_at = expiresAt.toISOString();
+            }
+
+            const { data: challenge, error: challengeError } = await supabase
+                .from('challenges')
+                .update(updateData)
+                .eq('id', challengeId)
+                .select()
+                .single();
+
+            if (challengeError) throw challengeError;
+
+            // Update participants list.
+            // 1. Delete all existing pending participants
+            const creatorId = challenge.creator_id;
+            const { error: delError } = await supabase
+                .from('challenge_participants')
+                .delete()
+                .eq('challenge_id', challengeId)
+                .neq('status', 'host')
+                .eq('status', 'pending');
+
+            if (delError) throw delError;
+
+            // 2. Insert new list of pending participants
+            const allParticipants = isCustomWord
+                ? params.invitedIds.filter((id: string) => id !== creatorId)
+                : [creatorId, ...params.invitedIds.filter((id: string) => id !== creatorId)];
+
+            const participantInserts = allParticipants.map((uid: string) => ({
+                challenge_id: challengeId,
+                user_id: uid,
+                status: 'pending'
+            }));
+
+            if (participantInserts.length > 0) {
+                const { error: insertError } = await supabase
+                    .from('challenge_participants')
+                    .insert(participantInserts);
+                if (insertError) throw insertError;
+            }
+
+            return challenge;
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['my-challenges', data.creator_id] });
+            queryClient.invalidateQueries({ queryKey: ['challenge', variables.challengeId] });
+        }
+    });
+
+    const deleteChallenge = useMutation({
+        mutationFn: async (challengeId: string) => {
+            const { error } = await supabase
+                .from('challenges')
+                .delete()
+                .eq('id', challengeId);
+
+            if (error) throw error;
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+            queryClient.invalidateQueries({ queryKey: ['challenge'] });
+        }
+    });
+
+    return { createChallenge, submitResult, joinChallenge, startChallenge, submitMarathonResult, updateChallenge, deleteChallenge };
 };
+
