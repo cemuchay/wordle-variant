@@ -21,6 +21,17 @@ class TechHouseSynth {
         this.isPlaying = true;
         this.recorderDest = recorderDestNode || null;
 
+        // Suggest playback audio session to bypass iOS silent switch if supported
+        // @ts-ignore
+        if (navigator.audioSession && typeof navigator.audioSession.type === 'string') {
+            try {
+                // @ts-ignore
+                navigator.audioSession.type = 'playback';
+            } catch (e) {
+                console.log("Failed to set audio session type:", e);
+            }
+        }
+
         // Main Gain setup
         this.mainGain = this.ctx.createGain();
         this.mainGain.gain.value = 0.4;
@@ -56,6 +67,14 @@ class TechHouseSynth {
         }
         this.recorderDest = null;
         this.mainGain = null;
+    }
+
+    resumeContext() {
+        if (!this.isPlaying) {
+            this.start();
+        } else if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(e => console.log("Failed to resume context:", e));
+        }
     }
 
     connectRecorder(destNode: MediaStreamAudioDestinationNode) {
@@ -269,6 +288,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
     const [isRecording, setIsRecording] = useState(false);
     const [recordingProgress, setRecordingProgress] = useState(0);
+    const [generatedVideoFile, setGeneratedVideoFile] = useState<File | null>(null);
 
     const synthRef = useRef<TechHouseSynth | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -359,6 +379,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 2. Play/Pause Music Loop
     useEffect(() => {
         if (!isOpen) {
+            setGeneratedVideoFile(null);
             if (synthRef.current) {
                 synthRef.current.stop();
                 synthRef.current = null;
@@ -834,24 +855,55 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             audioStream.getAudioTracks().forEach(track => combinedStream.addTrack(track));
         }
 
-        // Configure MediaRecorder with a high target bitrate (15 Mbps) for pristine visual quality
-        const options = { 
-            mimeType: 'video/webm;codecs=vp9',
-            videoBitsPerSecond: 15000000
-        };
+        // Probe supported formats, prioritizing MP4 (avc1/mp4a) for native iOS/Android sharing on WhatsApp
+        const candidateTypes = [
+            'video/mp4;codecs=avc1,mp4a.40.2',
+            'video/mp4;codecs=h264,aac',
+            'video/mp4',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm'
+        ];
+
+        let selectedMimeType = '';
+        let extension = 'webm';
+
+        for (const type of candidateTypes) {
+            try {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    selectedMimeType = type;
+                    if (type.includes('mp4')) {
+                        extension = 'mp4';
+                    }
+                    break;
+                }
+            } catch (e) {
+                // Ignore unsupported error
+            }
+        }
+
+        if (!selectedMimeType) {
+            selectedMimeType = 'video/webm';
+            extension = 'webm';
+        }
+
+        // Configure MediaRecorder with a target bitrate (8 Mbps) for pristine yet mobile-shareable file size
+        const targetBitrate = 8000000;
         let mediaRecorder: MediaRecorder;
         try {
-            mediaRecorder = new MediaRecorder(combinedStream, options);
+            mediaRecorder = new MediaRecorder(combinedStream, {
+                mimeType: selectedMimeType,
+                videoBitsPerSecond: targetBitrate
+            });
         } catch (e) {
             try {
+                // Fall back to just the mimeType if the bitrate parameter fails
                 mediaRecorder = new MediaRecorder(combinedStream, {
-                    mimeType: 'video/webm;codecs=vp8',
-                    videoBitsPerSecond: 15000000
+                    mimeType: selectedMimeType
                 });
             } catch (err) {
-                mediaRecorder = new MediaRecorder(combinedStream, {
-                    videoBitsPerSecond: 15000000
-                });
+                // Hard fallback to default
+                mediaRecorder = new MediaRecorder(combinedStream);
             }
         }
 
@@ -860,42 +912,20 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         };
 
         mediaRecorder.onstop = async () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const rawMime = selectedMimeType.split(';')[0]; // e.g. 'video/mp4' or 'video/webm'
+            const blob = new Blob(chunks, { type: rawMime });
             
             // Disconnect recorder from the synth
             if (synthRef.current) {
                 synthRef.current.disconnectRecorder();
             }
 
-            const file = new File([blob], 'wordle_weekly_wrapped.webm', { type: 'video/webm' });
+            const fileName = `wordle_weekly_wrapped.${extension}`;
+            const file = new File([blob], fileName, { type: rawMime });
 
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Wordle Variant Wrapped',
-                        text: 'Check out my Wordle Variant Weekly Performance Wrapped video!',
-                    });
-                } catch (err) {
-                    console.log('Video share failed, falling back to download:', err);
-                    triggerVideoDownload(blob);
-                }
-            } else {
-                triggerVideoDownload(blob);
-            }
-
+            // Store in state to present the compile-then-share flow
+            setGeneratedVideoFile(file);
             setIsRecording(false);
-        };
-
-        const triggerVideoDownload = (blob: Blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'wordle_weekly_wrapped.webm';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         };
 
         // Pre-recording drawing loop: draw slide 0 at 20fps to feed the stream during startup
@@ -938,8 +968,51 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         mediaRecorder.start();
     };
 
+    const shareGeneratedVideo = async () => {
+        if (!generatedVideoFile) return;
+
+        if (navigator.canShare && navigator.canShare({ files: [generatedVideoFile] })) {
+            try {
+                await navigator.share({
+                    files: [generatedVideoFile],
+                    title: 'Wordle Variant Wrapped',
+                    text: 'Check out my Wordle Variant Weekly Performance Wrapped video!',
+                });
+            } catch (err) {
+                console.log('Video share failed, falling back to download:', err);
+                downloadGeneratedVideo();
+            }
+        } else {
+            downloadGeneratedVideo();
+        }
+    };
+
+    const downloadGeneratedVideo = () => {
+        if (!generatedVideoFile) return;
+        const url = URL.createObjectURL(generatedVideoFile);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = generatedVideoFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none">
+        <div 
+            onClick={() => {
+                if (synthRef.current) {
+                    synthRef.current.resumeContext();
+                }
+            }}
+            onTouchStart={() => {
+                if (synthRef.current) {
+                    synthRef.current.resumeContext();
+                }
+            }}
+            className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
+        >
             {/* hidden canvas for export drawing - positioned offscreen to bypass layout engine throttling and preserve quality */}
             <canvas 
                 ref={canvasRef} 
@@ -977,17 +1050,54 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 </div>
             ) : (
                 <div className="w-full max-w-md h-[88vh] flex flex-col relative bg-linear-to-b from-gray-900 via-gray-950 to-black rounded-[36px] overflow-hidden border border-white/10 shadow-2xl">
-                    {/* Video Recording Progress Overlay */}
-                    {isRecording && (
-                        <div className="absolute inset-0 bg-black/90 z-60 flex flex-col items-center justify-center space-y-4 p-6 text-center">
-                            <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
-                            <div className="space-y-2">
-                                <h3 className="text-sm font-black uppercase tracking-widest">Generating Shareable Video</h3>
-                                <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
-                            </div>
-                            <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
-                            </div>
+                    {/* Video Recording & Share Overlay */}
+                    {(isRecording || generatedVideoFile) && (
+                        <div className="absolute inset-0 bg-black/95 z-60 flex flex-col items-center justify-center space-y-6 p-6 text-center">
+                            {isRecording ? (
+                                <>
+                                    <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-correct">Generating Shareable Video</h3>
+                                        <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
+                                    </div>
+                                    <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-6 max-w-xs w-full animate-pop">
+                                    <div className="w-16 h-16 bg-correct/10 border border-correct/20 text-correct rounded-full flex items-center justify-center mx-auto">
+                                        <Film size={28} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-lg font-black uppercase tracking-wider text-white">Video Ready!</h3>
+                                        <p className="text-xs text-gray-400 leading-relaxed">
+                                            Your weekly wrapped video has been generated successfully. Share it now on WhatsApp, Instagram, or download it!
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2.5 w-full">
+                                        <button
+                                            onClick={shareGeneratedVideo}
+                                            className="w-full py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                                        >
+                                            <Share2 size={14} />
+                                            Share Video 🎬
+                                        </button>
+                                        <button
+                                            onClick={downloadGeneratedVideo}
+                                            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                        >
+                                            Download Locally
+                                        </button>
+                                        <button
+                                            onClick={() => setGeneratedVideoFile(null)}
+                                            className="w-full py-3 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
