@@ -7,6 +7,7 @@ import { AppHeader } from './components/layout/AppHeader';
 import { GameArea } from './components/layout/GameArea';
 import { GameToolbar } from './components/layout/GameToolbar';
 import { ModalsManager } from './components/layout/ModalsManager';
+import { WeeklyWrappedModal } from './components/WeeklyWrappedModal';
 import { Toast } from './components/Toast';
 import { NotificationsManager } from './components/notifications/NotificationsManager';
 import { LandscapeBlocker } from './components/LandscapeBlocker';
@@ -66,6 +67,32 @@ export default function App() {
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [isAuthOpen, setIsAuthOpen] = useState(false);
     const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+    const [isWeeklyWrappedOpen, setIsWeeklyWrappedOpen] = useState(false);
+
+    // Auto-trigger weekly wrapped on Monday logins
+    useEffect(() => {
+        if (!user) return;
+
+        const now = new Date();
+        const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday
+
+        if (currentDay === 1) {
+            // Calculate current Monday's date string
+            const monday = new Date();
+            const day = monday.getDay();
+            const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+            monday.setDate(diff);
+            const mondayStr = monday.toISOString().split('T')[0];
+
+            const seenKey = `wrapped-seen-${mondayStr}-${user.id}`;
+            const alreadySeen = localStorage.getItem(seenKey);
+
+            if (!alreadySeen) {
+                setIsWeeklyWrappedOpen(true);
+                localStorage.setItem(seenKey, 'true');
+            }
+        }
+    }, [user]);
 
     // Listen to custom event to open stats modal at a specific tab
     useEffect(() => {
@@ -153,7 +180,10 @@ export default function App() {
                         onClose={() => setToast({ ...toast, show: false })}
                     />
 
-                    <AppHeader onOpenSettings={() => setIsSettingsOpen(true)} />
+                    <AppHeader 
+                        onOpenSettings={() => setIsSettingsOpen(true)} 
+                        onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)} 
+                    />
 
                     <GameToolbar
                         onOpenChallenge={() => setIsChallengeOpen(true)}
@@ -254,6 +284,16 @@ export default function App() {
                 <Suspense fallback={null}>
                     <ChatRoom user={user as AppUser} />
                 </Suspense>
+            )}
+
+            {isWeeklyWrappedOpen && user && (
+                <WeeklyWrappedModal
+                    isOpen={isWeeklyWrappedOpen}
+                    onClose={() => setIsWeeklyWrappedOpen(false)}
+                    userId={user.id}
+                    isEasterEgg={false}
+                    gameDate={date as string}
+                />
             )}
 
             <div className="fixed bottom-2 left-2 flex items-center gap-2 text-[10px] text-gray-600 z-40">

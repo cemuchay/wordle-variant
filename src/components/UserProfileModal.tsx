@@ -4,7 +4,7 @@ import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarD
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
-
+import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -47,7 +47,26 @@ interface ChallengeParticipation {
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onClose }) => {
     const { user: currentUser } = useAuth();
-    const { onlineUsers, initiatePrivateCall, activeCall, triggerToast } = useApp();
+    const { onlineUsers, initiatePrivateCall, activeCall, triggerToast, date } = useApp();
+    const [isWrappedOpen, setIsWrappedOpen] = useState(false);
+    const [avatarClicks, setAvatarClicks] = useState(0);
+
+    const handleAvatarClick = () => {
+        setAvatarClicks(prev => {
+            if (prev + 1 >= 3) {
+                setIsWrappedOpen(true);
+                return 0;
+            }
+            return prev + 1;
+        });
+    };
+
+    useEffect(() => {
+        if (avatarClicks > 0) {
+            const timer = setTimeout(() => setAvatarClicks(0), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [avatarClicks]);
 
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -335,7 +354,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     ) : (
                         profile && (
                             <div className="flex items-center gap-5 w-full">
-                                <div className="relative">
+                                <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
                                     <img
                                         src={profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}`}
                                         alt={profile.username}
@@ -610,6 +629,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     </>
                 )}
             </motion.div>
+            {isWrappedOpen && (
+                <WeeklyWrappedModal
+                    isOpen={isWrappedOpen}
+                    onClose={() => setIsWrappedOpen(false)}
+                    userId={userId}
+                    isEasterEgg={true}
+                    gameDate={date as string}
+                />
+            )}
         </div>
     );
 };
