@@ -21,6 +21,17 @@ class TechHouseSynth {
         this.isPlaying = true;
         this.recorderDest = recorderDestNode || null;
 
+        // Suggest playback audio session to bypass iOS silent switch if supported
+        // @ts-ignore
+        if (navigator.audioSession && typeof navigator.audioSession.type === 'string') {
+            try {
+                // @ts-ignore
+                navigator.audioSession.type = 'playback';
+            } catch (e) {
+                console.log("Failed to set audio session type:", e);
+            }
+        }
+
         // Main Gain setup
         this.mainGain = this.ctx.createGain();
         this.mainGain.gain.value = 0.4;
@@ -56,6 +67,14 @@ class TechHouseSynth {
         }
         this.recorderDest = null;
         this.mainGain = null;
+    }
+
+    resumeContext() {
+        if (!this.isPlaying) {
+            this.start();
+        } else if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(e => console.log("Failed to resume context:", e));
+        }
     }
 
     connectRecorder(destNode: MediaStreamAudioDestinationNode) {
@@ -269,6 +288,11 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
     const [isRecording, setIsRecording] = useState(false);
     const [recordingProgress, setRecordingProgress] = useState(0);
+    const [generatedVideoFile, setGeneratedVideoFile] = useState<File | null>(null);
+    const [showVideoOverlay, setShowVideoOverlay] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarLoaded, setAvatarLoaded] = useState(false);
+    const avatarImageRef = useRef<HTMLImageElement | null>(null);
 
     const synthRef = useRef<TechHouseSynth | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -281,13 +305,16 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             setLoading(true);
             setCurrentSlide(0);
             try {
-                // Fetch profile username
+                // Fetch profile username and avatar
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('username')
+                    .select('username, avatar_url')
                     .eq('id', userId)
                     .single();
-                if (profile) setUsername(profile.username);
+                if (profile) {
+                    setUsername(profile.username);
+                    setAvatarUrl(profile.avatar_url || null);
+                }
 
                 // Fetch scores range
                 const now = parseYYYYMMDD(gameDate);
@@ -359,6 +386,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 2. Play/Pause Music Loop
     useEffect(() => {
         if (!isOpen) {
+            setGeneratedVideoFile(null);
             if (synthRef.current) {
                 synthRef.current.stop();
                 synthRef.current = null;
@@ -383,6 +411,31 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             }
         };
     }, [isOpen, isPlayingMusic]);
+
+    // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
+    useEffect(() => {
+        if (!isOpen) {
+            setAvatarLoaded(false);
+            avatarImageRef.current = null;
+            return;
+        }
+
+        const url = avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
+        if (!url) return;
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = url;
+        img.onload = () => {
+            avatarImageRef.current = img;
+            setAvatarLoaded(true);
+        };
+        img.onerror = () => {
+            console.log("CORS/Image loading error for avatar. Fallback text will be rendered.");
+            avatarImageRef.current = null;
+            setAvatarLoaded(false);
+        };
+    }, [isOpen, avatarUrl, username]);
 
     if (!isOpen) return null;
 
@@ -478,12 +531,54 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         ctx.arc(width * 0.1, height * 0.8, 450, 0, Math.PI * 2);
         ctx.fill();
 
-        // Draw username on top for all slides except slide 0
+        // Draw username on top with mini avatar for all slides except slide 0
         if (index > 0) {
+            ctx.save();
+            ctx.font = 'bold 24px sans-serif';
+            const text = `@${username}`;
+            const textWidth = ctx.measureText(text).width;
+            const avatarRadius = 18;
+            const gap = 12;
+            const totalWidth = (avatarRadius * 2) + gap + textWidth;
+            const startX = (width - totalWidth) / 2;
+
+            const avatarCx = startX + avatarRadius;
+            const avatarCy = 75;
+
+            // Draw mini circular avatar
+            if (avatarLoaded && avatarImageRef.current) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(avatarImageRef.current, avatarCx - avatarRadius, avatarCy - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+                ctx.restore();
+                // Draw thin border
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                // Text fallback
+                ctx.fillStyle = '#6366f1';
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.round(avatarRadius * 1.0)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(username.charAt(0).toUpperCase(), avatarCx, avatarCy + 1);
+            }
+
+            // Draw username next to it
             ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`@${username}`, width / 2, 80);
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, startX + (avatarRadius * 2) + gap, avatarCy);
+            ctx.restore();
         }
 
         // Footer Brand
@@ -498,6 +593,36 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         if (index === 0) {
             // Slide 0: Intro
+            // Draw large circular avatar
+            const avatarCx = width / 2;
+            const avatarCy = height * 0.22;
+            const avatarRadius = 80;
+
+            if (avatarLoaded && avatarImageRef.current) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(avatarImageRef.current, avatarCx - avatarRadius, avatarCy - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+                ctx.restore();
+                // Draw border
+                ctx.strokeStyle = '#6366f1'; // indigo-500
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                // Fallback text avatar
+                ctx.fillStyle = '#6366f1';
+                ctx.beginPath();
+                ctx.arc(avatarCx, avatarCy, avatarRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.round(avatarRadius * 1.0)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(username.charAt(0).toUpperCase(), avatarCx, avatarCy + 4);
+            }
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 74px sans-serif';
             ctx.fillText('YOUR WEEKLY', width / 2, height * 0.38);
@@ -794,8 +919,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
     // 6. Record Canvas animation with Audio stream to share/download a video (WebM)
     const exportWrappedVideo = async () => {
+        if (generatedVideoFile) {
+            setShowVideoOverlay(true);
+            return;
+        }
         if (isRecording) return;
         setIsRecording(true);
+        setShowVideoOverlay(true);
         setRecordingProgress(0);
 
         const canvas = canvasRef.current || document.createElement('canvas');
@@ -834,24 +964,55 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             audioStream.getAudioTracks().forEach(track => combinedStream.addTrack(track));
         }
 
-        // Configure MediaRecorder with a high target bitrate (15 Mbps) for pristine visual quality
-        const options = { 
-            mimeType: 'video/webm;codecs=vp9',
-            videoBitsPerSecond: 15000000
-        };
+        // Probe supported formats, prioritizing MP4 (avc1/mp4a) for native iOS/Android sharing on WhatsApp
+        const candidateTypes = [
+            'video/mp4;codecs=avc1,mp4a.40.2',
+            'video/mp4;codecs=h264,aac',
+            'video/mp4',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm'
+        ];
+
+        let selectedMimeType = '';
+        let extension = 'webm';
+
+        for (const type of candidateTypes) {
+            try {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    selectedMimeType = type;
+                    if (type.includes('mp4')) {
+                        extension = 'mp4';
+                    }
+                    break;
+                }
+            } catch (e) {
+                // Ignore unsupported error
+            }
+        }
+
+        if (!selectedMimeType) {
+            selectedMimeType = 'video/webm';
+            extension = 'webm';
+        }
+
+        // Configure MediaRecorder with a target bitrate (8 Mbps) for pristine yet mobile-shareable file size
+        const targetBitrate = 8000000;
         let mediaRecorder: MediaRecorder;
         try {
-            mediaRecorder = new MediaRecorder(combinedStream, options);
+            mediaRecorder = new MediaRecorder(combinedStream, {
+                mimeType: selectedMimeType,
+                videoBitsPerSecond: targetBitrate
+            });
         } catch (e) {
             try {
+                // Fall back to just the mimeType if the bitrate parameter fails
                 mediaRecorder = new MediaRecorder(combinedStream, {
-                    mimeType: 'video/webm;codecs=vp8',
-                    videoBitsPerSecond: 15000000
+                    mimeType: selectedMimeType
                 });
             } catch (err) {
-                mediaRecorder = new MediaRecorder(combinedStream, {
-                    videoBitsPerSecond: 15000000
-                });
+                // Hard fallback to default
+                mediaRecorder = new MediaRecorder(combinedStream);
             }
         }
 
@@ -860,42 +1021,20 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         };
 
         mediaRecorder.onstop = async () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const rawMime = selectedMimeType.split(';')[0]; // e.g. 'video/mp4' or 'video/webm'
+            const blob = new Blob(chunks, { type: rawMime });
             
             // Disconnect recorder from the synth
             if (synthRef.current) {
                 synthRef.current.disconnectRecorder();
             }
 
-            const file = new File([blob], 'wordle_weekly_wrapped.webm', { type: 'video/webm' });
+            const fileName = `wordle_weekly_wrapped.${extension}`;
+            const file = new File([blob], fileName, { type: rawMime });
 
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Wordle Variant Wrapped',
-                        text: 'Check out my Wordle Variant Weekly Performance Wrapped video!',
-                    });
-                } catch (err) {
-                    console.log('Video share failed, falling back to download:', err);
-                    triggerVideoDownload(blob);
-                }
-            } else {
-                triggerVideoDownload(blob);
-            }
-
+            // Store in state to present the compile-then-share flow
+            setGeneratedVideoFile(file);
             setIsRecording(false);
-        };
-
-        const triggerVideoDownload = (blob: Blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'wordle_weekly_wrapped.webm';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         };
 
         // Pre-recording drawing loop: draw slide 0 at 20fps to feed the stream during startup
@@ -938,8 +1077,51 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         mediaRecorder.start();
     };
 
+    const shareGeneratedVideo = async () => {
+        if (!generatedVideoFile) return;
+
+        if (navigator.canShare && navigator.canShare({ files: [generatedVideoFile] })) {
+            try {
+                await navigator.share({
+                    files: [generatedVideoFile],
+                    title: 'Wordle Variant Wrapped',
+                    text: 'Check out my Wordle Variant Weekly Performance Wrapped video!',
+                });
+            } catch (err) {
+                console.log('Video share failed, falling back to download:', err);
+                downloadGeneratedVideo();
+            }
+        } else {
+            downloadGeneratedVideo();
+        }
+    };
+
+    const downloadGeneratedVideo = () => {
+        if (!generatedVideoFile) return;
+        const url = URL.createObjectURL(generatedVideoFile);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = generatedVideoFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none">
+        <div 
+            onClick={() => {
+                if (synthRef.current) {
+                    synthRef.current.resumeContext();
+                }
+            }}
+            onTouchStart={() => {
+                if (synthRef.current) {
+                    synthRef.current.resumeContext();
+                }
+            }}
+            className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
+        >
             {/* hidden canvas for export drawing - positioned offscreen to bypass layout engine throttling and preserve quality */}
             <canvas 
                 ref={canvasRef} 
@@ -977,17 +1159,54 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 </div>
             ) : (
                 <div className="w-full max-w-md h-[88vh] flex flex-col relative bg-linear-to-b from-gray-900 via-gray-950 to-black rounded-[36px] overflow-hidden border border-white/10 shadow-2xl">
-                    {/* Video Recording Progress Overlay */}
-                    {isRecording && (
-                        <div className="absolute inset-0 bg-black/90 z-60 flex flex-col items-center justify-center space-y-4 p-6 text-center">
-                            <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
-                            <div className="space-y-2">
-                                <h3 className="text-sm font-black uppercase tracking-widest">Generating Shareable Video</h3>
-                                <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
-                            </div>
-                            <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
-                            </div>
+                    {/* Video Recording & Share Overlay */}
+                    {showVideoOverlay && (isRecording || generatedVideoFile) && (
+                        <div className="absolute inset-0 bg-black/95 z-60 flex flex-col items-center justify-center space-y-6 p-6 text-center">
+                            {isRecording ? (
+                                <>
+                                    <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
+                                    <div className="space-y-2">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-correct">Generating Shareable Video</h3>
+                                        <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
+                                    </div>
+                                    <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-6 max-w-xs w-full animate-pop">
+                                    <div className="w-16 h-16 bg-correct/10 border border-correct/20 text-correct rounded-full flex items-center justify-center mx-auto">
+                                        <Film size={28} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-lg font-black uppercase tracking-wider text-white">Video Ready!</h3>
+                                        <p className="text-xs text-gray-400 leading-relaxed">
+                                            Your weekly wrapped video has been generated successfully. Share it now on WhatsApp, Instagram, or download it!
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2.5 w-full">
+                                        <button
+                                            onClick={shareGeneratedVideo}
+                                            className="w-full py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                                        >
+                                            <Share2 size={14} />
+                                            Share Video 🎬
+                                        </button>
+                                        <button
+                                            onClick={downloadGeneratedVideo}
+                                            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                        >
+                                            Download Locally
+                                        </button>
+                                        <button
+                                            onClick={() => setShowVideoOverlay(false)}
+                                            className="w-full py-3 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1038,9 +1257,28 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                 transition={{ duration: 0.4 }}
                                 className={`absolute inset-0 bg-gradient-to-b ${getSlideBackground(currentSlide)} flex flex-col justify-center p-8`}
                             >
+                                {currentSlide > 0 && (
+                                    <div className="absolute top-6 inset-x-8 flex items-center justify-center gap-2 z-10">
+                                        <img 
+                                            src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
+                                            className="w-6 h-6 rounded-full border border-white/20 object-cover" 
+                                            alt={username} 
+                                        />
+                                        <span className="text-xs font-bold text-gray-400/60 uppercase tracking-widest">
+                                            @{username}
+                                        </span>
+                                    </div>
+                                )}
                                 {currentSlide === 0 ? (
                                     // Slide 0: Intro
-                                    <div className="text-center space-y-6">
+                                    <div className="text-center space-y-5">
+                                        <div className="flex justify-center">
+                                            <img 
+                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
+                                                className="w-24 h-24 rounded-full border-4 border-indigo-500 shadow-xl object-cover animate-pulse" 
+                                                alt={username} 
+                                            />
+                                        </div>
                                         <div className="text-correct font-black text-xs uppercase tracking-widest animate-bounce">
                                             Weekly Wrapped
                                         </div>
@@ -1050,9 +1288,16 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                 WRAPPED
                                             </h1>
                                         </div>
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                            @{username}
-                                        </p>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <img 
+                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
+                                                className="w-6 h-6 rounded-full border border-white/20 object-cover" 
+                                                alt={username} 
+                                            />
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                @{username}
+                                            </span>
+                                        </div>
                                         <p className="text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
                                             Let's take a ride through all your daily guesses, roasts, and global standing.
                                         </p>
