@@ -6,9 +6,10 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
+    onOpenWeeklyWrapped?: () => void;
 }
 
-export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
+export const AppHeader = ({ onOpenSettings, onOpenWeeklyWrapped }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
@@ -78,6 +79,16 @@ export const AppHeader = ({ onOpenSettings }: AppHeaderProps) => {
                         >
                             <Shield size={14} className="sm:w-[15px] sm:h-[15px]" />
                         </a>
+                    )}
+
+                    {user && new Date().getDay() === 1 && (
+                        <button
+                            onClick={onOpenWeeklyWrapped}
+                            className="text-[9px] sm:text-[10px] font-black bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-3 py-1.5 rounded-full uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
+                            title="See your Weekly Wrapped"
+                        >
+                            Wrapped 🎁
+                        </button>
                     )}
 
                     {user && <NotificationBell />}
