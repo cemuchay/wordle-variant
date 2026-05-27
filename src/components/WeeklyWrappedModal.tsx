@@ -316,34 +316,20 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     setAvatarUrl(profile.avatar_url || null);
                 }
 
-                // Fetch scores range
+                // Fetch scores range: Previous week (Monday to Sunday) relative to context gameDate
                 const now = parseYYYYMMDD(gameDate);
-                let startDate: string;
-                let endDate: string;
-
-                if (isEasterEgg) {
-                    // Monday of current week to now
-                    const currentMonday = new Date();
-                    const day = currentMonday.getDay();
-                    const diff = currentMonday.getDate() - day + (day === 0 ? -6 : 1);
-                    currentMonday.setDate(diff);
-                    currentMonday.setHours(0, 0, 0, 0);
-                    startDate = toLocalYYYYMMDD(currentMonday);
-                    endDate = toLocalYYYYMMDD(now);
-                } else {
-                    // Previous week: Monday to Sunday
-                    const lastMonday = new Date();
-                    const day = lastMonday.getDay();
-                    const diff = lastMonday.getDate() - day + (day === 0 ? -6 : 1) - 7;
-                    lastMonday.setDate(diff);
-                    lastMonday.setHours(0, 0, 0, 0);
-                    
-                    const lastSunday = new Date(lastMonday);
-                    lastSunday.setDate(lastSunday.getDate() + 6);
-                    
-                    startDate = toLocalYYYYMMDD(lastMonday);
-                    endDate = toLocalYYYYMMDD(lastSunday);
-                }
+                const lastMonday = new Date(now);
+                const day = lastMonday.getDay();
+                const diff = lastMonday.getDate() - day + (day === 0 ? -6 : 1) - 7;
+                lastMonday.setDate(diff);
+                lastMonday.setHours(12, 0, 0, 0);
+                
+                const lastSunday = new Date(lastMonday);
+                lastSunday.setDate(lastSunday.getDate() + 6);
+                lastSunday.setHours(12, 0, 0, 0);
+                
+                const startDate = toLocalYYYYMMDD(lastMonday);
+                const endDate = toLocalYYYYMMDD(lastSunday);
 
                 // Query user scores for this range
                 const { data: scores } = await supabase
