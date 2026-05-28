@@ -138,7 +138,6 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         loading,
         error,
         searchQuery, setSearchQuery,
-        statusFilter, setStatusFilter,
         modeFilter, setModeFilter,
         lengthFilter, setLengthFilter,
         clearFilters,
@@ -147,7 +146,9 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         previewMarathonGameIndex, setPreviewMarathonGameIndex,
         backAction,
         isEditingChallenge,
-        setIsEditingChallenge
+        setIsEditingChallenge,
+        listColumn,
+        setListColumn
     } = useChallengeContext();
 
     const toggleFilters = () => {
@@ -171,7 +172,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                 <>
                                     <button
                                         onClick={() => backAction ? backAction() : setIsPlaying(false)}
-                                        className="p-1 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                        className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white"
                                     >
                                         <ArrowLeft size={16} />
                                     </button>
@@ -184,7 +185,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                     )}
                                 </>
                             ) : (
-                                <p className="text-gray-400 text-[10px] sm:text-xs">
+                                <p className="text-white text-[10px] sm:text-xs">
                                     Compete with friends
                                 </p>
                             )}
@@ -206,12 +207,12 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                     )}
                     <button
                         onClick={() => setIsHelpOpen(true)}
-                        className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                        className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
                         title="Challenge Guide"
                     >
                         <HelpCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                     </button>
-                    <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white">
+                    <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white">
                         <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                     </button>
                 </div>
@@ -245,11 +246,28 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                     <ChallengeLobby />
                                 ) : (
                                     <div className="space-y-6">
+                                        {/* Segmented Switcher for Columns */}
+                                        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
+                                            {(['active', 'expired', 'open'] as const).map((tab) => (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => setListColumn(tab)}
+                                                    className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
+                                                        listColumn === tab
+                                                            ? 'bg-correct text-black font-extrabold shadow-md'
+                                                            : 'text-white hover:text-white hover:bg-white/5'
+                                                    }`}
+                                                >
+                                                    {tab === 'open' ? 'Open (Discover)' : tab}
+                                                </button>
+                                            ))}
+                                        </div>
+
                                         {/* Search and Filters Toggle */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2">
                                                 <div className="relative flex-1 group">
-                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-correct transition-colors" size={18} />
+                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white group-focus-within:text-correct transition-colors" size={18} />
                                                     <input
                                                         type="text"
                                                         placeholder="Search by opponent..."
@@ -260,7 +278,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                 </div>
                                                 <button
                                                     onClick={toggleFilters}
-                                                    className={`p-3 rounded-2xl border transition-all ${showFilters ? 'bg-correct text-black border-correct shadow-lg shadow-correct/20' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'}`}
+                                                    className={`p-3 rounded-2xl border transition-all ${showFilters ? 'bg-correct text-black border-correct shadow-lg shadow-correct/20' : 'bg-white/5 border-white/10 text-white hover:text-white hover:bg-white/10'}`}
                                                 >
                                                     <SlidersHorizontal size={20} />
                                                 </button>
@@ -283,25 +301,12 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                             </button>
 
                                                             <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Status</span>
-                                                                {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
-                                                                    <button
-                                                                        key={f}
-                                                                        onClick={() => setStatusFilter(f)}
-                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${statusFilter === f ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
-                                                                    >
-                                                                        {f}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Mode</span>
+                                                                <span className="text-[9px] font-black uppercase text-white w-10 shrink-0">Mode</span>
                                                                 {(['ALL', 'LIVE', 'ANYTIME'] as const).map((m) => (
                                                                     <button
                                                                         key={m}
                                                                         onClick={() => setModeFilter(m)}
-                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${modeFilter === m ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
+                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${modeFilter === m ? 'bg-correct text-black' : 'bg-white/5 text-white hover:bg-white/10 hover:text-white'}`}
                                                                     >
                                                                         {m}
                                                                     </button>
@@ -309,16 +314,16 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                             </div>
 
                                                             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                                                <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Length</span>
+                                                                <span className="text-[9px] font-black uppercase text-white w-10 shrink-0">Length</span>
                                                                 <button
                                                                     onClick={() => setLengthFilter('ALL')}
-                                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === 'ALL' ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
+                                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === 'ALL' ? 'bg-correct text-black' : 'bg-white/5 text-white hover:bg-white/10 hover:text-white'}`}
                                                                 >
                                                                     ALL
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setLengthFilter(1)}
-                                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === 1 ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
+                                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === 1 ? 'bg-correct text-black' : 'bg-white/5 text-white hover:bg-white/10 hover:text-white'}`}
                                                                 >
                                                                     Marathon
                                                                 </button>
@@ -326,7 +331,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                                     <button
                                                                         key={l}
                                                                         onClick={() => setLengthFilter(l)}
-                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === l ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
+                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${lengthFilter === l ? 'bg-correct text-black' : 'bg-white/5 text-white hover:bg-white/10 hover:text-white'}`}
                                                                     >
                                                                         {l}
                                                                     </button>
@@ -342,16 +347,17 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                             {loading ? (
                                                 <ChallengeSkeleton />
                                             ) : filteredChallenges.length === 0 ? (
-                                                <div className="py-12 text-center text-gray-500">
+                                                <div className="py-12 text-center text-white">
                                                     {myChallenges.length === 0 ? "No challenges yet." : "No matching challenges found."}
                                                 </div>
                                             ) : (
-                                                filteredChallenges.map((item) => (
+                                                filteredChallenges.map((item, idx) => (
                                                     <ChallengeItem
                                                         key={item.id}
                                                         item={item}
                                                         user={user}
                                                         onSelect={handleViewChallenge}
+                                                        index={idx}
                                                     />
                                                 ))
                                             )}
@@ -454,15 +460,15 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                             </div>
                             <button
                                 onClick={() => setIsHelpOpen(false)}
-                                className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                                className="p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
                             >
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10 space-y-6 text-sm text-gray-300">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10 space-y-6 text-sm text-white">
                             <section className="space-y-2">
                                 <h4 className="text-sm font-black uppercase text-white tracking-wide">🏆 What is Challenge Mode?</h4>
-                                <p className="text-xs leading-relaxed text-gray-400">
+                                <p className="text-xs leading-relaxed text-white">
                                     Challenge Mode allows you to create custom Wordle games and compete directly against friends or players globally. You can play live in real-time or asynchronously at your own pace.
                                 </p>
                             </section>
@@ -472,13 +478,13 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                 <div className="grid gap-3">
                                     <div className="bg-white/5 border border-white/5 p-3.5 rounded-2xl">
                                         <h5 className="text-xs font-black uppercase text-correct">Anytime (Asynchronous)</h5>
-                                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                                        <p className="text-[11px] text-white mt-1 leading-relaxed">
                                             Create a challenge that remains open for up to 24 hours. Participants play at their own leisure. The leaderboard updates in real-time as scores are submitted.
                                         </p>
                                     </div>
                                     <div className="bg-white/5 border border-white/5 p-3.5 rounded-2xl">
                                         <h5 className="text-xs font-black uppercase text-red-500">Live (Real-time Race)</h5>
-                                        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                                        <p className="text-[11px] text-white mt-1 leading-relaxed">
                                             A synchronous race against time. All players compete concurrently. Has a strict time limit per game. Includes high-fidelity built-in audio chat for in-game banter!
                                         </p>
                                     </div>
@@ -487,10 +493,10 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 
                             <section className="space-y-2">
                                 <h4 className="text-sm font-black uppercase text-white tracking-wide">⚡ Marathon Mode</h4>
-                                <p className="text-xs leading-relaxed text-gray-400">
+                                <p className="text-xs leading-relaxed text-white">
                                     Instead of a single word, compete over a sequence of words of different lengths (e.g. 3-letter up to 7-letter words). 
                                 </p>
-                                <ul className="list-disc pl-4 space-y-2 text-xs text-gray-400">
+                                <ul className="list-disc pl-4 space-y-2 text-xs text-white">
                                     <li><strong className="text-yellow-500">Sequence Customization:</strong> Reorder games to build custom progressions (e.g., 5L {"->"} 3L {"->"} 7L).</li>
                                     <li><strong className="text-yellow-500">Force Game Order:</strong> Force sequential unlocking. Players must play game #1 to unlock game #2, and so on.</li>
                                     <li><strong className="text-yellow-500">Per-Word Timers:</strong> Set unique duration limits for each individual word length in Live mode.</li>
@@ -499,7 +505,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 
                             <section className="space-y-3">
                                 <h4 className="text-sm font-black uppercase text-white tracking-wide">🛠️ Advanced Rules</h4>
-                                <div className="space-y-2 text-xs text-gray-400">
+                                <div className="space-y-2 text-xs text-white">
                                     <p>
                                         <strong className="text-white">Custom Word Challenges:</strong> Create hand-crafted challenges with words of your own choice. (Note: Creators of custom-word challenges cannot play).
                                     </p>

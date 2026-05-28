@@ -174,7 +174,7 @@ export const ChallengeChat = memo(function ChallengeChat({
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/5 pb-2 shrink-0">
         <MessageSquare size={14} className="text-correct" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+        <span className="text-[10px] font-black uppercase tracking-widest text-white">
           Real-time Room Chat
         </span>
       </div>
@@ -189,11 +189,11 @@ export const ChallengeChat = memo(function ChallengeChat({
             <div className="w-6 h-6 border-2 border-correct border-t-transparent rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500 space-y-2 animate-in fade-in duration-300">
-            <MessageSquare size={28} className="text-gray-600 animate-pulse" />
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/80 space-y-2 animate-in fade-in duration-300">
+            <MessageSquare size={28} className="text-white/40 animate-pulse" />
             <div>
-              <p className="text-[10px] font-black uppercase text-gray-400">Room is Quiet</p>
-              <p className="text-[9px] text-gray-500 mt-0.5">Send a message to start the banter!</p>
+              <p className="text-[10px] font-black uppercase text-white">Room is Quiet</p>
+              <p className="text-[9px] text-white/80 mt-0.5">Send a message to start the banter!</p>
             </div>
           </div>
         ) : (
@@ -208,7 +208,7 @@ export const ChallengeChat = memo(function ChallengeChat({
                 key={msg.id}
                 className={`flex flex-col max-w-[85%] ${isMe ? "ml-auto items-end animate-in slide-in-from-right-3 duration-200" : "items-start animate-in slide-in-from-left-3 duration-200"}`}
               >
-                <span className="text-[8px] text-gray-500 font-black uppercase mb-0.5 px-1 tracking-wider">
+                <span className="text-[8px] text-white/80 font-black uppercase mb-0.5 px-1 tracking-wider">
                   {msg.sender_name} {isMe && "(You)"}
                 </span>
                 <div
@@ -240,7 +240,7 @@ export const ChallengeChat = memo(function ChallengeChat({
               key={username}
               type="button"
               onClick={() => handleSelectMention(username)}
-              className="w-full px-4 py-2.5 text-left text-xs font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+              className="w-full px-4 py-2.5 text-left text-xs font-bold text-white hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
             >
               <span className="text-correct">@</span>
               <span>{username}</span>
@@ -251,7 +251,7 @@ export const ChallengeChat = memo(function ChallengeChat({
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="text-[10px] text-gray-500 italic px-1 shrink-0 animate-pulse">
+        <div className="text-[10px] text-white/80 italic px-1 shrink-0 animate-pulse">
           {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
         </div>
       )}
@@ -267,7 +267,7 @@ export const ChallengeChat = memo(function ChallengeChat({
             setInputText(e.target.value);
             setTyping(true);
           }}
-          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium"
+          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/60 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium"
         />
         <button
           type="submit"

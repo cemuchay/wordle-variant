@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge } from '../hooks/queries/useChallengeQueries';
+import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge, useDiscoverChallenges } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
@@ -45,6 +45,8 @@ interface ChallengeContextType {
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     lengthFilter: 'ALL' | number;
     setLengthFilter: (l: 'ALL' | number) => void;
+    listColumn: 'active' | 'expired' | 'open';
+    setListColumn: (col: 'active' | 'expired' | 'open') => void;
     clearFilters: () => void;
     filteredChallenges: any[];
 
@@ -76,6 +78,9 @@ interface ChallengeContextType {
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
     effectiveUser: any;
+    loadingParticipants: boolean;
+    participantsError: string | null;
+    retryFetchParticipants: () => void;
 }
 
 const addRecentChallenge = (id: string) => {
@@ -148,6 +153,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setModeFilter = useChallengeStore(s => s.setModeFilter);
     const lengthFilter = useChallengeStore(s => s.lengthFilter);
     const setLengthFilter = useChallengeStore(s => s.setLengthFilter);
+    const listColumn = useChallengeStore(s => s.listColumn);
+    const setListColumn = useChallengeStore(s => s.setListColumn);
     const clearFilters = useChallengeStore(s => s.clearFilters);
     const resetForm = useChallengeStore(s => s.resetForm);
     const joinId = useChallengeStore(s => s.joinId);
@@ -165,6 +172,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges } = useMyChallenges(effectiveUser?.id);
+    const { data: discoverChallengesData, isLoading: isDiscoverLoading } = useDiscoverChallenges();
     const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
         createChallenge: createMutation,
@@ -178,14 +186,54 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // 2. Legacy Hook (Keep for real-time logic only)
     const challengeApi = useChallenge(user);
-    const { subscribeToParticipants, participants } = challengeApi;
+    const { subscribeToParticipants, participants, loadingParticipants, participantsError, retryFetchParticipants } = challengeApi;
 
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
 
     // 3. Computed State
     const myChallenges = useMemo(() => myChallengesData || [], [myChallengesData]);
+    const discoverChallenges = useMemo(() => discoverChallengesData || [], [discoverChallengesData]);
     const availableProfiles = useMemo(() => profilesData || [], [profilesData]);
+
+    const myChallengesRef = useRef(myChallenges);
+    const effectiveUserRef = useRef(effectiveUser);
+    const userRef = useRef(user);
+
+    useEffect(() => {
+        myChallengesRef.current = myChallenges;
+    }, [myChallenges]);
+
+    useEffect(() => {
+        effectiveUserRef.current = effectiveUser;
+    }, [effectiveUser]);
+
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
+
+    const openChallenges = useMemo(() => {
+        if (!effectiveUser) return discoverChallenges;
+        return discoverChallenges.filter((challenge: any) => {
+            const isCreator = challenge.creator_id === effectiveUser.id;
+            const isParticipant = challenge.participants?.some(
+                (p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id
+            );
+            return !isCreator && !isParticipant;
+        });
+    }, [discoverChallenges, effectiveUser]);
+
+    const openChallengeItems = useMemo(() => {
+        return openChallenges.map((c: any) => ({
+            id: `open-${c.id}`,
+            challenge_id: c.id,
+            challenge: c,
+            status: 'open',
+            score: 0,
+            attempts: 0,
+            guesses: []
+        }));
+    }, [openChallenges]);
 
     const unplayedCount = useMemo(() =>
         myChallenges.filter((c: any) => (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date()).length,
@@ -197,30 +245,41 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, [unplayedCount, setChallengeUnreadCount]);
 
     const filteredChallenges = useMemo(() => {
-        return myChallenges.filter((item: any) => {
-            const challenge = item.challenge;
-            const isExpired = new Date(challenge.expires_at) < new Date();
-            const isFinished = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-            const isHost = item.status === 'host';
+        let sourceList: any[] = [];
+        if (listColumn === 'active') {
+            sourceList = myChallenges.filter((item: any) => {
+                const isExpired = new Date(item.challenge?.expires_at) < new Date();
+                return !isExpired && item.status !== 'viewed';
+            });
+        } else if (listColumn === 'expired') {
+            sourceList = myChallenges.filter((item: any) => {
+                const isExpired = new Date(item.challenge?.expires_at) < new Date();
+                return isExpired;
+            });
+        } else if (listColumn === 'open') {
+            sourceList = openChallengeItems;
+        }
 
-            if (statusFilter === 'ACTIVE' && (isFinished || isExpired) && !isHost) return false;
-            if (statusFilter === 'COMPLETED' && (!isFinished && !isExpired) && !isHost) return false;
-            // Hosts stay in active until expired
-            if (isHost && statusFilter === 'COMPLETED') return false;
-            if (isHost && isExpired && statusFilter === 'ACTIVE') return false;
+        return sourceList.filter((item: any) => {
+            const challenge = item.challenge;
+            if (!challenge) return false;
+
             if (modeFilter !== 'ALL' && challenge.mode !== modeFilter) return false;
             if (lengthFilter !== 'ALL' && challenge.word_length !== lengthFilter) return false;
 
             if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const creatorName = challenge.creator?.username?.toLowerCase() || '';
                 const opponentNames = challenge.participants
                     ?.filter((p: any) => p.user_id !== effectiveUser?.id && p.guest_id !== effectiveUser?.id)
                     .map((p: any) => p.profiles?.username?.toLowerCase() || '')
-                    .join(' ');
-                if (!opponentNames.includes(searchQuery.toLowerCase())) return false;
+                    .join(' ') || '';
+
+                if (!creatorName.includes(query) && !opponentNames.includes(query)) return false;
             }
             return true;
         });
-    }, [myChallenges, statusFilter, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
+    }, [myChallenges, openChallengeItems, listColumn, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
 
     // 4. Action Wrappers
     const cleanupSubscription = useCallback(() => {
@@ -252,7 +311,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const handleViewChallenge = useCallback(async (id: string) => {
         // 1. Check local cache (myChallenges) for immediate display
-        const localMatch = myChallenges.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
+        const localMatch = myChallengesRef.current.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
 
         if (localMatch && localMatch.challenge) {
             const cachedChallenge = { ...localMatch.challenge };
@@ -262,7 +321,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             setMyParticipation(normalizeParticipation(localMatch, cachedChallenge));
             setActiveTab('join');
         } else {
-            if (selectedChallenge?.id !== id) {
+            const currentSelected = useChallengeStore.getState().selectedChallenge;
+            if (currentSelected?.id !== id) {
                 setSelectedChallenge(null);
                 setMyParticipation(null);
             }
@@ -317,19 +377,20 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 setSelectedChallenge(challenge);
                 setActiveTab('join');
 
+                const currentUser = effectiveUserRef.current;
                 // If user is authenticated or has guest ID, load/join participation
-                if (effectiveUser) {
-                    const isCreatorOfCustom = challenge.creator_id === effectiveUser.id && challenge.is_custom_word;
+                if (currentUser) {
+                    const isCreatorOfCustom = challenge.creator_id === currentUser.id && challenge.is_custom_word;
                     if (!isCreatorOfCustom) {
                         const participationPromise = !isExpired
-                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: effectiveUser.id, isGuest: !user })
+                            ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: currentUser.id, isGuest: !userRef.current })
                             : Promise.resolve(localMatch || null);
 
                         let participation = localMatch;
                         if (!participation && !isExpired) {
                             participation = await participationPromise;
                         } else if (isExpired) {
-                            participation = challenge.participants?.find((p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id) || null;
+                            participation = challenge.participants?.find((p: any) => p.user_id === currentUser.id || p.guest_id === currentUser.id) || null;
                         } else {
                             participationPromise.then(p => {
                                 setMyParticipation(normalizeParticipation(p, challenge));
@@ -353,7 +414,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             console.error("Failed to load challenge details", err);
             triggerToast(err?.message || "Failed to load challenge details.", 4000);
         }
-    }, [myChallenges, normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, selectedChallenge?.id, queryClient, cleanupSubscription, joinMutation, effectiveUser, subscribeToParticipants, triggerToast]);
+    }, [normalizeParticipation, setSelectedChallenge, setMyParticipation, setActiveTab, queryClient, cleanupSubscription, joinMutation, subscribeToParticipants, triggerToast]);
 
     const joinSelectedChallenge = useCallback(async () => {
         if (!selectedChallenge || !effectiveUser) return;
@@ -518,6 +579,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 // 1. Always update the specific word progress
                 const marathonPromise = marathonMutation.mutateAsync({
                     participationId: myParticipation.id,
+                    challengeId: selectedChallenge!.id,
                     gameIndex: resolvedGameIndex,
                     wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
                     result
@@ -693,7 +755,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         },
         loadMyChallenges: async () => { await refetchChallenges(); },
         submitResult,
-        loading: isChallengesLoading || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
+        listColumn,
+        setListColumn,
+        loading: isChallengesLoading || (listColumn === 'open' && isDiscoverLoading) || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
         error: null,
         joinId,
         setJoinId,
@@ -709,8 +773,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         registerAnonymousUser,
         effectiveUser,
         isEditingChallenge,
-        setIsEditingChallenge
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge]);
+        setIsEditingChallenge,
+        loadingParticipants,
+        participantsError,
+        retryFetchParticipants
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

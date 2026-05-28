@@ -27,6 +27,7 @@ interface ChallengeState {
     statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
     modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
     lengthFilter: 'ALL' | number;
+    listColumn: 'active' | 'expired' | 'open';
 
     // Actions
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
@@ -48,6 +49,7 @@ interface ChallengeState {
     setStatusFilter: (f: 'ALL' | 'ACTIVE' | 'COMPLETED') => void;
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     setLengthFilter: (l: 'ALL' | number) => void;
+    setListColumn: (col: 'active' | 'expired' | 'open') => void;
     clearFilters: () => void;
     resetForm: () => void;
 }
@@ -72,6 +74,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     statusFilter: 'ALL',
     modeFilter: 'ALL',
     lengthFilter: 'ALL',
+    listColumn: 'active',
 
     // Actions
     setActiveTab: (activeTab) => set({ activeTab }),
@@ -100,6 +103,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     setStatusFilter: (statusFilter) => set({ statusFilter }),
     setModeFilter: (modeFilter) => set({ modeFilter }),
     setLengthFilter: (lengthFilter) => set({ lengthFilter }),
+    setListColumn: (listColumn) => set({ listColumn }),
     clearFilters: () => set({
         searchQuery: '',
         statusFilter: 'ALL',

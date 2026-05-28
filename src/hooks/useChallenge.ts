@@ -71,7 +71,12 @@ export interface ChallengeParticipant {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const useChallenge = (_user: AppUser | null) => {
     const [participants, setParticipants] = useState<ChallengeParticipant[]>([]);
+    const [loadingParticipants, setLoadingParticipants] = useState(false);
+    const [participantsError, setParticipantsError] = useState<string | null>(null);
+    
     const participantsRef = useRef<ChallengeParticipant[]>([]);
+    const activeChallengeIdRef = useRef<string | null>(null);
+    const fetchRef = useRef<(() => Promise<void>) | null>(null);
 
     const normalizeParticipation = useCallback((p: any, challenge: any) => {
         if (!p || !challenge) return p;
@@ -90,8 +95,10 @@ export const useChallenge = (_user: AppUser | null) => {
     const subscribeToParticipants = useCallback((challengeId: string) => {
         const channelName = `challenge_participants_${challengeId}`;
         
+        activeChallengeIdRef.current = challengeId;
         // Clear previous participants immediately to prevent stale data flash
         setParticipants([]);
+        setParticipantsError(null);
 
         // Remove existing channel if it exists
         const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
@@ -100,30 +107,61 @@ export const useChallenge = (_user: AppUser | null) => {
         }
 
         const fetchAndSet = async () => {
-            // Fetch challenge mode/max_time and participants in a single query by using join if possible, 
-            // but challenge mode is static mostly. Let's just fetch participants.
-            const { data: challengeData } = await supabase
-                .from('challenges')
-                .select('mode, max_time')
-                .eq('id', challengeId)
-                .single();
+            setLoadingParticipants(true);
+            setParticipantsError(null);
 
-            const { data: parts } = await supabase
-                .from('challenge_participants')
-                .select('*, profiles(username, avatar_url), guest_profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
-                .eq('challenge_id', challengeId)
-                .order('score', { ascending: false });
+            let attempts = 0;
+            const maxAttempts = 3;
+            let success = false;
+            let lastError: any = null;
 
-            if (parts && challengeData) {
-                const mappedParts = parts.map((p: any) => ({
-                    ...p,
-                    profiles: p.profiles || p.guest_profiles || null
-                }));
-                const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
-                setParticipants(normalized as ChallengeParticipant[]);
-                participantsRef.current = normalized;
+            while (attempts < maxAttempts && !success) {
+                try {
+                    attempts++;
+                    const { data: challengeData, error: cError } = await supabase
+                        .from('challenges')
+                        .select('mode, max_time')
+                        .eq('id', challengeId)
+                        .single();
+
+                    if (cError) throw cError;
+
+                    const { data: parts, error: pError } = await supabase
+                        .from('challenge_participants')
+                        .select('*, profiles(username, avatar_url), guest_profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
+                        .eq('challenge_id', challengeId)
+                        .order('score', { ascending: false });
+
+                    if (pError) throw pError;
+
+                    if (parts && challengeData) {
+                        const mappedParts = parts.map((p: any) => ({
+                            ...p,
+                            profiles: p.profiles || p.guest_profiles || null
+                        }));
+                        const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
+                        setParticipants(normalized as ChallengeParticipant[]);
+                        participantsRef.current = normalized;
+                        success = true;
+                    } else {
+                        throw new Error("Challenge or participant data not found");
+                    }
+                } catch (err: any) {
+                    console.warn(`[useChallenge] Fetch participants attempt ${attempts} failed:`, err);
+                    lastError = err;
+                    if (attempts < maxAttempts) {
+                        await new Promise(res => setTimeout(res, 1000));
+                    }
+                }
+            }
+
+            setLoadingParticipants(false);
+            if (!success) {
+                setParticipantsError(lastError?.message || "Failed to load participants after 3 attempts.");
             }
         };
+
+        fetchRef.current = fetchAndSet;
 
         const channel = supabase
             .channel(channelName)
@@ -136,13 +174,9 @@ export const useChallenge = (_user: AppUser | null) => {
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'challenge_participants_marathon'
-            }, (payload) => {
-                const updatedPartId = (payload.new as any)?.participation_id;
-                if (!updatedPartId || participantsRef.current.some(p => p.id === updatedPartId)) {
-                    fetchAndSet();
-                }
-            })
+                table: 'challenge_participants_marathon',
+                filter: `challenge_id=eq.${challengeId}`
+            }, fetchAndSet)
             .subscribe();
 
         // Initial fetch
@@ -151,8 +185,17 @@ export const useChallenge = (_user: AppUser | null) => {
         return channel;
     }, [normalizeParticipation]);
 
+    const retryFetchParticipants = useCallback(() => {
+        if (fetchRef.current) {
+            fetchRef.current();
+        }
+    }, []);
+
     return {
         subscribeToParticipants,
-        participants
+        participants,
+        loadingParticipants,
+        participantsError,
+        retryFetchParticipants
     };
 };
