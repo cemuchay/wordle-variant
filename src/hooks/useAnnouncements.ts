@@ -20,8 +20,18 @@ export const useAnnouncements = () => {
             console.error('Failed to parse read announcements', e);
         }
 
-        // Find the latest (last in array) announcement that is unread
-        const latestUnread = [...ANNOUNCEMENTS].reverse().find(a => !readIds.includes(a.id));
+        // Find the latest (last in array) announcement that is unread and 3 days or younger
+        const latestUnread = [...ANNOUNCEMENTS].reverse().find(a => {
+            if (readIds.includes(a.id)) return false;
+
+            const annDate = new Date(a.date);
+            annDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const diffTime = todayMidnight.getTime() - annDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays <= 3;
+        });
 
         if (latestUnread) {
             // eslint-disable-next-line react-hooks/set-state-in-effect

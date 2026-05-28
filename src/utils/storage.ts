@@ -1,5 +1,21 @@
 type StorageType = 'local' | 'session';
 
+const originalLocalStorage = (() => {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+})();
+
+const originalSessionStorage = (() => {
+  try {
+    return typeof window !== 'undefined' ? window.sessionStorage : null;
+  } catch {
+    return null;
+  }
+})();
+
 class SafeStorage implements Storage {
   private type: StorageType;
   private memoryStore: Record<string, string> = {};
@@ -24,11 +40,7 @@ class SafeStorage implements Storage {
   }
 
   private getUnderlyingStorage(): Storage | null {
-    try {
-      return this.type === 'local' ? window.localStorage : window.sessionStorage;
-    } catch {
-      return null;
-    }
+    return this.type === 'local' ? originalLocalStorage : originalSessionStorage;
   }
 
   get length(): number {
