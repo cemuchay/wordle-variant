@@ -266,6 +266,35 @@ export const useDiscoverChallenges = () => {
 };
 
 /**
+ * Hook to fetch all active public challenges for discovery.
+ */
+export const useDiscoverChallenges = () => {
+    return useQuery({
+        queryKey: ['discover-challenges'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('challenges')
+                .select(`
+                    *,
+                    creator:profiles!creator_id(username, avatar_url),
+                    participants:challenge_participants(
+                        *,
+                        profiles(username, avatar_url),
+                        guest_profiles(username, avatar_url),
+                        marathon_progress:challenge_participants_marathon(*)
+                    )
+                `)
+                .eq('is_public', true)
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return (data || []).map(mapChallenge);
+        }
+    });
+};
+
+/**
  * Helper to count yellow + green matches between a starter word and a target word.
  */
 function getMatchCount(starter: string, target: string): number {
