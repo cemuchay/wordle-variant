@@ -371,7 +371,7 @@ export const useChallengeMutations = () => {
     const submitResult = useMutation({
         mutationFn: async ({ participationId, result }: any) => {
             const updateData: any = { ...result };
-            if (result.status && result.status !== 'playing') {
+            if (result?.status && result.status !== 'playing') {
                 updateData.completed_at = new Date().toISOString();
             }
 
@@ -384,7 +384,7 @@ export const useChallengeMutations = () => {
             return true;
         },
         onSuccess: (_, variables) => {
-            if (variables.result.status !== 'playing') {
+            if (variables?.result?.status !== 'playing') {
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
                 queryClient.invalidateQueries({ queryKey: ['challenge'] });
             }
@@ -480,7 +480,7 @@ export const useChallengeMutations = () => {
                 ...result
             };
 
-            if (result.status && result.status !== 'playing') {
+            if (result?.status && result.status !== 'playing') {
                 data.completed_at = new Date().toISOString();
             }
 
@@ -492,7 +492,7 @@ export const useChallengeMutations = () => {
             return true;
         },
         onSuccess: (_, variables) => {
-            if (variables.result.status !== 'playing') {
+            if (variables?.result?.status !== 'playing') {
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
                 queryClient.invalidateQueries({ queryKey: ['challenge'] });
             }
