@@ -136,13 +136,9 @@ export const useChallenge = (_user: AppUser | null) => {
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'challenge_participants_marathon'
-            }, (payload) => {
-                const updatedPartId = (payload.new as any)?.participation_id;
-                if (!updatedPartId || participantsRef.current.some(p => p.id === updatedPartId)) {
-                    fetchAndSet();
-                }
-            })
+                table: 'challenge_participants_marathon',
+                filter: `challenge_id=eq.${challengeId}`
+            }, fetchAndSet)
             .subscribe();
 
         // Initial fetch

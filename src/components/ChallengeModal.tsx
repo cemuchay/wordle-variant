@@ -138,7 +138,6 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         loading,
         error,
         searchQuery, setSearchQuery,
-        statusFilter, setStatusFilter,
         modeFilter, setModeFilter,
         lengthFilter, setLengthFilter,
         clearFilters,
@@ -147,7 +146,9 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         previewMarathonGameIndex, setPreviewMarathonGameIndex,
         backAction,
         isEditingChallenge,
-        setIsEditingChallenge
+        setIsEditingChallenge,
+        listColumn,
+        setListColumn
     } = useChallengeContext();
 
     const toggleFilters = () => {
@@ -245,6 +246,23 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                     <ChallengeLobby />
                                 ) : (
                                     <div className="space-y-6">
+                                        {/* Segmented Switcher for Columns */}
+                                        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
+                                            {(['active', 'expired', 'open'] as const).map((tab) => (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => setListColumn(tab)}
+                                                    className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
+                                                        listColumn === tab
+                                                            ? 'bg-correct text-black font-extrabold shadow-md'
+                                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                                    }`}
+                                                >
+                                                    {tab === 'open' ? 'Open (Discover)' : tab}
+                                                </button>
+                                            ))}
+                                        </div>
+
                                         {/* Search and Filters Toggle */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2">
@@ -281,19 +299,6 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                             >
                                                                 Clear All
                                                             </button>
-
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Status</span>
-                                                                {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((f) => (
-                                                                    <button
-                                                                        key={f}
-                                                                        onClick={() => setStatusFilter(f)}
-                                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${statusFilter === f ? 'bg-correct text-black' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'}`}
-                                                                    >
-                                                                        {f}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
 
                                                             <div className="flex flex-wrap items-center gap-2">
                                                                 <span className="text-[9px] font-black uppercase text-gray-500 w-10 shrink-0">Mode</span>
@@ -346,12 +351,13 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                                                     {myChallenges.length === 0 ? "No challenges yet." : "No matching challenges found."}
                                                 </div>
                                             ) : (
-                                                filteredChallenges.map((item) => (
+                                                filteredChallenges.map((item, idx) => (
                                                     <ChallengeItem
                                                         key={item.id}
                                                         item={item}
                                                         user={user}
                                                         onSelect={handleViewChallenge}
+                                                        index={idx}
                                                     />
                                                 ))
                                             )}
