@@ -78,6 +78,9 @@ interface ChallengeContextType {
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
     effectiveUser: any;
+    loadingParticipants: boolean;
+    participantsError: string | null;
+    retryFetchParticipants: () => void;
 }
 
 const addRecentChallenge = (id: string) => {
@@ -183,7 +186,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // 2. Legacy Hook (Keep for real-time logic only)
     const challengeApi = useChallenge(user);
-    const { subscribeToParticipants, participants } = challengeApi;
+    const { subscribeToParticipants, participants, loadingParticipants, participantsError, retryFetchParticipants } = challengeApi;
 
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
@@ -770,8 +773,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         registerAnonymousUser,
         effectiveUser,
         isEditingChallenge,
-        setIsEditingChallenge
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn]);
+        setIsEditingChallenge,
+        loadingParticipants,
+        participantsError,
+        retryFetchParticipants
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

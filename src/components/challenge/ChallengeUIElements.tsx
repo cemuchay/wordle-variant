@@ -229,7 +229,7 @@ export const ChallengeItem = memo(function ChallengeItem({
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-wrap items-center gap-2">
           {/* Index Number Badge */}
-          <span className="text-[10px] font-black text-white/50 bg-white/10 px-2 py-0.5 rounded-lg font-mono">
+          <span className="text-[10px] font-black text-white/80 bg-white/10 px-2 py-0.5 rounded-lg font-mono">
             #{index + 1}
           </span>
           {/* Mode Pill */}
@@ -295,7 +295,7 @@ export const ChallengeItem = memo(function ChallengeItem({
       </div>
 
       {/* CONFIGURATION OPTIONS SUB-LINE */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.625rem] font-bold text-gray-400 border-t border-b border-white/5 py-2 w-full">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.625rem] font-bold text-white border-t border-b border-white/5 py-2 w-full">
         {/* Privacy Badge */}
         <span className="flex items-center gap-1 text-white">
           {challenge.is_public ? (
@@ -351,7 +351,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ? "text-correct"
                   : status === "playing"
                     ? "text-yellow-500"
-                    : "text-gray-500"
+                    : "text-white/80"
               }`}
             >
               {status === "host" ? "Host (Spectating)" : status}
@@ -359,7 +359,7 @@ export const ChallengeItem = memo(function ChallengeItem({
             {status !== "host" && hasStarted && (
               <span className="text-[8px] sm:text-lg font-black text-white">
                 {myScore}{" "}
-                <span className="text-[9px] font-medium text-gray-500">
+                <span className="text-[9px] font-medium text-white/80">
                   pts
                 </span>
               </span>
@@ -367,7 +367,7 @@ export const ChallengeItem = memo(function ChallengeItem({
           </div>
 
           {status !== "host" && hasStarted && (
-            <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-1 pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between text-[8px] font-bold text-white mt-1 pt-1 border-t border-white/5">
               <span>
                 {item.attempts || item.guesses?.length || 0}{" "}
                 {(item.attempts || item.guesses?.length || 0) === 1
@@ -375,7 +375,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   : "Guesses"}
               </span>
               {mode === "LIVE" && time_taken && (
-                <span className="flex items-center gap-0.5 text-gray-400">
+                <span className="flex items-center gap-0.5 text-white">
                   <Clock size={8} />
                   {formatTime(time_taken)}
                 </span>
@@ -423,7 +423,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ))}
                 </div>
                 {opponents.length > 3 && (
-                  <span className="text-[8px] font-bold text-gray-500 ml-1">
+                  <span className="text-[8px] font-bold text-white/80 ml-1">
                     +{opponents.length - 3} more
                   </span>
                 )}
@@ -431,7 +431,7 @@ export const ChallengeItem = memo(function ChallengeItem({
 
               {/* Top Opponent Text summary */}
               {leaderParticipant ? (
-                <p className="text-[0.625rem] font-bold text-gray-400 truncate">
+                <p className="text-[0.625rem] font-bold text-white truncate">
                   Leader:{" "}
                   <span className="text-white">
                     @{leaderParticipant.profiles?.username || "Player"}
@@ -439,14 +439,14 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ({leaderParticipant.score} pts)
                 </p>
               ) : (
-                <p className="text-[9px] font-bold text-gray-500 italic">
+                <p className="text-[9px] font-bold text-white/80 italic">
                   No submissions yet
                 </p>
               )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-1">
-              <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest italic animate-pulse">
+              <p className="text-[8px] font-bold text-white/80 uppercase tracking-widest italic animate-pulse">
                 Waiting for others
               </p>
             </div>

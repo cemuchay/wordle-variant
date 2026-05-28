@@ -14,7 +14,7 @@ const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, too
     const isOpen = activeTooltip === tooltipId;
     return (
         <div className={`flex items-center gap-1.5 relative select-none ${className}`}>
-            <span className="text-xs font-black uppercase tracking-widest text-gray-300">
+            <span className="text-xs font-black uppercase tracking-widest text-white">
                 {label}
             </span>
             <button
@@ -23,7 +23,7 @@ const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, too
                     e.stopPropagation();
                     setActiveTooltip(isOpen ? null : tooltipId);
                 }}
-                className="text-gray-400 hover:text-white p-0.5 rounded-full transition-colors flex items-center justify-center focus:outline-none animate-pulse hover:animate-none"
+                className="text-white/80 hover:text-white p-0.5 rounded-full transition-colors flex items-center justify-center focus:outline-none animate-pulse hover:animate-none"
                 title="What is this?"
             >
                 <HelpCircle size={13} />
@@ -37,7 +37,7 @@ const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, too
                             setActiveTooltip(null);
                         }}
                     />
-                    <div className="absolute left-0 top-6 z-50 bg-gray-950 border border-white/20 p-3.5 rounded-2xl shadow-2xl text-[11px] leading-relaxed text-gray-200 font-medium normal-case tracking-normal w-64 max-w-[85vw] animate-in fade-in zoom-in duration-150">
+                    <div className="absolute left-0 top-6 z-50 bg-gray-950 border border-white/20 p-3.5 rounded-2xl shadow-2xl text-[11px] leading-relaxed text-white font-medium normal-case tracking-normal w-64 max-w-[85vw] animate-in fade-in zoom-in duration-150">
                         {tooltip}
                     </div>
                 </>
@@ -67,11 +67,11 @@ const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: {
                 className={`p-4 rounded-2xl border transition-all text-left ${mode === 'ANYTIME' ? 'border-correct bg-correct/15 border-2 shadow-lg shadow-correct/5' : 'border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
             >
                 <div className="flex items-center justify-between mb-2">
-                    <Clock className={mode === 'ANYTIME' ? 'text-correct' : 'text-gray-400'} size={18} />
+                    <Clock className={mode === 'ANYTIME' ? 'text-correct' : 'text-white/80'} size={18} />
                     {mode === 'ANYTIME' && <div className="w-2 h-2 bg-correct rounded-full" />}
                 </div>
                 <p className="text-xs font-black uppercase text-white">Anytime</p>
-                <p className="text-[9px] text-gray-400 mt-0.5">24h async play</p>
+                <p className="text-[9px] text-white/80 mt-0.5">24h async play</p>
             </button>
             <button
                 type="button"
@@ -79,11 +79,11 @@ const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: {
                 className={`p-4 rounded-2xl border transition-all text-left ${mode === 'LIVE' ? 'border-red-500 bg-red-500/15 border-2 shadow-lg shadow-red-500/5' : 'border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10'}`}
             >
                 <div className="flex items-center justify-between mb-2">
-                    <Play className={mode === 'LIVE' ? 'text-red-500' : 'text-gray-400'} size={18} />
+                    <Play className={mode === 'LIVE' ? 'text-red-500' : 'text-white/80'} size={18} />
                     {mode === 'LIVE' && <div className="w-2 h-2 bg-red-500 rounded-full" />}
                 </div>
                 <p className="text-xs font-black uppercase text-white">Live</p>
-                <p className="text-[9px] text-gray-400 mt-0.5">Timed race & voice</p>
+                <p className="text-[9px] text-white/80 mt-0.5">Timed race & voice</p>
             </button>
         </div>
     </div>
@@ -109,7 +109,7 @@ const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveToolti
                     key={l}
                     type="button"
                     onClick={() => setLength(l)}
-                    className={`w-11 h-11 rounded-xl border font-black transition-all ${length === l ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10 text-xs'}`}
+                    className={`w-11 h-11 rounded-xl border font-black transition-all ${length === l ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10 text-xs'}`}
                 >
                     {l}
                 </button>
@@ -117,14 +117,14 @@ const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveToolti
             <button
                 type="button"
                 onClick={() => setLength(0)} // 0 for random
-                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 0 ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
+                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 0 ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10'}`}
             >
                 Random
             </button>
             <button
                 type="button"
                 onClick={() => setLength(1)} // 1 for marathon
-                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 1 ? 'border-yellow-500 bg-yellow-500 text-black border-2 shadow-lg shadow-yellow-500/20' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
+                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 1 ? 'border-yellow-500 bg-yellow-500 text-black border-2 shadow-lg shadow-yellow-500/20' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10'}`}
             >
                 Marathon
             </button>
@@ -152,7 +152,7 @@ const TimeLimitSelector = memo(({ maxTime, setMaxTime, activeTooltip, setActiveT
                     key={t}
                     type="button"
                     onClick={() => setMaxTime(t)}
-                    className={`flex-1 p-3.5 rounded-xl border text-sm font-black transition-all ${maxTime === t ? 'border-2 border-red-500 bg-red-500/20 text-red-400 shadow-lg shadow-red-500/10' : 'border-white/15 bg-white/5 text-gray-300 hover:border-white/30 hover:bg-white/10'}`}
+                    className={`flex-1 p-3.5 rounded-xl border text-sm font-black transition-all ${maxTime === t ? 'border-2 border-red-500 bg-red-500/20 text-red-400 shadow-lg shadow-red-500/10' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10'}`}
                 >
                     {t}m
                 </button>
@@ -219,19 +219,19 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                 {/* Search Input & Dropdown */}
                 <div className="relative">
                     <div className="relative group">
-                        <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isDropdownOpen ? 'text-correct' : 'text-gray-500'}`} size={16} />
+                        <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isDropdownOpen ? 'text-correct' : 'text-white/80'}`} size={16} />
                         <input
                             type="text"
                             placeholder="Search by username..."
                             value={profileSearch}
                             onFocus={() => setIsDropdownOpen(true)}
                             onChange={(e) => setProfileSearch(e.target.value)}
-                            className="w-full bg-white/5 border border-white/15 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/60 focus:bg-white/10 focus:ring-1 focus:ring-correct/30 transition-all text-white placeholder-gray-500"
+                            className="w-full bg-white/5 border border-white/15 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/60 focus:bg-white/10 focus:ring-1 focus:ring-correct/30 transition-all text-white placeholder-white/60"
                         />
                         {profileSearch && (
                             <button 
                                 onClick={() => setProfileSearch('')}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
                             >
                                 <X size={14} />
                             </button>
@@ -251,14 +251,14 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                                         <img src={p.avatar_url || `https://ui-avatars.com/api/?name=${p.username}`} className="w-8 h-8 rounded-full border border-white/10" alt="" />
                                         <div>
                                             <p className="text-xs font-black text-white">{p.username}</p>
-                                            <p className="text-[9px] text-gray-500 uppercase font-bold">Available</p>
+                                            <p className="text-[9px] text-white/80 uppercase font-bold">Available</p>
                                         </div>
-                                        <Plus size={14} className="ml-auto text-gray-500 group-hover:text-correct" />
+                                        <Plus size={14} className="ml-auto text-white/80 group-hover:text-correct" />
                                     </button>
                                 ))
                             ) : (
                                 <div className="p-8 text-center">
-                                    <p className="text-[10px] text-gray-500 uppercase font-black">{profileSearch ? 'No users found' : 'Type to search users'}</p>
+                                    <p className="text-[10px] text-white/80 uppercase font-black">{profileSearch ? 'No users found' : 'Type to search users'}</p>
                                 </div>
                             )}
                         </div>
@@ -621,21 +621,21 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-black uppercase text-white">Marathon Mode Setup</p>
-                            <p className="text-[10px] text-gray-400">Configure your marathon format</p>
+                            <p className="text-[10px] text-white/80">Configure your marathon format</p>
                         </div>
                         
                         <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                             <button
                                 type="button"
                                 onClick={() => handleSetMarathonType('standard')}
-                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'standard' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
+                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'standard' ? 'bg-yellow-500 text-black font-extrabold' : 'text-white/80'}`}
                             >
                                 Standard (3-7L)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleSetMarathonType('custom')}
-                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'custom' ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-500'}`}
+                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'custom' ? 'bg-yellow-500 text-black font-extrabold' : 'text-white/80'}`}
                             >
                                 Custom
                             </button>
@@ -645,13 +645,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {marathonType === 'custom' && (
                         <div className="space-y-4 animate-in fade-in duration-200">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-white">
                                     Current Game Sequence ({marathonGames.length}/20 Games)
                                 </label>
                                 
                                 {marathonGames.length === 0 ? (
                                     <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase">No games added yet. Click lengths below to build your sequence.</p>
+                                        <p className="text-[10px] text-white/80 font-bold uppercase">No games added yet. Click lengths below to build your sequence.</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-2 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[220px] overflow-y-auto">
@@ -660,13 +660,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                 key={idx} 
                                                 className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-white transition-colors"
                                             >
-                                                <span className="text-gray-300">Game #{idx + 1}: <strong className="text-yellow-500 ml-1">{l}L Word</strong></span>
+                                                <span className="text-white">Game #{idx + 1}: <strong className="text-yellow-500 ml-1">{l}L Word</strong></span>
                                                 <div className="flex items-center gap-1">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleMoveGame(idx, 'up')}
                                                         disabled={idx === 0}
-                                                        className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                                        className="p-1 text-white/80 hover:text-white disabled:opacity-30 disabled:hover:text-white/80 transition-colors"
                                                     >
                                                         <ChevronUp size={14} />
                                                     </button>
@@ -674,7 +674,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                         type="button"
                                                         onClick={() => handleMoveGame(idx, 'down')}
                                                         disabled={idx === marathonGames.length - 1}
-                                                        className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                                                        className="p-1 text-white/80 hover:text-white disabled:opacity-30 disabled:hover:text-white/80 transition-colors"
                                                     >
                                                         <ChevronDown size={14} />
                                                     </button>
@@ -685,7 +685,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                             next.splice(idx, 1);
                                                             handleUpdateMarathonGames(next);
                                                         }}
-                                                        className="p-1 text-gray-400 hover:text-red-500 transition-colors ml-1"
+                                                        className="p-1 text-white/80 hover:text-red-500 transition-colors ml-1"
                                                     >
                                                         <X size={14} />
                                                     </button>
@@ -697,7 +697,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-white">
                                     Add Game Length
                                 </label>
                                 <div className="flex gap-2">
@@ -758,7 +758,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 className="w-full py-3.5 px-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl flex items-center justify-between text-xs font-black uppercase tracking-wider text-white transition-all shadow-md"
             >
                 <span className="flex items-center gap-2"><Settings2 size={14} /> Advanced Settings</span>
-                <span className="text-gray-400">{showAdvanced ? 'Hide' : 'Show'}</span>
+                <span className="text-white/80">{showAdvanced ? 'Hide' : 'Show'}</span>
             </button>
 
             {showAdvanced && (
@@ -883,7 +883,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                     <div className="space-y-2.5">
                                         {marathonGames.map((l, idx) => (
                                             <div key={idx} className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Word):</span>
+                                                <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Word):</span>
                                                 <input
                                                     type="text"
                                                     maxLength={l}
@@ -904,7 +904,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400">Target Word ({length === 0 ? '5-letter default' : `${length}-letter`}):</label>
+                                        <label className="text-[10px] font-black uppercase text-white">Target Word ({length === 0 ? '5-letter default' : `${length}-letter`}):</label>
                                         <input
                                             type="text"
                                             maxLength={length === 0 ? 5 : length}
@@ -985,7 +985,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                         {length === 1 ? (
                                             marathonGames.map((l, idx) => (
                                                 <div key={idx} className="flex flex-col gap-1">
-                                                    <span className="text-[10px] font-black uppercase text-gray-400">Game #{idx + 1} ({l}-letter Starter):</span>
+                                                    <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Starter):</span>
                                                     <input
                                                         type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"}
                                                         maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l}
@@ -1006,7 +1006,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                             ))
                                         ) : (
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-black uppercase text-gray-400">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
+                                                <label className="text-[10px] font-black uppercase text-white">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
                                                 <input
                                                     type={handicapStarter === '__MASKED__' ? "password" : "text"}
                                                     maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)}
@@ -1041,14 +1041,14 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                     <button
                                         type="button"
                                         onClick={() => setTimerType('same')}
-                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-gray-500'}`}
+                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-white/80'}`}
                                     >
                                         Same
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setTimerType('custom')}
-                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-gray-500'}`}
+                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-white/80'}`}
                                     >
                                         Custom
                                     </button>
@@ -1058,7 +1058,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                 <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
                                     {marathonGames.map((l, idx) => (
                                         <div key={idx} className="space-y-1 min-w-[50px] flex-1">
-                                            <p className="text-[8px] font-black uppercase text-gray-500 text-center">#{idx + 1} ({l}L)</p>
+                                            <p className="text-[8px] font-black uppercase text-white/80 text-center">#{idx + 1} ({l}L)</p>
                                             <input
                                                 type="number"
                                                 inputMode="numeric"
