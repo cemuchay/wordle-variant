@@ -297,6 +297,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const synthRef = useRef<TechHouseSynth | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+    const recordingIntervalRef = useRef<any>(null);
+    const preRecordIntervalRef = useRef<any>(null);
+    const wrappedTextCache = useRef<Record<string, string[]>>({});
+
     // 1. Fetch Weekly Wrapped Data
     useEffect(() => {
         if (!isOpen) return;
@@ -373,9 +377,18 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     useEffect(() => {
         if (!isOpen) {
             setGeneratedVideoFile(null);
+            wrappedTextCache.current = {};
             if (synthRef.current) {
                 synthRef.current.stop();
                 synthRef.current = null;
+            }
+            if (preRecordIntervalRef.current) {
+                clearInterval(preRecordIntervalRef.current);
+                preRecordIntervalRef.current = null;
+            }
+            if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+                recordingIntervalRef.current = null;
             }
             return;
         }
@@ -394,6 +407,14 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             if (synthRef.current) {
                 synthRef.current.stop();
                 synthRef.current = null;
+            }
+            if (preRecordIntervalRef.current) {
+                clearInterval(preRecordIntervalRef.current);
+                preRecordIntervalRef.current = null;
+            }
+            if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+                recordingIntervalRef.current = null;
             }
         };
     }, [isOpen, isPlayingMusic]);
@@ -833,23 +854,35 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 ctx.font = `italic bold ${Math.round(width * 0.03)}px sans-serif`;
                 ctx.textAlign = 'center';
 
-                // Wrap text manually
-                const words = dayScore.game_message.split(' ');
-                let line = '';
-                let lines: string[] = [];
-                const maxWordsWidth = width - 160;
+            // Draw Roast/Message
+            if (dayScore.game_message) {
+                ctx.fillStyle = '#f59e0b'; // amber-500
+                const fontSize = Math.round(width * 0.03);
+                ctx.font = `italic bold ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
 
-                for (let n = 0; n < words.length; n++) {
-                    let testLine = line + words[n] + ' ';
-                    let metrics = ctx.measureText(testLine);
-                    if (metrics.width > maxWordsWidth && n > 0) {
-                        lines.push(line);
-                        line = words[n] + ' ';
-                    } else {
-                        line = testLine;
+                const cacheKey = `${dayScore.game_date}_${width}`;
+                let lines = wrappedTextCache.current[cacheKey];
+
+                if (!lines) {
+                    const words = dayScore.game_message.split(' ');
+                    let line = '';
+                    lines = [];
+                    const maxWordsWidth = width - 160;
+
+                    for (let n = 0; n < words.length; n++) {
+                        let testLine = line + words[n] + ' ';
+                        let metrics = ctx.measureText(testLine);
+                        if (metrics.width > maxWordsWidth && n > 0) {
+                            lines.push(line);
+                            line = words[n] + ' ';
+                        } else {
+                            line = testLine;
+                        }
                     }
+                    lines.push(line);
+                    wrappedTextCache.current[cacheKey] = lines;
                 }
-                lines.push(line);
 
                 const roastY = startY + (rows * (tileSize + tileGap)) + Math.round(width * 0.08);
                 const lineSpacing = Math.round(width * 0.04);
@@ -857,6 +890,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 lines.forEach((l, idx) => {
                     ctx.fillText(l.trim(), width / 2, roastY + (idx * lineSpacing));
                 });
+            }
             }
         }
     };
@@ -1024,13 +1058,16 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         };
 
         // Pre-recording drawing loop: draw slide 0 at 20fps to feed the stream during startup
-        const preRecordInterval = setInterval(() => {
+        preRecordIntervalRef.current = setInterval(() => {
             drawSlideToCanvas(ctx, 0, 1080, 1920, 0);
         }, 50);
 
         // Synchronize actual recording timeline with MediaRecorder onstart event
         mediaRecorder.onstart = () => {
-            clearInterval(preRecordInterval);
+            if (preRecordIntervalRef.current) {
+                clearInterval(preRecordIntervalRef.current);
+                preRecordIntervalRef.current = null;
+            }
 
             // Play through all slides programmatically for the video recording (2.0 seconds per slide)
             const slideDuration = 2000; // ms
@@ -1039,7 +1076,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             let elapsed = 0;
             const interval = 33; // draw frame every 33ms (approx 30fps) for smooth video rendering
 
-            const recordingInterval = setInterval(() => {
+            recordingIntervalRef.current = setInterval(() => {
                 elapsed += interval;
                 const progress = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
                 setRecordingProgress(progress);
@@ -1054,7 +1091,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 drawSlideToCanvas(ctx, slideToDraw, 1080, 1920, slideElapsed);
 
                 if (elapsed >= totalDuration) {
-                    clearInterval(recordingInterval);
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                        recordingIntervalRef.current = null;
+                    }
                     mediaRecorder.stop();
                 }
             }, interval);
