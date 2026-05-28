@@ -18,6 +18,7 @@ import { formatTime } from "./lib";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useApp } from "../../context/AppContext";
 import { ConfirmationModal } from "../ConfirmationModal";
+import { safeSessionStorage } from "../../utils/storage";
 import { ChallengeChat } from "./ChallengeChat";
 import { useChallengeChat } from "../../hooks/useChallengeChat";
 import {
@@ -763,7 +764,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => {
-                    sessionStorage.setItem('auth_redirect_target', 'challenge');
+                    safeSessionStorage.setItem('auth_redirect_target', 'challenge');
                     window.dispatchEvent(new CustomEvent("open-auth-modal"));
                   }}
                   className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"

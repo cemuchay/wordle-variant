@@ -159,7 +159,8 @@ export const ChallengeItem = memo(function ChallengeItem({
 
   const myScore = score || 0;
   const isLeader = myScore === maxScore && myScore > 0;
-  const hasStarted = status !== "pending" && status !== "open" && status !== "not_joined";
+  const hasStarted =
+    status !== "pending" && status !== "open" && status !== "not_joined";
 
   const handleSelect = useCallback(() => {
     onSelect(challenge_id);
@@ -175,7 +176,7 @@ export const ChallengeItem = memo(function ChallengeItem({
 
   const isSelfChallenge = useMemo(
     () => !isExpired && opponents.length === 0 && !challenge.is_public,
-    [isExpired, opponents.length, challenge.is_public]
+    [isExpired, opponents.length, challenge.is_public],
   );
 
   // Find the current leader profile
@@ -199,7 +200,7 @@ export const ChallengeItem = memo(function ChallengeItem({
   return (
     <button
       onClick={handleSelect}
-      className={`w-full text-left bg-gradient-to-br from-white/5 to-transparent border ${
+      className={`w-full text-left bg-linear-to-br from-white/5 to-transparent border ${
         isExpired
           ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
           : isSelfChallenge
@@ -236,8 +237,8 @@ export const ChallengeItem = memo(function ChallengeItem({
           <span
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
               mode === "LIVE"
-                ? "bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30"
-                : "bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30"
+                ? "bg-linear-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30"
+                : "bg-linear-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30"
             }`}
           >
             {mode === "LIVE" ? (
@@ -258,8 +259,8 @@ export const ChallengeItem = memo(function ChallengeItem({
           <span
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
               isMarathon
-                ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30"
-                : "bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30"
+                ? "bg-linear-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30"
+                : "bg-linear-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30"
             }`}
           >
             {isMarathon ? (
@@ -474,7 +475,7 @@ export const NetworkLog = memo(function NetworkLog({
 }) {
   if (logs.length === 0) return null;
   return (
-    <div className="absolute top-2 right-2 z-110 flex flex-col items-end gap-1 pointer-events-none max-w-[200px] hidden">
+    <div className="absolute top-2 right-2 z-110 flex-col items-end gap-1 pointer-events-none max-w-[200px] hidden">
       {logs.slice(-5).map((log, index) => (
         <div
           key={log.id}

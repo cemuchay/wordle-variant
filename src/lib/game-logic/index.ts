@@ -7,6 +7,7 @@ import type {
 import { getWordLists } from "../../data/words";
 import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
+import { safeLocalStorage } from "../../utils/storage";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -386,7 +387,7 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
  * are updated in LocalStorage immediately after a game ends.
  */
 export const updateStats = (won: boolean, attempts: number): GameStats => {
-  const raw = localStorage.getItem("wordle-statistics");
+  const raw = safeLocalStorage.getItem("wordle-statistics");
   const stats: GameStats = raw
     ? JSON.parse(raw)
     : {
@@ -421,7 +422,7 @@ export const updateStats = (won: boolean, attempts: number): GameStats => {
     stats.guesses["X"] += 1;
   }
 
-  localStorage.setItem("wordle-statistics", JSON.stringify(stats));
+  safeLocalStorage.setItem("wordle-statistics", JSON.stringify(stats));
   return stats;
 };
 
@@ -432,7 +433,7 @@ export const updateStats = (won: boolean, attempts: number): GameStats => {
  * This crawls those keys once and aggregates them into the modern 'wordle-statistics' object.
  */
 export const syncStatsFromLocalStorage = () => {
-  if (localStorage.getItem("stats_synced_v1")) return;
+  if (safeLocalStorage.getItem("stats_synced_v1")) return;
 
   const stats: GameStats = {
     gamesPlayed: 0,
@@ -442,12 +443,12 @@ export const syncStatsFromLocalStorage = () => {
     guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, X: 0 },
   };
 
-  const gameKeys = Object.keys(localStorage)
+  const gameKeys = safeLocalStorage.getAllKeys()
     .filter((key) => /^wordle-\d{4}-\d{2}-\d{2}$/.test(key))
     .sort();
 
   gameKeys.forEach((key) => {
-    const data = localStorage.getItem(key);
+    const data = safeLocalStorage.getItem(key);
     if (!data) return;
 
     try {
@@ -476,8 +477,8 @@ export const syncStatsFromLocalStorage = () => {
     }
   });
 
-  localStorage.setItem("wordle-statistics", JSON.stringify(stats));
-  localStorage.setItem("stats_synced_v1", "true");
+  safeLocalStorage.setItem("wordle-statistics", JSON.stringify(stats));
+  safeLocalStorage.setItem("stats_synced_v1", "true");
 };
 
 /**
@@ -525,7 +526,7 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
       }
     });
 
-    const localRaw = localStorage.getItem("wordle-statistics");
+    const localRaw = safeLocalStorage.getItem("wordle-statistics");
     const localStats: GameStats | null = localRaw ? JSON.parse(localRaw) : null;
 
     if (localStats) {
@@ -534,8 +535,8 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
       }
     }
 
-    localStorage.setItem("wordle-statistics", JSON.stringify(cloudStats));
-    localStorage.setItem("stats_synced_v1", "true");
+    safeLocalStorage.setItem("wordle-statistics", JSON.stringify(cloudStats));
+    safeLocalStorage.setItem("stats_synced_v1", "true");
   } catch (err) {
     console.error("Cloud sync failed:", err);
   }

@@ -2,6 +2,7 @@
 import { useCallback, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser } from '../types/game';
+import { safeSessionStorage } from '../utils/storage';
 
 export interface Challenge {
     profiles: any;
@@ -100,7 +101,7 @@ export const useChallenge = (_user: AppUser | null) => {
         // Attempt to load from sessionStorage to prevent loading flash
         let initialParticipants: ChallengeParticipant[] = [];
         try {
-            const cached = sessionStorage.getItem(`wordle_challenge_participants_${challengeId}`);
+            const cached = safeSessionStorage.getItem(`wordle_challenge_participants_${challengeId}`);
             if (cached) {
                 initialParticipants = JSON.parse(cached);
             }
@@ -161,7 +162,7 @@ export const useChallenge = (_user: AppUser | null) => {
                             setParticipants(normalized as ChallengeParticipant[]);
                             participantsRef.current = normalized;
                             try {
-                                sessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
+                                safeSessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
                             } catch (e) {
                                 console.error('Failed to cache participants', e);
                             }

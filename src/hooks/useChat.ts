@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
+import { safeLocalStorage } from "../utils/storage";
 
 export interface Message {
    id: string;
@@ -24,7 +25,7 @@ export const useChat = (userId: string) => {
 
    // Get the timestamp from the browser's local storage
    const getLastSeen = () =>
-      localStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString();
+      safeLocalStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString();
 
    const typingTimeoutRef = useRef<number | null>(null);
 
@@ -213,7 +214,7 @@ export const useChat = (userId: string) => {
    };
 
    const markAsRead = async (messageId: string) => {
-      localStorage.setItem(`lastSeen_${userId}`, new Date().toISOString());
+      safeLocalStorage.setItem(`lastSeen_${userId}`, new Date().toISOString());
       setUnreadCount(0);
       setFirstUnreadId(null);
       await supabase

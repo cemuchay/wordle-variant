@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy } from 'react';
 import type { ComponentType } from 'react';
+import { safeLocalStorage } from './storage';
 
 /**
  * A wrapper around React.lazy that catches chunk loading errors (which typically
@@ -18,12 +19,12 @@ export const safeLazy = <T extends ComponentType<any>>(
       }
       return module as any;
     } catch (error) {
-      const lastReload = localStorage.getItem('last-chunk-reload');
+      const lastReload = safeLocalStorage.getItem('last-chunk-reload');
       const now = Date.now();
 
       // Avoid infinite reload loops: only reload if the last reload was > 10 seconds ago
       if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
-        localStorage.setItem('last-chunk-reload', now.toString());
+        safeLocalStorage.setItem('last-chunk-reload', now.toString());
         console.warn('Dynamic chunk import failed due to build update. Reloading page...', error);
         window.location.reload();
         // Return a pending promise to prevent rendering half-broken components
