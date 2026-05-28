@@ -79,6 +79,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
                         <button
                             onClick={() => {
                                 onClose();
+                                sessionStorage.setItem('auth_redirect_target', 'challenge');
                                 window.dispatchEvent(
                                     new CustomEvent('open-auth-modal')
                                 );

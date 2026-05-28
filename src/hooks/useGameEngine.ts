@@ -71,6 +71,33 @@ export const useGameEngine = (date: string) => {
         }
     }, [user, date]);
 
+    const loadFromCloud = useCallback(async () => {
+        if (!user || !date) return null;
+        try {
+            const { data, error } = await supabase
+                .from('scores')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('game_date', date)
+                .single();
+
+            if (!error && data) {
+                return {
+                    guesses: data.guesses,
+                    letterStatuses: getLetterStatuses(data.guesses),
+                    status: data.status,
+                    usedHint: data.hints_used,
+                    hintRecord: data.hint_record,
+                    config: { ...config, word: config.word }, // Use current config
+                    gameMessage: data.game_message
+                };
+            }
+        } catch (e) {
+            console.error("Cloud fetch failed:", e);
+        }
+        return null;
+    }, [user, date, config]);
+
     // Hydration & Authentication Swap Logic
     useEffect(() => {
         if (!date || isAuthLoading) {
@@ -80,33 +107,6 @@ export const useGameEngine = (date: string) => {
 
         setIsHydrated(false);
         const saved = localStorage.getItem(`wordle-${date}`);
-
-        const loadFromCloud = async () => {
-            if (!user) return null;
-            try {
-                const { data, error } = await supabase
-                    .from('scores')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('game_date', date)
-                    .single();
-
-                if (!error && data) {
-                    return {
-                        guesses: data.guesses,
-                        letterStatuses: getLetterStatuses(data.guesses),
-                        status: data.status,
-                        usedHint: data.hints_used,
-                        hintRecord: data.hint_record,
-                        config: { ...config, word: config.word }, // Use current config
-                        gameMessage: data.game_message
-                    };
-                }
-            } catch (e) {
-                console.error("Cloud fetch failed:", e);
-            }
-            return null;
-        };
 
         const hydrate = async () => {
             if (saved) {
@@ -188,7 +188,7 @@ export const useGameEngine = (date: string) => {
         };
 
         hydrate();
-    }, [date, user, isAuthLoading, config, triggerToast, performSync]);
+    }, [date, user, isAuthLoading, config, triggerToast, performSync, loadFromCloud]);
 
     const onChar = useCallback((char: string) => {
         dispatch({ type: 'ADD_LETTER', char, maxLength: config.length });
@@ -200,6 +200,40 @@ export const useGameEngine = (date: string) => {
 
     const onEnter = useCallback(async () => {
         if (state.isGameOver || state.currentGuess.length !== config.length) return;
+
+        // Prevent submission if the game is already completed on the cloud (e.g. from another tab/device)
+        if (user && date) {
+            try {
+                const { data: cloudScore } = await supabase
+                    .from('scores')
+                    .select('status')
+                    .eq('user_id', user.id)
+                    .eq('game_date', date)
+                    .maybeSingle();
+
+                if (cloudScore && (cloudScore.status === 'won' || cloudScore.status === 'lost')) {
+                    triggerToast("Game already completed.");
+                    
+                    // Fetch complete cloud state and override local
+                    const cloudPayload = await loadFromCloud();
+                    if (cloudPayload) {
+                        dispatch({ type: 'LOAD_STATE', payload: cloudPayload });
+                        const localSalt = getLocalSalt(date, user.id);
+                        const savedPayload = {
+                            ...cloudPayload,
+                            config: {
+                                ...cloudPayload.config,
+                                word: obfuscateWord(cloudPayload.config.word, localSalt)
+                            }
+                        };
+                        localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error("Failed to verify cloud score state:", e);
+            }
+        }
 
         const upperGuess = state.currentGuess.toUpperCase();
         const { valid } = getWordLists(config.length);
@@ -293,7 +327,7 @@ export const useGameEngine = (date: string) => {
                 triggerToast(message || state.gameMessage, TOAST_DURATION.LONG + 1000);
             }, revealDelay);
         }
-    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync, ask]);
+    }, [state.isGameOver, state.currentGuess, state.guesses, state.usedHint, state.hintRecord, state.gameMessage, config, date, user, preferences.allowRoasts, triggerToast, updateOptimistically, refresh, performSync, ask, loadFromCloud]);
 
     const handleHint = useCallback(async () => {
         if (state.guesses.length < 2 || state.isGameOver || state.usedHint) return;

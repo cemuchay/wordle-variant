@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const ALERT_EMAIL = "cemuchay@gmail.com";
+const FROM_EMAIL = (Deno.env.get("FROM_EMAIL") || "Wordle Variant Alerts <updates@wordle-variant.xyz>").replace(/^["']|["']$/g, "");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +40,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Wordle Variant Alerts <onboarding@resend.dev>",
+        from: FROM_EMAIL,
         to: [ALERT_EMAIL],
         subject: `🚨 CRITICAL CRASH: ${message}`,
         html: `
