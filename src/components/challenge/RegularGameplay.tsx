@@ -24,7 +24,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
 
-    const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
+    const { state, actions, isSaving, syncFailed, retryCount, wordLength, targetWord, networkLogs } = useChallengeGameEngine({
         challenge,
         participation,
         triggerToast,
@@ -139,7 +139,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                 />
             </div>
 
-            {!isGameOver && (
+            {!isGameOver ? (
                 <div className="w-full max-w-lg mx-auto pb-0.5 shrink-0">
                     <Keyboard
                         onChar={actions.onChar}
@@ -148,6 +148,38 @@ export const RegularGameplay = memo(function RegularGameplay({
                         letterStatuses={letterStatuses}
                         compact={true}
                     />
+                </div>
+            ) : (
+                <div className="w-full max-w-lg mx-auto pb-2 shrink-0 animate-in fade-in slide-in-from-bottom-5 duration-500">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-center gap-3 text-center">
+                        <div>
+                            <span className={`text-xs font-black uppercase tracking-widest ${guesses.some((g: any) => g.every((c: any) => c.status === 'correct')) ? 'text-correct animate-bounce inline-block' : 'text-red-500'}`}>
+                                {guesses.some((g: any) => g.every((c: any) => c.status === 'correct')) ? 'Completed! 🎉' : 'Challenge Failed 💔'}
+                            </span>
+                            <h4 className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-0.5">
+                                The correct word was
+                            </h4>
+                        </div>
+                        
+                        <div className="flex gap-1.5 justify-center">
+                            {(targetWord || '').toUpperCase().split('').map((letter, i) => (
+                                <div
+                                    key={i}
+                                    className="w-8 h-8 rounded-lg bg-correct/10 border border-correct/30 flex items-center justify-center text-xs font-black text-correct shadow-inner shadow-correct/5 animate-in zoom-in duration-300"
+                                    style={{ animationDelay: `${i * 100}ms` }}
+                                >
+                                    {letter}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="w-2 h-2 rounded-full bg-correct animate-pulse" />
+                            <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider">
+                                Syncing results with lobby...
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -245,6 +245,12 @@ const GuessPreviewModal: React.FC<{
   const isMe = profile?.id === entryUserId;
   const canSeeDetails = isMe || viewerHasFinished || isCreator;
 
+  useEffect(() => {
+    if (canSeeDetails) {
+      setShowTargetWord(true);
+    }
+  }, [canSeeDetails]);
+
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"

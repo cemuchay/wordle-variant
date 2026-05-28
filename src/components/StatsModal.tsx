@@ -1,5 +1,5 @@
 import { Eye, Loader2, Trophy, User, X } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
 import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
@@ -48,9 +48,60 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [loading, setLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
   const [viewerHasFinished, setViewerHasFinished] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   const { date: currentDate } = useApp();
 
+  // Fetch Leaderboard Data
+  const fetchLeaderboard = useCallback(async (ignoreCache = false) => {
+    if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
+
+    const cacheKey = `wordle_global_leaderboard_${timeframe}_${currentDate}`;
+    
+    if (!ignoreCache) {
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setLeaderboard(parsed);
+          setLeaderboardError(null);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse cached leaderboard', e);
+      }
+    }
+
+    setLoading(true);
+    setLeaderboardError(null);
+
+    try {
+      const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
+        body: { action: 'get-leaderboard', timeframe, date: currentDate }
+      });
+
+      if (error) throw error;
+
+      if (edgeRes && edgeRes.data) {
+        setLeaderboard(edgeRes.data);
+        setLeaderboardError(null);
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(edgeRes.data));
+        } catch (e) {
+          console.error('Failed to cache leaderboard data', e);
+        }
+      }
+    } catch (err: any) {
+      console.error("Leaderboard fetch error:", err.message || err);
+      setLeaderboardError(err.message || "Failed to retrieve leaderboard data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [isOpen, activeTab, timeframe, currentDate]);
+
+  useEffect(() => {
+    fetchLeaderboard(false);
+  }, [fetchLeaderboard]);
 
   // Check if viewer has finished TODAY's game specifically
   useEffect(() => {
@@ -78,41 +129,45 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     checkStatus();
   }, [isOpen, user, currentDate, isGameOver]);
 
+  // Subscribe to real-time score updates to invalidate the leaderboard cache when someone plays
+  useEffect(() => {
+    if (!isOpen || !currentDate) return;
+
+    const channelName = `scores_leaderboard_sync`;
+    const existing = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'scores',
+          filter: `game_date=eq.${currentDate}`
+        },
+        () => {
+          console.log('[StatsModal] Score insertion/update detected. Invalidating cache and refreshing...');
+          sessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+          sessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+          sessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+          sessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+          fetchLeaderboard(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, currentDate, fetchLeaderboard]);
+
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
   }, [stats]);
-
-  // Fetch Leaderboard Data
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchLeaderboard = async () => {
-      if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
-
-      setLoading(true);
-
-      try {
-        const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
-          body: { action: 'get-leaderboard', timeframe, date: currentDate }
-        });
-
-        if (error) throw error;
-
-        if (isMounted && edgeRes && edgeRes.data) {
-          setLeaderboard(edgeRes.data);
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        console.error("Leaderboard fetch error:", err.message || err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
-
-    return () => { isMounted = false; };
-  }, [isOpen, activeTab, timeframe, currentDate]);
 
   const canViewGuess = !!user && (timeframe === "yesterday" || (timeframe === "today" && viewerHasFinished));
   if (!isOpen) return null;
@@ -229,13 +284,40 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
 
 
-              {loading ? (
+              {leaderboardError && leaderboard.length === 0 ? (
+                <div className="py-12 px-4 text-center bg-red-950/20 border border-red-500/30 rounded-2xl space-y-4">
+                  <div className="bg-red-500/10 text-red-400 p-4 rounded-xl border border-red-500/20">
+                    <p className="text-xs font-black uppercase mb-1">Failed to Rank Players</p>
+                    <p className="text-[10px] leading-relaxed text-red-300/90">{leaderboardError}</p>
+                  </div>
+                  <button
+                    onClick={() => fetchLeaderboard(true)}
+                    className="bg-white text-black px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
+                  >
+                    Retry Connection
+                  </button>
+                </div>
+              ) : loading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
                   <Loader2 className="animate-spin text-gray-600" size={24} />
                   <span className="text-[10px] text-gray-600 uppercase font-bold">Ranking Players...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {leaderboardError && leaderboard.length > 0 && (
+                    <div className="mb-4 bg-amber-500/15 border border-amber-500/30 px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 text-left">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-amber-500">Connection Interrupted</p>
+                        <p className="text-[9px] text-white/80 font-semibold leading-tight">Leaderboard details might be stale.</p>
+                      </div>
+                      <button
+                        onClick={() => fetchLeaderboard(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-black px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
                   {(() => {
                     let currentRank = 1;
                     return leaderboard.map((entry, i, arr) => {
