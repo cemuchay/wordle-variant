@@ -92,7 +92,7 @@ export const useChallengeGameEngine = ({
     letterStatuses: {},
     usedHint: false,
     hintRecord: null,
-    status: participation.status,
+    status: participation?.status || 'pending',
     isGameOver: false,
   });
 
@@ -309,7 +309,7 @@ export const useChallengeGameEngine = ({
 
     const incoming = getIncomingGuesses();
     const progress = isMarathon
-      ? participation.marathon_progress?.find(
+      ? participation?.marathon_progress?.find(
           (p: any) =>
             p.game_index === gameIndex ||
             (p.game_index === undefined &&
@@ -324,7 +324,7 @@ export const useChallengeGameEngine = ({
 
     const serverStatus = isMarathon
       ? progress?.status || "playing"
-      : participation.status;
+      : participation?.status || "playing";
     const isFinishedStatus =
       serverStatus === "completed" || serverStatus === "timed_out";
 
@@ -359,10 +359,10 @@ export const useChallengeGameEngine = ({
     let localGuesses = incoming;
     let localUsedHint = isMarathon
       ? progress?.hints_used || false
-      : participation.hints_used || false;
+      : participation?.hints_used || false;
     let localHintRecord = isMarathon
       ? progress?.hint_record || null
-      : participation.hint_record || null;
+      : participation?.hint_record || null;
 
     try {
       let saved = localStorage.getItem(storageKey);
@@ -431,52 +431,56 @@ export const useChallengeGameEngine = ({
 
     // Side Effects (Timer Start / Timeout Sync)
     const runSideEffects = async () => {
-      // Handle Enforced Starter Word Sync
-      if (isStarterEnforced && !startTimerRef.current) {
-        console.log("[Engine] Syncing enforced starter word to server...");
-        startTimerRef.current = true;
-        await wrappedSubmitResult(
-          {
-            status: "playing",
-            attempts: 1,
-            guesses: localGuesses,
-            started_at: new Date().toISOString(),
-          },
-          isMarathon ? wordLength : undefined,
-          isMarathon ? gameIndex! : undefined,
-        );
-      }
-
-      // Handle Offline Timeout Sync
-      if (hasTimedOutOffline && !isSaving && !startTimerRef.current) {
-        console.log("[Engine] Offline timeout detected, syncing...");
-        startTimerRef.current = true;
-        await handleTimeExpired();
-      }
-
-      // Handle Per-Game Timer Start for LIVE mode
-      if (
-        challenge.mode === "LIVE" &&
-        effectiveMaxTime &&
-        !isSaving &&
-        !hasTimedOutOffline &&
-        !startTimerRef.current
-      ) {
-        const startTime = isMarathon
-          ? progress?.started_at
-          : participation.started_at;
-        if (!startTime) {
-          console.log("[Engine] Starting LIVE timer...");
+      try {
+        // Handle Enforced Starter Word Sync
+        if (isStarterEnforced && !startTimerRef.current) {
+          console.log("[Engine] Syncing enforced starter word to server...");
           startTimerRef.current = true;
           await wrappedSubmitResult(
             {
               status: "playing",
+              attempts: 1,
+              guesses: localGuesses,
               started_at: new Date().toISOString(),
             },
             isMarathon ? wordLength : undefined,
             isMarathon ? gameIndex! : undefined,
           );
         }
+
+        // Handle Offline Timeout Sync
+        if (hasTimedOutOffline && !isSaving && !startTimerRef.current) {
+          console.log("[Engine] Offline timeout detected, syncing...");
+          startTimerRef.current = true;
+          await handleTimeExpired();
+        }
+
+        // Handle Per-Game Timer Start for LIVE mode
+        if (
+          challenge.mode === "LIVE" &&
+          effectiveMaxTime &&
+          !isSaving &&
+          !hasTimedOutOffline &&
+          !startTimerRef.current
+        ) {
+          const startTime = isMarathon
+            ? progress?.started_at
+            : participation?.started_at;
+          if (!startTime) {
+            console.log("[Engine] Starting LIVE timer...");
+            startTimerRef.current = true;
+            await wrappedSubmitResult(
+              {
+                status: "playing",
+                started_at: new Date().toISOString(),
+              },
+              isMarathon ? wordLength : undefined,
+              isMarathon ? gameIndex! : undefined,
+            );
+          }
+        }
+      } catch (e) {
+        console.error("[Engine] Error in runSideEffects:", e);
       }
     };
 
@@ -697,17 +701,22 @@ export const useChallengeGameEngine = ({
     let attempt = 0;
     const maxAttempts = 3;
 
-    while (attempt < maxAttempts && !success) {
-      if (attempt > 0) {
-        setRetryCount(attempt);
-        await new Promise((r) => setTimeout(r, 1500));
+    try {
+      while (attempt < maxAttempts && !success) {
+        if (attempt > 0) {
+          setRetryCount(attempt);
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        success = await wrappedSubmitResult(
+          resultPayload,
+          isMarathon ? wordLength : undefined,
+          isMarathon ? gameIndex! : undefined,
+        );
+        attempt++;
       }
-      success = await wrappedSubmitResult(
-        resultPayload,
-        isMarathon ? wordLength : undefined,
-        isMarathon ? gameIndex! : undefined,
-      );
-      attempt++;
+    } catch (e) {
+      console.error("[Engine] Error during guess submission sync:", e);
+      success = false;
     }
 
     setIsSaving(false);
@@ -809,13 +818,19 @@ export const useChallengeGameEngine = ({
           hint_record: hintWithRow,
         };
       }
-      const success = await wrappedSubmitResult(
-        resultPayload,
-        isMarathon ? wordLength : undefined,
-        isMarathon ? gameIndex! : undefined,
-      );
-      setIsSaving(false);
-      if (!success) triggerToast("Failed to save hint usage.", 3000);
+      try {
+        const success = await wrappedSubmitResult(
+          resultPayload,
+          isMarathon ? wordLength : undefined,
+          isMarathon ? gameIndex! : undefined,
+        );
+        setIsSaving(false);
+        if (!success) triggerToast("Failed to save hint usage.", 3000);
+      } catch (e) {
+        console.error("[Engine] Error in handleHint sync:", e);
+        setIsSaving(false);
+        triggerToast("Failed to save hint usage.", 3000);
+      }
     }
   }, [
     isGameOver,
