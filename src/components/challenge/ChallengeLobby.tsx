@@ -25,6 +25,7 @@ import {
   getMarathonTimer,
   getHandicapStarter,
 } from "../../utils/marathon";
+import { deobfuscateWord } from "../../lib/game-logic";
 
 interface ParticipantItemProps {
   p: ChallengeParticipant;
@@ -289,6 +290,14 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       selectedChallenge.salt,
     );
   }, [isMarathon, selectedChallenge.target_word, selectedChallenge.salt]);
+
+  const deobfuscatedTargetWord = useMemo(() => {
+    if (!selectedChallenge || isMarathon) return "";
+    return deobfuscateWord(
+      selectedChallenge.target_word,
+      selectedChallenge.salt,
+    );
+  }, [selectedChallenge, isMarathon]);
 
   const maxParts = selectedChallenge.max_participants || 100;
   const currentParts = participants.length;
@@ -609,6 +618,49 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               </div>
             )}
         </div>
+
+        {/* Target Word Section for Completed Challenges */}
+        {myParticipation && (
+          <>
+            {!isMarathon ? (
+              (myParticipation.status === 'completed' || myParticipation.status === 'timed_out') && (
+                <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
+                    Target Answer
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-black uppercase tracking-wider font-mono text-correct">
+                      {deobfuscatedTargetWord}
+                    </span>
+                    <span className="text-[8px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded uppercase">
+                      Revealed
+                    </span>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
+                  Marathon Target Answers
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {marathonGamesList.map((game, idx) => {
+                    const prog = myParticipation.marathon_progress?.find((p: any) => p.game_index === idx);
+                    const isFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
+                    return (
+                      <div key={idx} className="bg-black/20 p-2.5 rounded-xl border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[8px] text-white/40 font-bold uppercase">Game #{idx + 1} ({game.wordLength}L)</span>
+                        <span className={`text-xs font-black uppercase tracking-widest ${isFinished ? 'text-correct font-mono' : 'text-white/20'}`}>
+                          {isFinished ? game.word : '• '.repeat(game.wordLength).trim()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="space-y-3">

@@ -151,13 +151,35 @@ export const useMyChallenges = (userId: string | undefined) => {
                 }
             }
 
-            return finalResults.sort((a, b) => {
+            const sortedResults = finalResults.sort((a, b) => {
                 const dateA = new Date(a.challenge.created_at).getTime();
                 const dateB = new Date(b.challenge.created_at).getTime();
                 return dateB - dateA;
             });
+
+            if (userId) {
+                try {
+                    sessionStorage.setItem(`wordle_my_challenges_${userId}`, JSON.stringify(sortedResults));
+                } catch (e) {
+                    console.error('Failed to cache challenges list', e);
+                }
+            }
+
+            return sortedResults;
         },
         enabled: true,
+        initialData: () => {
+            if (!userId) return [];
+            try {
+                const cached = sessionStorage.getItem(`wordle_my_challenges_${userId}`);
+                if (cached) {
+                    return JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error('Failed to load initial challenges cache', e);
+            }
+            return undefined;
+        },
     });
 };
 
@@ -190,9 +212,56 @@ export const useChallengeData = (challengeId: string | null) => {
                 body: { action: 'get-challenge', challengeId }
             });
             if (error) throw error;
-            return mapChallenge(edgeRes?.data) as Challenge;
+            const mapped = mapChallenge(edgeRes?.data) as Challenge;
+            try {
+                sessionStorage.setItem(`wordle_challenge_detail_${challengeId}`, JSON.stringify(mapped));
+            } catch (e) {
+                console.error('Failed to cache challenge details', e);
+            }
+            return mapped;
         },
         enabled: !!challengeId,
+        initialData: () => {
+            if (!challengeId) return undefined;
+            try {
+                const cached = sessionStorage.getItem(`wordle_challenge_detail_${challengeId}`);
+                if (cached) {
+                    return JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error('Failed to load initial challenge detail cache', e);
+            }
+            return undefined;
+        }
+    });
+};
+
+/**
+ * Hook to fetch all active public challenges for discovery.
+ */
+export const useDiscoverChallenges = () => {
+    return useQuery({
+        queryKey: ['discover-challenges'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('challenges')
+                .select(`
+                    *,
+                    creator:profiles!creator_id(username, avatar_url),
+                    participants:challenge_participants(
+                        *,
+                        profiles(username, avatar_url),
+                        guest_profiles(username, avatar_url),
+                        marathon_progress:challenge_participants_marathon(*)
+                    )
+                `)
+                .eq('is_public', true)
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return (data || []).map(mapChallenge);
+        }
     });
 };
 
