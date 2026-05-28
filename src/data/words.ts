@@ -22,37 +22,58 @@ const processWords = (rawContent: string): string[] => {
    ).sort();
 };
 
-// 4 & 5 Letter Processing
-export const WORDS_4 = processWords(raw4Official);
-export const WORDS_4_ALLOWED = processWords(raw4Allowed);
-export const WORDS_5 = processWords(raw5Official);
-export const WORDS_5_ALLOWED = processWords(raw5Allowed);
-export const WORDS_6_ALLOWED = processWords(raw6Allowed);
-export const WORDS_7_ALLOWED = processWords(raw7Allowed);
-export const WORDS_7 = processWords(raw7Official);
-export const WORDS_3_ALLOWED = processWords(raw3Allowed);
-export const WORDS_3 = processWords(raw3Official);
+interface WordListCache {
+   official: string[];
+   valid: Set<string>;
+}
 
-// 6 Letter Processing (Flat JSON Array)
-export const WORDS_6 = Array.from(
-   new Set(data6.map((w: string) => w.toUpperCase()))
-).sort();
-export const WORDS_6_OFFICIAL = WORDS_6; // Using the same list for allowed guesses
-
-// Master Sets for O(1) validation
-export const VALID_GUESSES_4 = new Set([...WORDS_4, ...WORDS_4_ALLOWED]);
-export const VALID_GUESSES_5 = new Set([...WORDS_5, ...WORDS_5_ALLOWED]);
-export const VALID_GUESSES_6 = new Set([...WORDS_6, ...WORDS_6_ALLOWED]);
-export const VALID_GUESSES_7 = new Set([...WORDS_7, ...WORDS_7_ALLOWED]);
-export const VALID_GUESSES_3 = new Set([...WORDS_3, ...WORDS_3_ALLOWED]);
+const cache: Record<number, WordListCache> = {};
 
 /**
- * Dynamic getter for game logic
+ * Dynamic getter for game logic (lazily initialized and cached)
  */
-export const getWordLists = (length: number) => {
-   if (length === 4) return { official: WORDS_4, valid: VALID_GUESSES_4 };
-   if (length === 6) return { official: WORDS_6, valid: VALID_GUESSES_6 };
-   if (length === 7) return { official: WORDS_7, valid: VALID_GUESSES_7 };
-   if (length === 3) return { official: WORDS_3, valid: VALID_GUESSES_3 };
-   return { official: WORDS_5, valid: VALID_GUESSES_5 };
+export const getWordLists = (length: number): WordListCache => {
+   if (cache[length]) {
+      return cache[length];
+   }
+
+   let official: string[] = [];
+   let valid: Set<string> = new Set();
+
+   if (length === 3) {
+      const off = processWords(raw3Official);
+      const all = processWords(raw3Allowed);
+      official = off;
+      valid = new Set([...off, ...all]);
+   } else if (length === 4) {
+      const off = processWords(raw4Official);
+      const all = processWords(raw4Allowed);
+      official = off;
+      valid = new Set([...off, ...all]);
+   } else if (length === 6) {
+      const off = Array.from(
+         new Set(data6.map((w: string) => w.toUpperCase()))
+      ).sort();
+      const all = processWords(raw6Allowed);
+      official = off;
+      valid = new Set([...off, ...all]);
+   } else if (length === 7) {
+      const off = processWords(raw7Official);
+      const all = processWords(raw7Allowed);
+      official = off;
+      valid = new Set([...off, ...all]);
+   } else {
+      // Default to 5-letter
+      const off = processWords(raw5Official);
+      const all = processWords(raw5Allowed);
+      official = off;
+      valid = new Set([...off, ...all]);
+   }
+
+   cache[length] = { official, valid };
+   return cache[length];
 };
+
+// Lazy getters exported for Admin Dashboard to prevent execution at module startup
+export const getWORDS_3 = () => getWordLists(3).official;
+export const getWORDS_4 = () => getWordLists(4).official;
