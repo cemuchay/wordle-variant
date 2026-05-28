@@ -493,105 +493,115 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const handleStartGame = useCallback(async () => {
         if (!selectedChallenge || !myParticipation) return;
 
-        if (myParticipation.status === 'pending') {
-            await startMutation.mutateAsync(myParticipation.id);
+        try {
+            if (myParticipation.status === 'pending') {
+                await startMutation.mutateAsync(myParticipation.id);
+            }
+            setIsPlaying(true);
+        } catch (err: any) {
+            console.error("Failed to start challenge game:", err);
+            triggerToast(err?.message || "Failed to start challenge.", 4000);
         }
-        setIsPlaying(true);
-    }, [selectedChallenge, myParticipation, startMutation, setIsPlaying]);
+    }, [selectedChallenge, myParticipation, startMutation, setIsPlaying, triggerToast]);
 
         const submitResult = useCallback(async (result: any, wordLength?: number, gameIndex?: number) => {
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
 
-        if (isMarathon && (wordLength || gameIndex !== undefined)) {
-            const isWordFinished = result.status !== 'playing';
-            const games = parseMarathonGames(selectedChallenge?.target_word, selectedChallenge?.salt);
-            const resolvedGameIndex = gameIndex !== undefined ? gameIndex : (wordLength ? games.findIndex(g => g.wordLength === wordLength) : 0);
+        try {
+            if (isMarathon && (wordLength || gameIndex !== undefined)) {
+                const isWordFinished = result.status !== 'playing';
+                const games = parseMarathonGames(selectedChallenge?.target_word, selectedChallenge?.salt);
+                const resolvedGameIndex = gameIndex !== undefined ? gameIndex : (wordLength ? games.findIndex(g => g.wordLength === wordLength) : 0);
 
-            // 1. Always update the specific word progress
-            const marathonPromise = marathonMutation.mutateAsync({
-                participationId: myParticipation.id,
-                gameIndex: resolvedGameIndex,
-                wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
-                result
-            });
+                // 1. Always update the specific word progress
+                const marathonPromise = marathonMutation.mutateAsync({
+                    participationId: myParticipation.id,
+                    gameIndex: resolvedGameIndex,
+                    wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
+                    result
+                });
 
-            // If not finishing the word, we can just wait for the marathon update
-            if (!isWordFinished) {
-                const success = await marathonPromise;
-                if (!success) return false;
+                // If not finishing the word, we can just wait for the marathon update
+                if (!isWordFinished) {
+                    const success = await marathonPromise;
+                    if (!success) return false;
 
-                // Update local state for immediate UI feedback without full re-fetch
+                    // Update local state for immediate UI feedback without full re-fetch
+                    const currentMarathon = myParticipation.marathon_progress || [];
+                    const updatedMarathon = [...currentMarathon];
+                    const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
+                    if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
+                    else updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
+
+                    setMyParticipation({ ...myParticipation, marathon_progress: updatedMarathon });
+                    return true;
+                }
+
+                // 2. Word finished: Calculate aggregates and update main participation
                 const currentMarathon = myParticipation.marathon_progress || [];
                 const updatedMarathon = [...currentMarathon];
                 const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
-                if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
-                else updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
 
-                setMyParticipation({ ...myParticipation, marathon_progress: updatedMarathon });
-                return true;
-            }
-
-            // 2. Word finished: Calculate aggregates and update main participation
-            const currentMarathon = myParticipation.marathon_progress || [];
-            const updatedMarathon = [...currentMarathon];
-            const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
-
-            if (idx > -1) {
-                updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
-            } else {
-                updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
-            }
-
-            let totalScore = 0;
-            let totalAttempts = 0;
-            let totalTimeTaken = 0;
-            let completedCount = 0;
-
-            games.forEach(g => {
-                const prog = updatedMarathon.find(p => p.game_index === g.gameIndex || (p.game_index === undefined && p.word_length === g.wordLength));
-                if (prog) {
-                    totalAttempts += prog.attempts || 0;
-                    totalTimeTaken += prog.time_taken || 0;
-                    if (prog.status === 'completed' || prog.status === 'timed_out') {
-                        totalScore += prog.score || 0;
-                        completedCount++;
-                    }
+                if (idx > -1) {
+                    updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
+                } else {
+                    updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
                 }
-            });
 
-            const allCompleted = completedCount === games.length;
-            const finalUpdateData = {
-                score: totalScore,
-                attempts: totalAttempts,
-                time_taken: totalTimeTaken,
-                status: (allCompleted ? 'completed' : 'playing') as 'completed' | 'playing',
-                hints_used: updatedMarathon.some(p => p.hints_used)
-            };
+                let totalScore = 0;
+                let totalAttempts = 0;
+                let totalTimeTaken = 0;
+                let completedCount = 0;
 
-            // Run both updates in parallel for better performance
-            const [mSuccess, sSuccess] = await Promise.all([
-                marathonPromise,
-                submitMutation.mutateAsync({ participationId: myParticipation.id, result: finalUpdateData })
-            ]);
-
-            if (mSuccess && sSuccess) {
-                setMyParticipation({
-                    ...myParticipation,
-                    ...finalUpdateData,
-                    marathon_progress: updatedMarathon
+                games.forEach(g => {
+                    const prog = updatedMarathon.find(p => p.game_index === g.gameIndex || (p.game_index === undefined && p.word_length === g.wordLength));
+                    if (prog) {
+                        totalAttempts += prog.attempts || 0;
+                        totalTimeTaken += prog.time_taken || 0;
+                        if (prog.status === 'completed' || prog.status === 'timed_out') {
+                            totalScore += prog.score || 0;
+                            completedCount++;
+                        }
+                    }
                 });
-                return true;
+
+                const allCompleted = completedCount === games.length;
+                const finalUpdateData = {
+                    score: totalScore,
+                    attempts: totalAttempts,
+                    time_taken: totalTimeTaken,
+                    status: (allCompleted ? 'completed' : 'playing') as 'completed' | 'playing',
+                    hints_used: updatedMarathon.some(p => p.hints_used)
+                };
+
+                // Run both updates in parallel for better performance
+                const [mSuccess, sSuccess] = await Promise.all([
+                    marathonPromise,
+                    submitMutation.mutateAsync({ participationId: myParticipation.id, result: finalUpdateData })
+                ]);
+
+                if (mSuccess && sSuccess) {
+                    setMyParticipation({
+                        ...myParticipation,
+                        ...finalUpdateData,
+                        marathon_progress: updatedMarathon
+                    });
+                    return true;
+                }
+                return false;
+            } else {
+                // Regular Challenge Mode
+                const success = await submitMutation.mutateAsync({ participationId: myParticipation.id, result });
+                if (success) {
+                    setMyParticipation(myParticipation ? { ...myParticipation, ...result } : null);
+                }
+                return success;
             }
+        } catch (err: any) {
+            console.error("Failed to submit challenge result:", err);
             return false;
-        } else {
-            // Regular Challenge Mode
-            const success = await submitMutation.mutateAsync({ participationId: myParticipation.id, result });
-            if (success) {
-                setMyParticipation(myParticipation ? { ...myParticipation, ...result } : null);
-            }
-            return success;
         }
     }, [myParticipation, selectedChallenge, marathonMutation, submitMutation, setMyParticipation]);
 
