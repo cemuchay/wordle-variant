@@ -96,8 +96,20 @@ export const useChallenge = (_user: AppUser | null) => {
         const channelName = `challenge_participants_${challengeId}`;
         
         activeChallengeIdRef.current = challengeId;
-        // Clear previous participants immediately to prevent stale data flash
-        setParticipants([]);
+        
+        // Attempt to load from sessionStorage to prevent loading flash
+        let initialParticipants: ChallengeParticipant[] = [];
+        try {
+            const cached = sessionStorage.getItem(`wordle_challenge_participants_${challengeId}`);
+            if (cached) {
+                initialParticipants = JSON.parse(cached);
+            }
+        } catch (e) {
+            console.error('Failed to parse cached participants', e);
+        }
+
+        setParticipants(initialParticipants);
+        participantsRef.current = initialParticipants;
         setParticipantsError(null);
 
         // Remove existing channel if it exists
@@ -140,8 +152,20 @@ export const useChallenge = (_user: AppUser | null) => {
                             profiles: p.profiles || p.guest_profiles || null
                         }));
                         const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
-                        setParticipants(normalized as ChallengeParticipant[]);
-                        participantsRef.current = normalized;
+                        
+                        // Compare structural difference to avoid redundant state updates and cache writes
+                        const currentStringified = JSON.stringify(participantsRef.current);
+                        const newStringified = JSON.stringify(normalized);
+                        
+                        if (currentStringified !== newStringified) {
+                            setParticipants(normalized as ChallengeParticipant[]);
+                            participantsRef.current = normalized;
+                            try {
+                                sessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
+                            } catch (e) {
+                                console.error('Failed to cache participants', e);
+                            }
+                        }
                         success = true;
                     } else {
                         throw new Error("Challenge or participant data not found");

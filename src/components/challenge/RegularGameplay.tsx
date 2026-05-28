@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Lightbulb, RefreshCw, AlertTriangle } from 'lucide-react';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { Grid } from '../Grid';
@@ -35,6 +35,25 @@ export const RegularGameplay = memo(function RegularGameplay({
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
+
+    const wasGameOverOnMount = useRef(isGameOver);
+    const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+
+    useEffect(() => {
+        if (isGameOver) {
+            if (wasGameOverOnMount.current) {
+                setHideKeyboard(true);
+            } else {
+                const timer = setTimeout(() => {
+                    setHideKeyboard(true);
+                }, 2200);
+                return () => clearTimeout(timer);
+            }
+        } else {
+            setHideKeyboard(false);
+            wasGameOverOnMount.current = false;
+        }
+    }, [isGameOver]);
 
     // Physical Keyboard Support
     useKeyboard(actions, isGameOver || isSaving);
@@ -139,7 +158,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                 />
             </div>
 
-            {!isGameOver && (
+            {!hideKeyboard && (
                 <div className="w-full max-w-lg mx-auto pb-0.5 shrink-0">
                     <Keyboard
                         onChar={actions.onChar}

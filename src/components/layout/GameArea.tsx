@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
@@ -31,6 +32,25 @@ export const GameArea = ({
     onDelete,
     onEnter
 }: GameAreaProps) => {
+    const wasGameOverOnMount = useRef(isGameOver);
+    const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+
+    useEffect(() => {
+        if (isGameOver) {
+            if (wasGameOverOnMount.current) {
+                setHideKeyboard(true);
+            } else {
+                const timer = setTimeout(() => {
+                    setHideKeyboard(true);
+                }, 2200);
+                return () => clearTimeout(timer);
+            }
+        } else {
+            setHideKeyboard(false);
+            wasGameOverOnMount.current = false;
+        }
+    }, [isGameOver]);
+
     return (
         <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-4">
             <div className="scale-[0.85] sm:scale-100 transition-transform origin-center relative">
@@ -52,7 +72,7 @@ export const GameArea = ({
                 />
             </div>
 
-            {!isGameOver && (
+            {!hideKeyboard && (
                 <div className="w-full max-w-125 mx-auto pb-8 shrink-0">
                     <Keyboard
                         onChar={onChar}
