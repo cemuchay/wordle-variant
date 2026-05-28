@@ -210,41 +210,130 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
  * @adjustment Tip: Starting May 6, 2026, maxAttempts is hardcoded to 6 for
  * consistency across all lengths. Change this if you want 3-letter words to be easier/harder.
  */
+const dailyConfigCache: Record<string, GameConfig> = {};
+const START_CONSTRAINT_DATE = "2026-05-29";
+
+const formatDateString = (date: Date): string => {
+  return date.toISOString().split("T")[0];
+};
+
 export function getDailyConfig(
   isAuthenticated: boolean,
   dateOverride?: string,
 ): GameConfig {
-  const dateStr = dateOverride || new Date().toISOString().split("T")[0];
+  const dateStr = dateOverride || formatDateString(new Date());
 
+  const cacheKey = `${dateStr}_auth_${isAuthenticated}`;
+  if (dailyConfigCache[cacheKey]) {
+    return dailyConfigCache[cacheKey];
+  }
+
+  // 1. If target date is before the constraint date, use the legacy algorithm directly.
+  if (dateStr < START_CONSTRAINT_DATE) {
+    const config = getUnconstrainedDailyConfig(isAuthenticated, dateStr);
+    dailyConfigCache[cacheKey] = config;
+    return config;
+  }
+
+  // 2. Sequential/Iterative generation from May 29th, 2026 up to targetDate.
+  const loopStart = new Date(START_CONSTRAINT_DATE);
+  const targetDate = new Date(dateStr);
+
+  // Pre-populate the cache for the 14 days preceding START_CONSTRAINT_DATE.
+  for (let i = 14; i >= 1; i--) {
+    const d = new Date(loopStart);
+    d.setDate(loopStart.getDate() - i);
+    const dStr = formatDateString(d);
+    const k = `${dStr}_auth_${isAuthenticated}`;
+    if (!dailyConfigCache[k]) {
+      dailyConfigCache[k] = getUnconstrainedDailyConfig(isAuthenticated, dStr);
+    }
+  }
+
+  // Calculate day-by-day sequentially up to targetDate.
+  let current = new Date(loopStart);
+  while (current <= targetDate) {
+    const currentStr = formatDateString(current);
+    const currentKey = `${currentStr}_auth_${isAuthenticated}`;
+
+    if (!dailyConfigCache[currentKey]) {
+      // Find history of last 14 days using final cached values
+      const history = new Set<string>();
+      for (let i = 1; i <= 14; i++) {
+        const prev = new Date(current);
+        prev.setDate(current.getDate() - i);
+        const prevStr = formatDateString(prev);
+        const prevKey = `${prevStr}_auth_${isAuthenticated}`;
+        const prevConfig = dailyConfigCache[prevKey];
+        if (prevConfig) {
+          history.add(prevConfig.word);
+        }
+      }
+
+      // Find yesterday's length from final cached values
+      const yesterday = new Date(current);
+      yesterday.setDate(current.getDate() - 1);
+      const yesterdayStr = formatDateString(yesterday);
+      const yesterdayKey = `${yesterdayStr}_auth_${isAuthenticated}`;
+      const yesterdayConfig = dailyConfigCache[yesterdayKey];
+      const prevLength = yesterdayConfig ? yesterdayConfig.length : null;
+
+      // Generate today's word and enforce both history and non-consecutive length constraints
+      let attempt = 0;
+      let word = "";
+      let length: 5 | 6 | 4 | 3 | 7 = 5;
+
+      do {
+        word = getWordAtDate(currentStr, isAuthenticated, attempt);
+        length = word.length as 5 | 6 | 4 | 3 | 7;
+        attempt++;
+      } while ((history.has(word) || (prevLength !== null && length === prevLength)) && attempt < 100);
+
+      dailyConfigCache[currentKey] = {
+        word,
+        length,
+        maxAttempts: MAX_ATTEMPTS,
+      };
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dailyConfigCache[cacheKey];
+}
+
+/**
+ * Legacy unconstrained daily configuration generator.
+ */
+function getUnconstrainedDailyConfig(
+  isAuthenticated: boolean,
+  dateStr: string,
+): GameConfig {
   const isNewEra = dateStr >= TRANSITION_DATE;
 
-  // 1. If before transition, return the legacy result immediately
   if (!isNewEra) {
     const word = getWordAtDate(dateStr, isAuthenticated);
     const length = word.length as 4 | 6 | 5;
-
     return { word, length, maxAttempts: length + 1 };
   }
 
-  // 2. New Algorithm: Check previous 14 days for collisions
   const history = new Set<string>();
   const cursor = new Date(dateStr);
 
   for (let i = 1; i <= 14; i++) {
     const prevDate = new Date(cursor);
     prevDate.setDate(cursor.getDate() - i);
-    const prevStr = prevDate.toISOString().split("T")[0];
+    const prevStr = formatDateString(prevDate);
     history.add(getWordAtDate(prevStr, isAuthenticated));
   }
 
-  // 3. Generate today's word with a retry loop if it exists in history
   let attempt = 0;
   let word;
 
   do {
     word = getWordAtDate(dateStr, isAuthenticated, attempt);
     attempt++;
-  } while (history.has(word) && attempt < 50); // Safety cap
+  } while (history.has(word) && attempt < 50);
 
   const length = word.length as 5 | 6 | 4 | 3 | 7;
 
