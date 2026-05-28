@@ -26,12 +26,12 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
       border-2 text-white
     `
     : `
-      w-[11vw] h-[11vw] 
-      max-w-[55px] max-h-[55px] 
-      sm:w-[6vh] sm:h-[6vh] 
-      sm:max-w-[62px] sm:max-h-[62px] 
+      w-[10vw] h-[10vw] 
+      max-w-[48px] max-h-[48px] 
+      sm:w-[5.5vh] sm:h-[5.5vh] 
+      sm:max-w-[54px] sm:max-h-[54px] 
       flex items-center justify-center 
-      text-xl sm:text-2xl font-bold uppercase transition-colors duration-300
+      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
       border-2 text-white
     `;
 

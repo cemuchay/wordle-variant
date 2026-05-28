@@ -45,6 +45,7 @@ interface AppContextType {
     allProfiles: PresenceUser[];
     audioChat: AudioChatState;
     activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
+    realtimeStatus: 'connected' | 'disconnected';
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -56,6 +57,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
         return () => subscription.unsubscribe();
+    }, []);
+
+    const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected'>('connected');
+
+    useEffect(() => {
+        // Monitor socket connection status via a shared real-time channel
+        const channel = supabase
+            .channel('connection_health_monitor')
+            .subscribe((status) => {
+                console.log('[Realtime Health] Channel status:', status);
+                if (status === 'SUBSCRIBED') {
+                    setRealtimeStatus('connected');
+                } else {
+                    setRealtimeStatus('disconnected');
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     // 1. Initialize Auth and Real-time Listeners
@@ -417,7 +438,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         initiatePrivateCall,
         acceptCall,
         rejectCall,
-        hangUpCall
+        hangUpCall,
+        realtimeStatus
     }), [
         profile, preferences, isProfileLoading, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
@@ -427,7 +449,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isNotificationsOpen, setIsNotificationsOpen,
         isChatOpen, setIsChatOpen, onlineUsers, allProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
-        acceptCall, rejectCall, hangUpCall
+        acceptCall, rejectCall, hangUpCall, realtimeStatus
     ]);
 
     return (

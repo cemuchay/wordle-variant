@@ -13,7 +13,11 @@ interface ChallengeChatProps {
   participants: ChallengeParticipant[];
 }
 
-const formatMessageContent = (content: string, isMe: boolean, usernames: string[]) => {
+const formatMessageContent = (
+  content: string,
+  isMe: boolean,
+  usernames: string[],
+) => {
   if (!content) return [];
   let parts: (string | React.JSX.Element)[] = [content];
 
@@ -23,17 +27,19 @@ const formatMessageContent = (content: string, isMe: boolean, usernames: string[
     const newParts: (string | React.JSX.Element)[] = [];
 
     parts.forEach((part, pIdx) => {
-      if (typeof part !== 'string') {
+      if (typeof part !== "string") {
         newParts.push(part);
         return;
       }
 
-      const escapedMention = mention.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const subParts = part.split(new RegExp(`(${escapedMention}(?:\\s|$))`, 'g'));
+      const escapedMention = mention.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const subParts = part.split(
+        new RegExp(`(${escapedMention}(?:\\s|$))`, "g"),
+      );
 
       subParts.forEach((subPart, sIdx) => {
         if (subPart.startsWith(mention)) {
-          const endsWithSpace = subPart.endsWith(' ');
+          const endsWithSpace = subPart.endsWith(" ");
           const cleanMention = endsWithSpace ? subPart.slice(0, -1) : subPart;
 
           newParts.push(
@@ -46,10 +52,10 @@ const formatMessageContent = (content: string, isMe: boolean, usernames: string[
               }`}
             >
               {cleanMention}
-            </span>
+            </span>,
           );
-          if (endsWithSpace) newParts.push(' ');
-        } else if (subPart !== '') {
+          if (endsWithSpace) newParts.push(" ");
+        } else if (subPart !== "") {
           newParts.push(subPart);
         }
       });
@@ -60,14 +66,14 @@ const formatMessageContent = (content: string, isMe: boolean, usernames: string[
   // 2. Fallback: Match any remaining standard @username mentions (without spaces)
   const finalParts: (string | React.JSX.Element)[] = [];
   parts.forEach((part, pIdx) => {
-    if (typeof part !== 'string') {
+    if (typeof part !== "string") {
       finalParts.push(part);
       return;
     }
 
     const subParts = part.split(/(@[A-Za-z0-9_]+)/g);
     subParts.forEach((subPart, sIdx) => {
-      if (subPart.startsWith('@')) {
+      if (subPart.startsWith("@")) {
         finalParts.push(
           <span
             key={`fallback-${pIdx}-${sIdx}`}
@@ -78,9 +84,9 @@ const formatMessageContent = (content: string, isMe: boolean, usernames: string[
             }`}
           >
             {subPart}
-          </span>
+          </span>,
         );
-      } else if (subPart !== '') {
+      } else if (subPart !== "") {
         finalParts.push(subPart);
       }
     });
@@ -104,12 +110,14 @@ export const ChallengeChat = memo(function ChallengeChat({
   const usernames = useMemo(() => {
     const set = new Set<string>();
     if (participants) {
-      participants.forEach(p => {
-        const username = p.profiles?.username || p.guest_profiles?.username || '';
+      participants.forEach((p) => {
+        const username =
+          p.profiles?.username || p.guest_profiles?.username || "";
         if (username) set.add(username);
       });
     }
-    const myName = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+    const myName =
+      effectiveUser?.username || effectiveUser?.user_metadata?.full_name || "";
     if (myName) set.add(myName);
     return Array.from(set).sort((a, b) => b.length - a.length);
   }, [participants, effectiveUser]);
@@ -117,7 +125,9 @@ export const ChallengeChat = memo(function ChallengeChat({
   // Consolidate input regex matches into a single computation
   const mentionMatch = useMemo(() => {
     const match = inputText.match(/@(\w*)$/);
-    return match ? { show: true, query: match[1].toLowerCase() } : { show: false, query: "" };
+    return match
+      ? { show: true, query: match[1].toLowerCase() }
+      : { show: false, query: "" };
   }, [inputText]);
 
   const showMentionsDropdown = mentionMatch.show;
@@ -125,13 +135,18 @@ export const ChallengeChat = memo(function ChallengeChat({
 
   const mentionSuggestions = useMemo(() => {
     if (!showMentionsDropdown || !participants) return [];
-    
-    const suggestionsSet = new Set<string>();
-    const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
 
-    participants.forEach(p => {
-      const username = p.profiles?.username || p.guest_profiles?.username || '';
-      if (username && username !== myUsername && username.toLowerCase().includes(mentionSearchQuery)) {
+    const suggestionsSet = new Set<string>();
+    const myUsername =
+      effectiveUser?.username || effectiveUser?.user_metadata?.full_name || "";
+
+    participants.forEach((p) => {
+      const username = p.profiles?.username || p.guest_profiles?.username || "";
+      if (
+        username &&
+        username !== myUsername &&
+        username.toLowerCase().includes(mentionSearchQuery)
+      ) {
         suggestionsSet.add(username);
       }
     });
@@ -140,7 +155,7 @@ export const ChallengeChat = memo(function ChallengeChat({
   }, [participants, showMentionsDropdown, mentionSearchQuery, effectiveUser]);
 
   const handleSelectMention = useCallback((username: string) => {
-    setInputText(prev => {
+    setInputText((prev) => {
       const match = prev.match(/@(\w*)$/);
       if (match) {
         const index = match.index!;
@@ -159,18 +174,21 @@ export const ChallengeChat = memo(function ChallengeChat({
     }
   }, [messages]);
 
-  const handleSend = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
-    const textToSend = inputText.trim();
-    setInputText("");
-    await sendMessage(textToSend);
-  }, [inputText, sendMessage]);
+  const handleSend = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!inputText.trim()) return;
+      const textToSend = inputText.trim();
+      setInputText("");
+      await sendMessage(textToSend);
+    },
+    [inputText, sendMessage],
+  );
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-[450px] space-y-3 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-24 h-24 bg-correct/5 blur-2xl -mr-12 -mt-12 pointer-events-none" />
-      
+
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-white/5 pb-2 shrink-0">
         <MessageSquare size={14} className="text-correct" />
@@ -192,8 +210,12 @@ export const ChallengeChat = memo(function ChallengeChat({
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/80 space-y-2 animate-in fade-in duration-300">
             <MessageSquare size={28} className="text-white/40 animate-pulse" />
             <div>
-              <p className="text-[10px] font-black uppercase text-white">Room is Quiet</p>
-              <p className="text-[9px] text-white/80 mt-0.5">Send a message to start the banter!</p>
+              <p className="text-[10px] font-black uppercase text-white">
+                Room is Quiet
+              </p>
+              <p className="text-[9px] text-white/80 mt-0.5">
+                Send a message to start the banter!
+              </p>
             </div>
           </div>
         ) : (
@@ -212,7 +234,7 @@ export const ChallengeChat = memo(function ChallengeChat({
                   {msg.sender_name} {isMe && "(You)"}
                 </span>
                 <div
-                  className={`px-3 py-2 text-xs font-semibold break-words leading-relaxed rounded-2xl ${
+                  className={`px-3 py-2 text-xs font-semibold wrap-break-word leading-relaxed rounded-2xl ${
                     isMe
                       ? "bg-correct text-black rounded-tr-none shadow-md shadow-correct/5 font-bold"
                       : "bg-white/10 text-white rounded-tl-none border border-white/5"
@@ -234,7 +256,9 @@ export const ChallengeChat = memo(function ChallengeChat({
 
       {/* Mention Suggestions Dropdown */}
       {mentionSuggestions.length > 0 && (
-        <div className={`absolute left-4 right-4 ${typingUsers.length > 0 ? 'bottom-[72px]' : 'bottom-[55px]'} bg-gray-950/98 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[150px] overflow-y-auto z-50 divide-y divide-white/5 animate-in fade-in slide-in-from-bottom-2 duration-150`}>
+        <div
+          className={`absolute left-4 right-4 ${typingUsers.length > 0 ? "bottom-[72px]" : "bottom-[55px]"} bg-gray-950/98 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[150px] overflow-y-auto z-50 divide-y divide-white/5 animate-in fade-in slide-in-from-bottom-2 duration-150`}
+        >
           {mentionSuggestions.map((username) => (
             <button
               key={username}
@@ -252,12 +276,16 @@ export const ChallengeChat = memo(function ChallengeChat({
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
         <div className="text-[10px] text-white/80 italic px-1 shrink-0 animate-pulse">
-          {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+          {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"}{" "}
+          typing...
         </div>
       )}
 
       {/* Input Form */}
-      <form onSubmit={handleSend} className="flex gap-2 border-t border-white/5 pt-3 shrink-0">
+      <form
+        onSubmit={handleSend}
+        className="flex gap-2 border-t border-white/5 pt-3 shrink-0"
+      >
         <input
           type="text"
           maxLength={300}

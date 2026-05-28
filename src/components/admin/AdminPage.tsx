@@ -22,7 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
-import { WORDS_3, WORDS_4 } from '../../data/words';
+import { getWORDS_3, getWORDS_4 } from '../../data/words';
 import { supabase } from '../../lib/supabaseClient';
 
 interface FlaggedWordData {
@@ -38,6 +38,9 @@ interface FlaggedWordData {
 }
 
 export const AdminPage: React.FC = () => {
+    const WORDS_3 = useMemo(() => getWORDS_3(), []);
+    const WORDS_4 = useMemo(() => getWORDS_4(), []);
+
     const { user, loading: authLoading, signInWithEmail, signOut } = useAuth();
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 

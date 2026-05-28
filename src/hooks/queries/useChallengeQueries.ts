@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import { getRandomWord, obfuscateWord } from "../../lib/game-logic";
 import { type Challenge } from "../useChallenge";
+import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 
 export const mapParticipant = (p: any) => {
   if (!p) return p;
@@ -39,7 +40,7 @@ export const useMyChallenges = (userId: string | undefined) => {
       // Retrieve recent challenges from localStorage
       let recentIds: string[] = [];
       try {
-        const stored = localStorage.getItem("wordle_recent_challenges");
+        const stored = safeLocalStorage.getItem("wordle_recent_challenges");
         if (stored) {
           recentIds = JSON.parse(stored);
         }
@@ -165,7 +166,7 @@ export const useMyChallenges = (userId: string | undefined) => {
 
       if (userId) {
         try {
-          sessionStorage.setItem(
+          safeSessionStorage.setItem(
             `wordle_my_challenges_${userId}`,
             JSON.stringify(sortedResults),
           );
@@ -180,7 +181,7 @@ export const useMyChallenges = (userId: string | undefined) => {
     initialData: () => {
       if (!userId) return [];
       try {
-        const cached = sessionStorage.getItem(`wordle_my_challenges_${userId}`);
+        const cached = safeSessionStorage.getItem(`wordle_my_challenges_${userId}`);
         if (cached) {
           return JSON.parse(cached);
         }
@@ -226,7 +227,7 @@ export const useChallengeData = (challengeId: string | null) => {
       if (error) throw error;
       const mapped = mapChallenge(edgeRes?.data) as Challenge;
       try {
-        sessionStorage.setItem(
+        safeSessionStorage.setItem(
           `wordle_challenge_detail_${challengeId}`,
           JSON.stringify(mapped),
         );
@@ -239,7 +240,7 @@ export const useChallengeData = (challengeId: string | null) => {
     initialData: () => {
       if (!challengeId) return undefined;
       try {
-        const cached = sessionStorage.getItem(
+        const cached = safeSessionStorage.getItem(
           `wordle_challenge_detail_${challengeId}`,
         );
         if (cached) {
