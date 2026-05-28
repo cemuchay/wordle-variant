@@ -230,9 +230,7 @@ export const useChallengeGameEngine = ({
       );
       setIsSaving(false);
       if (!success) triggerToast("Failed to save progress.", 3000);
-      setTimeout(() => {
-        if (onLengthComplete) onLengthComplete();
-      }, 4500);
+      if (onLengthComplete) onLengthComplete();
     } else {
       const success = await wrappedSubmitResult({
         status: "timed_out",
@@ -245,9 +243,7 @@ export const useChallengeGameEngine = ({
       });
       setIsSaving(false);
       if (!success) triggerToast("Failed to save result.", 4000);
-      setTimeout(() => {
-        onFinish();
-      }, 4500);
+      onFinish();
     }
   }, [
     isSaving,
@@ -750,7 +746,7 @@ export const useChallengeGameEngine = ({
         } else {
           onFinish();
         }
-      }, 4500);
+      }, 2000);
     }
   }, [
     isGameOver,
