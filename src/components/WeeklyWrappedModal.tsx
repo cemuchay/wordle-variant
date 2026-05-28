@@ -267,6 +267,7 @@ interface ScoreRecord {
 
 interface LeaderboardEntry {
     username: string;
+    avatar_url?: string;
     total_points: number;
     days_active: number;
 }
