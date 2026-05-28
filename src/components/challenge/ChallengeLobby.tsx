@@ -291,6 +291,14 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     );
   }, [isMarathon, selectedChallenge.target_word, selectedChallenge.salt]);
 
+  const deobfuscatedTargetWord = useMemo(() => {
+    if (!selectedChallenge || isMarathon) return "";
+    return deobfuscateWord(
+      selectedChallenge.target_word,
+      selectedChallenge.salt,
+    );
+  }, [selectedChallenge, isMarathon]);
+
   const maxParts = selectedChallenge.max_participants || 100;
   const currentParts = participants.length;
   const isFull =
@@ -622,7 +630,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-black uppercase tracking-wider font-mono text-correct">
-                      {deobfuscateWord(selectedChallenge.target_word, selectedChallenge.salt)}
+                      {deobfuscatedTargetWord}
                     </span>
                     <span className="text-[8px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded uppercase">
                       Revealed
