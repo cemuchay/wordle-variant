@@ -8,6 +8,7 @@ import {
   useRef,
 } from "react";
 import { getWordLists } from "../data/words";
+import { safeLocalStorage } from "../utils/storage";
 import {
   calculateSkillIndex,
   checkGuess,
@@ -125,9 +126,9 @@ export const useChallengeGameEngine = ({
   const saveToLocal = useCallback(
     (payload: any) => {
       try {
-        const existing = localStorage.getItem(storageKey);
+        const existing = safeLocalStorage.getItem(storageKey);
         const existingParsed = existing ? JSON.parse(existing) : {};
-        localStorage.setItem(
+        safeLocalStorage.setItem(
           storageKey,
           JSON.stringify({
             ...existingParsed,
@@ -365,10 +366,10 @@ export const useChallengeGameEngine = ({
       : participation?.hint_record || null;
 
     try {
-      let saved = localStorage.getItem(storageKey);
+      let saved = safeLocalStorage.getItem(storageKey);
       if (!saved && isMarathon && activeGame) {
         const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
-        saved = localStorage.getItem(legacyKey);
+        saved = safeLocalStorage.getItem(legacyKey);
         if (saved) {
           console.log(
             "[Engine] Found legacy storage key, migrating/recovering from:",

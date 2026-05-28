@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
+import { safeLocalStorage } from '../utils/storage';
 
 interface ChallengeContextType {
     // UI State
@@ -86,7 +87,7 @@ interface ChallengeContextType {
 
 const addRecentChallenge = (id: string) => {
     try {
-        const stored = localStorage.getItem('wordle_recent_challenges');
+        const stored = safeLocalStorage.getItem('wordle_recent_challenges');
         let ids: string[] = [];
         if (stored) {
             ids = JSON.parse(stored);
@@ -96,7 +97,7 @@ const addRecentChallenge = (id: string) => {
         if (ids.length > 20) {
             ids = ids.slice(0, 20);
         }
-        localStorage.setItem('wordle_recent_challenges', JSON.stringify(ids));
+        safeLocalStorage.setItem('wordle_recent_challenges', JSON.stringify(ids));
     } catch (e) {
         console.error('Failed to add recent challenge', e);
     }
@@ -115,8 +116,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Anonymous / Guest User Support
     const [anonUser, setAnonUser] = useState<any>(() => {
-        const id = localStorage.getItem('wordle_anon_id');
-        const username = localStorage.getItem('wordle_anon_username');
+        const id = safeLocalStorage.getItem('wordle_anon_id');
+        const username = safeLocalStorage.getItem('wordle_anon_username');
         if (id && username) {
             return { id, username, user_metadata: { full_name: username } };
         }
@@ -172,8 +173,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const [isEditingChallenge, setIsEditingChallenge] = useState(false);
 
     // 1. Server Data (TanStack Query)
-    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching } = useMyChallenges(effectiveUser?.id);
-    const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching } = useDiscoverChallenges();
+    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError } = useMyChallenges(effectiveUser?.id);
+    const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError } = useDiscoverChallenges();
     const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
         createChallenge: createMutation,
@@ -193,6 +194,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         (isChallengesFetching && !isChallengesLoading) || 
         (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) || 
         loadingParticipants;
+
+    const error = (listColumn === 'open' ? discoverChallengesError : myChallengesError)
+        ? ((listColumn === 'open' ? discoverChallengesError : myChallengesError) as any)?.message || "Failed to load challenges."
+        : null;
 
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
@@ -487,12 +492,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation, user]);
 
     const registerAnonymousUser = useCallback(async (nickname: string) => {
-        let anonId = localStorage.getItem('wordle_anon_id');
+        let anonId = safeLocalStorage.getItem('wordle_anon_id');
         if (!anonId) {
             anonId = crypto.randomUUID();
-            localStorage.setItem('wordle_anon_id', anonId);
+            safeLocalStorage.setItem('wordle_anon_id', anonId);
         }
-        localStorage.setItem('wordle_anon_username', nickname);
+        safeLocalStorage.setItem('wordle_anon_username', nickname);
 
         // Insert/update guest profile in database
         const { error } = await supabase.from('guest_profiles').upsert({
@@ -805,7 +810,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setListColumn,
         loading: isChallengesLoading || (listColumn === 'open' && isDiscoverLoading) || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
         isBackgroundFetching,
-        error: null,
+        error,
         joinId,
         setJoinId,
         previewParticipant,

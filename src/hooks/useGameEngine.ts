@@ -11,6 +11,7 @@ import { useConfirmation } from '../context/ConfirmationContext';
 
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
+import { safeLocalStorage } from '../utils/storage';
 
 const getLocalSalt = (date: string, userId: string | undefined) => {
     const base = `local_salt_${date}_${userId || 'guest'}`;
@@ -40,12 +41,12 @@ export const useGameEngine = (date: string) => {
             dispatch({ type: 'SET_SYNC_STATUS', status: 'synced' });
 
             // Clear needsSync flag in localStorage
-            const saved = localStorage.getItem(`wordle-${date}`);
+            const saved = safeLocalStorage.getItem(`wordle-${date}`);
             if (saved) {
                 const current = JSON.parse(saved);
                 if (current.needsSync) {
                     delete current.needsSync;
-                    localStorage.setItem(`wordle-${date}`, JSON.stringify(current));
+                    safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(current));
                 }
             }
 
@@ -61,11 +62,11 @@ export const useGameEngine = (date: string) => {
                 payload: gamePayload
             });
             // Ensure needsSync flag is set in localStorage
-            const saved = localStorage.getItem(`wordle-${date}`);
+            const saved = safeLocalStorage.getItem(`wordle-${date}`);
             if (saved) {
                 const current = JSON.parse(saved);
                 current.needsSync = true;
-                localStorage.setItem(`wordle-${date}`, JSON.stringify(current));
+                safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(current));
             }
             return false;
         }
@@ -106,7 +107,7 @@ export const useGameEngine = (date: string) => {
         }
 
         setIsHydrated(false);
-        const saved = localStorage.getItem(`wordle-${date}`);
+        const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
         const hydrate = async () => {
             if (saved) {
@@ -123,11 +124,11 @@ export const useGameEngine = (date: string) => {
                     // Only perform mismatch check once auth state is stable.
                     if (payload.config && payload.config.word !== config.word) {
                         console.log("[Engine] Target word mismatch (Auth status changed), wiping today's progress.");
-                        localStorage.removeItem(`wordle-${date}`);
+                        safeLocalStorage.removeItem(`wordle-${date}`);
 
                         // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
                         if (user && payload.isGuest) {
-                            localStorage.removeItem("wordle-statistics");
+                            safeLocalStorage.removeItem("wordle-statistics");
                             triggerToast("Logged in: Starting today's official word fresh.");
                         }
 
@@ -143,7 +144,7 @@ export const useGameEngine = (date: string) => {
                                         word: obfuscateWord(cloudPayload.config.word, localSalt)
                                     }
                                 };
-                                localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+                                safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
                             } else {
                                 dispatch({ type: 'LOAD_STATE', payload: initialState });
                             }
@@ -176,7 +177,7 @@ export const useGameEngine = (date: string) => {
                             word: obfuscateWord(cloudPayload.config.word, localSalt)
                         }
                     };
-                    localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+                    safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
                 } else {
                     dispatch({ type: 'LOAD_STATE', payload: initialState });
                 }
@@ -226,7 +227,7 @@ export const useGameEngine = (date: string) => {
                                 word: obfuscateWord(cloudPayload.config.word, localSalt)
                             }
                         };
-                        localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+                        safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
                     }
                     return;
                 }
@@ -294,7 +295,7 @@ export const useGameEngine = (date: string) => {
                 word: obfuscateWord(payload.config.word, localSalt)
             }
         };
-        localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+        safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
 
         if (user) {
             const success = await performSync(payload);
@@ -368,7 +369,7 @@ export const useGameEngine = (date: string) => {
                     word: obfuscateWord(payload.config.word, localSalt)
                 }
             };
-            localStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+            safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
 
             // 2. Update UI
             dispatch({ type: 'SET_HINT', hint: hintWithRow });
@@ -384,7 +385,7 @@ export const useGameEngine = (date: string) => {
     }, [state.guesses, state.isGameOver, state.usedHint, config, date, user, triggerToast, performSync]);
 
     const retrySync = useCallback(async () => {
-        const saved = localStorage.getItem(`wordle-${date}`);
+        const saved = safeLocalStorage.getItem(`wordle-${date}`);
         if (!saved || !user) return;
 
         try {

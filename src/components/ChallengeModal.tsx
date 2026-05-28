@@ -7,6 +7,7 @@ import { ChallengeProvider, useChallengeContext } from '../context/ChallengeCont
 import GuessPreviewModal from './GuessPreviewModal';
 import { AudioChatControls } from './challenge/AudioChatControls';
 import { Z_INDEX, ANIMATION_DURATION } from '../constants/ui';
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 import { useChallengeStore } from '../store/useChallengeStore';
 
@@ -79,7 +80,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
                         <button
                             onClick={() => {
                                 onClose();
-                                sessionStorage.setItem('auth_redirect_target', 'challenge');
+                                safeSessionStorage.setItem('auth_redirect_target', 'challenge');
                                 window.dispatchEvent(
                                     new CustomEvent('open-auth-modal')
                                 );
@@ -574,7 +575,7 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
 
 const hasRecentChallenges = (): boolean => {
     try {
-        const stored = localStorage.getItem('wordle_recent_challenges');
+        const stored = safeLocalStorage.getItem('wordle_recent_challenges');
         if (stored) {
             const parsed = JSON.parse(stored);
             return Array.isArray(parsed) && parsed.length > 0;
@@ -597,8 +598,8 @@ export const ChallengeModal = ({ isOpen, onClose, user, onChallengeCreated, init
     if (!isOpen) return null;
 
     if (!user && !initialChallengeId && !hasRecentChallenges()) {
-        const id = localStorage.getItem('wordle_anon_id');
-        const username = localStorage.getItem('wordle_anon_username');
+        const id = safeLocalStorage.getItem('wordle_anon_id');
+        const username = safeLocalStorage.getItem('wordle_anon_username');
         if (!id || !username) {
             return <GuestChallengeView onClose={onClose} />;
         }

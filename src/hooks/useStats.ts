@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { AppUser, GameStats } from "../types/game";
 import { useApp } from "../context/AppContext";
+import { safeLocalStorage } from "../utils/storage";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
@@ -38,14 +39,14 @@ export const useWordleStats = (
          const prefix = "wordle-";
          const todayKey = `${prefix}${date}`;
 
-         Object.keys(localStorage).forEach((key) => {
+         safeLocalStorage.getAllKeys().forEach((key) => {
             // Remove only daily wordle keys that aren't for today
             if (
                key.startsWith(prefix) &&
                key !== todayKey &&
                key !== "wordle-statistics"
             ) {
-               localStorage.removeItem(key);
+               safeLocalStorage.removeItem(key);
             }
          });
       }
@@ -110,7 +111,7 @@ export const useWordleStats = (
    // Load initial stats from local storage if no user
    useEffect(() => {
       if (!userId) {
-         const raw = localStorage.getItem("wordle-statistics");
+         const raw = safeLocalStorage.getItem("wordle-statistics");
          if (raw) {
             setStats(JSON.parse(raw));
          }

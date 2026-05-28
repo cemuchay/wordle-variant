@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
+import { safeLocalStorage } from '../utils/storage';
 
 export function usePWAInstall() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -9,7 +10,7 @@ export function usePWAInstall() {
 
   useEffect(() => {
     // 1. Check if user previously declined
-    const dismissed = localStorage.getItem('pwa_dismissed') === 'true';
+    const dismissed = safeLocalStorage.getItem('pwa_dismissed') === 'true';
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDismissed(dismissed);
 
@@ -42,7 +43,7 @@ export function usePWAInstall() {
   };
 
   const handleDontAskAgain = () => {
-    localStorage.setItem('pwa_dismissed', 'true');
+    safeLocalStorage.setItem('pwa_dismissed', 'true');
     setIsDismissed(true);
   };
 

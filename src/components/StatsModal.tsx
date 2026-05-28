@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
 import { useApp } from '../context/AppContext';
+import { safeSessionStorage } from '../utils/storage';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -60,7 +61,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     
     if (!ignoreCache) {
       try {
-        const cached = sessionStorage.getItem(cacheKey);
+        const cached = safeSessionStorage.getItem(cacheKey);
         if (cached) {
           const parsed = JSON.parse(cached);
           setLeaderboard(parsed);
@@ -86,7 +87,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         setLeaderboard(edgeRes.data);
         setLeaderboardError(null);
         try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(edgeRes.data));
+          safeSessionStorage.setItem(cacheKey, JSON.stringify(edgeRes.data));
         } catch (e) {
           console.error('Failed to cache leaderboard data', e);
         }

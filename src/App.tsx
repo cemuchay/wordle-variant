@@ -18,6 +18,7 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { useWordleStats } from './hooks/useStats';
 import { type AppUser, type Challenge } from './types/game';
 import { useMyChallenges } from './hooks/queries/useChallengeQueries';
+import { safeLocalStorage, safeSessionStorage } from './utils/storage';
 import { safeLazy } from './utils/safeLazy';
 import { supabase } from './lib/supabaseClient';
 
@@ -87,11 +88,11 @@ export default function App() {
             const mondayStr = monday.toISOString().split('T')[0];
 
             const seenKey = `wrapped-seen-${mondayStr}-${user.id}`;
-            const alreadySeen = localStorage.getItem(seenKey);
+            const alreadySeen = safeLocalStorage.getItem(seenKey);
 
             if (!alreadySeen) {
                 setIsWeeklyWrappedOpen(true);
-                localStorage.setItem(seenKey, 'true');
+                safeLocalStorage.setItem(seenKey, 'true');
             }
         }
     }, [user]);
@@ -118,10 +119,10 @@ export default function App() {
                 },
                 () => {
                     console.log('[Global Score Sync] score update detected. Invalidating sessionStorage cache...');
-                    sessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
-                    sessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
-                    sessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
-                    sessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
 
                     // Dispatch custom event to notify any open StatsModal
                     window.dispatchEvent(new CustomEvent('global-scores-updated'));
@@ -159,9 +160,9 @@ export default function App() {
     // Re-open challenge modal after successful login/signup if initiated from the challenge screen
     useEffect(() => {
         if (user) {
-            const redirectTarget = sessionStorage.getItem('auth_redirect_target');
+            const redirectTarget = safeSessionStorage.getItem('auth_redirect_target');
             if (redirectTarget === 'challenge') {
-                sessionStorage.removeItem('auth_redirect_target');
+                safeSessionStorage.removeItem('auth_redirect_target');
                 setIsChallengeOpen(true);
             }
         }
