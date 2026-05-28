@@ -116,6 +116,17 @@ export default function App() {
         return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
     }, []);
 
+    // Re-open challenge modal after successful login/signup if initiated from the challenge screen
+    useEffect(() => {
+        if (user) {
+            const redirectTarget = sessionStorage.getItem('auth_redirect_target');
+            if (redirectTarget === 'challenge') {
+                sessionStorage.removeItem('auth_redirect_target');
+                setIsChallengeOpen(true);
+            }
+        }
+    }, [user, setIsChallengeOpen]);
+
     // Listen to custom event to open user profile modal
     useEffect(() => {
         const handleOpenProfile = (e: Event) => {

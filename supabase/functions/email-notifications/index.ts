@@ -2,8 +2,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = (Deno.env.get("FROM_EMAIL") || "Wordle Variant <onboarding@resend.dev>").replace(/^["']|["']$/g, "");
+const FROM_EMAIL = (Deno.env.get("FROM_EMAIL") || "Wordle Variant <updates@wordle-variant.xyz>").replace(/^["']|["']$/g, "");
 const APP_URL = Deno.env.get("APP_URL") || "https://wordle-variant.vercel.app";
+
+// Helper to convert Dicebear SVG to PNG and handle fallbacks for email client rendering (like Gmail)
+const getAvatarUrl = (avatarUrl: string | null | undefined, username: string): string => {
+  if (!avatarUrl) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6366f1&color=fff&size=128`;
+  }
+  if (avatarUrl.includes("api.dicebear.com") && avatarUrl.includes("/svg")) {
+    return avatarUrl.replace("/svg", "/png");
+  }
+  return avatarUrl;
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -599,10 +610,15 @@ serve(async (req) => {
               ? "font-weight: 800; color: #a5b4fc;" 
               : "color: #ffffff;";
 
+            const avatarSrc = getAvatarUrl(entry.avatar_url, entry.username);
+
             tableRowsHtml += `
               <tr style="${rowStyle}">
                 <td style="padding: 12px 8px; font-weight: 800; color: ${rankColor};">${rankLabel}</td>
-                <td style="padding: 12px 8px; font-weight: bold; ${textStyle}">${entry.username}${isMe ? " (You)" : ""}</td>
+                <td style="padding: 12px 8px; font-weight: bold; ${textStyle}">
+                  <img src="${avatarSrc}" alt="" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #374151; vertical-align: middle; margin-right: 8px; background-color: #1f2937;" />
+                  <span style="vertical-align: middle;">${entry.username}${isMe ? " (You)" : ""}</span>
+                </td>
                 <td style="padding: 12px 8px; text-align: right; font-weight: 900; color: #6366f1;">${entry.total_points}</td>
                 <td style="padding: 12px 8px; text-align: right; color: #9ca3af; font-size: 13px;">${entry.days_active}d</td>
               </tr>

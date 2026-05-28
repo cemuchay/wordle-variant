@@ -136,12 +136,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- 7. Helper function to get the weekly leaderboard rankings for the previous week
+DROP FUNCTION IF EXISTS public.get_weekly_report_leaderboard();
 CREATE OR REPLACE FUNCTION public.get_weekly_report_leaderboard()
-RETURNS TABLE (username TEXT, total_points INT, days_active INT) AS $$
+RETURNS TABLE (username TEXT, avatar_url TEXT, total_points INT, days_active INT) AS $$
 BEGIN
   RETURN QUERY
   SELECT 
       p.username,
+      p.avatar_url,
       COALESCE(SUM(s.skill_score), 0)::int AS total_points,
       COUNT(DISTINCT s.game_date)::int AS days_active
   FROM public.scores s
@@ -149,7 +151,7 @@ BEGIN
   -- Previous week: Monday to Sunday
   WHERE s.game_date::date >= (timezone('Africa/Lagos', now())::date - EXTRACT(ISODOW FROM timezone('Africa/Lagos', now()))::integer - 6)::date
     AND s.game_date::date <= (timezone('Africa/Lagos', now())::date - EXTRACT(ISODOW FROM timezone('Africa/Lagos', now()))::integer)::date
-  GROUP BY p.username
+  GROUP BY p.username, p.avatar_url
   ORDER BY total_points DESC, days_active DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
