@@ -4,7 +4,7 @@ import { getWordLists } from '../data/words';
 import { useAuth } from '../hooks/useAuth';
 import { checkGuess, getDailyConfig, getHint, getLetterStatuses, isHintDisabled, syncWithRetry, updateStats, obfuscateWord, deobfuscateWord } from '../lib/game-logic';
 import { supabase } from '../lib/supabaseClient';
-import { getLossMessage, getWinMessage } from '../lib/messages';
+import { generateRoast } from '../utils/roastEngine';
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { useWordleStats } from './useStats';
 import { useConfirmation } from '../context/ConfirmationContext';
@@ -264,10 +264,14 @@ export const useGameEngine = (date: string) => {
         const result = checkGuess(upperGuess, config.word);
         const won = upperGuess === config.word;
         const lost = (state.guesses.length + 1) === config.maxAttempts;
-        const message = preferences.allowRoasts ? (won ? getWinMessage(state.guesses.length + 1) : lost ? getLossMessage() : "") : "";
 
         const newGuesses = [...state.guesses, result];
         const newStatus = won ? 'won' : (lost ? 'lost' : 'playing');
+
+        const message = (preferences.allowRoasts && (newStatus === 'won' || newStatus === 'lost'))
+            ? generateRoast(newGuesses, config.word, state.usedHint, won, newGuesses.length)
+            : "";
+
         const payload = {
             date,
             isGuest: !user,

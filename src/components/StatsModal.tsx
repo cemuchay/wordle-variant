@@ -50,7 +50,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [viewerHasFinished, setViewerHasFinished] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
-  const { date: currentDate } = useApp();
+  const { date: currentDate, triggerToast } = useApp();
 
   // Fetch Leaderboard Data
   const fetchLeaderboard = useCallback(async (ignoreCache = false) => {
@@ -129,41 +129,29 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     checkStatus();
   }, [isOpen, user, currentDate, isGameOver]);
 
-  // Subscribe to real-time score updates to invalidate the leaderboard cache when someone plays
+  // Listen to global leaderboard score sync events
   useEffect(() => {
-    if (!isOpen || !currentDate) return;
+    if (!isOpen) return;
 
-    const channelName = `scores_leaderboard_sync`;
-    const existing = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
-    if (existing) {
-      supabase.removeChannel(existing);
-    }
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'scores',
-          filter: `game_date=eq.${currentDate}`
-        },
-        () => {
-          console.log('[StatsModal] Score insertion/update detected. Invalidating cache and refreshing...');
-          sessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
-          sessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
-          sessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
-          sessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
-          fetchLeaderboard(true);
-        }
-      )
-      .subscribe();
+    const handleGlobalUpdate = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
 
-    return () => {
-      supabase.removeChannel(channel);
+      // Debounce refreshes by 1.5s to batch multiple simultaneous score submissions
+      debounceTimer = setTimeout(() => {
+        console.log('[StatsModal] Global score update event received. Refreshing leaderboard data...');
+        fetchLeaderboard(true);
+        triggerToast("Leaderboard updated with new scores!", 3000);
+      }, 1500);
     };
-  }, [isOpen, currentDate, fetchLeaderboard]);
+
+    window.addEventListener('global-scores-updated', handleGlobalUpdate);
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.removeEventListener('global-scores-updated', handleGlobalUpdate);
+    };
+  }, [isOpen, fetchLeaderboard, triggerToast]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
@@ -263,6 +251,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                 ))}
 
 
+              </div>
+
+              <div className="flex items-center gap-1.5 justify-center py-1.5 px-3 mb-3 bg-correct/5 border border-correct/20 rounded-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />
+                  <span className="text-[8px] text-correct font-bold uppercase tracking-wider">Live Updates Enabled</span>
               </div>
 
               {

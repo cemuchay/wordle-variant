@@ -19,6 +19,7 @@ import { useWordleStats } from './hooks/useStats';
 import { type AppUser, type Challenge } from './types/game';
 import { useMyChallenges } from './hooks/queries/useChallengeQueries';
 import { safeLazy } from './utils/safeLazy';
+import { supabase } from './lib/supabaseClient';
 
 const ChatRoom = safeLazy(() => import('./components/chatRoom'));
 import { AdminPage } from './components/admin/AdminPage';
@@ -42,6 +43,7 @@ export default function App() {
         isNotificationsOpen,
         setIsNotificationsOpen,
         setChallengeUnreadCount,
+        realtimeStatus,
     } = useApp();
 
     // Core Game Engine
@@ -93,6 +95,44 @@ export default function App() {
             }
         }
     }, [user]);
+
+    // Global Leaderboard Sync & Cache Invalidation
+    useEffect(() => {
+        if (!date) return;
+
+        const channelName = `global_scores_leaderboard_sync`;
+        const existing = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelName}`);
+        if (existing) {
+            supabase.removeChannel(existing);
+        }
+
+        const channel = supabase
+            .channel(channelName)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to INSERT, UPDATE, DELETE
+                    schema: 'public',
+                    table: 'scores',
+                    filter: `game_date=eq.${date}`
+                },
+                () => {
+                    console.log('[Global Score Sync] score update detected. Invalidating sessionStorage cache...');
+                    sessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
+                    sessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
+                    sessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
+                    sessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+
+                    // Dispatch custom event to notify any open StatsModal
+                    window.dispatchEvent(new CustomEvent('global-scores-updated'));
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [date]);
 
     // Listen to custom event to open stats modal at a specific tab
     useEffect(() => {
@@ -182,6 +222,30 @@ export default function App() {
             <AudioConnectionLog />
             <GlobalAudioPlayer />
             <NotificationsManager />
+            {realtimeStatus === 'disconnected' && (
+                <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center gap-3 bg-amber-950/90 backdrop-blur-md border border-amber-500/30 px-4 py-2.5 rounded-2xl shadow-xl">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                        <p className="text-[10px] uppercase font-black tracking-wide text-amber-200">
+                            Live sync disconnected
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => supabase.realtime.connect()} 
+                                className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer font-bold"
+                            >
+                                Reconnect
+                            </button>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer font-bold"
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {!isChatOpen && (
                 <main className="h-svh flex flex-col bg-dark text-white p-2 sm:p-4 pt-12 sm:pt-4">
                     <Toast

@@ -148,7 +148,8 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
         isEditingChallenge,
         setIsEditingChallenge,
         listColumn,
-        setListColumn
+        setListColumn,
+        isBackgroundFetching
     } = useChallengeContext();
 
     const toggleFilters = () => {
@@ -164,9 +165,22 @@ const AuthenticatedChallengeContent = memo(({ onClose, user }: { onClose: () => 
                         <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                        <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
-                            Challenges
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
+                                Challenges
+                            </h2>
+                            {isBackgroundFetching && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    className="flex items-center gap-1 bg-correct/10 px-2 py-0.5 rounded-full border border-correct/20"
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />
+                                    <span className="text-[8px] text-correct font-extrabold uppercase tracking-wider">Syncing</span>
+                                </motion.div>
+                            )}
+                        </div>
                         <div className="flex items-center gap-1.5 sm:gap-2 min-h-5">
                             {isPlaying ? (
                                 <>
