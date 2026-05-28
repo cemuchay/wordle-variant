@@ -117,10 +117,12 @@ export const ChallengeItem = memo(function ChallengeItem({
   item,
   user,
   onSelect,
+  index,
 }: {
   item: any;
   user: any;
   onSelect: (id: string) => void;
+  index: number;
 }) {
   const { challenge, status, score, time_taken, challenge_id } = item;
   const {
@@ -157,7 +159,7 @@ export const ChallengeItem = memo(function ChallengeItem({
 
   const myScore = score || 0;
   const isLeader = myScore === maxScore && myScore > 0;
-  const hasStarted = status !== "pending";
+  const hasStarted = status !== "pending" && status !== "open" && status !== "not_joined";
 
   const handleSelect = useCallback(() => {
     onSelect(challenge_id);
@@ -169,6 +171,11 @@ export const ChallengeItem = memo(function ChallengeItem({
         (p: any) => p.user_id !== user?.id && p.guest_id !== user?.id,
       ),
     [participants, user?.id],
+  );
+
+  const isSelfChallenge = useMemo(
+    () => !isExpired && opponents.length === 0 && !challenge.is_public,
+    [isExpired, opponents.length, challenge.is_public]
   );
 
   // Find the current leader profile
@@ -193,24 +200,38 @@ export const ChallengeItem = memo(function ChallengeItem({
     <button
       onClick={handleSelect}
       className={`w-full text-left bg-gradient-to-br from-white/5 to-transparent border ${
-        isLeader && !isExpired
-          ? "border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-          : mode === "LIVE" && !isExpired
-            ? "border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/30"
-            : "border-white/5 hover:border-white/15"
+        isExpired
+          ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
+          : isSelfChallenge
+            ? "border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:border-indigo-500/50"
+            : isLeader
+              ? "border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)] hover:border-correct/50"
+              : mode === "LIVE"
+                ? "border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/35"
+                : "border-blue-500/20 hover:border-blue-500/35"
       } p-5 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
     >
       {/* Ambient Background Glows */}
-      {isLeader && !isExpired && (
+      {!isExpired && isSelfChallenge && (
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+      )}
+      {!isExpired && !isSelfChallenge && isLeader && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-2xl -mr-16 -mt-16 pointer-events-none" />
       )}
-      {mode === "LIVE" && !isExpired && (
+      {!isExpired && !isSelfChallenge && !isLeader && mode === "LIVE" && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+      )}
+      {!isExpired && !isSelfChallenge && !isLeader && mode !== "LIVE" && (
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
       )}
 
       {/* HEADER ROW */}
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Index Number Badge */}
+          <span className="text-[10px] font-black text-white/80 bg-white/10 px-2 py-0.5 rounded-lg font-mono">
+            #{index + 1}
+          </span>
           {/* Mode Pill */}
           <span
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
@@ -274,7 +295,7 @@ export const ChallengeItem = memo(function ChallengeItem({
       </div>
 
       {/* CONFIGURATION OPTIONS SUB-LINE */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.625rem] font-bold text-gray-400 border-t border-b border-white/5 py-2 w-full">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.625rem] font-bold text-white border-t border-b border-white/5 py-2 w-full">
         {/* Privacy Badge */}
         <span className="flex items-center gap-1 text-white">
           {challenge.is_public ? (
@@ -330,7 +351,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ? "text-correct"
                   : status === "playing"
                     ? "text-yellow-500"
-                    : "text-gray-500"
+                    : "text-white/80"
               }`}
             >
               {status === "host" ? "Host (Spectating)" : status}
@@ -338,7 +359,7 @@ export const ChallengeItem = memo(function ChallengeItem({
             {status !== "host" && hasStarted && (
               <span className="text-[8px] sm:text-lg font-black text-white">
                 {myScore}{" "}
-                <span className="text-[9px] font-medium text-gray-500">
+                <span className="text-[9px] font-medium text-white/80">
                   pts
                 </span>
               </span>
@@ -346,7 +367,7 @@ export const ChallengeItem = memo(function ChallengeItem({
           </div>
 
           {status !== "host" && hasStarted && (
-            <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-1 pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between text-[8px] font-bold text-white mt-1 pt-1 border-t border-white/5">
               <span>
                 {item.attempts || item.guesses?.length || 0}{" "}
                 {(item.attempts || item.guesses?.length || 0) === 1
@@ -354,7 +375,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   : "Guesses"}
               </span>
               {mode === "LIVE" && time_taken && (
-                <span className="flex items-center gap-0.5 text-gray-400">
+                <span className="flex items-center gap-0.5 text-white">
                   <Clock size={8} />
                   {formatTime(time_taken)}
                 </span>
@@ -402,7 +423,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ))}
                 </div>
                 {opponents.length > 3 && (
-                  <span className="text-[8px] font-bold text-gray-500 ml-1">
+                  <span className="text-[8px] font-bold text-white/80 ml-1">
                     +{opponents.length - 3} more
                   </span>
                 )}
@@ -410,7 +431,7 @@ export const ChallengeItem = memo(function ChallengeItem({
 
               {/* Top Opponent Text summary */}
               {leaderParticipant ? (
-                <p className="text-[0.625rem] font-bold text-gray-400 truncate">
+                <p className="text-[0.625rem] font-bold text-white truncate">
                   Leader:{" "}
                   <span className="text-white">
                     @{leaderParticipant.profiles?.username || "Player"}
@@ -418,14 +439,14 @@ export const ChallengeItem = memo(function ChallengeItem({
                   ({leaderParticipant.score} pts)
                 </p>
               ) : (
-                <p className="text-[9px] font-bold text-gray-500 italic">
+                <p className="text-[9px] font-bold text-white/80 italic">
                   No submissions yet
                 </p>
               )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-1">
-              <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest italic animate-pulse">
+              <p className="text-[8px] font-bold text-white/80 uppercase tracking-widest italic animate-pulse">
                 Waiting for others
               </p>
             </div>

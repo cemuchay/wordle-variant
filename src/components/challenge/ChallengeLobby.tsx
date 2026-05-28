@@ -113,7 +113,7 @@ const ParticipantItem = memo(function ParticipantItem({
             {p.profiles?.username || "Player"}
           </p>
           <p
-            className={`text-[9px] font-black uppercase ${pIsFinished ? "text-gray-500" : "text-yellow-500"}`}
+            className={`text-[9px] font-black uppercase ${pIsFinished ? "text-white/60" : "text-yellow-500"}`}
           >
             {isMarathon && p.status === "playing"
               ? `${marathonCompletedCount}/${totalMarathonGames} Games`
@@ -127,12 +127,12 @@ const ParticipantItem = memo(function ParticipantItem({
             <p className="text-correct font-black text-lg">{p.score}</p>
             <div className="flex flex-col items-end">
               {!isMarathon && (
-                <p className="text-[9px] text-gray-500 font-bold uppercase">
+                <p className="text-[9px] text-white/60 font-bold uppercase">
                   {p.attempts} Tries
                 </p>
               )}
               {isLive && p.time_taken && (
-                <div className="flex items-center gap-1 text-[8px] font-black text-white/30">
+                <div className="flex items-center gap-1 text-[8px] font-black text-white/70">
                   <Clock size={8} />
                   <span>{formatTime(p.time_taken)}</span>
                 </div>
@@ -141,7 +141,7 @@ const ParticipantItem = memo(function ParticipantItem({
           </div>
         )}
         {(myHasFinished || isMarathon || canPreviewAll) && (
-          <div className="text-gray-500">
+          <div className="text-white/60">
             <Eye size={16} />
           </div>
         )}
@@ -165,6 +165,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     effectiveUser,
     setIsEditingChallenge,
     handleDelete,
+    loadingParticipants,
+    participantsError,
+    retryFetchParticipants,
   } = useChallengeContext();
   const { triggerToast } = useApp();
 
@@ -318,13 +321,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           <div className="flex gap-4">
             <button
               onClick={() => copyLink(selectedChallenge)}
-              className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+              className="text-white hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
             >
               <Copy size={12} /> Copy Link
             </button>
             <button
               onClick={() => shareLink(selectedChallenge)}
-              className="text-gray-400 hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
+              className="text-white hover:text-white flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors"
             >
               <Share2 size={12} /> Share
             </button>
@@ -335,7 +338,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             ? `The Marathon (${marathonGamesList.length} Games)`
             : `${selectedChallenge.word_length} Letter Word`}
         </h3>
-        <p className="text-gray-400 text-sm mb-4">
+        <p className="text-white text-sm mb-4">
           {isMarathon
             ? `Solve sequence (${marathonGamesList.map((g) => g.wordLength).join("-")}). ${selectedChallenge.mode === "LIVE" ? `You have ${selectedChallenge.max_time} minutes per word!` : "Take your time, async play."}`
             : selectedChallenge.mode === "LIVE"
@@ -357,13 +360,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1">
         <button
           onClick={() => setLobbyTab('lobby')}
-          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
         >
           Lobby
         </button>
         <button
           onClick={() => setLobbyTab('chat')}
-          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
         >
           <span>Chat Room</span>
           {unreadChatCount > 0 && (
@@ -389,11 +392,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           {/* Challenge Configuration Details */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5">
                 <SlidersHorizontal size={12} className="text-correct" />
                 Challenge Configuration
               </h4>
-              <span className="text-[8px] font-bold text-gray-500 uppercase">
+              <span className="text-[8px] font-bold text-white/70 uppercase">
                 Hosted by{" "}
                 {selectedChallenge.profiles?.username ||
                   selectedChallenge.creator?.username ||
@@ -404,7 +407,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         <div className="grid grid-cols-2 gap-3">
           {/* Mode / Time Limit */}
           <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-gray-500">
+            <p className="text-[8px] font-black uppercase text-white/70">
               Timing & Mode
             </p>
             <div className="flex items-center gap-1.5">
@@ -423,7 +426,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               </span>
             </div>
             {selectedChallenge.mode === "LIVE" && (
-              <p className="text-[9px] text-gray-400">
+              <p className="text-[9px] text-white">
                 {isMarathon && selectedChallenge.marathon_timers
                   ? "Custom per-word timers"
                   : `${selectedChallenge.max_time}m per game limit`}
@@ -433,7 +436,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
           {/* Word Info */}
           <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-gray-500">
+            <p className="text-[8px] font-black uppercase text-white/70">
               Word Rules
             </p>
             <div className="flex items-center gap-1.5">
@@ -444,7 +447,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   : `${selectedChallenge.word_length || "Random"} Letters`}
               </span>
             </div>
-            <p className="text-[9px] text-gray-400">
+            <p className="text-[9px] text-white">
               {selectedChallenge.is_custom_word
                 ? "Host Custom Word"
                 : "System Generated"}
@@ -455,7 +458,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-[8px] font-black uppercase text-gray-500">
+                <p className="text-[8px] font-black uppercase text-white/70">
                   Handicap Starter
                 </p>
                 <div className="flex items-center gap-1.5">
@@ -465,7 +468,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                       selectedChallenge.handicap_starter ||
                       selectedChallenge.handicap_starters
                         ? "text-correct"
-                        : "text-gray-400"
+                        : "text-white/55"
                     }
                   />
                   <span className="text-xs font-bold text-white">
@@ -489,7 +492,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </div>
             {(selectedChallenge.handicap_starter ||
               selectedChallenge.handicap_starters) && (
-              <div className="mt-2 text-[9px] text-gray-400 space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
+              <div className="mt-2 text-[9px] text-white space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
                 {isMarathon && selectedChallenge.handicap_starters ? (
                   <div className="flex flex-wrap gap-1 justify-center text-center font-black max-h-[100px] overflow-y-auto animate-in fade-in duration-200">
                     {marathonGamesList.map((game, idx) => {
@@ -504,10 +507,10 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                           key={idx}
                           className="bg-white/5 p-1 rounded min-w-[45px]"
                         >
-                          <span className="text-[7px] text-gray-500 block">
+                          <span className="text-[7px] text-white/60 block">
                             #{idx + 1} ({game.wordLength}L)
                           </span>
-                          <span className="text-white/60 uppercase text-[8px]">
+                          <span className="text-white/80 uppercase text-[8px]">
                             {hasWord ? "Hidden" : "Rand"}
                           </span>
                         </div>
@@ -517,7 +520,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 ) : (
                   <p className="font-bold">
                     Starter Word:{" "}
-                    <span className="text-white/60 uppercase tracking-wider font-mono">
+                    <span className="text-white/80 uppercase tracking-wider font-mono">
                       {selectedChallenge.handicap_starter ===
                       "__SYSTEM_RANDOM__"
                         ? "Random (Hidden until start)"
@@ -531,7 +534,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
           {/* Lifespan & Participants */}
           <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-gray-500">
+            <p className="text-[8px] font-black uppercase text-white/70">
               Privacy & Limits
             </p>
             <div className="flex items-center gap-1.5">
@@ -544,7 +547,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 {selectedChallenge.is_public ? "Public Room" : "Invite Only"}
               </span>
             </div>
-            <p className="text-[9px] text-gray-400">
+            <p className="text-[9px] text-white">
               {selectedChallenge.is_public
                 ? `Max ${selectedChallenge.max_participants || 100} players`
                 : "Direct shares only"}
@@ -553,14 +556,14 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
           {/* Expiration Timer */}
           <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-gray-500">
+            <p className="text-[8px] font-black uppercase text-white/70">
               Room Lifespan
             </p>
             <div className="flex items-center gap-1.5">
-              <Hourglass size={12} className="text-gray-400" />
+              <Hourglass size={12} className="text-white/70" />
               <span className="text-xs font-bold text-white">Expires in</span>
             </div>
-            <p className="text-[9px] text-gray-400 tabular-nums">
+            <p className="text-[9px] text-white tabular-nums">
               {new Date(selectedChallenge.expires_at).toLocaleString(
                 undefined,
                 {
@@ -578,7 +581,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             selectedChallenge.mode === "LIVE" &&
             selectedChallenge.marathon_timers && (
               <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
-                <p className="text-[8px] font-black uppercase text-gray-500">
+                <p className="text-[8px] font-black uppercase text-white/70">
                   Marathon Per-Length Time Limits
                 </p>
                 <div className="flex flex-wrap gap-1.5 justify-center pt-1 max-h-[120px] overflow-y-auto animate-in fade-in duration-200">
@@ -593,7 +596,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                         key={idx}
                         className="bg-black/30 p-1.5 rounded-lg border border-white/5 text-center min-w-[50px]"
                       >
-                        <p className="text-[8px] font-bold text-gray-500">
+                        <p className="text-[8px] font-bold text-white/70">
                           #{idx + 1} ({game.wordLength}L)
                         </p>
                         <p className="text-[10px] font-black text-white">
@@ -610,34 +613,55 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between px-2">
-          <h4 className="text-xs font-black uppercase tracking-widest text-gray-500">
+          <h4 className="text-xs font-black uppercase tracking-widest text-white">
             Participants ({currentParts} / {maxParts})
           </h4>
         </div>
         <div className="space-y-2">
-          {loading && participants.length === 0
-            ? [1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-16 bg-white/5 rounded-xl animate-pulse border border-white/5"
-                />
-              ))
-            : participants.map((p) => (
-                <ParticipantItem
-                  key={p.id}
-                  p={p}
-                  isMarathon={isMarathon}
-                  totalMarathonGames={marathonGamesList.length}
-                  myHasFinished={myHasFinished}
-                  isLive={isLive}
-                  onPreview={handlePreview}
-                  canPreviewAll={
-                    selectedChallenge.creator_id === effectiveUser?.id &&
-                    !!selectedChallenge.is_custom_word
-                  }
-                  isExpired={isExpired}
-                />
-              ))}
+          {loadingParticipants && participants.length === 0 ? (
+            <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
+              <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
+              <p className="text-xs font-black uppercase tracking-wider text-white">
+                Fetching participants...
+              </p>
+            </div>
+          ) : participantsError ? (
+            <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
+              <p className="text-xs font-black uppercase text-red-500">
+                Failed to load participants
+              </p>
+              <p className="text-[10px] text-white font-bold">
+                {participantsError}
+              </p>
+              <button
+                onClick={retryFetchParticipants}
+                className="bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-widest text-[9px] px-4 py-2 rounded-xl transition-colors cursor-pointer"
+              >
+                Retry Connection
+              </button>
+            </div>
+          ) : participants.length === 0 ? (
+            <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
+              No participants found
+            </div>
+          ) : (
+            participants.map((p) => (
+              <ParticipantItem
+                key={p.id}
+                p={p}
+                isMarathon={isMarathon}
+                totalMarathonGames={marathonGamesList.length}
+                myHasFinished={myHasFinished}
+                isLive={isLive}
+                onPreview={handlePreview}
+                canPreviewAll={
+                  selectedChallenge.creator_id === effectiveUser?.id &&
+                  !!selectedChallenge.is_custom_word
+                }
+                isExpired={isExpired}
+              />
+            ))
+          )}
         </div>
       </div>
 
@@ -647,7 +671,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
               <Hourglass size={14} /> Challenge Expired ⌛
             </p>
-            <p className="text-[10px] text-red-400/80 font-bold leading-relaxed">
+            <p className="text-[10px] text-white font-bold leading-relaxed">
               This challenge has ended. You can view the final scores and
               details, but no more entries are allowed.
             </p>
@@ -657,7 +681,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             <p className="text-xs font-black uppercase text-yellow-500">
               Host Mode Active 👑
             </p>
-            <p className="text-[10px] text-yellow-500/80 font-bold">
+            <p className="text-[10px] text-white font-bold">
               You created this custom word challenge. Watch your friends compete
               on the leaderboard above!
             </p>
@@ -667,7 +691,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             <p className="text-xs font-black uppercase text-red-500">
               Challenge Full 🚫
             </p>
-            <p className="text-[10px] text-red-400/80 font-bold mt-1">
+            <p className="text-[10px] text-white font-bold mt-1">
               This challenge has reached its maximum participant limit of{" "}
               {maxParts}.
             </p>
@@ -678,7 +702,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               <p className="text-xs font-black uppercase tracking-wider text-white">
                 Join the Challenge
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-white">
                 Log in to save stats permanently, or play now as a guest.
               </p>
             </div>
@@ -718,7 +742,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setShowGuestInput(false)}
-                    className="bg-white/5 text-gray-400 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                    className="bg-white/5 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
                   >
                     Back
                   </button>
@@ -762,8 +786,8 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           </div>
         )}
       </div>
-    </>
-  )}
+      </>
+      )}
 
       <div className="pt-6 flex flex-col gap-3">
         {/* Host Edit/Delete Actions (Only in Lobby tab and if unplayed) */}
@@ -786,7 +810,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
         <button
           onClick={() => setSelectedChallenge(null)}
-          className="w-full bg-white/5 border border-white/10 text-white/50 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          className="w-full bg-white/5 border border-white/10 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer"
         >
           Back to List
         </button>

@@ -169,7 +169,7 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isOpponentSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800'}`}>
                         {isConnected ? (
                             <div className="relative">
-                                <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-zinc-400'} />
+                                <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-white/80'} />
                                 {!opponentStatus.mic && (
                                     <div className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border border-zinc-900" title="Opponent Muted" />
                                 )}
@@ -183,7 +183,7 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
 
                     {/* Call Timer */}
                     <div className="px-2 min-w-12 text-center">
-                        <span className="text-[10px] font-mono font-bold text-zinc-400 tabular-nums">
+                        <span className="text-[10px] font-mono font-bold text-white/80 tabular-nums">
                             {Math.floor(callDuration / 60)}:{String(callDuration % 60).padStart(2, '0')}
                         </span>
                     </div>
@@ -193,10 +193,10 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
                     {/* Mic Toggle with Local Speaking Visualizer */}
                     <button
                         onClick={toggleMic}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${error ? 'bg-red-500/20 text-red-500' : isMicOn ? (isLocalSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-zinc-800/50 text-zinc-600'}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${error ? 'bg-red-500/20 text-red-500' : isMicOn ? (isLocalSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-zinc-800/50 text-white/40'}`}
                         title={error ? error : isMicOn ? 'Mute Mic' : 'Unmute Mic'}
                     >
-                        {error ? <AlertCircle size={14} /> : isMicOn ? <Mic size={14} className={isLocalSpeaking ? 'text-white' : 'text-zinc-400'} /> : <MicOff size={14} />}
+                        {error ? <AlertCircle size={14} /> : isMicOn ? <Mic size={14} className={isLocalSpeaking ? 'text-white' : 'text-white/80'} /> : <MicOff size={14} />}
                         {isMicOn && isLocalSpeaking && (
                             <div className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping opacity-20" />
                         )}
@@ -212,7 +212,7 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
                         className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${isSpeakerOn ? (isOpponentSpeaking ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-zinc-800') : 'bg-red-500/10 text-red-500'}`}
                         title={isSpeakerOn ? 'Mute Speaker' : 'Unmute Speaker'}
                     >
-                        {isSpeakerOn ? <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-zinc-400'} /> : <VolumeX size={14} />}
+                        {isSpeakerOn ? <Volume2 size={14} className={isOpponentSpeaking ? 'text-white' : 'text-white/80'} /> : <VolumeX size={14} />}
 
                         {/* Opponent Speaker Status Indicator (Green dot if they are listening) */}
                         {isSpeakerOn && opponentStatus.speaker && !isOpponentSpeaking && (
@@ -240,7 +240,7 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
                     {/* Active Engine Badge */}
                     {activeEngine && (
                         <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-zinc-800/80 rounded-full border border-zinc-700/50 backdrop-blur-sm pointer-events-none">
-                            <span className="text-[8px] font-black uppercase tracking-tighter text-zinc-500 whitespace-nowrap">
+                            <span className="text-[8px] font-black uppercase tracking-tighter text-white/60 whitespace-nowrap">
                                 Engine: <span className={activeEngine === 'agora' ? 'text-emerald-500' : 'text-amber-500'}>{activeEngine}</span>
                             </span>
                         </div>
