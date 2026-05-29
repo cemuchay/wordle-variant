@@ -27,7 +27,7 @@ interface ChallengeState {
     statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
     modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
     lengthFilter: 'ALL' | number;
-    listColumn: 'active' | 'expired' | 'open';
+    listColumn: 'active' | 'played' | 'expired' | 'open';
 
     // Actions
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
@@ -49,7 +49,7 @@ interface ChallengeState {
     setStatusFilter: (f: 'ALL' | 'ACTIVE' | 'COMPLETED') => void;
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     setLengthFilter: (l: 'ALL' | number) => void;
-    setListColumn: (col: 'active' | 'expired' | 'open') => void;
+    setListColumn: (col: 'active' | 'played' | 'expired' | 'open') => void;
     clearFilters: () => void;
     resetForm: () => void;
 }

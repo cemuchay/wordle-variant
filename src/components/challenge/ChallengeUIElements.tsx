@@ -333,9 +333,9 @@ export const ChallengeItem = memo(function ChallengeItem({
       {/* PROGRESS SPLIT GRID */}
       <div className="grid grid-cols-2 gap-3 w-full">
         {/* My Stats Box */}
-        <div className="bg-black/15 border border-white/5 p-3 rounded-2xl flex flex-col gap-1.5 justify-between">
+        <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-2xl flex flex-col gap-1.5 justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[0.5rem] font-black uppercase text-white tracking-wider">
+            <span className="text-[0.625rem] font-black uppercase text-indigo-300 tracking-wider font-mono">
               My Status
             </span>
             {isLeader && !isExpired && (
@@ -347,7 +347,7 @@ export const ChallengeItem = memo(function ChallengeItem({
 
           <div className="flex items-baseline justify-between">
             <span
-              className={`text-[8px] sm:text-[11px] font-black uppercase ${
+              className={`text-[9px] sm:text-[12px] font-black uppercase font-mono ${
                 status === "completed" || status === "host"
                   ? "text-correct"
                   : status === "playing"
@@ -358,9 +358,9 @@ export const ChallengeItem = memo(function ChallengeItem({
               {status === "host" ? "Host (Spectating)" : status}
             </span>
             {status !== "host" && hasStarted && (
-              <span className="text-[8px] sm:text-lg font-black text-white">
+              <span className="text-[9px] sm:text-lg font-black text-white font-mono">
                 {myScore}{" "}
-                <span className="text-[9px] font-medium text-white/80">
+                <span className="text-[9px] font-medium text-white/80 font-sans">
                   pts
                 </span>
               </span>

@@ -300,7 +300,7 @@ const AuthenticatedChallengeContent = memo(
                     <div className="space-y-6">
                       {/* Segmented Switcher for Columns */}
                       <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
-                        {(["active", "expired", "open"] as const).map((tab) => (
+                        {(["active", "played", "expired", "open"] as const).map((tab) => (
                           <button
                             key={tab}
                             onClick={() => setListColumn(tab)}
