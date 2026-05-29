@@ -11,7 +11,7 @@ import { useConfirmation } from '../context/ConfirmationContext';
 
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
-import { safeLocalStorage } from '../utils/storage';
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 const getLocalSalt = (date: string, userId: string | undefined) => {
     const base = `local_salt_${date}_${userId || 'guest'}`;
@@ -48,6 +48,35 @@ export const useGameEngine = (date: string) => {
                     delete current.needsSync;
                     safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(current));
                 }
+            }
+
+            const isGameOver = gamePayload?.status === 'won' || gamePayload?.status === 'lost';
+            if (isGameOver) {
+                // Invalidate local leaderboard cache keys immediately
+                try {
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
+                    safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+                } catch (e) {
+                    console.error('Failed to invalidate local leaderboard cache:', e);
+                }
+
+                // Notify open StatsModal on this client immediately
+                window.dispatchEvent(new CustomEvent("global-scores-updated"));
+
+                // Broadcast score update to other active players
+                const syncChannel = supabase.channel('global_scores_leaderboard_sync');
+                syncChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        syncChannel.send({
+                            type: 'broadcast',
+                            event: 'score_submitted',
+                            payload: { userId: user.id, date }
+                        });
+                        setTimeout(() => syncChannel.unsubscribe(), 1000);
+                    }
+                });
             }
 
             setTimeout(() => dispatch({ type: 'SET_SYNC_STATUS', status: 'idle' }), TOAST_DURATION.DEFAULT);

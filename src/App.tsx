@@ -111,6 +111,27 @@ export default function App() {
       supabase.removeChannel(existing);
     }
 
+    const invalidateLocalLeaderboard = () => {
+      console.log(
+        "[Global Score Sync] score update detected. Invalidating sessionStorage cache...",
+      );
+      safeSessionStorage.removeItem(
+        `wordle_global_leaderboard_today_${date}`,
+      );
+      safeSessionStorage.removeItem(
+        `wordle_global_leaderboard_yesterday_${date}`,
+      );
+      safeSessionStorage.removeItem(
+        `wordle_global_leaderboard_weekly_${date}`,
+      );
+      safeSessionStorage.removeItem(
+        `wordle_global_leaderboard_monthly_${date}`,
+      );
+
+      // Dispatch custom event to notify any open StatsModal
+      window.dispatchEvent(new CustomEvent("global-scores-updated"));
+    };
+
     const channel = supabase
       .channel(channelName)
       .on(
@@ -121,26 +142,15 @@ export default function App() {
           table: "scores",
           filter: `game_date=eq.${date}`,
         },
-        () => {
-          console.log(
-            "[Global Score Sync] score update detected. Invalidating sessionStorage cache...",
-          );
-          safeSessionStorage.removeItem(
-            `wordle_global_leaderboard_today_${date}`,
-          );
-          safeSessionStorage.removeItem(
-            `wordle_global_leaderboard_yesterday_${date}`,
-          );
-          safeSessionStorage.removeItem(
-            `wordle_global_leaderboard_weekly_${date}`,
-          );
-          safeSessionStorage.removeItem(
-            `wordle_global_leaderboard_monthly_${date}`,
-          );
-
-          // Dispatch custom event to notify any open StatsModal
-          window.dispatchEvent(new CustomEvent("global-scores-updated"));
-        },
+        invalidateLocalLeaderboard
+      )
+      .on(
+        "broadcast",
+        { event: "score_submitted" },
+        (payload) => {
+          console.log("[Global Score Sync] Received broadcast score update event:", payload);
+          invalidateLocalLeaderboard();
+        }
       )
       .subscribe();
 
