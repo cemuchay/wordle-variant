@@ -1,4 +1,4 @@
-import { Eye, Loader2, Trophy, User, X } from 'lucide-react';
+import { Eye, Loader2, Trophy, User, X, RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
 import { Z_INDEX } from '../constants/ui';
@@ -78,7 +78,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
     try {
       const { data: edgeRes, error } = await supabase.functions.invoke('redis-cache', {
-        body: { action: 'get-leaderboard', timeframe, date: currentDate }
+        body: { action: 'get-leaderboard', timeframe, date: currentDate, ignoreCache }
       });
 
       if (error) throw error;
@@ -103,6 +103,20 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   useEffect(() => {
     fetchLeaderboard(false);
   }, [fetchLeaderboard]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (loading) return;
+    try {
+      safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+      safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+      safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+      safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+    } catch (e) {
+      console.error('Failed to clear sessionStorage on manual refresh:', e);
+    }
+    await fetchLeaderboard(true);
+    triggerToast("Leaderboard refreshed with latest scores!", 3000);
+  }, [fetchLeaderboard, loading, triggerToast, currentDate]);
 
   // Check if viewer has finished TODAY's game specifically
   useEffect(() => {
@@ -254,9 +268,20 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
               </div>
 
-              <div className="flex items-center gap-1.5 justify-center py-1.5 px-3 mb-3 bg-correct/5 border border-correct/20 rounded-xl">
+              <div className="flex items-center justify-between py-1.5 px-3 mb-3 bg-correct/5 border border-correct/20 rounded-xl">
+                <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />
                   <span className="text-[8px] text-correct font-bold uppercase tracking-wider">Live Updates Enabled</span>
+                </div>
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={loading}
+                  className="text-correct hover:text-white transition-colors disabled:opacity-50 p-1 rounded hover:bg-correct/10"
+                  title="Force Refresh Leaderboard"
+                  id="force-refresh-leaderboard"
+                >
+                  <RotateCw size={12} className={loading ? "animate-spin" : ""} />
+                </button>
               </div>
 
               {
