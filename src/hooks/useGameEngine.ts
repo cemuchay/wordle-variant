@@ -11,7 +11,7 @@ import { useConfirmation } from '../context/ConfirmationContext';
 
 import { logger } from '../lib/logger';
 import { TOAST_DURATION } from '../constants/ui';
-import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
+import { safeLocalStorage } from '../utils/storage';
 
 const getLocalSalt = (date: string, userId: string | undefined) => {
     const base = `local_salt_${date}_${userId || 'guest'}`;
@@ -50,18 +50,11 @@ export const useGameEngine = (date: string) => {
                 }
             }
 
-            // Invalidate local leaderboard cache keys immediately on every sync
-            try {
-                safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
-                safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
-                safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
-                safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
-            } catch (e) {
-                console.error('Failed to invalidate local leaderboard cache:', e);
-            }
-
             // Notify open StatsModal on this client immediately on every sync
-            window.dispatchEvent(new CustomEvent("global-scores-updated"));
+            const isGameOver = gamePayload?.status === 'won' || gamePayload?.status === 'lost';
+            window.dispatchEvent(new CustomEvent("global-scores-updated", {
+                detail: { isBackground: true, isGameOver }
+            }));
 
             // Broadcast score update to other active players on every sync
             const syncChannel = supabase.channel('global_scores_leaderboard_sync');
@@ -70,20 +63,22 @@ export const useGameEngine = (date: string) => {
                     syncChannel.send({
                         type: 'broadcast',
                         event: 'score_submitted',
-                        payload: { userId: user.id, date }
+                        payload: { userId: user.id, date, status: gamePayload.status }
                     });
-                    setTimeout(() => syncChannel.unsubscribe(), 1000);
                 }
             });
 
-            // Invalidate Redis server cache on first guess or completion (Hybrid Optimization)
-            const isFirstGuess = gamePayload?.guesses?.length === 1;
-            const isGameOver = gamePayload?.status === 'won' || gamePayload?.status === 'lost';
-            if (isFirstGuess || isGameOver) {
+            // Invalidate Redis server cache on completion (Hybrid Optimization)
+            if (isGameOver) {
                 supabase.functions.invoke('redis-cache', {
-                    body: { action: 'invalidate', key: 'leaderboard:today' }
+                    body: { action: 'invalidate', key: 'leaderboard:weekly' }
                 }).catch((e) => {
-                    console.error('Failed to invalidate Redis cache on server:', e);
+                    console.error('Failed to invalidate Redis weekly cache on server:', e);
+                });
+                supabase.functions.invoke('redis-cache', {
+                    body: { action: 'invalidate', key: 'leaderboard:monthly' }
+                }).catch((e) => {
+                    console.error('Failed to invalidate Redis monthly cache on server:', e);
                 });
             }
 

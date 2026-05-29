@@ -99,65 +99,7 @@ export default function App() {
     }
   }, [user]);
 
-  // Global Leaderboard Sync & Cache Invalidation
-  useEffect(() => {
-    if (!date) return;
 
-    const channelName = `global_scores_leaderboard_sync`;
-    const existing = supabase
-      .getChannels()
-      .find((c) => (c as any).topic === `realtime:${channelName}`);
-    if (existing) {
-      supabase.removeChannel(existing);
-    }
-
-    const invalidateLocalLeaderboard = () => {
-      console.log(
-        "[Global Score Sync] score update detected. Invalidating sessionStorage cache...",
-      );
-      safeSessionStorage.removeItem(
-        `wordle_global_leaderboard_today_${date}`,
-      );
-      safeSessionStorage.removeItem(
-        `wordle_global_leaderboard_yesterday_${date}`,
-      );
-      safeSessionStorage.removeItem(
-        `wordle_global_leaderboard_weekly_${date}`,
-      );
-      safeSessionStorage.removeItem(
-        `wordle_global_leaderboard_monthly_${date}`,
-      );
-
-      // Dispatch custom event to notify any open StatsModal
-      window.dispatchEvent(new CustomEvent("global-scores-updated"));
-    };
-
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Listen to INSERT, UPDATE, DELETE
-          schema: "public",
-          table: "scores",
-          filter: `game_date=eq.${date}`,
-        },
-        invalidateLocalLeaderboard
-      )
-      .on(
-        "broadcast",
-        { event: "score_submitted" },
-        (payload) => {
-          console.log("[Global Score Sync] Received broadcast score update event:", payload);
-          invalidateLocalLeaderboard();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [date]);
 
   // Listen to custom event to open stats modal at a specific tab
   useEffect(() => {
