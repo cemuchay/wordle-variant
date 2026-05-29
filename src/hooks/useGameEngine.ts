@@ -50,32 +50,40 @@ export const useGameEngine = (date: string) => {
                 }
             }
 
-            const isGameOver = gamePayload?.status === 'won' || gamePayload?.status === 'lost';
-            if (isGameOver) {
-                // Invalidate local leaderboard cache keys immediately
-                try {
-                    safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
-                    safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
-                    safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
-                    safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
-                } catch (e) {
-                    console.error('Failed to invalidate local leaderboard cache:', e);
+            // Invalidate local leaderboard cache keys immediately on every sync
+            try {
+                safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${date}`);
+                safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${date}`);
+                safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${date}`);
+                safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${date}`);
+            } catch (e) {
+                console.error('Failed to invalidate local leaderboard cache:', e);
+            }
+
+            // Notify open StatsModal on this client immediately on every sync
+            window.dispatchEvent(new CustomEvent("global-scores-updated"));
+
+            // Broadcast score update to other active players on every sync
+            const syncChannel = supabase.channel('global_scores_leaderboard_sync');
+            syncChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    syncChannel.send({
+                        type: 'broadcast',
+                        event: 'score_submitted',
+                        payload: { userId: user.id, date }
+                    });
+                    setTimeout(() => syncChannel.unsubscribe(), 1000);
                 }
+            });
 
-                // Notify open StatsModal on this client immediately
-                window.dispatchEvent(new CustomEvent("global-scores-updated"));
-
-                // Broadcast score update to other active players
-                const syncChannel = supabase.channel('global_scores_leaderboard_sync');
-                syncChannel.subscribe((status) => {
-                    if (status === 'SUBSCRIBED') {
-                        syncChannel.send({
-                            type: 'broadcast',
-                            event: 'score_submitted',
-                            payload: { userId: user.id, date }
-                        });
-                        setTimeout(() => syncChannel.unsubscribe(), 1000);
-                    }
+            // Invalidate Redis server cache on first guess or completion (Hybrid Optimization)
+            const isFirstGuess = gamePayload?.guesses?.length === 1;
+            const isGameOver = gamePayload?.status === 'won' || gamePayload?.status === 'lost';
+            if (isFirstGuess || isGameOver) {
+                supabase.functions.invoke('redis-cache', {
+                    body: { action: 'invalidate', key: 'leaderboard:today' }
+                }).catch((e) => {
+                    console.error('Failed to invalidate Redis cache on server:', e);
                 });
             }
 

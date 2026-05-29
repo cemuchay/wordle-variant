@@ -46,8 +46,8 @@ interface ChallengeContextType {
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     lengthFilter: 'ALL' | number;
     setLengthFilter: (l: 'ALL' | number) => void;
-    listColumn: 'active' | 'expired' | 'open';
-    setListColumn: (col: 'active' | 'expired' | 'open') => void;
+    listColumn: 'active' | 'played' | 'expired' | 'open';
+    setListColumn: (col: 'active' | 'played' | 'expired' | 'open') => void;
     clearFilters: () => void;
     filteredChallenges: any[];
 
@@ -260,7 +260,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (listColumn === 'active') {
             sourceList = myChallenges.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
-                return !isExpired && item.status !== 'viewed';
+                const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                return !isExpired && !isCompleted && item.status !== 'viewed';
+            });
+        } else if (listColumn === 'played') {
+            sourceList = myChallenges.filter((item: any) => {
+                const isExpired = new Date(item.challenge?.expires_at) < new Date();
+                const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                return !isExpired && isCompleted && item.status !== 'viewed';
             });
         } else if (listColumn === 'expired') {
             sourceList = myChallenges.filter((item: any) => {
@@ -737,6 +744,42 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             setMyParticipation(null);
         }
     }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
+
+    const hasSetDefaultTab = useRef(false);
+
+    // Dynamic Default View Priority Auto-Selection on Open
+    useEffect(() => {
+        if (isChallengesLoading || hasSetDefaultTab.current) return;
+        if (myChallengesData) {
+            hasSetDefaultTab.current = true;
+            
+            const activeChallenges = myChallengesData.filter((item: any) => {
+                const isExpired = new Date(item.challenge?.expires_at) < new Date();
+                const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                return !isExpired && !isCompleted && item.status !== 'viewed';
+            });
+            
+            const playedChallenges = myChallengesData.filter((item: any) => {
+                const isExpired = new Date(item.challenge?.expires_at) < new Date();
+                const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+                return !isExpired && isCompleted && item.status !== 'viewed';
+            });
+
+            const expiredChallenges = myChallengesData.filter((item: any) => {
+                return new Date(item.challenge?.expires_at) < new Date();
+            });
+
+            if (activeChallenges.length > 0) {
+                setListColumn('active');
+            } else if (playedChallenges.length > 0) {
+                setListColumn('played');
+            } else if (expiredChallenges.length > 0) {
+                setListColumn('expired');
+            } else {
+                setListColumn('active');
+            }
+        }
+    }, [isChallengesLoading, myChallengesData, setListColumn]);
 
     // Context Value (Bridge)
     const contextValue: ChallengeContextType = useMemo(() => ({

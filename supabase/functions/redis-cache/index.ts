@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, timeframe, userId, key, date, challengeId } = body;
+    const { action, timeframe, userId, key, date, challengeId, ignoreCache } = body;
 
     const upstashUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
     const upstashToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
@@ -88,7 +88,10 @@ serve(async (req) => {
         cacheKey = `leaderboard:daily:${getLagosDate(date, -1)}`;
       }
 
-      const cached = await runRedisCommand(["GET", cacheKey]);
+      let cached = null;
+      if (!ignoreCache) {
+        cached = await runRedisCommand(["GET", cacheKey]);
+      }
 
       if (cached && cached.result) {
         return new Response(JSON.stringify({ data: JSON.parse(cached.result), cached: true }), {
@@ -348,6 +351,8 @@ serve(async (req) => {
         const yesterdayStr = getLagosDate(null, -1);
         await runRedisCommand(["DEL", `leaderboard:daily:${todayStr}`]);
         await runRedisCommand(["DEL", `leaderboard:daily:${yesterdayStr}`]);
+        await runRedisCommand(["DEL", `leaderboard:weekly`]);
+        await runRedisCommand(["DEL", `leaderboard:monthly`]);
       } else {
         await runRedisCommand(["DEL", key]);
       }
