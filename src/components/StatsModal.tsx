@@ -1,5 +1,5 @@
 import { Eye, Loader2, Trophy, User, X, RotateCw } from 'lucide-react';
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
 import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
@@ -53,8 +53,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
   const { date: currentDate, triggerToast } = useApp();
 
+  const fetchIdRef = useRef(0);
+
   // Fetch Leaderboard Data
-  const fetchLeaderboard = useCallback(async (ignoreCache = false) => {
+  const fetchLeaderboard = useCallback(async (ignoreCache = false, isBackground = false) => {
     if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
 
     const cacheKey = `wordle_global_leaderboard_${timeframe}_${currentDate}`;
@@ -73,7 +75,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       }
     }
 
-    setLoading(true);
+    const currentFetchId = ++fetchIdRef.current;
+    if (!isBackground) {
+      setLoading(true);
+    }
     setLeaderboardError(null);
 
     try {
@@ -82,6 +87,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       });
 
       if (error) throw error;
+
+      if (currentFetchId !== fetchIdRef.current) {
+        console.log('[StatsModal] Stale fetch response ignored.');
+        return;
+      }
 
       if (edgeRes && edgeRes.data) {
         setLeaderboard(edgeRes.data);
@@ -93,12 +103,17 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         }
       }
     } catch (err: any) {
+      if (currentFetchId !== fetchIdRef.current) return;
       console.error("Leaderboard fetch error:", err.message || err);
-      setLeaderboardError(err.message || "Failed to retrieve leaderboard data.");
+      if (!isBackground || leaderboard.length === 0) {
+        setLeaderboardError(err.message || "Failed to retrieve leaderboard data.");
+      }
     } finally {
-      setLoading(false);
+      if (currentFetchId === fetchIdRef.current && !isBackground) {
+        setLoading(false);
+      }
     }
-  }, [isOpen, activeTab, timeframe, currentDate]);
+  }, [isOpen, activeTab, timeframe, currentDate, leaderboard.length]);
 
   useEffect(() => {
     fetchLeaderboard(false);
@@ -144,21 +159,140 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     checkStatus();
   }, [isOpen, user, currentDate, isGameOver]);
 
-  // Listen to global leaderboard score sync events
+  // Evict all sessionStorage caches on modal close (unmount)
+  useEffect(() => {
+    return () => {
+      if (currentDate) {
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+      }
+    };
+  }, [currentDate]);
+
+  // Track timeframe in a ref to avoid subscription churn
+  const timeframeRef = useRef(timeframe);
+  useEffect(() => {
+    timeframeRef.current = timeframe;
+  }, [timeframe]);
+
+  // Open-only realtime score updates subscription
+  useEffect(() => {
+    if (!isOpen || !currentDate) return;
+
+    const channelName = `global_scores_leaderboard_sync_${currentDate}`;
+    const existing = supabase
+      .getChannels()
+      .find((c) => (c as any).topic === `realtime:${channelName}`);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleScoreUpdate = (status: string | null) => {
+      const isGameOverUpdate = status === 'won' || status === 'lost';
+      const currentTF = timeframeRef.current;
+
+      console.log(`[StatsModal Realtime] Score update received: status=${status}, currentTF=${currentTF}`);
+
+      // 1. Evict sessionStorage cache keys
+      if (status === 'playing') {
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+      } else if (isGameOverUpdate) {
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+      }
+
+      // 2. Decide if we trigger a background refresh
+      let shouldRefresh = false;
+      if (currentTF === 'today') {
+        shouldRefresh = true;
+      } else if (isGameOverUpdate && (currentTF === 'weekly' || currentTF === 'monthly' || currentTF === 'yesterday')) {
+        shouldRefresh = true;
+      }
+
+      if (shouldRefresh) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          console.log(`[StatsModal Realtime] Performing background refresh for timeframe: ${currentTF}`);
+          fetchLeaderboard(true, true);
+        }, 1500);
+      }
+    };
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "scores",
+          filter: `game_date=eq.${currentDate}`,
+        },
+        (payload: any) => {
+          const status = payload.new ? payload.new.status : null;
+          handleScoreUpdate(status);
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "score_submitted" },
+        (payload: any) => {
+          const status = payload.payload ? payload.payload.status : null;
+          handleScoreUpdate(status);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, currentDate, fetchLeaderboard]);
+
+  // Listen to global leaderboard score sync events (local custom events)
   useEffect(() => {
     if (!isOpen) return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const handleGlobalUpdate = () => {
+    const handleGlobalUpdate = (e: Event) => {
       if (debounceTimer) clearTimeout(debounceTimer);
 
-      // Debounce refreshes by 1.5s to batch multiple simultaneous score submissions
-      debounceTimer = setTimeout(() => {
-        console.log('[StatsModal] Global score update event received. Refreshing leaderboard data...');
-        fetchLeaderboard(true);
-        triggerToast("Leaderboard updated with new scores!", 3000);
-      }, 1500);
+      const customEvent = e as CustomEvent;
+      const isBackground = customEvent.detail?.isBackground ?? false;
+      const isGameOverUpdate = customEvent.detail?.isGameOver ?? false;
+      const currentTF = timeframeRef.current;
+
+      // 1. Evict sessionStorage cache keys
+      if (isGameOverUpdate) {
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_yesterday_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_weekly_${currentDate}`);
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_monthly_${currentDate}`);
+      } else {
+        safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
+      }
+
+      // 2. Decide if we trigger refresh
+      let shouldRefresh = false;
+      if (currentTF === 'today') {
+        shouldRefresh = true;
+      } else if (isGameOverUpdate && (currentTF === 'weekly' || currentTF === 'monthly' || currentTF === 'yesterday')) {
+        shouldRefresh = true;
+      }
+
+      if (shouldRefresh) {
+        debounceTimer = setTimeout(() => {
+          console.log('[StatsModal] Local update received. Refreshing...', isBackground);
+          fetchLeaderboard(true, isBackground);
+        }, 1500);
+      }
     };
 
     window.addEventListener('global-scores-updated', handleGlobalUpdate);
@@ -166,7 +300,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener('global-scores-updated', handleGlobalUpdate);
     };
-  }, [isOpen, fetchLeaderboard, triggerToast]);
+  }, [isOpen, currentDate, fetchLeaderboard]);
 
   const maxGuesses = useMemo(() => {
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
@@ -486,11 +620,14 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
       </div>
 
       <div className="text-right">
-        <div className={`text-xs font-black ${isFirst ? 'text-yellow-400' : 'text-white'}`}>
+        <div className={`text-xs font-black ${isFirst ? 'text-yellow-400' : 'text-white'} flex items-center justify-end gap-1`}>
           {entry.total_score} {formattedGameScore}
+          {status === 'playing' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" title="In Progress" />
+          )}
         </div>
-        <div className={`text-[8px] uppercase font-bold tracking-tighter ${isFirst ? 'text-yellow-600/80' : 'text-gray-500'}`}>
-          Skill PTS
+        <div className={`text-[8px] uppercase font-bold tracking-tighter ${isFirst ? 'text-yellow-600/80' : (status === 'playing' ? 'text-amber-400 animate-pulse' : 'text-gray-500')}`}>
+          {status === 'playing' ? 'Playing' : 'Skill PTS'}
         </div>
       </div>
     </div>

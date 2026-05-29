@@ -130,14 +130,14 @@ serve(async (req) => {
       if (error) throw error;
 
       // TTL definitions:
-      // today: 60s (1m), yesterday: 86400s (24h), weekly: 300s (5m), monthly: 600s (10m)
+      // today: 5s, yesterday: 86400s (24h), weekly: 300s (5m), monthly: 600s (10m)
       const ttlMap: Record<string, number> = {
-        today: 60,
+        today: 5,
         yesterday: 86400,
         weekly: 300,
         monthly: 600,
       };
-      const ttl = ttlMap[timeframe] || 60;
+      const ttl = ttlMap[timeframe] || 5;
 
       // Format data to match LeaderboardEntry shape
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

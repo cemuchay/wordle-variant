@@ -58,10 +58,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.handle_score_cache_invalidation()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Invalidate daily, weekly, monthly leaderboards on new/changed scores
-  PERFORM public.request_cache_invalidation('leaderboard:today');
-  PERFORM public.request_cache_invalidation('leaderboard:weekly');
-  PERFORM public.request_cache_invalidation('leaderboard:monthly');
+  -- Only invalidate weekly and monthly leaderboards on game completion (won/lost status)
+  IF NEW.status IN ('won', 'lost') THEN
+    PERFORM public.request_cache_invalidation('leaderboard:weekly');
+    PERFORM public.request_cache_invalidation('leaderboard:monthly');
+  END IF;
   
   -- Also invalidate the specific user's cached score for that day
   PERFORM public.request_cache_invalidation('score:' || NEW.user_id || ':' || NEW.game_date);
