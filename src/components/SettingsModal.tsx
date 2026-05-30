@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -214,6 +214,40 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             >
                                 DOWNLOAD
                             </button>
+                        </div>
+                    </section>
+
+                    {/* Legal & Policies */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <FileText size={14} className="text-indigo-400" />
+                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                Legal & Policies
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                            <a
+                                href="/privacy.html"
+                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                            >
+                                <span className="text-[10px] font-bold text-gray-200">Privacy</span>
+                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Policy</span>
+                            </a>
+                            <a
+                                href="/tos.html"
+                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                            >
+                                <span className="text-[10px] font-bold text-gray-200">Terms</span>
+                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">of Service</span>
+                            </a>
+                            <a
+                                href="/deletion.html"
+                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                            >
+                                <span className="text-[10px] font-bold text-gray-200">Data</span>
+                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Deletion</span>
+                            </a>
                         </div>
                     </section>
                 </div>

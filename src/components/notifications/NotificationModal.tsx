@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useMemo, useState, useEffect } from 'react';
+import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { X, Bell, Trash2, BellOff, Mail, MailOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -19,7 +18,7 @@ const NotificationItem = memo(({
     onMarkRead: (id: string) => void, 
     onMarkUnread: (id: string) => void, 
     onDelete: (id: string) => void,
-    onClick?: () => void,
+    onClick?: (n: AppNotification) => void,
     isSessionNew: boolean
 }) => {
     const isUnread = !notification.is_read;
@@ -31,7 +30,7 @@ const NotificationItem = memo(({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            onClick={onClick}
+            onClick={onClick ? () => onClick(notification) : undefined}
             className={`p-4 rounded-2xl border transition-all ${
                 onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
             } ${
@@ -116,7 +115,7 @@ export const NotificationModal = memo(() => {
         }
     }, [isNotificationsOpen, isLoading, notifications, hasAutoMarked, markAllAsRead]);
 
-    const handleNotificationClick = (n: AppNotification) => {
+    const handleNotificationClick = useCallback((n: AppNotification) => {
         if (!n.is_read) {
             markAsRead(n.id);
         }
@@ -134,10 +133,10 @@ export const NotificationModal = memo(() => {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
         }
-    };
+    }, [markAsRead, setIsChallengeOpen, setIsNotificationsOpen]);
 
     const sortedNotifications = useMemo(() => {
-        return [...notifications].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return [...notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
     }, [notifications]);
 
     if (!isNotificationsOpen) return null;
@@ -225,7 +224,7 @@ export const NotificationModal = memo(() => {
                                         onMarkRead={markAsRead} 
                                         onMarkUnread={markAsUnread}
                                         onDelete={deleteNotification} 
-                                        onClick={isInteractive ? () => handleNotificationClick(n) : undefined}
+                                        onClick={isInteractive ? handleNotificationClick : undefined}
                                     />
                                 );
                             })}

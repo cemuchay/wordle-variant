@@ -287,7 +287,10 @@ export function getDailyConfig(
         word = getWordAtDate(currentStr, isAuthenticated, attempt);
         length = word.length as 5 | 6 | 4 | 3 | 7;
         attempt++;
-      } while ((history.has(word) || (prevLength !== null && length === prevLength)) && attempt < 100);
+      } while (
+        (history.has(word) || (prevLength !== null && length === prevLength)) &&
+        attempt < 100
+      );
 
       dailyConfigCache[currentKey] = {
         word,
@@ -412,7 +415,7 @@ export const isHintDisabled = (word: string, guesses: GuessResult[][]) => {
 
   const remainingCount = remainingIndices.length;
   const undiscoveredCount = remainingIndices.filter(
-    (i) => !foundLetters.has(targetWord[i])
+    (i) => !foundLetters.has(targetWord[i]),
   ).length;
 
   if (remainingCount <= 1) return true;
@@ -455,10 +458,11 @@ export const getHint = (word: string, guesses: GuessResult[][]) => {
   // Prioritize revealing new letters (not yet discovered/guessed in target word)
   // over correct positions of yellow letters.
   const newLetterIndices = remainingIndices.filter(
-    (i) => !foundLetters.has(targetWord[i])
+    (i) => !foundLetters.has(targetWord[i]),
   );
 
-  const candidateIndices = newLetterIndices.length > 0 ? newLetterIndices : remainingIndices;
+  const candidateIndices =
+    newLetterIndices.length > 0 ? newLetterIndices : remainingIndices;
 
   const randomIndex =
     candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
@@ -532,7 +536,8 @@ export const syncStatsFromLocalStorage = () => {
     guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, X: 0 },
   };
 
-  const gameKeys = safeLocalStorage.getAllKeys()
+  const gameKeys = safeLocalStorage
+    .getAllKeys()
     .filter((key) => /^wordle-\d{4}-\d{2}-\d{2}$/.test(key))
     .sort();
 
