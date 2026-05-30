@@ -174,7 +174,25 @@ const AuthenticatedChallengeContent = memo(
       listColumn,
       setListColumn,
       isBackgroundFetching,
+      openChallengesCount
     } = useChallengeContext();
+
+    const activeCount = myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+        return !isExpired && !isCompleted && item.status !== 'viewed';
+    }).length;
+
+    const playedCount = myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+        return !isExpired && isCompleted && item.status !== 'viewed';
+    }).length;
+
+    const expiredCount = myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        return isExpired;
+    }).length;
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -214,7 +232,7 @@ const AuthenticatedChallengeContent = memo(
                   <>
                     <button
                       onClick={() =>
-                        backAction ? backAction() : setIsPlaying(false)
+                      	backAction ? backAction() : setIsPlaying(false)
                       }
                       className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white"
                     >
@@ -300,19 +318,23 @@ const AuthenticatedChallengeContent = memo(
                     <div className="space-y-6">
                       {/* Segmented Switcher for Columns */}
                       <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
-                        {(["active", "played", "expired", "open"] as const).map((tab) => (
-                          <button
-                            key={tab}
-                            onClick={() => setListColumn(tab)}
-                            className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                              listColumn === tab
-                                ? "bg-correct text-black font-extrabold shadow-md"
-                                : "text-white hover:text-white hover:bg-white/5"
-                            }`}
-                          >
-                            {tab === "open" ? "Open (Discover)" : tab}
-                          </button>
-                        ))}
+                        {(["active", "played", "expired", "open"] as const).map((tab) => {
+                          const count = tab === "active" ? activeCount : tab === "played" ? playedCount : tab === "expired" ? expiredCount : openChallengesCount;
+                          const label = tab === "open" ? `Open (${count})` : `${tab} (${count})`;
+                          return (
+                            <button
+                              key={tab}
+                              onClick={() => setListColumn(tab)}
+                              className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
+                                listColumn === tab
+                                  ? "bg-correct text-black font-extrabold shadow-md"
+                                  : "text-white hover:text-white hover:bg-white/5"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* Search and Filters Toggle */}

@@ -83,6 +83,7 @@ interface ChallengeContextType {
     loadingParticipants: boolean;
     participantsError: string | null;
     retryFetchParticipants: () => void;
+    openChallengesCount: number;
 }
 
 const addRecentChallenge = (id: string) => {
@@ -820,14 +821,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         toggleInvite,
         copyLink: (c: Challenge) => {
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
-            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
             navigator.clipboard.writeText(text);
             triggerToast('Challenge link copied to clipboard!', 2000);
         },
         shareLink: async (c: Challenge) => {
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
-            const title = `Wordle Challenge`;
-            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆`;
+            const title = `Variant Challenge`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter'} match (${c.mode} mode)! 🏆`;
             if (navigator.share) {
                 try {
                     await navigator.share({
@@ -871,8 +872,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setIsEditingChallenge,
         loadingParticipants,
         participantsError,
-        retryFetchParticipants
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching]);
+        retryFetchParticipants,
+        openChallengesCount: openChallenges.length
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

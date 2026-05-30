@@ -13,9 +13,13 @@ export const NotificationToast = memo(() => {
         let timer: any = null;
 
         const handleNewNotification = (event: any) => {
+            const notification = event.detail as AppNotification;
+            if (notification.type === 'MARATHON_GAME_COMPLETED') {
+                return;
+            }
+
             if (timer) clearTimeout(timer);
 
-            const notification = event.detail as AppNotification;
             setCurrentNotification(notification);
 
             // Auto-hide after 5 seconds

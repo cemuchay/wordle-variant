@@ -1,15 +1,40 @@
-import { SettingsIcon, Shield } from 'lucide-react';
+import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
+import { CloudSyncMenu } from '../SyncCloudModal';
+import type { SyncStatus } from '../../types/game';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
     onOpenWeeklyWrapped?: () => void;
+    onHint: () => void;
+    onReset: () => void;
+    onShare: () => void;
+    onRetrySync: () => void;
+    isGameOver: boolean;
+    usedHint: boolean;
+    canShowHint: boolean;
+    isHintLocked?: boolean;
+    syncStatus: SyncStatus;
 }
 
-export const AppHeader = ({ onOpenSettings, onOpenWeeklyWrapped }: AppHeaderProps) => {
+const ICON_SIZE = 16;
+
+export const AppHeader = ({
+    onOpenSettings,
+    onOpenWeeklyWrapped,
+    onHint,
+    onReset,
+    onShare,
+    onRetrySync,
+    isGameOver,
+    usedHint,
+    canShowHint,
+    isHintLocked,
+    syncStatus
+}: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
@@ -28,36 +53,110 @@ export const AppHeader = ({ onOpenSettings, onOpenWeeklyWrapped }: AppHeaderProp
     };
 
     return (
-        <div className="w-full max-w-lg mx-auto flex flex-col gap-3 mb-4">
-            <div className="w-full flex items-center justify-between gap-2 h-12 py-1">
-                <div className="flex items-center min-w-0">
-                    <div className="bg-correct/10 px-2.5 py-1 rounded-full border border-correct/20 shrink-0">
-                        <h1 className="text-sm sm:text-lg font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-white whitespace-nowrap">
-                            Wordle Variant<span className="text-correct">.</span>
+        <header className="w-full max-w-lg mx-auto flex flex-col gap-2 mb-3 shrink-0">
+            <div className="w-full flex items-center justify-between gap-1 h-10 py-1 px-2 bg-white/5 rounded-2xl border border-white/10">
+                {/* Left Side: Logo & Sync Status */}
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="bg-correct/10 px-1.5 py-0.5 rounded-lg border border-correct/20 shrink-0">
+                        <h1 className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white">
+                            V<span className="hidden sm:inline">ariant</span><span className="text-correct">.</span>
                         </h1>
                     </div>
+                    <CloudSyncMenu status={syncStatus} onRetry={onRetrySync} />
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                {/* Right Side: Gameplay & App controls & Profile */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                    {/* Gameplay Actions */}
+                    <div className="flex items-center gap-0.5">
+                        {canShowHint && !isGameOver && (
+                            <button
+                                onClick={onHint}
+                                disabled={usedHint || isHintLocked}
+                                className={`p-1.5 transition-all rounded-lg relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : isHintLocked ? "Hint Unavailable" : "Get Hint"}
+                            >
+                                <Lightbulb size={ICON_SIZE} />
+                                {isHintLocked && !usedHint && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
+                                    </div>
+                                )}
+                            </button>
+                        )}
+                        <button
+                            onClick={onReset}
+                            className="p-1.5 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500"
+                            title="Reset"
+                        >
+                            <RotateCcw size={ICON_SIZE} />
+                        </button>
+                        {isGameOver && (
+                            <button
+                                onClick={onShare}
+                                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all"
+                                title="Share"
+                            >
+                                <Share size={ICON_SIZE} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+
+                    {/* App Controls */}
+                    <div className="flex items-center gap-0.5">
+                        {isAdmin && (
+                            <a
+                                href="/admin"
+                                className="text-correct hover:text-correct/80 transition-colors p-1 bg-correct/10 hover:bg-correct/20 border border-correct/20 rounded-lg shrink-0 flex items-center justify-center"
+                                title="Admin Vetting Portal"
+                            >
+                                <Shield size={ICON_SIZE - 2} />
+                            </a>
+                        )}
+
+                        {user && new Date().getDay() === 1 && (
+                            <button
+                                onClick={onOpenWeeklyWrapped}
+                                className="text-[8px] sm:text-[9px] font-black bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-2 py-1 rounded-lg uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
+                                title="See your Weekly Wrapped"
+                            >
+                                🎁
+                            </button>
+                        )}
+
+                        {user && <NotificationBell />}
+
+                        <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0" title="Settings">
+                            <SettingsIcon size={ICON_SIZE} />
+                        </button>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+
+                    {/* Profile Area */}
                     {user ? (
-                        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 pl-1 pr-2.5 sm:pr-3 py-1 rounded-full border border-white/10 group relative max-w-[100px] min-[360px]:max-w-[140px] min-[400px]:max-w-[180px] sm:max-w-none">
+                        <div className="flex items-center gap-1 bg-white/5 pl-0.5 pr-2 py-0.5 rounded-full border border-white/10 group relative max-w-[80px] min-[360px]:max-w-[100px] min-[400px]:max-w-[120px] sm:max-w-none">
                             {user.user_metadata.avatar_url ? (
                                 <img
                                     src={user.user_metadata.avatar_url}
                                     alt="Profile"
-                                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-white/10"
+                                    className="w-4 h-4 rounded-full border border-white/10"
                                 />
                             ) : (
-                                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-white/10 flex items-center justify-center bg-white/10 text-[8px] sm:text-[9px] font-black uppercase text-white shrink-0">
+                                <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center bg-white/10 text-[7px] font-black uppercase text-white shrink-0">
                                     {(user.user_metadata.full_name || user.email || '?').substring(0, 2)}
                                 </div>
                             )}
-                            <span className="text-[9px] sm:text-[10px] font-black uppercase text-gray-400 truncate max-w-[40px] min-[360px]:max-w-[75px] min-[400px]:max-w-[110px] sm:max-w-none">
+                            <span className="text-[8px] font-black uppercase text-gray-400 truncate max-w-[30px] min-[360px]:max-w-[50px] min-[400px]:max-w-[70px] sm:max-w-none">
                                 {user.user_metadata.full_name || user.email?.split('@')[0]}
                             </span>
                             <button
                                 onClick={handleSignOut}
-                                className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-[9px] font-black px-3 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap"
+                                className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-[8px] font-black px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap"
                             >
                                 LOGOUT
                             </button>
@@ -65,39 +164,13 @@ export const AppHeader = ({ onOpenSettings, onOpenWeeklyWrapped }: AppHeaderProp
                     ) : (
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal'))}
-                            className="text-[9px] sm:text-[10px] font-black bg-white text-black px-3 sm:px-4 py-1.5 rounded-full uppercase tracking-wider sm:tracking-widest hover:bg-gray-200 transition-colors"
+                            className="text-[8px] sm:text-[9px] font-black bg-white text-black px-2 py-1 rounded-lg uppercase tracking-wider hover:bg-gray-200 transition-colors"
                         >
                             Login
                         </button>
                     )}
-
-                    {isAdmin && (
-                        <a 
-                            href="/admin" 
-                            className="text-correct hover:text-correct/80 transition-colors p-1.5 bg-correct/10 hover:bg-correct/20 border border-correct/20 rounded-full shrink-0 flex items-center justify-center"
-                            title="Admin Vetting Portal"
-                        >
-                            <Shield size={14} className="sm:w-[15px] sm:h-[15px]" />
-                        </a>
-                    )}
-
-                    {user && new Date().getDay() === 1 && (
-                        <button
-                            onClick={onOpenWeeklyWrapped}
-                            className="text-[9px] sm:text-[10px] font-black bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-3 py-1.5 rounded-full uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
-                            title="See your Weekly Wrapped"
-                        >
-                            Wrapped 🎁
-                        </button>
-                    )}
-
-                    {user && <NotificationBell />}
-
-                    <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors p-1 shrink-0">
-                        <SettingsIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                    </button>
                 </div>
             </div>
-        </div>
+        </header>
     );
 };

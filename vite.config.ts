@@ -26,8 +26,8 @@ export default defineConfig({
             "mask-icon.svg",
          ],
          manifest: {
-            name: "Wordle Variant: 4-5-6 Challenge",
-            short_name: "WordleVariant",
+            name: "Variant: 4-5-6 Challenge",
+            short_name: "Variant",
             description: "Daily word challenge with 4, 5, and 6 letter words",
             theme_color: "#121213",
             background_color: "#121213",

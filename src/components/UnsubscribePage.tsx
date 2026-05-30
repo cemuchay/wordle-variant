@@ -87,7 +87,7 @@ export const UnsubscribePage = () => {
                         className="inline-flex items-center gap-2 px-5 py-3 bg-gray-900 hover:bg-gray-800 active:scale-[0.98] border border-gray-800 hover:border-gray-700 text-xs font-black uppercase tracking-widest text-gray-300 hover:text-white rounded-xl transition-all"
                     >
                         <ArrowLeft size={14} />
-                        Back to Wordle Variant
+                        Back to Variant
                     </button>
                 </div>
             </div>

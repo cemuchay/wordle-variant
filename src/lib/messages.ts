@@ -48,7 +48,7 @@ export const getWinMessage = (attempts: number): string => {
       4: [
          "Standard. The human embodiment of room temperature water.",
          "Aggressively average. You are the 'Default Settings' of people.",
-         "Four is the participation trophy of Wordle scores.",
+         "Four is the participation trophy of game scores.",
          "Mid. Just... purely mid.",
          "You got it. Eventually. Like a slow internet connection.",
          "4/6? Premium mediocrity with confidence.",
