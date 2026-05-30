@@ -38,7 +38,7 @@ export const generateShareText = ({
       day: '2-digit'
    });
    
-   const header = `Wordle Variant - ${localDate} \n
+   const header = `Variant - ${localDate} \n
   ${score}/${maxAttempts}${` (${wordLength}L)`}${hintMarker}\n`;
 
    const grid = guesses

@@ -821,14 +821,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         toggleInvite,
         copyLink: (c: Challenge) => {
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
-            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
             navigator.clipboard.writeText(text);
             triggerToast('Challenge link copied to clipboard!', 2000);
         },
         shareLink: async (c: Challenge) => {
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
-            const title = `Wordle Challenge`;
-            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter Wordle'} match (${c.mode} mode)! 🏆`;
+            const title = `Variant Challenge`;
+            const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter'} match (${c.mode} mode)! 🏆`;
             if (navigator.share) {
                 try {
                     await navigator.share({

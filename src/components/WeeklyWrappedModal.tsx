@@ -593,7 +593,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         ctx.fillStyle = '#6366f1'; // indigo-500
         ctx.font = 'bold 28px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('WORDLE VARIANT WRAPPED', width / 2, height - 100);
+        ctx.fillText('VARIANT WRAPPED', width / 2, height - 100);
 
         ctx.fillStyle = '#9ca3af'; // gray-400
         ctx.font = '22px sans-serif';
@@ -914,8 +914,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 try {
                     await navigator.share({
                         files: [file],
-                        title: 'Wordle Variant Wrapped',
-                        text: `Check out my Wordle Variant Wrapped slide!`,
+                        title: 'Variant Wrapped',
+                        text: `Check out my Variant Wrapped slide!`,
                     });
                 } catch (err) {
                     console.log('Share failed, falling back to download:', err);
@@ -1111,8 +1111,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             try {
                 await navigator.share({
                     files: [generatedVideoFile],
-                    title: 'Wordle Variant Wrapped',
-                    text: 'Check out my Wordle Variant Weekly Performance Wrapped video!',
+                    title: 'Variant Wrapped',
+                    text: 'Check out my Variant Weekly Performance Wrapped video!',
                 });
             } catch (err) {
                 console.log('Video share failed, falling back to download:', err);
@@ -1172,8 +1172,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                         <h2 className="text-xl font-black uppercase tracking-wider">No Wrapped Moments</h2>
                         <p className="text-xs text-gray-400 leading-relaxed">
                             {isEasterEgg 
-                              ? "You haven't played any classic Wordle puzzles yet this week. Play a few rounds to unlock your Wrapped presentation!"
-                              : "You didn't submit any classic Wordle scores during the previous week. Start playing now to receive next week's Wrapped!"
+                              ? "You haven't played any classic puzzles yet this week. Play a few rounds to unlock your Wrapped presentation!"
+                              : "You didn't submit any classic scores during the previous week. Start playing now to receive next week's Wrapped!"
                             }
                         </p>
                     </div>

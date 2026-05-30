@@ -59,7 +59,7 @@ export const AppHeader = ({
                 <div className="flex items-center gap-1.5 min-w-0">
                     <div className="bg-correct/10 px-1.5 py-0.5 rounded-lg border border-correct/20 shrink-0">
                         <h1 className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white">
-                            W<span className="hidden sm:inline">ordle Variant</span><span className="text-correct">.</span>
+                            V<span className="hidden sm:inline">ariant</span><span className="text-correct">.</span>
                         </h1>
                     </div>
                     <CloudSyncMenu status={syncStatus} onRetry={onRetrySync} />

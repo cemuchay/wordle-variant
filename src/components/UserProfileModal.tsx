@@ -570,7 +570,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                                     </div>
                                                     <div>
                                                         <div className="text-sm font-bold text-white">Highest Daily Score</div>
-                                                        <div className="text-[9px] font-bold text-gray-500 uppercase mt-0.5">Classic Single Wordle</div>
+                                                        <div className="text-[9px] font-bold text-gray-500 uppercase mt-0.5">Classic Single Mode</div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
