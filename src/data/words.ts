@@ -77,3 +77,17 @@ export const getWordLists = (length: number): WordListCache => {
 // Lazy getters exported for Admin Dashboard to prevent execution at module startup
 export const getWORDS_3 = () => getWordLists(3).official;
 export const getWORDS_4 = () => getWordLists(4).official;
+export const getWORDS_5 = () => getWordLists(5).official;
+export const getWORDS_6 = () => getWordLists(6).official;
+export const getWORDS_7 = () => getWordLists(7).official;
+
+/**
+ * Mapping of length to getter for dynamic selection.
+ */
+export const OFFICIAL_WORDS: Record<number, () => string[]> = {
+   3: getWORDS_3,
+   4: getWORDS_4,
+   5: getWORDS_5,
+   6: getWORDS_6,
+   7: getWORDS_7
+};
