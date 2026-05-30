@@ -568,8 +568,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const handleCreate = useCallback(async (customParams?: any, viewAfterCreate = true) => {
         if (!effectiveUser) return;
         try {
+            const isBotMarathon = !!customParams?.is_bot_marathon;
+            const creatorId = isBotMarathon ? '00000000-0000-0000-0000-000000000b0b' : effectiveUser.id;
+
             const challenge = await createMutation.mutateAsync({
-                creatorId: effectiveUser.id,
+                creatorId: creatorId,
                 mode: mode,
                 length: length,
                 maxTime: mode === 'LIVE' ? maxTime : null,

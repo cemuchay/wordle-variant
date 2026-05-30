@@ -3,6 +3,7 @@ import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Setti
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
+import { useAdminStatus } from '../../hooks/useAdminStatus';
 
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
@@ -313,7 +314,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
         joinId, setJoinId, handleViewChallenge, handleCreate, loading,
-        handleEdit, setInvitedIds
+        handleEdit, setInvitedIds, effectiveUser
     } = useChallengeContext();
     const { ask } = useConfirmation();
 
@@ -408,13 +409,27 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(['3', '5', '5', '10', '10']);
 
     // Handicap States
-    const [isBotMarathon] = useState(false);
+    const { isAdmin } = useAdminStatus(effectiveUser?.id);
+    const [isBotMarathon, setIsBotMarathon] = useState(false);
     const [isHandicap, setIsHandicap] = useState(false);
     const [disableHints, setDisableHints] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
     const [handicapStartersArray, setHandicapStartersArray] = useState<string[]>(() => Array(5).fill(''));
+
+    // Handle lifespan options alignment based on challenge type
+    useEffect(() => {
+        if (isBotMarathon) {
+            if (![24, 48, 72, 168].includes(lifespanHours)) {
+                setLifespanHours(24);
+            }
+        } else {
+            if (![1, 6, 12, 24].includes(lifespanHours)) {
+                setLifespanHours(24);
+            }
+        }
+    }, [isBotMarathon, lifespanHours, setLifespanHours]);
 
     const handleUpdateMarathonGames = useCallback((newGames: number[]) => {
         setMarathonGames(newGames);
@@ -551,6 +566,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
         if (length === 1 && marathonGames.length === 0) {
             errs.push("Marathon must have at least 1 game.");
+        }
+
+        if (isBotMarathon && lifespanHours > 168) {
+            errs.push("Daily Bot Challenge lifespan cannot exceed 7 days (168 hours).");
         }
 
         return errs;
@@ -770,6 +789,27 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             {showAdvanced && (
                 <div className="p-5 rounded-2xl border border-white/15 bg-white/5 space-y-5 animate-in fade-in duration-300">
                     
+                    {/* Daily Challenge Option (Admins Only) */}
+                    {isAdmin && (
+                        <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Daily Bot Challenge" 
+                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="dailyBotChallenge" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isBotMarathon}
+                                    onChange={(e) => setIsBotMarathon(e.target.checked)}
+                                    className="w-5 h-5 accent-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Disable Hints Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -853,7 +893,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             tooltipId="lifespan" 
                         />
                         <div className="grid grid-cols-4 gap-2">
-                            {[1, 6, 12, 24].map(h => (
+                            {(isBotMarathon ? [24, 48, 72, 168] : [1, 6, 12, 24]).map(h => (
                                 <button
                                     key={h}
                                     type="button"

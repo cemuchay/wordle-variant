@@ -194,7 +194,7 @@ export const useChallengeGameEngine = ({
   const [botDailyWords, setBotDailyWords] = useState<Record<number, { word: string; salt: string }>>({});
 
   const fetchBotDailyWords = useCallback(async () => {
-    if (!challenge.is_bot_marathon) return;
+    if (!challenge.is_bot_marathon || challenge.target_word !== 'MARATHON') return;
     try {
       const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Africa/Lagos",
@@ -224,13 +224,13 @@ export const useChallengeGameEngine = ({
       console.error("Failed to fetch bot daily words:", err);
       triggerToast("Failed to fetch today's words.", 4000);
     }
-  }, [challenge.is_bot_marathon, triggerToast]);
+  }, [challenge.is_bot_marathon, challenge.target_word, triggerToast]);
 
   useEffect(() => {
-    if (challenge.is_bot_marathon) {
+    if (challenge.is_bot_marathon && challenge.target_word === 'MARATHON') {
       fetchBotDailyWords();
     }
-  }, [challenge.is_bot_marathon, fetchBotDailyWords]);
+  }, [challenge.is_bot_marathon, challenge.target_word, fetchBotDailyWords]);
 
   const wordLength = isMarathon
     ? activeGame
@@ -239,7 +239,7 @@ export const useChallengeGameEngine = ({
     : challenge.word_length;
 
   const targetWord = useMemo(() => {
-    if (challenge.is_bot_marathon) {
+    if (challenge.is_bot_marathon && challenge.target_word === 'MARATHON') {
       const botData = botDailyWords[wordLength];
       if (botData) {
         return deobfuscateWord(botData.word, botData.salt);

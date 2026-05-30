@@ -13,6 +13,9 @@ ALTER TABLE public.challenge_participants_marathon
 DROP CONSTRAINT IF EXISTS challenge_participants_marathon_participation_id_game_index_key;
 
 ALTER TABLE public.challenge_participants_marathon 
+DROP CONSTRAINT IF EXISTS challenge_participants_marathon_participation_id_game_index_pla;
+
+ALTER TABLE public.challenge_participants_marathon 
 ADD CONSTRAINT challenge_participants_marathon_participation_id_game_index_play_date_key 
 UNIQUE (participation_id, game_index, play_date);
 
