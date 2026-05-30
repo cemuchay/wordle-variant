@@ -389,7 +389,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
 
     // Advanced UI States
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(true);
     const [isPublic, setIsPublic] = useState(false);
     const [maxParticipants, setMaxParticipants] = useState<number>(10);
     const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
