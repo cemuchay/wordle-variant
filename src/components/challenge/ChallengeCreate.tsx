@@ -408,6 +408,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(['3', '5', '5', '10', '10']);
 
     // Handicap States
+    const [isBotMarathon] = useState(false);
     const [isHandicap, setIsHandicap] = useState(false);
     const [disableHints, setDisableHints] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
@@ -574,7 +575,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             isCustomWord,
             lifespanHours,
             invitedIds,
-            disableHints
+            disableHints,
+            is_bot_marathon: isBotMarathon
         };
 
         if (isCustomWord) {

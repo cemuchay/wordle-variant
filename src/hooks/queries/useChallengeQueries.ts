@@ -275,7 +275,7 @@ export const useDiscoverChallenges = () => {
                     )
                 `,
         )
-        .eq("is_public", true)
+        .or(`is_public.eq.true,is_bot_marathon.eq.true`)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
 
@@ -342,6 +342,7 @@ export const useChallengeMutations = () => {
       marathonGames = null,
       marathonForceOrder = false,
       disableHints = false,
+      isBotMarathon = false,
     }: any) => {
       const salt = Math.random().toString(36).substring(2, 15);
       let actualLength = length;
@@ -459,6 +460,7 @@ export const useChallengeMutations = () => {
             disable_hints: disableHints,
             marathon_timers: marathonTimers,
             marathon_force_order: marathonForceOrder,
+            is_bot_marathon: isBotMarathon,
           },
         ])
         .select()
@@ -613,12 +615,14 @@ export const useChallengeMutations = () => {
       gameIndex,
       wordLength,
       result,
+      playDate,
     }: {
       participationId: string;
       challengeId: string;
       gameIndex?: number;
       wordLength: number;
       result: any;
+      playDate?: string;
     }) => {
       const resolvedGameIndex =
         gameIndex !== undefined ? gameIndex : wordLength - 3;
@@ -627,6 +631,7 @@ export const useChallengeMutations = () => {
         challenge_id: challengeId,
         game_index: resolvedGameIndex,
         word_length: wordLength,
+        play_date: playDate || "1970-01-01",
         ...result,
       };
 
@@ -636,11 +641,12 @@ export const useChallengeMutations = () => {
 
       const { error } = await supabase
         .from("challenge_participants_marathon")
-        .upsert(data, { onConflict: "participation_id, game_index" });
+        .upsert(data, { onConflict: "participation_id, game_index, play_date" });
 
       if (error) throw error;
       return true;
     },
+
     onSuccess: (_, variables) => {
       if (variables?.result?.status !== "playing") {
         queryClient.invalidateQueries({ queryKey: ["my-challenges"] });

@@ -326,7 +326,9 @@ export const ChallengeItem = memo(function ChallengeItem({
         {/* Host Creator Profile */}
         <span className="flex items-center gap-1 ml-auto text-white text-[0.625rem]">
           <User size={11} />
-          by @{challenge.creator?.username || "Host"}
+          by @{challenge.is_bot_marathon
+            ? "Variant Bot"
+            : challenge.creator?.username || "Host"}
         </span>
       </div>
 

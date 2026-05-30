@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { Clock, Lock } from 'lucide-react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { MAX_ATTEMPTS } from '../../constants/game';
 import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
+import { supabase } from '../../lib/supabaseClient';
+import { deobfuscateWord } from '../../lib/game-logic';
 
 interface MarathonGameplayProps {
     challenge: any;
@@ -128,9 +130,61 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         setPreviewParticipant(p);
     }, [setPreviewMarathonGameIndex, setPreviewParticipant]);
 
+    const [botDailyWords, setBotDailyWords] = useState<Record<number, { word: string; salt: string }>>({});
+
+    const fetchBotDailyWords = useCallback(async () => {
+        if (!challenge.is_bot_marathon) return;
+        try {
+            const today = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Africa/Lagos",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }).format(new Date());
+
+            const { data, error } = await supabase
+                .from("bot_marathon_daily_words")
+                .select("*")
+                .eq("play_date", today);
+
+            if (error) throw error;
+
+            if (data) {
+                const wordsMap: Record<number, { word: string; salt: string }> = {};
+                data.forEach((row: any) => {
+                    wordsMap[row.word_length] = {
+                        word: row.target_word,
+                        salt: row.salt,
+                    };
+                });
+                setBotDailyWords(wordsMap);
+            }
+        } catch (err: any) {
+            console.error("Failed to fetch bot daily words:", err);
+            triggerToast("Failed to fetch today's words.", 4000);
+        }
+    }, [challenge.is_bot_marathon, triggerToast]);
+
+    useEffect(() => {
+        if (challenge.is_bot_marathon) {
+            fetchBotDailyWords();
+        }
+    }, [challenge.is_bot_marathon, fetchBotDailyWords]);
+
     const marathonGames = useMemo(() => {
+        if (challenge.is_bot_marathon) {
+            // For bot marathon, we always show 3-7 sequence
+            return [3, 4, 5, 6, 7].map((len, idx) => {
+                const botData = botDailyWords[len];
+                return {
+                    wordLength: len,
+                    gameIndex: idx,
+                    word: botData ? deobfuscateWord(botData.word, botData.salt) : ""
+                };
+            });
+        }
         return parseMarathonGames(challenge.target_word, challenge.salt);
-    }, [challenge.target_word, challenge.salt]);
+    }, [challenge.target_word, challenge.salt, challenge.is_bot_marathon, botDailyWords]);
 
     // Pre-calculate finishers for each game index in a single pass O(P)
     const finishersByGameIndex = useMemo(() => {

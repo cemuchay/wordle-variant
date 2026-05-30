@@ -28,6 +28,7 @@ import {
   getMarathonTimer,
   getHandicapStarter,
 } from "../utils/marathon";
+import { supabase } from "../lib/supabaseClient";
 
 interface UseChallengeGameEngineProps {
   challenge: any;
@@ -190,18 +191,76 @@ export const useChallengeGameEngine = ({
     ],
   );
 
+  const [botDailyWords, setBotDailyWords] = useState<Record<number, { word: string; salt: string }>>({});
+
+  const fetchBotDailyWords = useCallback(async () => {
+    if (!challenge.is_bot_marathon) return;
+    try {
+      const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+
+      const { data, error } = await supabase
+        .from("bot_marathon_daily_words")
+        .select("*")
+        .eq("play_date", today);
+
+      if (error) throw error;
+
+      if (data) {
+        const wordsMap: Record<number, { word: string; salt: string }> = {};
+        data.forEach((row: any) => {
+          wordsMap[row.word_length] = {
+            word: row.target_word,
+            salt: row.salt,
+          };
+        });
+        setBotDailyWords(wordsMap);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch bot daily words:", err);
+      triggerToast("Failed to fetch today's words.", 4000);
+    }
+  }, [challenge.is_bot_marathon, triggerToast]);
+
+  useEffect(() => {
+    if (challenge.is_bot_marathon) {
+      fetchBotDailyWords();
+    }
+  }, [challenge.is_bot_marathon, fetchBotDailyWords]);
+
   const wordLength = isMarathon
     ? activeGame
       ? activeGame.wordLength
       : 5
     : challenge.word_length;
+
   const targetWord = useMemo(() => {
+    if (challenge.is_bot_marathon) {
+      const botData = botDailyWords[wordLength];
+      if (botData) {
+        return deobfuscateWord(botData.word, botData.salt);
+      }
+      return "";
+    }
+
     return isMarathon
       ? activeGame
         ? activeGame.word
         : ""
       : deobfuscateWord(challenge.target_word, challenge.salt);
-  }, [isMarathon, activeGame, challenge.target_word, challenge.salt]);
+  }, [
+    isMarathon,
+    activeGame,
+    challenge.target_word,
+    challenge.salt,
+    challenge.is_bot_marathon,
+    botDailyWords,
+    wordLength,
+  ]);
 
   const handleTimeExpired = useCallback(async () => {
     if (isSaving) return;

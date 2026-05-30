@@ -173,6 +173,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const [isEditingChallenge, setIsEditingChallenge] = useState(false);
 
+    // Date/Time utilities
+    const getLagosDate = useCallback(() => {
+        return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Africa/Lagos",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).format(new Date());
+    }, []);
+
+    const playDate = useMemo(() => getLagosDate(), [getLagosDate]);
+
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError } = useMyChallenges(effectiveUser?.id);
     const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError } = useDiscoverChallenges();
@@ -628,6 +640,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
+        const isBotMarathon = selectedChallenge?.is_bot_marathon;
 
         try {
             if (isMarathon && (wordLength || gameIndex !== undefined)) {
@@ -641,7 +654,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     challengeId: selectedChallenge!.id,
                     gameIndex: resolvedGameIndex,
                     wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
-                    result
+                    result,
+                    playDate: isBotMarathon ? playDate : undefined
                 });
 
                 // If not finishing the word, we can just wait for the marathon update

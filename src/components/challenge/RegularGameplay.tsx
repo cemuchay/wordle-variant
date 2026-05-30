@@ -31,7 +31,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         submitChallengeResult,
         onFinish,
         gameIndex,
-        onLengthComplete: onBack
+        onLengthComplete: onBack || onFinish
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;

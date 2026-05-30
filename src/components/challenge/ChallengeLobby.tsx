@@ -327,6 +327,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 Public
               </span>
             )}
+            {selectedChallenge.is_bot_marathon && (
+              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                Daily Event
+              </span>
+            )}
           </div>
           <div className="flex gap-4">
             <button
@@ -408,10 +413,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               </h4>
               <span className="text-[8px] font-bold text-white/70 uppercase">
                 Hosted by{" "}
-                {selectedChallenge.profiles?.username ||
-                  selectedChallenge.creator?.username ||
-                  "Host"}
+                {selectedChallenge.is_bot_marathon
+                  ? "Variant Bot"
+                  : selectedChallenge.profiles?.username ||
+                    selectedChallenge.creator?.username ||
+                    "Host"}
               </span>
+
             </div>
 
         <div className="grid grid-cols-2 gap-3">
