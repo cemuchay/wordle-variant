@@ -2,6 +2,7 @@
 import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2 } from 'lucide-react';
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
+import { useConfirmation } from '../../hooks/useConfirmation';
 
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
@@ -191,7 +192,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
     }, [toggleInvite]);
 
     return (
-        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all relative">
+        <div className="bg-indigo-950/20 border-2 border-indigo-500/30 p-5 rounded-2xl space-y-4 hover:border-indigo-400/50 shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all relative">
             <OptionLabel 
                 label="Invite Friends" 
                 tooltip="Search and invite other registered players to join this challenge lobby." 
@@ -314,6 +315,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         joinId, setJoinId, handleViewChallenge, handleCreate, loading,
         handleEdit, setInvitedIds
     } = useChallengeContext();
+    const { ask } = useConfirmation();
 
     // Initialize edit fields
     useEffect(() => {
@@ -556,6 +558,16 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
 
+        if (!isPublic && invitedIds.length === 0) {
+            const confirmed = await ask({
+                title: 'No Friends Invited',
+                message: 'You have not invited any friends and this challenge is not public. Are you sure you want to create a private challenge for just yourself?',
+                confirmLabel: 'Create Anyway',
+                type: 'info'
+            });
+            if (!confirmed) return;
+        }
+
         const customParams: any = {
             isPublic,
             maxParticipants: isPublic ? maxParticipants : null,
@@ -609,7 +621,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask]);
 
     return (
         <div className="space-y-6">
@@ -743,14 +755,6 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             {mode === 'LIVE' && (
                 <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
             )}
-
-            <ProfileInviteSystem 
-                availableProfiles={availableProfiles} 
-                invitedIds={invitedIds} 
-                toggleInvite={toggleInvite} 
-                activeTooltip={activeTooltip}
-                setActiveTooltip={setActiveTooltip}
-            />
 
             {/* Advanced Settings Button */}
             <button
@@ -1118,6 +1122,14 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     </ul>
                 </div>
             )}
+
+            <ProfileInviteSystem 
+                availableProfiles={availableProfiles} 
+                invitedIds={invitedIds} 
+                toggleInvite={toggleInvite} 
+                activeTooltip={activeTooltip}
+                setActiveTooltip={setActiveTooltip}
+            />
 
             <div className="pt-4 border-t border-white/5 space-y-4">
                 {!editingChallenge && (
