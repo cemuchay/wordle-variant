@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useEffect } from "react";
 import {
   X,
   Trophy,
@@ -176,32 +176,33 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
-      dailyMarathonChallenge
+      dailyMarathonChallenge,
+      initialChallengeId,
     } = useChallengeContext();
 
     const activeCount = useMemo(() => {
-        return myChallenges.filter((item: any) => {
-            const isExpired = new Date(item.challenge?.expires_at) < new Date();
-            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-            const isBotMarathon = item.challenge?.is_bot_marathon;
-            if (isBotMarathon && item.status === 'pending') return false;
-            return !isExpired && !isCompleted && item.status !== 'viewed';
-        }).length;
+      return myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+        const isBotMarathon = item.challenge?.is_bot_marathon;
+        if (isBotMarathon && item.status === 'pending') return false;
+        return !isExpired && !isCompleted && item.status !== 'viewed';
+      }).length;
     }, [myChallenges]);
 
     const playedCount = useMemo(() => {
-        return myChallenges.filter((item: any) => {
-            const isExpired = new Date(item.challenge?.expires_at) < new Date();
-            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-            return !isExpired && isCompleted && item.status !== 'viewed';
-        }).length;
+      return myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+        return !isExpired && isCompleted && item.status !== 'viewed';
+      }).length;
     }, [myChallenges]);
 
     const expiredCount = useMemo(() => {
-        return myChallenges.filter((item: any) => {
-            const isExpired = new Date(item.challenge?.expires_at) < new Date();
-            return isExpired;
-        }).length;
+      return myChallenges.filter((item: any) => {
+        const isExpired = new Date(item.challenge?.expires_at) < new Date();
+        return isExpired;
+      }).length;
     }, [myChallenges]);
 
     const displayChallenges = useMemo(() => {
@@ -217,6 +218,15 @@ const AuthenticatedChallengeContent = memo(
       if (showFilters) clearFilters();
       setShowFilters(!showFilters);
     };
+
+
+    //if initialChallengeId is present, nagivate to the challenge lobby
+    useEffect(() => {
+      if (initialChallengeId && initialChallengeId !== "null" && initialChallengeId !== "undefined") {
+        handleViewChallenge(initialChallengeId);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
@@ -251,7 +261,7 @@ const AuthenticatedChallengeContent = memo(
                   <>
                     <button
                       onClick={() =>
-                      	backAction ? backAction() : setIsPlaying(false)
+                        backAction ? backAction() : setIsPlaying(false)
                       }
                       className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white"
                     >
@@ -344,11 +354,10 @@ const AuthenticatedChallengeContent = memo(
                             <button
                               key={tab}
                               onClick={() => setListColumn(tab)}
-                              className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${
-                                listColumn === tab
-                                  ? "bg-correct text-black font-extrabold shadow-md"
-                                  : "text-white hover:text-white hover:bg-white/5"
-                              }`}
+                              className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${listColumn === tab
+                                ? "bg-correct text-black font-extrabold shadow-md"
+                                : "text-white hover:text-white hover:bg-white/5"
+                                }`}
                             >
                               {label}
                             </button>
@@ -360,7 +369,9 @@ const AuthenticatedChallengeContent = memo(
                       <div className="space-y-4">
                         {dailyMarathonChallenge && (
                           <motion.button
-                            onClick={() => handleViewChallenge(dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)}
+                            onClick={() => {
+                              handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
+                            }}
                             className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-5 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
                             style={{
                               animationDuration: '2s'
@@ -376,7 +387,7 @@ const AuthenticatedChallengeContent = memo(
                                 Hosted by @Variant Bot
                               </span>
                             </div>
-                            
+
                             <div>
                               <h3 className="text-lg font-black text-white uppercase tracking-tight">
                                 Today's Daily Marathon Challenge 🏃‍♂️💨
@@ -385,7 +396,7 @@ const AuthenticatedChallengeContent = memo(
                                 Play today's curated sequence of words. Compete on the leaderboard to claim the top spot!
                               </p>
                             </div>
-                            
+
                             <div className="flex items-center justify-between w-full border-t border-white/10 pt-2.5 mt-1">
                               <span className="text-[10px] font-bold text-white/70 uppercase">
                                 Click to join and start playing

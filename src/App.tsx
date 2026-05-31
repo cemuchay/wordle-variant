@@ -100,20 +100,20 @@ export default function App() {
   // Auto-trigger weekly wrapped on Monday logins
   useEffect(() => {
     if (!user || !date) return;
- 
+
     // Use universal app/server time
     const parts = (date as string).split("-").map(Number);
     const now = new Date(parts[0], parts[1] - 1, parts[2]);
-    
+
     const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday
- 
+
     if (currentDay === 1) {
       // Current Monday's date string is the universal app/server date
       const mondayStr = date as string;
- 
+
       const seenKey = `wrapped-seen-${mondayStr}-${user.id}`;
       const alreadySeen = safeLocalStorage.getItem(seenKey);
- 
+
       if (!alreadySeen) {
         const timer = setTimeout(() => {
           setIsWeeklyWrappedOpen(true);

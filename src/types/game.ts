@@ -41,9 +41,14 @@ export interface LeaderboardEntry {
    user_id?: string;
 }
 
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+export type SyncStatus = "idle" | "syncing" | "synced" | "error";
 
 export interface Challenge {
    status: string;
    challenge: { expires_at: Date };
 }
+
+export type MarathonGameProgress = {
+   game_index: number;
+   status: "playing" | "completed" | "timed_out";
+};

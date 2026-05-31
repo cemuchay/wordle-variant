@@ -85,6 +85,7 @@ interface ChallengeContextType {
     retryFetchParticipants: () => void;
     openChallengesCount: number;
     dailyMarathonChallenge: any;
+    initialChallengeId?: string;
 }
 
 const addRecentChallenge = (id: string) => {
@@ -204,9 +205,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const challengeApi = useChallenge(user);
     const { subscribeToParticipants, participants, loadingParticipants, participantsError, retryFetchParticipants } = challengeApi;
 
-    const isBackgroundFetching = 
-        (isChallengesFetching && !isChallengesLoading) || 
-        (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) || 
+    const isBackgroundFetching =
+        (isChallengesFetching && !isChallengesLoading) ||
+        (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) ||
         loadingParticipants;
 
     const error = (listColumn === 'open' ? discoverChallengesError : myChallengesError)
@@ -262,7 +263,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const dailyMarathonChallenge = useMemo(() => {
         // Find in openChallenges
-        const openDaily = openChallenges.find((c: any) => c.is_bot_marathon);
+        const openDaily = discoverChallenges.find((c: any) => c.is_bot_marathon);
+
         if (openDaily) {
             return {
                 id: `open-${openDaily.id}`,
@@ -279,7 +281,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (pendingDaily) return pendingDaily;
 
         return null;
-    }, [openChallenges, myChallenges]);
+    }, [discoverChallenges, myChallenges]);
 
     const unplayedCount = useMemo(() =>
         myChallenges.filter((c: any) => {
@@ -408,7 +410,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         return p;
     }, []);
 
-    const handleViewChallenge = useCallback(async (id: string) => {
+    const handleViewChallenge = useCallback(async (id: string | null | undefined) => {
+        if (!id || id === "null" || id === "undefined") {
+            return;
+        }
+
         // 1. Check local cache (myChallenges) for immediate display
         const localMatch = myChallengesRef.current.find((item: any) => item.challenge_id === id || item.challenge?.id === id);
 
@@ -553,7 +559,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             username: nickname,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
         });
-        
+
         if (error) {
             console.error("Error creating guest profile:", error);
             triggerToast("Failed to create guest profile. Please try again.", 4000);
@@ -616,7 +622,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 if (onChallengeCreated) onChallengeCreated(challenge, invitedUsernames, invitedIds);
 
                 resetForm();
-                
+
                 if (viewAfterCreate) {
                     handleViewChallenge(challenge.id);
                 } else {
@@ -667,7 +673,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [selectedChallenge, myParticipation, startMutation, setIsPlaying, triggerToast]);
 
-        const submitResult = useCallback(async (result: any, wordLength?: number, gameIndex?: number) => {
+    const submitResult = useCallback(async (result: any, wordLength?: number, gameIndex?: number) => {
         if (!myParticipation) return false;
 
         const isMarathon = selectedChallenge?.word_length === 1;
@@ -776,7 +782,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (initialProcessed.current) return;
         initialProcessed.current = true;
 
-        if (initialChallengeId) {
+        if (initialChallengeId && initialChallengeId !== "null" && initialChallengeId !== "undefined") {
             handleViewChallenge(initialChallengeId).then(() => {
                 // Clear the URL parameter after successful load to keep the URL clean
                 const url = new URL(window.location.href);
@@ -798,13 +804,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         if (isChallengesLoading || hasSetDefaultTab.current) return;
         if (myChallengesData) {
             hasSetDefaultTab.current = true;
-            
+
             const activeChallenges = myChallengesData.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
                 const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
                 return !isExpired && !isCompleted && item.status !== 'viewed';
             });
-            
+
             const playedChallenges = myChallengesData.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
                 const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
@@ -919,8 +925,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         participantsError,
         retryFetchParticipants,
         openChallengesCount: openChallenges.length,
-        dailyMarathonChallenge
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenge]);
+        dailyMarathonChallenge,
+        initialChallengeId,
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenge, initialChallengeId]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>
