@@ -18,6 +18,7 @@ interface AppHeaderProps {
     canShowHint: boolean;
     isHintLocked?: boolean;
     syncStatus: SyncStatus;
+    isMonday?: boolean;
 }
 
 const ICON_SIZE = 16;
@@ -33,7 +34,8 @@ export const AppHeader = ({
     usedHint,
     canShowHint,
     isHintLocked,
-    syncStatus
+    syncStatus,
+    isMonday = false
 }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
@@ -117,7 +119,7 @@ export const AppHeader = ({
                             </a>
                         )}
 
-                        {user && new Date().getDay() === 1 && (
+                        {user && isMonday && (
                             <button
                                 onClick={onOpenWeeklyWrapped}
                                 className="text-[8px] sm:text-[9px] font-black bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-2 py-1 rounded-lg uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
