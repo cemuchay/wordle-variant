@@ -347,10 +347,12 @@ export const useChallengeMutations = () => {
          marathonForceOrder = false,
          disableHints = false,
          isBotMarathon = false,
+         is_bot_marathon,
       }: any) => {
          const salt = Math.random().toString(36).substring(2, 15);
          let actualLength = length;
          let targetWord: string;
+         const resolvedIsBotMarathon = !!(isBotMarathon || is_bot_marathon);
 
          const plainMarathonTargets: Record<number, string> = {};
          let plainRegularTarget = "";
@@ -466,7 +468,7 @@ export const useChallengeMutations = () => {
                   disable_hints: disableHints,
                   marathon_timers: marathonTimers,
                   marathon_force_order: marathonForceOrder,
-                  is_bot_marathon: isBotMarathon,
+                  is_bot_marathon: resolvedIsBotMarathon,
                },
             ])
             .select()
@@ -561,7 +563,7 @@ export const useChallengeMutations = () => {
 
          // Check guest/user permission if private
          const isCreator = challenge.creator_id === userId;
-         if (!challenge.is_public && !isCreator) {
+         if (!challenge.is_public && !challenge.is_bot_marathon && !isCreator) {
             throw new Error(
                "This is a private challenge. You must be invited to join.",
             );
