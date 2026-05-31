@@ -4,13 +4,16 @@ import { MessageSquare, Lock } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
+import { useApp } from "../context/AppContext";
+import { safeLocalStorage } from "../utils/storage";
 
 // Sub-components
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
 import MessageInput from "./chat/MessageInput";
 
-const ChatRoom = ({ user }: { user: AppUser }) => {
+const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
+    const { setUnreadCount } = useApp();
     const {
         messages,
         sendMessage,
@@ -20,6 +23,14 @@ const ChatRoom = ({ user }: { user: AppUser }) => {
         firstUnreadId,
         users
     } = useChat(user?.id);
+
+    // Clear unread count when chat is opened
+    useEffect(() => {
+        if (user?.id) {
+            safeLocalStorage.setItem(`lastSeen_${user.id}`, new Date().toISOString());
+            setUnreadCount(0);
+        }
+    }, [user?.id, setUnreadCount]);
 
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -96,6 +107,7 @@ const ChatRoom = ({ user }: { user: AppUser }) => {
             <ChatHeader
                 typingUsers={typingUsers}
                 currentUserName={nameOfUser}
+                onClose={onClose}
             />
 
             {/* Message Area */}

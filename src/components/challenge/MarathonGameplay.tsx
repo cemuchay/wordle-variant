@@ -46,10 +46,11 @@ interface MarathonLengthItemProps {
     onSelect: (index: number, isFinished: boolean) => void;
     onPreview: (p: any, index: number) => void;
     isUnlocked: boolean;
+    lockReason?: string;
 }
 
 const MarathonLengthItem = memo(function MarathonLengthItem({
-    game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked
+    game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked, lockReason
 }: MarathonLengthItemProps) {
     const isCompleted = prog?.status === 'completed';
     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
@@ -70,7 +71,7 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                         <p className="text-xs font-black uppercase">Game #{index + 1} ({game.wordLength}L)</p>
                         <p className="text-[10px] text-gray-500">
                             {!isUnlocked 
-                                ? 'Locked (Play games in order)'
+                                ? (lockReason || 'Locked (Play games in order)')
                                 : isFinished
                                     ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
                                     : (prog ? 'In Progress' : 'Not Started')}
@@ -210,6 +211,19 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         return map;
     }, [participants, participation.user_id, marathonGames]);
 
+    const numDays = useMemo(() => {
+        const created = new Date(challenge.created_at).getTime();
+        const expires = new Date(challenge.expires_at).getTime();
+        const diffHours = (expires - created) / (1000 * 60 * 60);
+        return Math.max(1, Math.round(diffHours / 24));
+    }, [challenge.created_at, challenge.expires_at]);
+
+    const currentDay = useMemo(() => {
+        const created = new Date(challenge.created_at).getTime();
+        const elapsedHours = (Date.now() - created) / (1000 * 60 * 60);
+        return Math.floor(elapsedHours / 24) + 1;
+    }, [challenge.created_at]);
+
     if (selectedGameIndex !== null) {
         return (
             <RegularGameplay
@@ -236,14 +250,29 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                     const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
                     
                     let isUnlocked = true;
-                    if (challenge.marathon_force_order && idx > 0) {
+                    let lockReason = '';
+
+                    if (challenge.is_bot_marathon) {
+                        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+                        const gameDay = Math.floor(idx / baseSequenceLength) + 1;
+                        if (gameDay > currentDay) {
+                            isUnlocked = false;
+                            lockReason = `Locked until Day ${gameDay}`;
+                        }
+                    }
+                    
+                    if (isUnlocked && challenge.marathon_force_order && idx > 0) {
                         const prevProg = participation.marathon_progress?.find((p: any) => p.game_index === idx - 1);
                         if (!prevProg) {
                             isUnlocked = false;
+                            lockReason = 'Locked (Play games in order)';
                         } else {
                             const prevCompleted = prevProg.status === 'completed';
                             const prevFailed = prevProg.status === 'timed_out' || (prevProg.attempts >= MAX_ATTEMPTS && !prevCompleted);
-                            isUnlocked = prevCompleted || prevFailed;
+                            if (!prevCompleted && !prevFailed) {
+                                isUnlocked = false;
+                                lockReason = 'Locked (Play games in order)';
+                            }
                         }
                     }
 
@@ -258,6 +287,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                             onSelect={handleSelect}
                             onPreview={handlePreview}
                             isUnlocked={isUnlocked}
+                            lockReason={lockReason}
                         />
                     );
                 })}

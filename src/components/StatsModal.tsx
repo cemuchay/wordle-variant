@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Loader2, Trophy, User, X, RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
@@ -48,7 +49,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null);
-  const [viewerHasFinished, setViewerHasFinished] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   const { date: currentDate, triggerToast } = useApp();
@@ -60,7 +60,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     if (!isOpen || activeTab !== 'leaderboard' || !currentDate) return;
 
     const cacheKey = `wordle_global_leaderboard_${timeframe}_${currentDate}`;
-    
+
     if (!ignoreCache) {
       try {
         const cached = safeSessionStorage.getItem(cacheKey);
@@ -116,6 +116,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   }, [isOpen, activeTab, timeframe, currentDate, leaderboard.length]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeaderboard(false);
   }, [fetchLeaderboard]);
 
@@ -132,32 +133,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     await fetchLeaderboard(true);
     triggerToast("Leaderboard refreshed with latest scores!", 3000);
   }, [fetchLeaderboard, loading, triggerToast, currentDate]);
-
-  // Check if viewer has finished TODAY's game specifically
-  useEffect(() => {
-    if (!isOpen || !user || !currentDate) return;
-
-    // isGameOver prop refers to literal today's game
-    if (isGameOver) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewerHasFinished(true);
-      return;
-    }
-
-    const checkStatus = async () => {
-      const { data } = await supabase
-        .from('scores')
-        .select('status')
-        .eq('user_id', user.id)
-        .eq('game_date', currentDate)
-        .in('status', ['won', 'lost'])
-        .maybeSingle();
-
-      setViewerHasFinished(!!data);
-    };
-
-    checkStatus();
-  }, [isOpen, user, currentDate, isGameOver]);
 
   // Evict all sessionStorage caches on modal close (unmount)
   useEffect(() => {
@@ -306,7 +281,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
     return Math.max(...(Object.values(stats.guesses) as number[]), 1);
   }, [stats]);
 
-  const canViewGuess = !!user && (timeframe === "yesterday" || (timeframe === "today" && viewerHasFinished));
+  const canViewGuess = !!user && (timeframe === "yesterday" || timeframe === "today");
   if (!isOpen) return null;
 
   return (

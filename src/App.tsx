@@ -1,4 +1,6 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
 import { DynamicIslandStatus } from "./components/DynamicIslandStatus";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
@@ -17,7 +19,7 @@ import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { type AppUser, type Challenge } from "./types/game";
-import { useMyChallenges } from "./hooks/queries/useChallengeQueries";
+import { useMyChallenges, useDiscoverChallenges } from "./hooks/queries/useChallengeQueries";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import { safeLazy } from "./utils/safeLazy";
 import { supabase } from "./lib/supabaseClient";
@@ -52,6 +54,21 @@ export default function App() {
 
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
+  const { data: discoverChallenges } = useDiscoverChallenges();
+
+  const activeDailyMarathon = useMemo(() => {
+    if (!discoverChallenges) return null;
+    return discoverChallenges.find((c: { is_bot_marathon: boolean; expires_at: string; id: string }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+  }, [discoverChallenges]);
+
+  const isMonday = useMemo(() => {
+    if (!date) return false;
+    const parts = (date as string).split("-").map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    return d.getDay() === 1;
+  }, [date]);
+
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (myChallenges) {
@@ -82,28 +99,30 @@ export default function App() {
 
   // Auto-trigger weekly wrapped on Monday logins
   useEffect(() => {
-    if (!user) return;
-
-    const now = new Date();
+    if (!user || !date) return;
+ 
+    // Use universal app/server time
+    const parts = (date as string).split("-").map(Number);
+    const now = new Date(parts[0], parts[1] - 1, parts[2]);
+    
     const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday
-
+ 
     if (currentDay === 1) {
-      // Calculate current Monday's date string
-      const monday = new Date();
-      const day = monday.getDay();
-      const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
-      monday.setDate(diff);
-      const mondayStr = monday.toISOString().split("T")[0];
-
+      // Current Monday's date string is the universal app/server date
+      const mondayStr = date as string;
+ 
       const seenKey = `wrapped-seen-${mondayStr}-${user.id}`;
       const alreadySeen = safeLocalStorage.getItem(seenKey);
-
+ 
       if (!alreadySeen) {
-        setIsWeeklyWrappedOpen(true);
+        const timer = setTimeout(() => {
+          setIsWeeklyWrappedOpen(true);
+        }, 0);
         safeLocalStorage.setItem(seenKey, "true");
+        return () => clearTimeout(timer);
       }
     }
-  }, [user]);
+  }, [user, date]);
 
   // Listen to custom event to open stats modal at a specific tab
   useEffect(() => {
@@ -160,7 +179,10 @@ export default function App() {
   // Intercept notifications open to show transition loader
   useEffect(() => {
     if (isNotificationsOpen && !showNotifications) {
-      setNavLoading({ active: true, message: "Retrieving notifications..." });
+      const loadTimer = setTimeout(() => {
+        setNavLoading({ active: true, message: "Retrieving notifications..." });
+      }, 0);
+
       const timer = setTimeout(() => {
         setShowNotifications(true);
         const hideTimer = setTimeout(() => {
@@ -168,9 +190,16 @@ export default function App() {
         }, 100);
         return () => clearTimeout(hideTimer);
       }, 300);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(loadTimer);
+        clearTimeout(timer);
+      };
     } else if (!isNotificationsOpen && showNotifications) {
-      setShowNotifications(false);
+      const closeTimer = setTimeout(() => {
+        setShowNotifications(false);
+      }, 0);
+      return () => clearTimeout(closeTimer);
     }
   }, [isNotificationsOpen, showNotifications]);
 
@@ -181,14 +210,14 @@ export default function App() {
   useKeyboard(
     actions,
     isChatOpen ||
-      !isHydrated ||
-      isChallengeOpen ||
-      isStatsOpen ||
-      isSettingsOpen ||
-      isInfoOpen ||
-      isNotificationsOpen ||
-      isAuthOpen ||
-      !!viewedProfileId,
+    !isHydrated ||
+    isChallengeOpen ||
+    isStatsOpen ||
+    isSettingsOpen ||
+    isInfoOpen ||
+    isNotificationsOpen ||
+    isAuthOpen ||
+    !!viewedProfileId,
   );
 
   const handleChallengeCreated = () => {
@@ -320,7 +349,52 @@ export default function App() {
                 !state.usedHint
               }
               syncStatus={state.syncStatus}
+              isMonday={isMonday}
             />
+
+            {state.isGameOver && activeDailyMarathon && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300"
+              >
+                <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="flex items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
+                      <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                          Active Marathon
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          Daily Challenge
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
+                        Bot Marathon Event
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Test your skills across multiple word lengths!
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedChallengeId(activeDailyMarathon.id);
+                      setIsChallengeOpen(true);
+                    }}
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    Play
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
             <GameArea
               wordLength={config.length}
@@ -350,7 +424,12 @@ export default function App() {
                 setSettingsOpen: setIsSettingsOpen,
                 setInfoOpen: setIsInfoOpen,
                 setStatsOpen: setIsStatsOpen,
-                setChallengeOpen: setIsChallengeOpen,
+                setChallengeOpen: (open) => {
+                  setIsChallengeOpen(open);
+                  if (!open) {
+                    setSelectedChallengeId(null);
+                  }
+                },
                 setNotificationsOpen: setIsNotificationsOpen,
                 setAuthOpen: setIsAuthOpen,
                 setGameOverOpen: actions.setGameOverModalOpen,
@@ -370,12 +449,13 @@ export default function App() {
               onChallengeCreated={handleChallengeCreated}
               viewedProfileId={viewedProfileId}
               setViewedProfileId={setViewedProfileId}
+              initialChallengeId={selectedChallengeId}
             />
           </main>
         ) : (
           <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
             <Suspense fallback={null}>
-              <ChatRoom user={user as AppUser} />
+              <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
             </Suspense>
           </div>
         )}
