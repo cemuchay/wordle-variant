@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
@@ -15,17 +16,17 @@ class TechHouseSynth {
 
     start(recorderDestNode?: MediaStreamAudioDestinationNode) {
         if (this.isPlaying) return;
-        // @ts-ignore
+        // @ts-expect-error undefined
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AudioContextClass();
         this.isPlaying = true;
         this.recorderDest = recorderDestNode || null;
 
         // Suggest playback audio session to bypass iOS silent switch if supported
-        // @ts-ignore
+        // @ts-expect-error undefined
         if (navigator.audioSession && typeof navigator.audioSession.type === 'string') {
             try {
-                // @ts-ignore
+                // @ts-expect-error undefined
                 navigator.audioSession.type = 'playback';
             } catch (e) {
                 console.log("Failed to set audio session type:", e);
@@ -328,11 +329,11 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 const diff = lastMonday.getDate() - day + (day === 0 ? -6 : 1) - 7;
                 lastMonday.setDate(diff);
                 lastMonday.setHours(12, 0, 0, 0);
-                
+
                 const lastSunday = new Date(lastMonday);
                 lastSunday.setDate(lastSunday.getDate() + 6);
                 lastSunday.setHours(12, 0, 0, 0);
-                
+
                 const startDate = toLocalYYYYMMDD(lastMonday);
                 const endDate = toLocalYYYYMMDD(lastSunday);
 
@@ -372,11 +373,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         };
 
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, userId, isEasterEgg]);
 
     // 2. Play/Pause Music Loop
     useEffect(() => {
         if (!isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setGeneratedVideoFile(null);
             wrappedTextCache.current = {};
             if (synthRef.current) {
@@ -423,6 +426,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
     useEffect(() => {
         if (!isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setAvatarLoaded(false);
             avatarImageRef.current = null;
             return;
@@ -478,7 +482,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         if (index === 0) return 'from-indigo-950 via-purple-950 to-gray-950'; // Intro
         if (index === totalSlides - 2) return 'from-teal-950 via-emerald-950 to-gray-950'; // Stats
         if (index === totalSlides - 1) return 'from-fuchsia-950 via-violet-950 to-gray-950'; // Leaderboard
-        
+
         // Alternate colors for daily slides
         const dayIdx = index - 1;
         const gradients = [
@@ -711,7 +715,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                 // Draw standard leaderboard window (up to 3 players around)
                 const myIdx = leaderboard.findIndex(e => e.username === username);
-                let start = 0;
+                let start: number
                 if (myIdx === -1) {
                     start = 0;
                 } else {
@@ -721,7 +725,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     }
                 }
                 const windowLb = leaderboard.slice(start, start + 3);
-                let startY = height * 0.60;
+                const startY = height * 0.60;
                 windowLb.forEach((entry, idx) => {
                     const originalIdx = leaderboard.findIndex(e => e.username === entry.username);
                     const rank = originalIdx + 1;
@@ -783,9 +787,9 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     const flipDuration = 600; // Matches CSS animation (0.6s)
                     const t = slideElapsed !== undefined ? slideElapsed - tileDelay : Infinity;
 
-                    let bgColor = '#3a3a3c';
-                    let textColor = '#ffffff';
-                    let borderColor = '#52525b';
+                    let bgColor: string;
+                    let textColor: string;
+                    let borderColor: string;
                     let isRevealed = false;
 
                     if (t >= flipDuration / 2 || t === Infinity || slideElapsed === undefined || slideElapsed >= 999999) {
@@ -855,43 +859,43 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 ctx.font = `italic bold ${Math.round(width * 0.03)}px sans-serif`;
                 ctx.textAlign = 'center';
 
-            // Draw Roast/Message
-            if (dayScore.game_message) {
-                ctx.fillStyle = '#f59e0b'; // amber-500
-                const fontSize = Math.round(width * 0.03);
-                ctx.font = `italic bold ${fontSize}px sans-serif`;
-                ctx.textAlign = 'center';
+                // Draw Roast/Message
+                if (dayScore.game_message) {
+                    ctx.fillStyle = '#f59e0b'; // amber-500
+                    const fontSize = Math.round(width * 0.03);
+                    ctx.font = `italic bold ${fontSize}px sans-serif`;
+                    ctx.textAlign = 'center';
 
-                const cacheKey = `${dayScore.game_date}_${width}`;
-                let lines = wrappedTextCache.current[cacheKey];
+                    const cacheKey = `${dayScore.game_date}_${width}`;
+                    let lines = wrappedTextCache.current[cacheKey];
 
-                if (!lines) {
-                    const words = dayScore.game_message.split(' ');
-                    let line = '';
-                    lines = [];
-                    const maxWordsWidth = width - 160;
+                    if (!lines) {
+                        const words = dayScore.game_message.split(' ');
+                        let line = '';
+                        lines = [];
+                        const maxWordsWidth = width - 160;
 
-                    for (let n = 0; n < words.length; n++) {
-                        let testLine = line + words[n] + ' ';
-                        let metrics = ctx.measureText(testLine);
-                        if (metrics.width > maxWordsWidth && n > 0) {
-                            lines.push(line);
-                            line = words[n] + ' ';
-                        } else {
-                            line = testLine;
+                        for (let n = 0; n < words.length; n++) {
+                            const testLine = line + words[n] + ' ';
+                            const metrics = ctx.measureText(testLine);
+                            if (metrics.width > maxWordsWidth && n > 0) {
+                                lines.push(line);
+                                line = words[n] + ' ';
+                            } else {
+                                line = testLine;
+                            }
                         }
+                        lines.push(line);
+                        wrappedTextCache.current[cacheKey] = lines;
                     }
-                    lines.push(line);
-                    wrappedTextCache.current[cacheKey] = lines;
+
+                    const roastY = startY + (rows * (tileSize + tileGap)) + Math.round(width * 0.08);
+                    const lineSpacing = Math.round(width * 0.04);
+
+                    lines.forEach((l, idx) => {
+                        ctx.fillText(l.trim(), width / 2, roastY + (idx * lineSpacing));
+                    });
                 }
-
-                const roastY = startY + (rows * (tileSize + tileGap)) + Math.round(width * 0.08);
-                const lineSpacing = Math.round(width * 0.04);
-
-                lines.forEach((l, idx) => {
-                    ctx.fillText(l.trim(), width / 2, roastY + (idx * lineSpacing));
-                });
-            }
             }
         }
     };
@@ -1009,6 +1013,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 }
             } catch (e) {
                 // Ignore unsupported error
+                console.log("Unsupported mime type", e);
             }
         }
 
@@ -1026,6 +1031,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 videoBitsPerSecond: targetBitrate
             });
         } catch (e) {
+            console.log("Error with bitrate", e);
             try {
                 // Fall back to just the mimeType if the bitrate parameter fails
                 mediaRecorder = new MediaRecorder(combinedStream, {
@@ -1034,6 +1040,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             } catch (err) {
                 // Hard fallback to default
                 mediaRecorder = new MediaRecorder(combinedStream);
+                console.log("Hard fallback to default", err);
             }
         }
 
@@ -1044,7 +1051,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         mediaRecorder.onstop = async () => {
             const rawMime = selectedMimeType.split(';')[0]; // e.g. 'video/mp4' or 'video/webm'
             const blob = new Blob(chunks, { type: rawMime });
-            
+
             // Disconnect recorder from the synth
             if (synthRef.current) {
                 synthRef.current.disconnectRecorder();
@@ -1071,7 +1078,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             }
 
             // Play through all slides programmatically for the video recording (2.0 seconds per slide)
-            const slideDuration = 2000; // ms
+            const slideDuration = 4000; // ms
             const totalDuration = totalSlides * slideDuration;
 
             let elapsed = 0;
@@ -1084,10 +1091,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                 // Determine which slide to draw based on elapsed time
                 const slideToDraw = Math.min(Math.floor(elapsed / slideDuration), totalSlides - 1);
-                
+
                 // Calculate elapsed time within the current slide
                 const slideElapsed = elapsed % slideDuration;
-                
+
                 // Redraw every interval step to keep the video encoder fed and active with dynamic reveals
                 drawSlideToCanvas(ctx, slideToDraw, 1080, 1920, slideElapsed);
 
@@ -1136,7 +1143,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     };
 
     return (
-        <div 
+        <div
             onClick={() => {
                 if (synthRef.current) {
                     synthRef.current.resumeContext();
@@ -1150,10 +1157,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
         >
             {/* hidden canvas for export drawing - positioned offscreen to bypass layout engine throttling and preserve quality */}
-            <canvas 
-                ref={canvasRef} 
-                className="absolute left-[-9999px] top-[-9999px]" 
-                width={1080} 
+            <canvas
+                ref={canvasRef}
+                className="absolute left-[-9999px] top-[-9999px]"
+                width={1080}
                 height={1920}
                 style={{ width: '1080px', height: '1920px' }}
             />
@@ -1171,9 +1178,9 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     <div className="space-y-2">
                         <h2 className="text-xl font-black uppercase tracking-wider">No Wrapped Moments</h2>
                         <p className="text-xs text-gray-400 leading-relaxed">
-                            {isEasterEgg 
-                              ? "You haven't played any classic puzzles yet this week. Play a few rounds to unlock your Wrapped presentation!"
-                              : "You didn't submit any classic scores during the previous week. Start playing now to receive next week's Wrapped!"
+                            {isEasterEgg
+                                ? "You haven't played any classic puzzles yet this week. Play a few rounds to unlock your Wrapped presentation!"
+                                : "You didn't submit any classic scores during the previous week. Start playing now to receive next week's Wrapped!"
                             }
                         </p>
                     </div>
@@ -1282,14 +1289,14 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                 animate={{ opacity: 1, x: 0, scale: 1 }}
                                 exit={{ opacity: 0, x: -50, scale: 0.95 }}
                                 transition={{ duration: 0.4 }}
-                                className={`absolute inset-0 bg-gradient-to-b ${getSlideBackground(currentSlide)} flex flex-col justify-center p-8`}
+                                className={`absolute inset-0 bg-linear-to-b ${getSlideBackground(currentSlide)} flex flex-col justify-center p-8`}
                             >
                                 {currentSlide > 0 && (
                                     <div className="absolute top-6 inset-x-8 flex items-center justify-center gap-2 z-10">
-                                        <img 
-                                            src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
-                                            className="w-6 h-6 rounded-full border border-white/20 object-cover" 
-                                            alt={username} 
+                                        <img
+                                            src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`}
+                                            className="w-6 h-6 rounded-full border border-white/20 object-cover"
+                                            alt={username}
                                         />
                                         <span className="text-xs font-bold text-gray-400/60 uppercase tracking-widest">
                                             @{username}
@@ -1300,10 +1307,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     // Slide 0: Intro
                                     <div className="text-center space-y-5">
                                         <div className="flex justify-center">
-                                            <img 
-                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
-                                                className="w-24 h-24 rounded-full border-4 border-indigo-500 shadow-xl object-cover animate-pulse" 
-                                                alt={username} 
+                                            <img
+                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`}
+                                                className="w-24 h-24 rounded-full border-4 border-indigo-500 shadow-xl object-cover animate-pulse"
+                                                alt={username}
                                             />
                                         </div>
                                         <div className="text-correct font-black text-xs uppercase tracking-widest animate-bounce">
@@ -1311,15 +1318,15 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h1 className="text-4xl sm:text-5xl font-black text-white leading-none">YOUR WEEKLY</h1>
-                                            <h1 className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-pink-500 leading-none">
+                                            <h1 className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-400 to-pink-500 leading-none">
                                                 WRAPPED
                                             </h1>
                                         </div>
                                         <div className="flex items-center justify-center gap-2">
-                                            <img 
-                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`} 
-                                                className="w-6 h-6 rounded-full border border-white/20 object-cover" 
-                                                alt={username} 
+                                            <img
+                                                src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`}
+                                                className="w-6 h-6 rounded-full border border-white/20 object-cover"
+                                                alt={username}
                                             />
                                             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                                                 @{username}
@@ -1334,7 +1341,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     <div className="space-y-6 text-center">
                                         <h2 className="text-xs font-black uppercase text-correct tracking-widest">Your Performance</h2>
                                         <h1 className="text-3xl font-black text-white uppercase tracking-wider">Weekly Stats</h1>
-                                        
+
                                         <div className="space-y-4 max-w-xs mx-auto">
                                             <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
                                                 <span className="text-xs font-black text-gray-400 uppercase">Played</span>
@@ -1371,7 +1378,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                 <div className="space-y-1.5 max-w-xs mx-auto text-left w-full">
                                                     {(() => {
                                                         const myIdx = leaderboard.findIndex(e => e.username === username);
-                                                        let start = 0;
+                                                        let start: number
                                                         if (myIdx === -1) {
                                                             start = 0;
                                                         } else {
@@ -1386,11 +1393,11 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                             const rank = originalIdx + 1;
                                                             const isMe = entry.username === username;
                                                             return (
-                                                                <div 
-                                                                    key={entry.username} 
+                                                                <div
+                                                                    key={entry.username}
                                                                     className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px]
-                                                                        ${isMe 
-                                                                            ? 'bg-indigo-500/20 border-indigo-500/40 text-white font-black' 
+                                                                        ${isMe
+                                                                            ? 'bg-indigo-500/20 border-indigo-500/40 text-white font-black'
                                                                             : 'bg-white/5 border-white/5 text-gray-300'
                                                                         }`}
                                                                 >
@@ -1417,7 +1424,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                     <button
                                                         onClick={exportWrappedVideo}
                                                         disabled={isRecording}
-                                                        className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                        className="w-full flex items-center justify-center gap-2 py-3 bg-linear-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
                                                     >
                                                         <Film size={14} />
                                                         Share Full Video 🎬
@@ -1451,8 +1458,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                                     key={cIdx}
                                                                     className={`w-11 h-11 flex items-center justify-center font-bold text-sm rounded-md border
                                                                         ${charObj.status === 'correct' ? 'animate-reveal-wrapped-correct' :
-                                                                          charObj.status === 'present' ? 'animate-reveal-wrapped-present' :
-                                                                          'animate-reveal-wrapped-absent'}`}
+                                                                            charObj.status === 'present' ? 'animate-reveal-wrapped-present' :
+                                                                                'animate-reveal-wrapped-absent'}`}
                                                                     style={{
                                                                         animationDelay: `${rIdx * 0.20 + cIdx * 0.06}s`,
                                                                         animationFillMode: 'both'

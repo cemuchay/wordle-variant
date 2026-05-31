@@ -105,7 +105,7 @@ export const AppHeader = ({
                     </div>
 
                     {/* Divider */}
-                    <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
 
                     {/* App Controls */}
                     <div className="flex items-center gap-0.5">
@@ -122,7 +122,7 @@ export const AppHeader = ({
                         {user && isMonday && (
                             <button
                                 onClick={onOpenWeeklyWrapped}
-                                className="text-[8px] sm:text-[9px] font-black bg-gradient-to-r from-pink-500 to-indigo-600 text-white px-2 py-1 rounded-lg uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
+                                className="text-[8px] sm:text-[9px] font-black bg-linear-to-r from-pink-500 to-indigo-600 text-white px-2 py-1 rounded-lg uppercase tracking-wider hover:scale-105 active:scale-95 transition-all shadow-[0_0_10px_rgba(236,72,153,0.3)] shrink-0 flex items-center justify-center gap-1"
                                 title="See your Weekly Wrapped"
                             >
                                 🎁
@@ -137,7 +137,7 @@ export const AppHeader = ({
                     </div>
 
                     {/* Divider */}
-                    <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
 
                     {/* Profile Area */}
                     {user ? (
