@@ -455,7 +455,7 @@ export default function App() {
         ) : (
           <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
             <Suspense fallback={null}>
-              <ChatRoom user={user as AppUser} />
+              <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
             </Suspense>
           </div>
         )}
