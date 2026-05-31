@@ -34,20 +34,29 @@ export const mapParticipation = (participation: any) => {
  * Hook to fetch all challenges a user is participating in.
  */
 export const useMyChallenges = (userId: string | undefined) => {
+   // Retrieve recent challenges from localStorage
+   let recentIds: string[] = [];
+   try {
+      const stored = safeLocalStorage.getItem("wordle_recent_challenges");
+      if (stored) {
+         const parsed = JSON.parse(stored);
+         if (Array.isArray(parsed)) {
+            // Filter out null, undefined, empty strings, or literal "null"/"undefined" strings
+            recentIds = parsed.filter(
+               (id): id is string =>
+                  !!id && id !== "null" && id !== "undefined",
+            );
+         }
+      }
+   } catch (e) {
+      console.error("Failed to parse recent challenges", e);
+   }
+
    return useQuery({
+      // Only enable if we have a logged-in user OR anonymous local items to look up
+      enabled: !!userId || recentIds.length > 0,
       queryKey: ["my-challenges", userId],
       queryFn: async () => {
-         // Retrieve recent challenges from localStorage
-         let recentIds: string[] = [];
-         try {
-            const stored = safeLocalStorage.getItem("wordle_recent_challenges");
-            if (stored) {
-               recentIds = JSON.parse(stored);
-            }
-         } catch (e) {
-            console.error("Failed to parse recent challenges", e);
-         }
-
          if (!userId && recentIds.length === 0) return [];
 
          let participations: any[] = [];
@@ -179,7 +188,6 @@ export const useMyChallenges = (userId: string | undefined) => {
 
          return sortedResults;
       },
-      enabled: true,
       initialData: () => {
          if (!userId) return [];
          try {
@@ -363,7 +371,9 @@ export const useChallengeMutations = () => {
 
             if (countError) throw countError;
             if (count !== null && count >= 2) {
-               throw new Error("Maximum of 2 daily bot marathons can run concurrently.");
+               throw new Error(
+                  "Maximum of 2 daily bot marathons can run concurrently.",
+               );
             }
          }
 
@@ -798,7 +808,7 @@ export const useChallengeMutations = () => {
 
          let finalHandicapStarter = handicapStarter;
          let finalHandicapStarters = handicapStarters;
-         let finalHandicapIsRandom = existing.handicap_starter_is_random;
+         let finalHandicapIsRandom: boolean;
 
          const isHandicap = params.isHandicap;
 

@@ -233,7 +233,7 @@ const GuessPreviewModal: React.FC<{
     const targetWordToUse = getTargetWordToUse();
 
     const fakeGrid = useMemo(() => {
-      const cols = targetWordToUse?.length || 5;
+      const cols = 2;
       const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       const rows = 5;
       const grid = [];

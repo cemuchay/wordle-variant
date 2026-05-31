@@ -6,16 +6,15 @@ import { MarathonGameplay } from './MarathonGameplay';
 import { useApp } from '../../context/AppContext';
 
 export const ChallengeGameplayContainer = memo(function ChallengeGameplayContainer() {
-    const { 
+    const {
         selectedChallenge, myParticipation, setIsPlaying, submitResult
     } = useChallengeContext();
     const { triggerToast } = useApp();
 
+    const onFinish = useCallback(() => setIsPlaying(false), [setIsPlaying]);
     if (!selectedChallenge || !myParticipation) return null;
 
     const isMarathon = selectedChallenge.word_length === 1;
-
-    const onFinish = useCallback(() => setIsPlaying(false), [setIsPlaying]);
 
     if (isMarathon) {
         return (
