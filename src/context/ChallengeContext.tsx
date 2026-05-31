@@ -85,7 +85,7 @@ interface ChallengeContextType {
     retryFetchParticipants: () => void;
     openChallengesCount: number;
     dailyMarathonChallenge: any;
-    initialChallengeId?: string;
+    initialChallengeId?: string | null | undefined;
 }
 
 const addRecentChallenge = (id: string) => {
