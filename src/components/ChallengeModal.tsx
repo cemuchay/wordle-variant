@@ -179,24 +179,30 @@ const AuthenticatedChallengeContent = memo(
       dailyMarathonChallenge
     } = useChallengeContext();
 
-    const activeCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-        const isBotMarathon = item.challenge?.is_bot_marathon;
-        if (isBotMarathon && item.status === 'pending') return false;
-        return !isExpired && !isCompleted && item.status !== 'viewed';
-    }).length;
+    const activeCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            const isBotMarathon = item.challenge?.is_bot_marathon;
+            if (isBotMarathon && item.status === 'pending') return false;
+            return !isExpired && !isCompleted && item.status !== 'viewed';
+        }).length;
+    }, [myChallenges]);
 
-    const playedCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-        return !isExpired && isCompleted && item.status !== 'viewed';
-    }).length;
+    const playedCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            return !isExpired && isCompleted && item.status !== 'viewed';
+        }).length;
+    }, [myChallenges]);
 
-    const expiredCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        return isExpired;
-    }).length;
+    const expiredCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            return isExpired;
+        }).length;
+    }, [myChallenges]);
 
     const displayChallenges = useMemo(() => {
       if (dailyMarathonChallenge) {
