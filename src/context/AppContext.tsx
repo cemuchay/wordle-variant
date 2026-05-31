@@ -7,6 +7,7 @@ import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
 import { useAppStore, type VoiceCallState } from '../store/useAppStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
+import { safeLocalStorage } from '../utils/storage';
 
 interface AppContextType {
     profile: any | null;
@@ -390,6 +391,46 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .filter(u => u.id !== user?.id && u.activeVoiceRoomId && (u.activeVoiceRoomId === 'global' || myParticipations.includes(u.activeVoiceRoomId)))
             .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
     }, [onlineUsers, user?.id, myParticipations]);
+
+    // Global chat unread message listener & initial count fetch
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const fetchInitialUnread = async () => {
+            const lastSeen = safeLocalStorage.getItem(`lastSeen_${user.id}`) || new Date(0).toISOString();
+            const { data } = await supabase
+                .from('messages')
+                .select('id')
+                .neq('user_id', user.id)
+                .gt('created_at', lastSeen);
+            
+            if (data) {
+                setUnreadCount(data.length);
+            }
+        };
+
+        fetchInitialUnread();
+
+        const channel = supabase
+            .channel('global_unread_messages')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages' },
+                (payload) => {
+                    const newMessage = payload.new as any;
+                    const currentIsChatOpen = useAppStore.getState().isChatOpen;
+                    if (newMessage.user_id !== user.id && !currentIsChatOpen) {
+                        setUnreadCount(useAppStore.getState().unreadCount + 1);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            channel.unsubscribe();
+            supabase.removeChannel(channel);
+        };
+    }, [user?.id, setUnreadCount]);
 
     // Sync Query data with Store (Bridge)
     useEffect(() => {

@@ -1,13 +1,15 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioChatControls } from "../challenge/AudioChatControls";
 import { useApp } from "../../context/AppContext";
+import { X } from "lucide-react";
 
 interface ChatHeaderProps {
     typingUsers: string[];
     currentUserName?: string;
+    onClose?: () => void;
 }
 
-const ChatHeader = ({ typingUsers, currentUserName }: ChatHeaderProps) => {
+const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) => {
     const { profile } = useApp();
     // Filter out the current user from typing indicators
     const otherTypingUsers = typingUsers.filter(name => name !== currentUserName);
@@ -26,7 +28,7 @@ const ChatHeader = ({ typingUsers, currentUserName }: ChatHeaderProps) => {
                     />
                 </div>
                 <div>
-                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Wordle ChatRoom (24h)</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Variant ChatRoom (24h)</h3>
                     <div className="h-4 flex items-center">
                         <AnimatePresence mode="wait">
                             {otherTypingUsers.length > 0 ? (
@@ -60,12 +62,23 @@ const ChatHeader = ({ typingUsers, currentUserName }: ChatHeaderProps) => {
                 </div>
             </div>
 
-            {profile && (
-                <AudioChatControls
-                    challengeId="global"
-                    userId={profile.id}
-                />
-            )}
+            <div className="flex items-center gap-2">
+                {profile && (
+                    <AudioChatControls
+                        challengeId="global"
+                        userId={profile.id}
+                    />
+                )}
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5"
+                        title="Close Chat"
+                    >
+                        <X size={18} />
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
