@@ -354,11 +354,34 @@ export const useChallengeMutations = () => {
          let targetWord: string;
          const resolvedIsBotMarathon = !!(isBotMarathon || is_bot_marathon);
 
+         if (resolvedIsBotMarathon) {
+            const { count, error: countError } = await supabase
+               .from("challenges")
+               .select("id", { count: "exact", head: true })
+               .eq("is_bot_marathon", true)
+               .gt("expires_at", new Date().toISOString());
+
+            if (countError) throw countError;
+            if (count !== null && count >= 2) {
+               throw new Error("Maximum of 2 daily bot marathons can run concurrently.");
+            }
+         }
+
          const plainMarathonTargets: Record<number, string> = {};
          let plainRegularTarget = "";
 
-         const resolvedMarathonGames =
+         let resolvedMarathonGames =
             marathonGames || (length === 1 ? [3, 4, 5, 6, 7] : null);
+
+         if (resolvedIsBotMarathon && resolvedMarathonGames) {
+            const numDays = Math.ceil(lifespanHours / 24);
+            const baseSequence = [...resolvedMarathonGames];
+            const fullSequence: number[] = [];
+            for (let d = 0; d < numDays; d++) {
+               fullSequence.push(...baseSequence);
+            }
+            resolvedMarathonGames = fullSequence;
+         }
 
          if (resolvedMarathonGames) {
             const targetArray: { length: number; word: string }[] = [];
