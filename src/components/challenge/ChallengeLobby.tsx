@@ -233,7 +233,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         if (lobbyTab !== 'chat') {
           newUnreadCount++;
         }
-        
+
         // Scan for mention of the current user: @username
         const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
         if (myUsername) {
@@ -393,7 +393,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       </div>
 
       {lobbyTab === 'chat' ? (
-        <ChallengeChat 
+        <ChallengeChat
           messages={messages}
           sendMessage={sendMessage}
           typingUsers={typingUsers}
@@ -416,438 +416,443 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 {selectedChallenge.is_bot_marathon
                   ? "Variant Bot"
                   : selectedChallenge.profiles?.username ||
-                    selectedChallenge.creator?.username ||
-                    "Host"}
+                  selectedChallenge.creator?.username ||
+                  "Host"}
               </span>
 
             </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {/* Mode / Time Limit */}
-          <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-white/70">
-              Timing & Mode
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Clock
-                size={12}
-                className={
-                  selectedChallenge.mode === "LIVE"
-                    ? "text-red-500"
-                    : "text-blue-500"
-                }
-              />
-              <span className="text-xs font-bold text-white">
-                {selectedChallenge.mode === "LIVE"
-                  ? "Live Race"
-                  : "Anytime (Async)"}
-              </span>
-            </div>
-            {selectedChallenge.mode === "LIVE" && (
-              <p className="text-[9px] text-white">
-                {isMarathon && selectedChallenge.marathon_timers
-                  ? "Custom per-word timers"
-                  : `${selectedChallenge.max_time}m per game limit`}
-              </p>
-            )}
-          </div>
 
-          {/* Word Info */}
-          <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-white/70">
-              Word Rules
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={12} className="text-yellow-500" />
-              <span className="text-xs font-bold text-white">
-                {isMarathon
-                  ? `Marathon (${marathonGamesList.length} Games)`
-                  : `${selectedChallenge.word_length || "Random"} Letters`}
-              </span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-2">
+                <h4 className="text-xs font-black uppercase tracking-widest text-white">
+                  Participants ({currentParts} / {maxParts})
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {loadingParticipants && participants.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
+                    <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
+                    <p className="text-xs font-black uppercase tracking-wider text-white">
+                      Fetching participants...
+                    </p>
+                  </div>
+                ) : participantsError ? (
+                  <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
+                    <p className="text-xs font-black uppercase text-red-500">
+                      Failed to load participants
+                    </p>
+                    <p className="text-[10px] text-white font-bold">
+                      {participantsError}
+                    </p>
+                    <button
+                      onClick={retryFetchParticipants}
+                      className="bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-widest text-[9px] px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Retry Connection
+                    </button>
+                  </div>
+                ) : participants.length === 0 ? (
+                  <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
+                    No participants found
+                  </div>
+                ) : (
+                  participants.map((p) => (
+                    <ParticipantItem
+                      key={p.id}
+                      p={p}
+                      isMarathon={isMarathon}
+                      totalMarathonGames={marathonGamesList.length}
+                      myHasFinished={myHasFinished}
+                      isLive={isLive}
+                      onPreview={handlePreview}
+                      canPreviewAll={
+                        selectedChallenge.creator_id === effectiveUser?.id &&
+                        !!selectedChallenge.is_custom_word
+                      }
+                      isExpired={isExpired}
+                    />
+                  ))
+                )}
+              </div>
             </div>
-            <p className="text-[9px] text-white">
-              {selectedChallenge.is_custom_word
-                ? "Host Custom Word"
-                : "System Generated"}
-            </p>
-          </div>
 
-          {/* Handicap Info */}
-          <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
+            <div className="pt-6 flex flex-col gap-3">
+              {isExpired ? (
+                <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
+                  <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
+                    <Hourglass size={14} /> Challenge Expired ⌛
+                  </p>
+                  <p className="text-[10px] text-white font-bold leading-relaxed">
+                    This challenge has ended. You can view the final scores and
+                    details, but no more entries are allowed.
+                  </p>
+                </div>
+              ) : isCreatorOfCustom ? (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
+                  <p className="text-xs font-black uppercase text-yellow-500">
+                    Host Mode Active 👑
+                  </p>
+                  <p className="text-[10px] text-white font-bold">
+                    You created this custom word challenge. Watch your friends compete
+                    on the leaderboard above!
+                  </p>
+                </div>
+              ) : isFull ? (
+                <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center">
+                  <p className="text-xs font-black uppercase text-red-500">
+                    Challenge Full 🚫
+                  </p>
+                  <p className="text-[10px] text-white font-bold mt-1">
+                    This challenge has reached its maximum participant limit of{" "}
+                    {maxParts}.
+                  </p>
+                </div>
+              ) : !effectiveUser ? (
+                <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 animate-in fade-in duration-300">
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-black uppercase tracking-wider text-white">
+                      Join the Challenge
+                    </p>
+                    <p className="text-[10px] text-white">
+                      Log in to save stats permanently, or play now as a guest.
+                    </p>
+                  </div>
+
+                  {!showGuestInput ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => {
+                          safeSessionStorage.setItem('auth_redirect_target', 'challenge');
+                          window.dispatchEvent(new CustomEvent("open-auth-modal"));
+                        }}
+                        className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
+                      >
+                        Log In / Sign Up
+                      </button>
+                      <button
+                        onClick={() => setShowGuestInput(true)}
+                        className="bg-white/10 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center border border-white/5 cursor-pointer"
+                      >
+                        Play as Guest
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        maxLength={15}
+                        placeholder="Enter nickname..."
+                        value={nicknameInput}
+                        onChange={(e) =>
+                          setNicknameInput(
+                            e.target.value.replace(/[^A-Za-z0-9_]/g, ""),
+                          )
+                        }
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setShowGuestInput(false)}
+                          className="bg-white/5 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                        >
+                          Back
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const name = nicknameInput.trim();
+                            if (name.length < 3) {
+                              triggerToast(
+                                "Nickname must be at least 3 characters.",
+                                3000,
+                              );
+                              return;
+                            }
+                            const user = await registerAnonymousUser(name);
+                            if (user) {
+                              triggerToast("Guest profile created! Joining...", 2000);
+                            }
+                          }}
+                          className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
+                        >
+                          Join
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : !myHasFinished ? (
+                <button
+                  onClick={handleStartGame}
+                  disabled={loading}
+                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Play size={18} fill="currentColor" />{" "}
+                  {myParticipation?.status === "playing"
+                    ? "Continue Challenge"
+                    : "Start Challenge"}
+                </button>
+              ) : (
+                <div className="w-full bg-white/5 border border-white/10 text-correct py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
+                  Challenge Completed 🎉
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Mode / Time Limit */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
                 <p className="text-[8px] font-black uppercase text-white/70">
-                  Handicap Starter
+                  Timing & Mode
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <Shield
+                  <Clock
                     size={12}
                     className={
-                      selectedChallenge.handicap_starter ||
-                      selectedChallenge.handicap_starters
-                        ? "text-correct"
-                        : "text-white/55"
+                      selectedChallenge.mode === "LIVE"
+                        ? "text-red-500"
+                        : "text-blue-500"
                     }
                   />
                   <span className="text-xs font-bold text-white">
-                    {selectedChallenge.handicap_starter ||
-                    selectedChallenge.handicap_starters
-                      ? "Enabled"
-                      : "Disabled"}
+                    {selectedChallenge.mode === "LIVE"
+                      ? "Live Race"
+                      : "Anytime (Async)"}
                   </span>
                 </div>
-              </div>
-              {(selectedChallenge.handicap_starter ||
-                selectedChallenge.handicap_starters) && (
-                <div className="text-right">
-                  <span className="text-[9px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-md uppercase">
-                    {selectedChallenge.handicap_enforced
-                      ? "Auto-Enforced"
-                      : "Optional"}
-                  </span>
-                </div>
-              )}
-            </div>
-            {(selectedChallenge.handicap_starter ||
-              selectedChallenge.handicap_starters) && (
-              <div className="mt-2 text-[9px] text-white space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
-                {isMarathon && selectedChallenge.handicap_starters ? (
-                  <div className="flex flex-wrap gap-1 justify-center text-center font-black max-h-[100px] overflow-y-auto animate-in fade-in duration-200">
-                    {marathonGamesList.map((game, idx) => {
-                      const w = getHandicapStarter(
-                        selectedChallenge,
-                        idx,
-                        game.wordLength,
-                      );
-                      const hasWord = !!w && w !== "__SYSTEM_RANDOM__";
-                      return (
-                        <div
-                          key={idx}
-                          className="bg-white/5 p-1 rounded min-w-[45px]"
-                        >
-                          <span className="text-[7px] text-white/60 block">
-                            #{idx + 1} ({game.wordLength}L)
-                          </span>
-                          <span className="text-white/80 uppercase text-[8px]">
-                            {hasWord ? "Hidden" : "Rand"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="font-bold">
-                    Starter Word:{" "}
-                    <span className="text-white/80 uppercase tracking-wider font-mono">
-                      {selectedChallenge.handicap_starter ===
-                      "__SYSTEM_RANDOM__"
-                        ? "Random (Hidden until start)"
-                        : "Hidden until start"}
-                    </span>
+                {selectedChallenge.mode === "LIVE" && (
+                  <p className="text-[9px] text-white">
+                    {isMarathon && selectedChallenge.marathon_timers
+                      ? "Custom per-word timers"
+                      : `${selectedChallenge.max_time}m per game limit`}
                   </p>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Lifespan & Participants */}
-          <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-white/70">
-              Privacy & Limits
-            </p>
-            <div className="flex items-center gap-1.5">
-              {selectedChallenge.is_public ? (
-                <Globe size={12} className="text-correct" />
-              ) : (
-                <Lock size={12} className="text-yellow-500" />
-              )}
-              <span className="text-xs font-bold text-white">
-                {selectedChallenge.is_public ? "Public Room" : "Invite Only"}
-              </span>
-            </div>
-            <p className="text-[9px] text-white">
-              {selectedChallenge.is_public
-                ? `Max ${selectedChallenge.max_participants || 100} players`
-                : "Direct shares only"}
-            </p>
-          </div>
-
-          {/* Expiration Timer */}
-          <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
-            <p className="text-[8px] font-black uppercase text-white/70">
-              Room Lifespan
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Hourglass size={12} className="text-white/70" />
-              <span className="text-xs font-bold text-white">Expires in</span>
-            </div>
-            <p className="text-[9px] text-white tabular-nums">
-              {new Date(selectedChallenge.expires_at).toLocaleString(
-                undefined,
-                {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                },
-              )}
-            </p>
-          </div>
-
-          {/* Custom Marathon Timers if active */}
-          {isMarathon &&
-            selectedChallenge.mode === "LIVE" &&
-            selectedChallenge.marathon_timers && (
-              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+              {/* Word Info */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
                 <p className="text-[8px] font-black uppercase text-white/70">
-                  Marathon Per-Length Time Limits
+                  Word Rules
                 </p>
-                <div className="flex flex-wrap gap-1.5 justify-center pt-1 max-h-[120px] overflow-y-auto animate-in fade-in duration-200">
-                  {marathonGamesList.map((game, idx) => {
-                    const t = getMarathonTimer(
-                      selectedChallenge,
-                      idx,
-                      game.wordLength,
-                    );
-                    return (
-                      <div
-                        key={idx}
-                        className="bg-black/30 p-1.5 rounded-lg border border-white/5 text-center min-w-[50px]"
-                      >
-                        <p className="text-[8px] font-bold text-white/70">
-                          #{idx + 1} ({game.wordLength}L)
-                        </p>
-                        <p className="text-[10px] font-black text-white">
-                          {t}m
-                        </p>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-yellow-500" />
+                  <span className="text-xs font-bold text-white">
+                    {isMarathon
+                      ? `Marathon (${marathonGamesList.length} Games)`
+                      : `${selectedChallenge.word_length || "Random"} Letters`}
+                  </span>
                 </div>
+                <p className="text-[9px] text-white">
+                  {selectedChallenge.is_custom_word
+                    ? "Host Custom Word"
+                    : "System Generated"}
+                </p>
               </div>
-            )}
-        </div>
 
-        {/* Target Word Section for Completed Challenges */}
-        {myParticipation && (
-          <>
-            {!isMarathon ? (
-              (myParticipation.status === 'completed' || myParticipation.status === 'timed_out') && (
-                <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
-                    Target Answer
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-black uppercase tracking-wider font-mono text-correct">
-                      {deobfuscatedTargetWord}
-                    </span>
-                    <span className="text-[8px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded uppercase">
-                      Revealed
-                    </span>
+              {/* Handicap Info */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black uppercase text-white/70">
+                      Handicap Starter
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <Shield
+                        size={12}
+                        className={
+                          selectedChallenge.handicap_starter ||
+                            selectedChallenge.handicap_starters
+                            ? "text-correct"
+                            : "text-white/55"
+                        }
+                      />
+                      <span className="text-xs font-bold text-white">
+                        {selectedChallenge.handicap_starter ||
+                          selectedChallenge.handicap_starters
+                          ? "Enabled"
+                          : "Disabled"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )
-            ) : (
-              <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
-                  Marathon Target Answers
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {marathonGamesList.map((game, idx) => {
-                    const prog = myParticipation.marathon_progress?.find((p: any) => p.game_index === idx);
-                    const isFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
-                    return (
-                      <div key={idx} className="bg-black/20 p-2.5 rounded-xl border border-white/5 flex flex-col gap-0.5">
-                        <span className="text-[8px] text-white/40 font-bold uppercase">Game #{idx + 1} ({game.wordLength}L)</span>
-                        <span className={`text-xs font-black uppercase tracking-widest ${isFinished ? 'text-correct font-mono' : 'text-white/20'}`}>
-                          {isFinished ? game.word : '• '.repeat(game.wordLength).trim()}
+                  {(selectedChallenge.handicap_starter ||
+                    selectedChallenge.handicap_starters) && (
+                      <div className="text-right">
+                        <span className="text-[9px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded-md uppercase">
+                          {selectedChallenge.handicap_enforced
+                            ? "Auto-Enforced"
+                            : "Optional"}
                         </span>
                       </div>
-                    );
-                  })}
+                    )}
                 </div>
+                {(selectedChallenge.handicap_starter ||
+                  selectedChallenge.handicap_starters) && (
+                    <div className="mt-2 text-[9px] text-white space-y-1 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                      {isMarathon && selectedChallenge.handicap_starters ? (
+                        <div className="flex flex-wrap gap-1 justify-center text-center font-black max-h-[100px] overflow-y-auto animate-in fade-in duration-200">
+                          {marathonGamesList.map((game, idx) => {
+                            const w = getHandicapStarter(
+                              selectedChallenge,
+                              idx,
+                              game.wordLength,
+                            );
+                            const hasWord = !!w && w !== "__SYSTEM_RANDOM__";
+                            return (
+                              <div
+                                key={idx}
+                                className="bg-white/5 p-1 rounded min-w-[45px]"
+                              >
+                                <span className="text-[7px] text-white/60 block">
+                                  #{idx + 1} ({game.wordLength}L)
+                                </span>
+                                <span className="text-white/80 uppercase text-[8px]">
+                                  {hasWord ? "Hidden" : "Rand"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="font-bold">
+                          Starter Word:{" "}
+                          <span className="text-white/80 uppercase tracking-wider font-mono">
+                            {selectedChallenge.handicap_starter ===
+                              "__SYSTEM_RANDOM__"
+                              ? "Random (Hidden until start)"
+                              : "Hidden until start"}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  )}
               </div>
-            )}
-          </>
-        )}
-      </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-2">
-          <h4 className="text-xs font-black uppercase tracking-widest text-white">
-            Participants ({currentParts} / {maxParts})
-          </h4>
-        </div>
-        <div className="space-y-2">
-          {loadingParticipants && participants.length === 0 ? (
-            <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
-              <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
-              <p className="text-xs font-black uppercase tracking-wider text-white">
-                Fetching participants...
-              </p>
-            </div>
-          ) : participantsError ? (
-            <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
-              <p className="text-xs font-black uppercase text-red-500">
-                Failed to load participants
-              </p>
-              <p className="text-[10px] text-white font-bold">
-                {participantsError}
-              </p>
-              <button
-                onClick={retryFetchParticipants}
-                className="bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-widest text-[9px] px-4 py-2 rounded-xl transition-colors cursor-pointer"
-              >
-                Retry Connection
-              </button>
-            </div>
-          ) : participants.length === 0 ? (
-            <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
-              No participants found
-            </div>
-          ) : (
-            participants.map((p) => (
-              <ParticipantItem
-                key={p.id}
-                p={p}
-                isMarathon={isMarathon}
-                totalMarathonGames={marathonGamesList.length}
-                myHasFinished={myHasFinished}
-                isLive={isLive}
-                onPreview={handlePreview}
-                canPreviewAll={
-                  selectedChallenge.creator_id === effectiveUser?.id &&
-                  !!selectedChallenge.is_custom_word
-                }
-                isExpired={isExpired}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="pt-6 flex flex-col gap-3">
-        {isExpired ? (
-          <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
-            <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
-              <Hourglass size={14} /> Challenge Expired ⌛
-            </p>
-            <p className="text-[10px] text-white font-bold leading-relaxed">
-              This challenge has ended. You can view the final scores and
-              details, but no more entries are allowed.
-            </p>
-          </div>
-        ) : isCreatorOfCustom ? (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl text-center space-y-1">
-            <p className="text-xs font-black uppercase text-yellow-500">
-              Host Mode Active 👑
-            </p>
-            <p className="text-[10px] text-white font-bold">
-              You created this custom word challenge. Watch your friends compete
-              on the leaderboard above!
-            </p>
-          </div>
-        ) : isFull ? (
-          <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center">
-            <p className="text-xs font-black uppercase text-red-500">
-              Challenge Full 🚫
-            </p>
-            <p className="text-[10px] text-white font-bold mt-1">
-              This challenge has reached its maximum participant limit of{" "}
-              {maxParts}.
-            </p>
-          </div>
-        ) : !effectiveUser ? (
-          <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 animate-in fade-in duration-300">
-            <div className="text-center space-y-1">
-              <p className="text-xs font-black uppercase tracking-wider text-white">
-                Join the Challenge
-              </p>
-              <p className="text-[10px] text-white">
-                Log in to save stats permanently, or play now as a guest.
-              </p>
-            </div>
-
-            {!showGuestInput ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => {
-                    safeSessionStorage.setItem('auth_redirect_target', 'challenge');
-                    window.dispatchEvent(new CustomEvent("open-auth-modal"));
-                  }}
-                  className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center cursor-pointer"
-                >
-                  Log In / Sign Up
-                </button>
-                <button
-                  onClick={() => setShowGuestInput(true)}
-                  className="bg-white/10 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center border border-white/5 cursor-pointer"
-                >
-                  Play as Guest
-                </button>
+              {/* Lifespan & Participants */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                <p className="text-[8px] font-black uppercase text-white/70">
+                  Privacy & Limits
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {selectedChallenge.is_public ? (
+                    <Globe size={12} className="text-correct" />
+                  ) : (
+                    <Lock size={12} className="text-yellow-500" />
+                  )}
+                  <span className="text-xs font-bold text-white">
+                    {selectedChallenge.is_public ? "Public Room" : "Invite Only"}
+                  </span>
+                </div>
+                <p className="text-[9px] text-white">
+                  {selectedChallenge.is_public
+                    ? `Max ${selectedChallenge.max_participants || 100} players`
+                    : "Direct shares only"}
+                </p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  maxLength={15}
-                  placeholder="Enter nickname..."
-                  value={nicknameInput}
-                  onChange={(e) =>
-                    setNicknameInput(
-                      e.target.value.replace(/[^A-Za-z0-9_]/g, ""),
-                    )
-                  }
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setShowGuestInput(false)}
-                    className="bg-white/5 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const name = nicknameInput.trim();
-                      if (name.length < 3) {
-                        triggerToast(
-                          "Nickname must be at least 3 characters.",
-                          3000,
+
+              {/* Expiration Timer */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                <p className="text-[8px] font-black uppercase text-white/70">
+                  Room Lifespan
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <Hourglass size={12} className="text-white/70" />
+                  <span className="text-xs font-bold text-white">Expires in</span>
+                </div>
+                <p className="text-[9px] text-white tabular-nums">
+                  {new Date(selectedChallenge.expires_at).toLocaleString(
+                    undefined,
+                    {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  )}
+                </p>
+              </div>
+
+              {/* Custom Marathon Timers if active */}
+              {isMarathon &&
+                selectedChallenge.mode === "LIVE" &&
+                selectedChallenge.marathon_timers && (
+                  <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
+                    <p className="text-[8px] font-black uppercase text-white/70">
+                      Marathon Per-Length Time Limits
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 justify-center pt-1 max-h-[120px] overflow-y-auto animate-in fade-in duration-200">
+                      {marathonGamesList.map((game, idx) => {
+                        const t = getMarathonTimer(
+                          selectedChallenge,
+                          idx,
+                          game.wordLength,
                         );
-                        return;
-                      }
-                      const user = await registerAnonymousUser(name);
-                      if (user) {
-                        triggerToast("Guest profile created! Joining...", 2000);
-                      }
-                    }}
-                    className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
-                  >
-                    Join
-                  </button>
-                </div>
-              </div>
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-black/30 p-1.5 rounded-lg border border-white/5 text-center min-w-[50px]"
+                          >
+                            <p className="text-[8px] font-bold text-white/70">
+                              #{idx + 1} ({game.wordLength}L)
+                            </p>
+                            <p className="text-[10px] font-black text-white">
+                              {t}m
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* Target Word Section for Completed Challenges */}
+            {myParticipation && (
+              <>
+                {!isMarathon ? (
+                  (myParticipation.status === 'completed' || myParticipation.status === 'timed_out') && (
+                    <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
+                        Target Answer
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-black uppercase tracking-wider font-mono text-correct">
+                          {deobfuscatedTargetWord}
+                        </span>
+                        <span className="text-[8px] font-black bg-correct/10 text-correct border border-correct/20 px-2 py-0.5 rounded uppercase">
+                          Revealed
+                        </span>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="mt-4 bg-white/3 p-4 rounded-xl border border-white/5 space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <p className="text-[8px] font-black uppercase text-white/50 tracking-wider">
+                      Marathon Target Answers
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {marathonGamesList.map((game, idx) => {
+                        const prog = myParticipation.marathon_progress?.find((p: any) => p.game_index === idx);
+                        const isFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
+                        return (
+                          <div key={idx} className="bg-black/20 p-2.5 rounded-xl border border-white/5 flex flex-col gap-0.5">
+                            <span className="text-[8px] text-white/40 font-bold uppercase">Game #{idx + 1} ({game.wordLength}L)</span>
+                            <span className={`text-xs font-black uppercase tracking-widest ${isFinished ? 'text-correct font-mono' : 'text-white/20'}`}>
+                              {isFinished ? game.word : '• '.repeat(game.wordLength).trim()}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
-        ) : !myHasFinished ? (
-          <button
-            onClick={handleStartGame}
-            disabled={loading}
-            className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Play size={18} fill="currentColor" />{" "}
-            {myParticipation?.status === "playing"
-              ? "Continue Challenge"
-              : "Start Challenge"}
-          </button>
-        ) : (
-          <div className="w-full bg-white/5 border border-white/10 text-correct py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
-            Challenge Completed 🎉
-          </div>
-        )}
-      </div>
-      </>
+
+
+
+
+        </>
       )}
 
       <div className="pt-6 flex flex-col gap-3">
