@@ -595,7 +595,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             lifespanHours,
             invitedIds,
             disableHints,
-            is_bot_marathon: isBotMarathon
+            is_bot_marathon: isBotMarathon,
+            isBotMarathon: isBotMarathon
         };
 
         if (isCustomWord) {

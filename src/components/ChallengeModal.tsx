@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState } from "react";
+import { memo, useState, useMemo } from "react";
 import {
   X,
   Trophy,
@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   Plus,
   HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type Challenge } from "../hooks/useChallenge";
@@ -174,25 +175,43 @@ const AuthenticatedChallengeContent = memo(
       listColumn,
       setListColumn,
       isBackgroundFetching,
-      openChallengesCount
+      openChallengesCount,
+      dailyMarathonChallenge
     } = useChallengeContext();
 
-    const activeCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-        return !isExpired && !isCompleted && item.status !== 'viewed';
-    }).length;
+    const activeCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            const isBotMarathon = item.challenge?.is_bot_marathon;
+            if (isBotMarathon && item.status === 'pending') return false;
+            return !isExpired && !isCompleted && item.status !== 'viewed';
+        }).length;
+    }, [myChallenges]);
 
-    const playedCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-        return !isExpired && isCompleted && item.status !== 'viewed';
-    }).length;
+    const playedCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
+            return !isExpired && isCompleted && item.status !== 'viewed';
+        }).length;
+    }, [myChallenges]);
 
-    const expiredCount = myChallenges.filter((item: any) => {
-        const isExpired = new Date(item.challenge?.expires_at) < new Date();
-        return isExpired;
-    }).length;
+    const expiredCount = useMemo(() => {
+        return myChallenges.filter((item: any) => {
+            const isExpired = new Date(item.challenge?.expires_at) < new Date();
+            return isExpired;
+        }).length;
+    }, [myChallenges]);
+
+    const displayChallenges = useMemo(() => {
+      if (dailyMarathonChallenge) {
+        return filteredChallenges.filter(
+          (item: any) => (item.challenge_id || item.challenge?.id) !== (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)
+        );
+      }
+      return filteredChallenges;
+    }, [filteredChallenges, dailyMarathonChallenge]);
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -339,6 +358,45 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
+                        {dailyMarathonChallenge && (
+                          <motion.button
+                            onClick={() => handleViewChallenge(dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)}
+                            className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-5 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
+                            style={{
+                              animationDuration: '2s'
+                            }}
+                          >
+                            <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
+                            <div className="flex items-center justify-between w-full">
+                              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/25 text-yellow-400 border border-yellow-500/40">
+                                <Sparkles size={11} className="animate-spin" style={{ animationDuration: '4s' }} />
+                                Daily Event Challenge
+                              </span>
+                              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-wider font-mono">
+                                Hosted by @Variant Bot
+                              </span>
+                            </div>
+                            
+                            <div>
+                              <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                                Today's Daily Marathon Challenge 🏃‍♂️💨
+                              </h3>
+                              <p className="text-white/80 text-xs mt-1 leading-relaxed">
+                                Play today's curated sequence of words. Compete on the leaderboard to claim the top spot!
+                              </p>
+                            </div>
+                            
+                            <div className="flex items-center justify-between w-full border-t border-white/10 pt-2.5 mt-1">
+                              <span className="text-[10px] font-bold text-white/70 uppercase">
+                                Click to join and start playing
+                              </span>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-correct flex items-center gap-1">
+                                Play Now &rarr;
+                              </span>
+                            </div>
+                          </motion.button>
+                        )}
+
                         <div className="flex items-center gap-2">
                           <div className="relative flex-1 group">
                             <Search
@@ -429,14 +487,14 @@ const AuthenticatedChallengeContent = memo(
                       <div className="space-y-4">
                         {loading ? (
                           <ChallengeSkeleton />
-                        ) : filteredChallenges.length === 0 ? (
+                        ) : displayChallenges.length === 0 ? (
                           <div className="py-12 text-center text-white">
                             {myChallenges.length === 0
                               ? "No challenges yet."
                               : "No matching challenges found."}
                           </div>
                         ) : (
-                          filteredChallenges.map((item, idx) => (
+                          displayChallenges.map((item: any, idx: number) => (
                             <ChallengeItem
                               key={item.id}
                               item={item}

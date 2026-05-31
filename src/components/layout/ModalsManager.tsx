@@ -49,6 +49,7 @@ interface ModalsManagerProps {
     onChallengeCreated: (challenge: any, invitedUsernames: string[], invitedIds: string[]) => void;
     viewedProfileId: string | null;
     setViewedProfileId: (id: string | null) => void;
+    initialChallengeId?: string | null;
 }
 
 export const ModalsManager = ({
@@ -58,7 +59,8 @@ export const ModalsManager = ({
     statsActiveTab = 'leaderboard',
     onChallengeCreated,
     viewedProfileId,
-    setViewedProfileId
+    setViewedProfileId,
+    initialChallengeId
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
 
@@ -102,7 +104,7 @@ export const ModalsManager = ({
                     onClose={() => actions.setChallengeOpen(false)}
                     user={gameContext.user}
                     onChallengeCreated={onChallengeCreated}
-                    initialChallengeId={new URLSearchParams(window.location.search).get('challenge')}
+                    initialChallengeId={initialChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                 />
             )}
 
