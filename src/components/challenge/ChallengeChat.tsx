@@ -246,6 +246,7 @@ export const ChallengeChat = memo(function ChallengeChat({
                   {new Date(msg.created_at).toLocaleTimeString(undefined, {
                     hour: "2-digit",
                     minute: "2-digit",
+                    hour12: true,
                   })}
                 </span>
               </div>

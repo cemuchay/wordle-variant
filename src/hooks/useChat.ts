@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
+import { useAppStore } from "../store/useAppStore";
 
 export interface Message {
    id: string;
@@ -13,10 +14,12 @@ export interface Message {
    mentions?: string[];
    is_read: boolean;
    profiles: { username: string; avatar_url: string; id: string };
+   reactions?: Record<string, string>; // userId -> emoji
+   voice_url?: string;
 }
 
 export const useChat = (userId: string) => {
-   const [messages, setMessages] = useState<Message[]>([]);
+   const messages = useAppStore((state) => state.globalMessages);
    const [typingUsers, setTypingUsers] = useState<string[]>([]);
    const channelRef = useRef<any>(null);
    const { setUnreadCount } = useApp();
@@ -24,8 +27,8 @@ export const useChat = (userId: string) => {
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
    // Get the timestamp from the browser's local storage
-   const getLastSeen = () =>
-      safeLocalStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString();
+   const getLastSeen = useCallback(() =>
+      safeLocalStorage.getItem(`lastSeen_${userId}`) || new Date(0).toISOString(), [userId]);
 
    const typingTimeoutRef = useRef<number | null>(null);
 
@@ -34,33 +37,23 @@ export const useChat = (userId: string) => {
 
    useEffect(() => {
       if (!userId) return;
-      // 1. Fetch messages with timezone conversion via JS Date
-      const fetchMessages = async () => {
-         const { data } = await supabase
-            .from("messages")
-            .select("*, profiles(username, avatar_url)")
-            .order("created_at", { ascending: true });
 
-         if (data) {
-            setMessages(data);
-            const lastSeen = getLastSeen();
-            // Find messages that are NOT yours and are NEWER than your last visit
-            const unreads = data.filter(
-               (m) => m.user_id !== userId && m.created_at > lastSeen
-            );
+      // Find first unread message on mount/load
+      const lastSeen = getLastSeen();
+      const unreads = messages.filter(
+         (m) => m.user_id !== userId && m.created_at > lastSeen
+      );
+      if (unreads.length > 0 && !firstUnreadId) {
+         setFirstUnreadId(unreads[0].id);
+      }
+   }, [userId, messages, getLastSeen, firstUnreadId]);
 
-            setUnreadCount(unreads.length);
-            if (unreads.length > 0) {
-               setFirstUnreadId(unreads[0].id);
-            }
-         }
-      };
-
-      fetchMessages();
+   useEffect(() => {
+      if (!userId) return;
 
       const channelId = "chat_global";
 
-      // 2. Setup Realtime Channel for Messages and Presence
+      // Setup Realtime Channel for Presence only (messages inserts are handled globally in AppContext)
       const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelId}`);
 
       if (existingChannel) {
@@ -74,44 +67,6 @@ export const useChat = (userId: string) => {
       let mounted = true;
 
       channel
-         .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "messages" },
-            async (payload) => {
-               if (!mounted) return;
-               if (payload.eventType === "INSERT") {
-                  const newMessage = payload.new as Message;
-
-                  const { data: profile } = await supabase
-                     .from("profiles")
-                     .select("id, username, avatar_url")
-                     .eq("id", newMessage.user_id)
-                     .single();
-
-                  if (!mounted) return;
-                  const messageWithProfile = { ...newMessage, profiles: profile };
-
-                  setMessages((prev: any[]) => {
-                     const exists = prev.some((m) => m.id === newMessage.id);
-
-                     if (exists) {
-                        return prev.map((m: any) => (m.id === newMessage.id ? messageWithProfile : m));
-                     }
-
-                     return [...prev, messageWithProfile];
-                  });
-               }
-               if (payload.eventType === "UPDATE") {
-                  setMessages((prev) =>
-                     prev.map((m) =>
-                        m.id === payload.new.id
-                           ? { ...m, ...payload.new }
-                           : m
-                     )
-                  );
-               }
-            }
-         )
          .on("presence", { event: "sync" }, () => {
             if (!mounted) return;
             const state = channel.presenceState();
@@ -140,7 +95,7 @@ export const useChat = (userId: string) => {
          supabase.removeChannel(channel);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [userId, setUnreadCount]);
+   }, [userId]);
 
    const setTyping = useCallback((isTyping: boolean, username: string) => {
       if (!channelRef.current) return;
@@ -166,7 +121,7 @@ export const useChat = (userId: string) => {
       // 3. Refresh the 5-second timer regardless
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-      typingTimeoutRef.current = setTimeout(() => {
+      typingTimeoutRef.current = window.setTimeout(() => {
          isCurrentlyTypingLocally.current = false;
          channelRef.current?.track({
             isTyping: false,
@@ -176,8 +131,8 @@ export const useChat = (userId: string) => {
       }, 2000);
    }, []);
 
-   const sendMessage = async (content: string, replyToId?: string, mentions?: string[]) => {
-      if (!content.trim()) return;
+   const sendMessage = async (content: string, replyToId?: string, mentions?: string[], voiceUrl?: string) => {
+      if (!content.trim() && !voiceUrl) return;
 
       const tempId = crypto.randomUUID();
       const optimisticMessage: Message = {
@@ -188,11 +143,12 @@ export const useChat = (userId: string) => {
          reply_to: replyToId,
          mentions: mentions,
          is_read: false,
+         voice_url: voiceUrl,
          profiles: messages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '', id: userId }
       };
 
       // 1. Add optimistically
-      setMessages((prev) => [...prev, optimisticMessage]);
+      useAppStore.getState().addGlobalMessage(optimisticMessage);
 
       // 2. Insert to DB
       const { error } = await supabase.from("messages").insert([
@@ -203,13 +159,66 @@ export const useChat = (userId: string) => {
             reply_to: replyToId,
             mentions: mentions,
             is_read: false,
+            voice_url: voiceUrl,
          },
       ]);
 
       // 3. Only handle errors. The Realtime listener handles the success state.
       if (error) {
-         setMessages((prev) => prev.filter((m) => m.id !== tempId));
+         // Note: We don't remove optimistic messages here immediately because
+         // the real-time sync will overwrite/clean up, but we could filter it out if required:
+         // setMessages(prev => prev.filter(m => m.id !== tempId));
          console.error("Failed to send message:", error);
+      }
+   };
+
+   const reactToMessage = async (messageId: string, emoji: string | null) => {
+      if (!userId) return;
+      const msg = messages.find(m => m.id === messageId);
+      if (!msg) return;
+
+      const currentReactions = { ...(msg.reactions || {}) };
+      if (emoji) {
+         currentReactions[userId] = emoji;
+      } else {
+         delete currentReactions[userId];
+      }
+
+      // Optimistic update
+      useAppStore.getState().updateGlobalMessage({ id: messageId, reactions: currentReactions });
+
+      const { error } = await supabase
+         .from("messages")
+         .update({ reactions: currentReactions })
+         .eq("id", messageId);
+
+      if (error) {
+         console.error("Failed to react to message:", error);
+      }
+   };
+
+   const uploadVoiceNote = async (blob: Blob): Promise<string> => {
+      const fileName = `${userId}/${Date.now()}.ogg`;
+      const { error } = await supabase.storage
+         .from("voice-notes")
+         .upload(fileName, blob, {
+            contentType: 'audio/ogg',
+            cacheControl: '3600'
+         });
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+         .from("voice-notes")
+         .getPublicUrl(fileName);
+      return publicUrl;
+   };
+
+   const sendVoiceMessage = async (audioBlob: Blob) => {
+      try {
+         const publicUrl = await uploadVoiceNote(audioBlob);
+         await sendMessage("[Voice Note]", undefined, undefined, publicUrl);
+      } catch (err) {
+         console.error("Failed to send voice message:", err);
       }
    };
 
@@ -235,5 +244,5 @@ export const useChat = (userId: string) => {
       fetchUsers();
    }, []);
 
-   return { messages, sendMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
+   return { messages, sendMessage, reactToMessage, sendVoiceMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
 };
