@@ -21,5 +21,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "twl.txt/new/generate_official.ts", "twl.txt/new/generate_allowed_unified.ts", "twl.txt/new/generate_20k.ts"]
 }

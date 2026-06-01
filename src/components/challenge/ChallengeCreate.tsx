@@ -106,7 +106,7 @@ const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveToolti
             tooltipId="length" 
         />
         <div className="flex gap-2 flex-wrap">
-            {[3, 4, 5, 6, 7].map((l) => (
+            {[3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
                 <button
                     key={l}
                     type="button"
@@ -735,7 +735,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                     Add Game Length
                                 </label>
                                 <div className="flex gap-2">
-                                    {[3, 4, 5, 6, 7].map((l) => (
+                                    {[3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
                                         <button
                                             key={l}
                                             type="button"

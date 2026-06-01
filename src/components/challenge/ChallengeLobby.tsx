@@ -422,61 +422,6 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
             </div>
 
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between px-2">
-                <h4 className="text-xs font-black uppercase tracking-widest text-white">
-                  Participants ({currentParts} / {maxParts})
-                </h4>
-              </div>
-              <div className="space-y-2">
-                {loadingParticipants && participants.length === 0 ? (
-                  <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
-                    <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
-                    <p className="text-xs font-black uppercase tracking-wider text-white">
-                      Fetching participants...
-                    </p>
-                  </div>
-                ) : participantsError ? (
-                  <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
-                    <p className="text-xs font-black uppercase text-red-500">
-                      Failed to load participants
-                    </p>
-                    <p className="text-[10px] text-white font-bold">
-                      {participantsError}
-                    </p>
-                    <button
-                      onClick={retryFetchParticipants}
-                      className="bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-widest text-[9px] px-4 py-2 rounded-xl transition-colors cursor-pointer"
-                    >
-                      Retry Connection
-                    </button>
-                  </div>
-                ) : participants.length === 0 ? (
-                  <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
-                    No participants found
-                  </div>
-                ) : (
-                  participants.map((p) => (
-                    <ParticipantItem
-                      key={p.id}
-                      p={p}
-                      isMarathon={isMarathon}
-                      totalMarathonGames={marathonGamesList.length}
-                      myHasFinished={myHasFinished}
-                      isLive={isLive}
-                      onPreview={handlePreview}
-                      canPreviewAll={
-                        selectedChallenge.creator_id === effectiveUser?.id &&
-                        !!selectedChallenge.is_custom_word
-                      }
-                      isExpired={isExpired}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-
             <div className="pt-6 flex flex-col gap-3">
               {isExpired ? (
                 <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
@@ -598,6 +543,62 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </div>
               )}
             </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-2">
+                <h4 className="text-xs font-black uppercase tracking-widest text-white">
+                  Participants ({currentParts} / {maxParts})
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {loadingParticipants && participants.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
+                    <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
+                    <p className="text-xs font-black uppercase tracking-wider text-white">
+                      Fetching participants...
+                    </p>
+                  </div>
+                ) : participantsError ? (
+                  <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
+                    <p className="text-xs font-black uppercase text-red-500">
+                      Failed to load participants
+                    </p>
+                    <p className="text-[10px] text-white font-bold">
+                      {participantsError}
+                    </p>
+                    <button
+                      onClick={retryFetchParticipants}
+                      className="bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-widest text-[9px] px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Retry Connection
+                    </button>
+                  </div>
+                ) : participants.length === 0 ? (
+                  <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
+                    No participants found
+                  </div>
+                ) : (
+                  participants.map((p) => (
+                    <ParticipantItem
+                      key={p.id}
+                      p={p}
+                      isMarathon={isMarathon}
+                      totalMarathonGames={marathonGamesList.length}
+                      myHasFinished={myHasFinished}
+                      isLive={isLive}
+                      onPreview={handlePreview}
+                      canPreviewAll={
+                        selectedChallenge.creator_id === effectiveUser?.id &&
+                        !!selectedChallenge.is_custom_word
+                      }
+                      isExpired={isExpired}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+
 
             <div className="grid grid-cols-2 gap-3">
               {/* Mode / Time Limit */}
