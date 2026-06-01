@@ -4,6 +4,7 @@ import { Clock, Lock } from 'lucide-react';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
+import { useApp } from '../../context/AppContext';
 import { MAX_ATTEMPTS } from '../../constants/game';
 import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
 import { supabase } from '../../lib/supabaseClient';
@@ -113,6 +114,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish
 }: MarathonGameplayProps) {
     const { participants, setPreviewParticipant, setPreviewMarathonGameIndex } = useChallengeContext();
+    const { date: appDate } = useApp();
     const [selectedGameIndex, setSelectedGameIndex] = useState<number | null>(null);
 
     const onBack = useCallback(() => setSelectedGameIndex(null), []);
@@ -219,10 +221,27 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     }, [challenge.created_at, challenge.expires_at]);
 
     const currentDay = useMemo(() => {
-        const created = new Date(challenge.created_at).getTime();
-        const elapsedHours = (Date.now() - created) / (1000 * 60 * 60);
-        return Math.floor(elapsedHours / 24) + 1;
-    }, [challenge.created_at]);
+        if (!appDate) return 1;
+        try {
+            // Parse challenge creation date formatted to Africa/Lagos timezone (YYYY-MM-DD)
+            const createdLagos = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Africa/Lagos",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }).format(new Date(challenge.created_at));
+
+            const createdDate = new Date(createdLagos + "T00:00:00");
+            const currentDate = new Date(appDate + "T00:00:00");
+            const diffMs = currentDate.getTime() - createdDate.getTime();
+            return Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+        } catch (e) {
+            console.error("Failed to compute calendar currentDay", e);
+            const created = new Date(challenge.created_at).getTime();
+            const elapsedHours = (Date.now() - created) / (1000 * 60 * 60);
+            return Math.floor(elapsedHours / 24) + 1;
+        }
+    }, [challenge.created_at, appDate]);
 
     if (selectedGameIndex !== null) {
         return (
