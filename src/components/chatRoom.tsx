@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
+import { useConfirmation } from "../hooks/useConfirmation";
 
 // Sub-components
 import ChatHeader from "./chat/ChatHeader";
@@ -14,11 +15,14 @@ import MessageInput from "./chat/MessageInput";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
     const { setUnreadCount } = useApp();
+    const { ask } = useConfirmation();
     const {
         messages,
         sendMessage,
         reactToMessage,
         sendVoiceMessage,
+        editMessage,
+        deleteMessage,
         typingUsers,
         setTyping,
         markAsRead,
@@ -176,6 +180,19 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     users={users}
                                     onReact={(emoji) => reactToMessage(msg.id, emoji)}
                                     currentUserId={user.id}
+                                    onEdit={(newContent) => editMessage(msg.id, newContent)}
+                                    onDelete={async () => {
+                                        const confirmed = await ask({
+                                            title: "Delete Message",
+                                            message: "Are you sure you want to delete this message? This action cannot be undone.",
+                                            confirmLabel: "Delete",
+                                            cancelLabel: "Cancel",
+                                            type: "danger"
+                                        });
+                                        if (confirmed) {
+                                            await deleteMessage(msg.id);
+                                        }
+                                    }}
                                 />
                             </div>
                         );

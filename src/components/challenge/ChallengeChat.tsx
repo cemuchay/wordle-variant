@@ -1,17 +1,185 @@
 import { useEffect, useRef, useState, memo, useMemo, useCallback } from "react";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { type ChallengeMessage } from "../../hooks/useChallengeChat";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
+import { useConfirmation } from "../../hooks/useConfirmation";
 
 interface ChallengeChatProps {
   messages: ChallengeMessage[];
   sendMessage: (content: string) => Promise<void>;
+  editMessage: (id: string, newContent: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
   typingUsers: string[];
   setTyping: (isTyping: boolean) => void;
   effectiveUser: any;
   loading?: boolean;
   participants: ChallengeParticipant[];
 }
+
+interface ChallengeChatMessageProps {
+  msg: ChallengeMessage;
+  isMe: boolean;
+  usernames: string[];
+  avatarUrl?: string;
+  senderColor: string;
+  onEdit: (newContent: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}
+
+const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
+
+const ChallengeChatMessage = memo(function ChallengeChatMessage({
+  msg,
+  isMe,
+  usernames,
+  avatarUrl,
+  senderColor,
+  onEdit,
+  onDelete
+}: ChallengeChatMessageProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.content);
+
+  const isWithinTimeLimit = useMemo(() => {
+    const elapsed = Date.now() - new Date(msg.created_at).getTime();
+    return elapsed < 5 * 60 * 1000;
+  }, [msg.created_at]);
+
+  const isEditable = isMe && !msg.is_deleted && isWithinTimeLimit;
+
+  return (
+    <div
+      className={`flex flex-col max-w-[85%] ${isMe ? "ml-auto items-end animate-in slide-in-from-right-3 duration-200" : "items-start animate-in slide-in-from-left-3 duration-200"} mb-4 relative group`}
+    >
+      <div className={`flex items-center gap-2 mb-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+        {!msg.is_deleted && !isEditing && isEditable && (
+          <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 transition-all bg-black/25 rounded-md px-1 py-0.5 border border-white/5">
+            <button
+              type="button"
+              onClick={() => {
+                setEditText(msg.content);
+                setIsEditing(true);
+              }}
+              className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+              title="Edit message"
+            >
+              <Pencil size={13} className="text-blue-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm("Delete this message?")) {
+                  onDelete();
+                }
+              }}
+              className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+              title="Delete message"
+            >
+              <Trash2 size={13} className="text-red-400" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`relative p-3 px-4 shadow-lg transition-all text-left ${
+          isMe
+            ? "bg-[#005c4b] text-white rounded-2xl rounded-tr-none"
+            : "bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]"
+        }`}
+      >
+        {/* Sender profile header inside the bubble container */}
+        <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>
+          {avatarUrl ? (
+            <img 
+              src={avatarUrl} 
+              className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform" 
+              alt="avatar" 
+              onClick={(e) => {
+                if (msg.sender_id) {
+                  e.stopPropagation();
+                  window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.sender_id } }));
+                }
+              }}
+            />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[7px] font-black uppercase text-white">
+              {msg.sender_name?.substring(0, 2) || "??"}
+            </div>
+          )}
+          <span 
+            className="text-[9px] font-black uppercase tracking-wider cursor-pointer hover:underline text-left"
+            style={{ 
+              color: isMe 
+                ? '#82e0aa'
+                : senderColor
+            }}
+            onClick={(e) => {
+              if (msg.sender_id) {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.sender_id } }));
+              }
+            }}
+          >
+            {isMe ? 'You' : msg.sender_name}
+          </span>
+        </div>
+
+        <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap wrap-break-word text-left">
+          {msg.is_deleted ? (
+            <span className="text-white/40 italic font-medium flex items-center gap-1">
+              🚫 This message was deleted
+            </span>
+          ) : isEditing ? (
+            <div className="flex flex-col gap-2 min-w-[200px] mt-1">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="w-full bg-black/25 text-white border border-white/15 rounded-lg p-1.5 text-xs outline-none focus:border-correct resize-none font-sans"
+                rows={2}
+                maxLength={300}
+              />
+              <div className="flex justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="text-white/60 hover:text-white text-[10px] font-black uppercase bg-white/5 px-2.5 py-1 rounded cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (editText.trim() && editText.trim() !== msg.content) {
+                      await onEdit(editText.trim());
+                    }
+                    setIsEditing(false);
+                  }}
+                  className="text-black bg-correct hover:brightness-110 text-[10px] font-black uppercase px-2.5 py-1 rounded cursor-pointer transition-all"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            formatMessageContent(msg.content, isMe, usernames)
+          )}
+        </div>
+
+        <div className="text-[10px] mt-1 flex font-mono font-bold items-center gap-1.5 justify-end text-white/60 text-left">
+          {msg.is_edited && !msg.is_deleted && (
+            <span className="text-[8px] font-black uppercase tracking-wider text-white/40 italic">(edited)</span>
+          )}
+          {new Date(msg.created_at).toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const formatMessageContent = (
   content: string,
@@ -98,12 +266,15 @@ const formatMessageContent = (
 export const ChallengeChat = memo(function ChallengeChat({
   messages,
   sendMessage,
+  editMessage,
+  deleteMessage,
   typingUsers,
   setTyping,
   effectiveUser,
   loading = false,
   participants,
 }: ChallengeChatProps) {
+  const { ask } = useConfirmation();
   const [inputText, setInputText] = useState("");
 
   // Extract all unique usernames in this challenge room (including ourselves)
@@ -186,7 +357,10 @@ export const ChallengeChat = memo(function ChallengeChat({
   );
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-[450px] space-y-3 relative overflow-hidden">
+    <div 
+      className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-[450px] space-y-3 relative overflow-hidden"
+      style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+    >
       <div className="absolute top-0 right-0 w-24 h-24 bg-correct/5 blur-2xl -mr-12 -mt-12 pointer-events-none" />
 
       {/* Header */}
@@ -225,31 +399,33 @@ export const ChallengeChat = memo(function ChallengeChat({
               (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id)
             );
 
+            const participant = participants?.find(p => p.user_id === msg.sender_id || p.guest_id === msg.guest_sender_id);
+            const avatarUrl = participant?.profiles?.avatar_url || '';
+            const participantIndex = participants?.findIndex(p => p.user_id === msg.sender_id || p.guest_id === msg.guest_sender_id);
+            const senderColor = MENTION_COLORS[participantIndex % MENTION_COLORS.length] || '#38bdf8';
+
             return (
-              <div
+              <ChallengeChatMessage
                 key={msg.id}
-                className={`flex flex-col max-w-[85%] ${isMe ? "ml-auto items-end animate-in slide-in-from-right-3 duration-200" : "items-start animate-in slide-in-from-left-3 duration-200"}`}
-              >
-                <span className="text-[8px] text-white/80 font-black uppercase mb-0.5 px-1 tracking-wider">
-                  {msg.sender_name} {isMe && "(You)"}
-                </span>
-                <div
-                  className={`px-3 py-2 text-xs font-semibold wrap-break-word leading-relaxed rounded-2xl ${
-                    isMe
-                      ? "bg-correct text-black rounded-tr-none shadow-md shadow-correct/5 font-bold"
-                      : "bg-white/10 text-white rounded-tl-none border border-white/5"
-                  }`}
-                >
-                  {formatMessageContent(msg.content, isMe, usernames)}
-                </div>
-                <span className="text-[7px] text-white/20 px-1 mt-0.5 font-bold tabular-nums">
-                  {new Date(msg.created_at).toLocaleTimeString(undefined, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
-                </span>
-              </div>
+                msg={msg}
+                isMe={isMe}
+                usernames={usernames}
+                avatarUrl={avatarUrl}
+                senderColor={senderColor}
+                onEdit={(newContent) => editMessage(msg.id, newContent)}
+                onDelete={async () => {
+                  const confirmed = await ask({
+                    title: "Delete Message",
+                    message: "Are you sure you want to delete this message? This action cannot be undone.",
+                    confirmLabel: "Delete",
+                    cancelLabel: "Cancel",
+                    type: "danger"
+                  });
+                  if (confirmed) {
+                    await deleteMessage(msg.id);
+                  }
+                }}
+              />
             );
           })
         )}

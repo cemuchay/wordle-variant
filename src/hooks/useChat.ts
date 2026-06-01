@@ -15,7 +15,9 @@ export interface Message {
    is_read: boolean;
    profiles: { username: string; avatar_url: string; id: string };
    reactions?: Record<string, string>; // userId -> emoji
-   voice_url?: string;
+   voice_url?: string | null;
+   is_edited?: boolean;
+   is_deleted?: boolean;
 }
 
 export const useChat = (userId: string) => {
@@ -222,6 +224,67 @@ export const useChat = (userId: string) => {
       }
    };
 
+   const editMessage = async (messageId: string, newContent: string) => {
+      if (!userId || !newContent.trim()) return;
+      const msg = messages.find(m => m.id === messageId);
+      if (!msg) return;
+
+      // 5-minute check
+      const elapsed = Date.now() - new Date(msg.created_at).getTime();
+      if (elapsed > 5 * 60 * 1000) {
+         console.warn("Message cannot be edited after 5 minutes");
+         return;
+      }
+
+      // Optimistic update
+      useAppStore.getState().updateGlobalMessage({ id: messageId, content: newContent, is_edited: true });
+
+      const { error } = await supabase
+         .from("messages")
+         .update({ content: newContent, is_edited: true })
+         .eq("id", messageId);
+
+      if (error) {
+         console.error("Failed to edit message:", error);
+      }
+   };
+
+   const deleteMessage = async (messageId: string) => {
+      if (!userId) return;
+      const msg = messages.find(m => m.id === messageId);
+      if (!msg) return;
+
+      // 5-minute check
+      const elapsed = Date.now() - new Date(msg.created_at).getTime();
+      if (elapsed > 5 * 60 * 1000) {
+         console.warn("Message cannot be deleted after 5 minutes");
+         return;
+      }
+
+      // Optimistic update
+      useAppStore.getState().updateGlobalMessage({ 
+         id: messageId, 
+         content: "🚫 This message was deleted", 
+         is_deleted: true, 
+         voice_url: null, 
+         reactions: {} 
+      });
+
+      const { error } = await supabase
+         .from("messages")
+         .update({ 
+            content: "🚫 This message was deleted", 
+            is_deleted: true, 
+            voice_url: null, 
+            reactions: {} 
+         })
+         .eq("id", messageId);
+
+      if (error) {
+         console.error("Failed to delete message:", error);
+      }
+   };
+
    const markAsRead = async (messageId: string) => {
       safeLocalStorage.setItem(`lastSeen_${userId}`, new Date().toISOString());
       setUnreadCount(0);
@@ -244,5 +307,5 @@ export const useChat = (userId: string) => {
       fetchUsers();
    }, []);
 
-   return { messages, sendMessage, reactToMessage, sendVoiceMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
+   return { messages, sendMessage, reactToMessage, sendVoiceMessage, editMessage, deleteMessage, typingUsers, setTyping, markAsRead, firstUnreadId, users };
 };

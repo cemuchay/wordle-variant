@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
-import { Reply, CheckCheck, Smile, Play, Pause } from "lucide-react";
+import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 
@@ -13,6 +13,8 @@ interface ChatMessageProps {
     users: { username: string; avatar_url: string; id: string }[];
     onReact: (emoji: string | null) => void;
     currentUserId: string;
+    onEdit: (newContent: string) => Promise<void>;
+    onDelete: () => Promise<void>;
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
@@ -104,9 +106,13 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId }: ChatMessageProps) => {
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete }: ChatMessageProps) => {
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
+    
+    // Inline edit and menu states
+    const [isEditing, setIsEditing] = useState(false);
+    const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
 
     // Transform x position to reply icon properties (swipe to right)
@@ -118,6 +124,13 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
         const userIndex = users.findIndex(u => u.username === msg.profiles?.username);
         return MENTION_COLORS[userIndex % MENTION_COLORS.length] || '#38bdf8';
     }, [users, msg.profiles?.username]);
+
+    const isWithinTimeLimit = useMemo(() => {
+        const elapsed = Date.now() - new Date(msg.created_at).getTime();
+        return elapsed < 5 * 60 * 1000; // 5 minutes
+    }, [msg.created_at]);
+
+    const isEditable = isMe && !msg.is_deleted && isWithinTimeLimit;
 
     const renderedContent = useMemo(() => {
         const content = msg.content;
@@ -201,15 +214,17 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     return (
         <div className="relative group overflow-visible">
             {/* Swipe Reply Indicator */}
-            <motion.div
-                style={{ opacity: replyIconOpacity, scale: replyIconScale, x: replyIconTranslateX }}
-                className="absolute left-0 top-1/2 -translate-y-1/2 text-correct pointer-events-none"
-            >
-                <Reply size={24} />
-            </motion.div>
+            {(!msg.is_deleted && !isEditing) && (
+                <motion.div
+                    style={{ opacity: replyIconOpacity, scale: replyIconScale, x: replyIconTranslateX }}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 text-correct pointer-events-none"
+                >
+                    <Reply size={24} />
+                </motion.div>
+            )}
 
             <motion.div
-                drag="x"
+                drag={(!msg.is_deleted && !isEditing) ? "x" : false}
                 dragDirectionLock
                 dragConstraints={{ left: 0, right: 0 }}
                 dragSnapToOrigin
@@ -227,7 +242,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                 onMouseEnter={() => !isMe && !msg.is_read && onMarkAsRead(msg.id)}
             >
                 {/* Reply Preview */}
-                {replyMsg && (
+                {replyMsg && !msg.is_deleted && (
                     <div className={`text-[10px] mb-1.5 flex items-center gap-2 text-white/60 bg-white/5 px-3 py-1.5 rounded-t-xl border-l-2 border-correct/40 max-w-[80%] ${isMe ? 'flex-row-reverse' : ''}`}>
                         <Reply size={10} className="text-correct shrink-0" />
                         <span className="opacity-60 truncate">
@@ -237,23 +252,54 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                 )}
 
                 <div className={`flex items-center gap-2 mb-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Action buttons (Reply & React) */}
-                    <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 transition-all bg-black/25 rounded-md px-1 py-0.5 border border-white/5">
-                        <button
-                            type="button"
-                            onClick={() => onReply(msg)}
-                            className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
-                        >
-                            <Reply size={13} className="text-correct" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowReactionsMenu(!showReactionsMenu)}
-                            className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer relative"
-                        >
-                            <Smile size={13} className="text-white" />
-                        </button>
-                    </div>
+                    {/* Action buttons (Reply, React, Edit, Delete) */}
+                    {!msg.is_deleted && !isEditing && (
+                        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 transition-all bg-black/25 rounded-md px-1 py-0.5 border border-white/5">
+                            <button
+                                type="button"
+                                onClick={() => onReply(msg)}
+                                className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+                                title="Reply"
+                            >
+                                <Reply size={13} className="text-correct" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowReactionsMenu(!showReactionsMenu)}
+                                className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer relative"
+                                title="React"
+                            >
+                                <Smile size={13} className="text-white" />
+                            </button>
+                            {isEditable && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setEditText(msg.content);
+                                            setIsEditing(true);
+                                        }}
+                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+                                        title="Edit message"
+                                    >
+                                        <Pencil size={13} className="text-blue-400" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (confirm("Delete this message?")) {
+                                                onDelete();
+                                            }
+                                        }}
+                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+                                        title="Delete message"
+                                    >
+                                        <Trash2 size={13} className="text-red-400" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {/* Reactions Quick Picker popover */}
                     <AnimatePresence>
@@ -322,7 +368,42 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     </div>
 
                     <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap wrap-break-word text-left">
-                        {msg.voice_url ? (
+                        {msg.is_deleted ? (
+                            <span className="text-white/40 italic font-medium flex items-center gap-1">
+                                🚫 This message was deleted
+                            </span>
+                        ) : isEditing ? (
+                            <div className="flex flex-col gap-2 min-w-[200px] mt-1">
+                                <textarea
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="w-full bg-black/25 text-white border border-white/15 rounded-lg p-1.5 text-xs outline-none focus:border-correct resize-none font-sans"
+                                    rows={2}
+                                    maxLength={300}
+                                />
+                                <div className="flex justify-end gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditing(false)}
+                                        className="text-white/60 hover:text-white text-[10px] font-black uppercase bg-white/5 px-2.5 py-1 rounded cursor-pointer transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (editText.trim() && editText.trim() !== msg.content) {
+                                                await onEdit(editText.trim());
+                                            }
+                                            setIsEditing(false);
+                                        }}
+                                        className="text-black bg-correct hover:brightness-110 text-[10px] font-black uppercase px-2.5 py-1 rounded cursor-pointer transition-all"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        ) : msg.voice_url ? (
                             <AudioPlayer url={msg.voice_url} />
                         ) : (
                             renderedContent
@@ -330,6 +411,9 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     </div>
 
                     <div className={`text-[10px] mt-1 flex font-mono font-bold items-center gap-1.5 justify-end text-white/60 text-left`}>
+                        {msg.is_edited && !msg.is_deleted && (
+                            <span className="text-[8px] font-black uppercase tracking-wider text-white/40 italic">(edited)</span>
+                        )}
                         {time}
                         {isMe && (
                             <CheckCheck
@@ -340,7 +424,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     </div>
 
                     {/* Reactions Count Display */}
-                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                    {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
                         <div className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30`}>
                             {Array.from(new Set(Object.values(msg.reactions))).slice(0, 3).map((emoji, idx) => (
                                 <span key={idx} className="text-[10px]">{emoji as string}</span>
