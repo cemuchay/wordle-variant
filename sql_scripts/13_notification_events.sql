@@ -123,6 +123,7 @@ CREATE OR REPLACE FUNCTION public.handle_marathon_game_completed()
 RETURNS TRIGGER AS $$
 DECLARE
     ch_id UUID;
+    ch_is_bot_marathon BOOLEAN;
     player_id UUID;
     player_username VARCHAR;
     msg_str TEXT;
@@ -139,6 +140,16 @@ BEGIN
     WHERE id = NEW.participation_id;
 
     IF ch_id IS NULL OR player_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Check if challenge is bot marathon
+    SELECT is_bot_marathon INTO ch_is_bot_marathon
+    FROM public.challenges
+    WHERE id = ch_id;
+
+    -- Return early if this is a bot marathon challenge
+    IF COALESCE(ch_is_bot_marathon, FALSE) THEN
         RETURN NEW;
     END IF;
 

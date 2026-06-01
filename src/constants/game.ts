@@ -1,7 +1,7 @@
 export const MAX_ATTEMPTS = 6;
-export const WORD_LENGTHS = [3, 4, 5, 6, 7] as const;
+export const WORD_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10] as const;
 export const MIN_WORD_LENGTH = 3;
-export const MAX_WORD_LENGTH = 7;
+export const MAX_WORD_LENGTH = 10;
 export const DEFAULT_WORD_LENGTH = 5;
 
 export const SCORING = {
