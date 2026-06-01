@@ -46,6 +46,8 @@ interface AppState {
     unreadCount: number;
     challengeUnreadCount: number;
     activeCall: VoiceCallState | null;
+    globalMessages: any[];
+    isGlobalMessagesLoaded: boolean;
 
     // Actions
     triggerToast: (message: string, duration?: number) => void;
@@ -60,6 +62,9 @@ interface AppState {
     setStats: (stats: GameStats) => void;
     setMyParticipations: (ids: string[]) => void;
     setIsLoadingDate: (loading: boolean) => void;
+    setGlobalMessages: (messages: any[]) => void;
+    addGlobalMessage: (message: any) => void;
+    updateGlobalMessage: (message: any) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -75,6 +80,8 @@ export const useAppStore = create<AppState>((set) => ({
     unreadCount: 0,
     challengeUnreadCount: 0,
     activeCall: null,
+    globalMessages: [],
+    isGlobalMessagesLoaded: false,
 
     // Actions
     triggerToast: (message, duration) => set({ toast: { show: true, message, duration } }),
@@ -89,4 +96,15 @@ export const useAppStore = create<AppState>((set) => ({
     setStats: (stats) => set({ stats }),
     setMyParticipations: (myParticipations) => set({ myParticipations }),
     setIsLoadingDate: (isLoadingDate) => set({ isLoadingDate }),
+    setGlobalMessages: (globalMessages) => set({ globalMessages, isGlobalMessagesLoaded: true }),
+    addGlobalMessage: (msg) => set((state) => {
+        const exists = state.globalMessages.some((m) => m.id === msg.id);
+        if (exists) return {
+            globalMessages: state.globalMessages.map((m) => m.id === msg.id ? { ...m, ...msg } : m)
+        };
+        return { globalMessages: [...state.globalMessages, msg] };
+    }),
+    updateGlobalMessage: (msg) => set((state) => ({
+        globalMessages: state.globalMessages.map((m) => m.id === msg.id ? { ...m, ...msg } : m)
+    })),
 }));

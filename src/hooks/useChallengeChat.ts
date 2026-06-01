@@ -10,6 +10,10 @@ export interface ChallengeMessage {
     sender_name: string;
     content: string;
     created_at: string;
+    is_edited?: boolean;
+    is_deleted?: boolean;
+    reactions?: Record<string, string>;
+    voice_url?: string | null;
 }
 
 export const useChallengeChat = (challengeId: string | undefined, effectiveUser: any, isGuest: boolean) => {
@@ -52,16 +56,21 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         const channel = supabase
             .channel(channelName)
             .on('postgres_changes', {
-                event: 'INSERT',
+                event: '*',
                 schema: 'public',
                 table: 'challenge_messages',
                 filter: `challenge_id=eq.${challengeId}`
             }, (payload) => {
-                const newMsg = payload.new as ChallengeMessage;
-                setMessages(prev => {
-                    if (prev.some(m => m.id === newMsg.id)) return prev;
-                    return [...prev, newMsg];
-                });
+                if (payload.eventType === 'INSERT') {
+                    const newMsg = payload.new as ChallengeMessage;
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === newMsg.id)) return prev;
+                        return [...prev, newMsg];
+                    });
+                } else if (payload.eventType === 'UPDATE') {
+                    const updatedMsg = payload.new as ChallengeMessage;
+                    setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+                }
             })
             .on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState();
@@ -107,7 +116,11 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => {
             isCurrentlyTypingLocally.current = false;
-            channelRef.current?.track({ isTyping: false, username, ts: Date.now() });
+            channelRef.current?.track({
+                isTyping: false,
+                username,
+                ts: Date.now(),
+            });
         }, 2000);
     }, [effectiveUser]);
 
@@ -147,5 +160,51 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         }
     }, [challengeId, effectiveUser, isGuest]);
 
-    return { messages, sendMessage, loading, typingUsers, setTyping };
+    const editMessage = useCallback(async (messageId: string, newContent: string) => {
+        if (!newContent.trim()) return;
+        const msg = messages.find(m => m.id === messageId);
+        if (!msg) return;
+
+        const elapsed = Date.now() - new Date(msg.created_at).getTime();
+        if (elapsed > 5 * 60 * 1000) return;
+
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
+
+        try {
+            const { error } = await supabase
+                .from('challenge_messages')
+                .update({ content: newContent, is_edited: true })
+                .eq('id', messageId);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to edit challenge message:', err);
+        }
+    }, [messages]);
+
+    const deleteMessage = useCallback(async (messageId: string) => {
+        const msg = messages.find(m => m.id === messageId);
+        if (!msg) return;
+
+        const elapsed = Date.now() - new Date(msg.created_at).getTime();
+        if (elapsed > 5 * 60 * 1000) return;
+
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: '🚫 This message was deleted', is_deleted: true, voice_url: null, reactions: {} } : m));
+
+        try {
+            const { error } = await supabase
+                .from('challenge_messages')
+                .update({ 
+                    content: '🚫 This message was deleted', 
+                    is_deleted: true, 
+                    voice_url: null, 
+                    reactions: {} 
+                })
+                .eq('id', messageId);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to delete challenge message:', err);
+        }
+    }, [messages]);
+
+    return { messages, sendMessage, editMessage, deleteMessage, loading, typingUsers, setTyping };
 };

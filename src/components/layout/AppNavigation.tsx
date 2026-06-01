@@ -69,7 +69,11 @@ export const AppNavigation = ({
 
                             {/* Badge */}
                             {item.badge !== undefined && item.badge > 0 && (
-                                <span className="absolute top-0.5 right-1.5 sm:right-3 bg-correct text-black text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-black shadow-[0_0_10px_rgba(46,204,113,0.5)] animate-pulse">
+                                <span className={`absolute top-0.5 right-1.5 sm:right-3 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-black animate-pulse ${
+                                    item.id === 'chat'
+                                        ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.8)]'
+                                        : 'bg-correct text-black shadow-[0_0_10px_rgba(46,204,113,0.5)]'
+                                }`}>
                                     {item.badge}
                                 </span>
                             )}
