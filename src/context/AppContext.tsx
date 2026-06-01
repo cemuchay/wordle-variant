@@ -392,35 +392,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .map(u => ({ challengeId: u.activeVoiceRoomId!, user: u }));
     }, [onlineUsers, user?.id, myParticipations]);
 
-    // Global chat unread message listener & initial count fetch
+    // Global chat background sync: messages pre-fetching and real-time subscription
     useEffect(() => {
         if (!user?.id) return;
 
-        const fetchInitialUnread = async () => {
-            const lastSeen = safeLocalStorage.getItem(`lastSeen_${user.id}`) || new Date(0).toISOString();
+        const fetchMessages = async () => {
             const { data } = await supabase
                 .from('messages')
-                .select('id')
-                .neq('user_id', user.id)
-                .gt('created_at', lastSeen);
+                .select('*, profiles(username, avatar_url)')
+                .order('created_at', { ascending: true });
             
             if (data) {
-                setUnreadCount(data.length);
+                useAppStore.getState().setGlobalMessages(data);
+                const lastSeen = safeLocalStorage.getItem(`lastSeen_${user.id}`) || new Date(0).toISOString();
+                const unreads = data.filter(
+                    (m) => m.user_id !== user.id && m.created_at > lastSeen
+                );
+                setUnreadCount(unreads.length);
             }
         };
 
-        fetchInitialUnread();
+        fetchMessages();
 
         const channel = supabase
-            .channel('global_unread_messages')
+            .channel('global_chat_channel')
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'messages' },
-                (payload) => {
-                    const newMessage = payload.new as any;
-                    const currentIsChatOpen = useAppStore.getState().isChatOpen;
-                    if (newMessage.user_id !== user.id && !currentIsChatOpen) {
-                        setUnreadCount(useAppStore.getState().unreadCount + 1);
+                { event: '*', schema: 'public', table: 'messages' },
+                async (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        const newMessage = payload.new as any;
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('id, username, avatar_url')
+                            .eq('id', newMessage.user_id)
+                            .single();
+                        
+                        const messageWithProfile = { ...newMessage, profiles: profile };
+                        useAppStore.getState().addGlobalMessage(messageWithProfile);
+
+                        const currentIsChatOpen = useAppStore.getState().isChatOpen;
+                        if (newMessage.user_id !== user.id && !currentIsChatOpen) {
+                            setUnreadCount(useAppStore.getState().unreadCount + 1);
+                        }
+                    } else if (payload.eventType === 'UPDATE') {
+                        useAppStore.getState().updateGlobalMessage(payload.new);
                     }
                 }
             )

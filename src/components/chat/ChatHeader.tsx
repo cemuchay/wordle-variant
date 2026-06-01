@@ -15,7 +15,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
     const otherTypingUsers = typingUsers.filter(name => name !== currentUserName);
 
     return (
-        <div className="p-5 border-b border-white/5 bg-white/5 flex justify-between items-center backdrop-blur-md">
+        <div className="p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md">
             <div className="flex items-center gap-4">
                 <div className="relative">
                     <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-correct to-emerald-400 flex items-center justify-center text-black shadow-lg shadow-correct/20">
@@ -52,7 +52,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                                     initial={{ opacity: 0, y: 5 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -5 }}
-                                    className="text-[9px] text-gray-500 font-bold uppercase tracking-widest"
+                                    className="text-[9px] text-white/60 font-bold uppercase tracking-widest"
                                 >
                                     Live Now
                                 </motion.p>
@@ -72,7 +72,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                 {onClose && (
                     <button
                         onClick={onClose}
-                        className="p-2 text-gray-500 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5"
+                        className="p-2 text-white/60 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/5"
                         title="Close Chat"
                     >
                         <X size={18} />
