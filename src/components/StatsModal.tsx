@@ -8,6 +8,7 @@ import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
 import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
+import { LeaderboardSkeleton } from './common/Skeletons';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -426,10 +427,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                   </button>
                 </div>
               ) : loading ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-2">
-                  <Loader2 className="animate-spin text-gray-600" size={24} />
-                  <span className="text-[10px] text-gray-600 uppercase font-bold">Ranking Players...</span>
-                </div>
+                <LeaderboardSkeleton />
               ) : (
                 <div className="space-y-2">
                   {leaderboardError && leaderboard.length > 0 && (
