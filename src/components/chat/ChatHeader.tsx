@@ -17,8 +17,8 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
     return (
         <div className="p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md">
             <div className="flex items-center gap-4">
-                <div className="relative">
-                    <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-correct to-emerald-400 flex items-center justify-center text-black shadow-lg shadow-correct/20">
+                <div className="relative ms-8">
+                    <div className="w-8 h-8 rounded-2xl bg-linear-to-tr from-correct to-emerald-400 flex items-center justify-center text-black shadow-lg shadow-correct/20">
                         <span className="font-black text-sm">#</span>
                     </div>
                     <motion.div
@@ -28,7 +28,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                     />
                 </div>
                 <div>
-                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Variant ChatRoom (24h)</h3>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Variant ChatRoom (24h)</h4>
                     <div className="h-4 flex items-center">
                         <AnimatePresence mode="wait">
                             {otherTypingUsers.length > 0 ? (

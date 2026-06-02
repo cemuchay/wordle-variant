@@ -25,7 +25,7 @@ export interface Message {
 export interface ChatGroup {
    id: string;
    name: string;
-   type: 'general' | 'game_analysis' | 'bugs_features' | 'dm' | 'custom';
+   type: "general" | "game_analysis" | "bugs_features" | "dm" | "custom";
    created_by?: string;
    created_at: string;
    is_core: boolean;
@@ -58,7 +58,7 @@ const rc4EncryptDecrypt = (key: string, str: string): string => {
    return res;
 };
 
-const getDMRoomKey = (user1Id: string, user2Id: string): string => {
+export const getDMRoomKey = (user1Id: string, user2Id: string): string => {
    const sorted = [user1Id, user2Id].sort().join("-");
    const salt = "wordle-variant-e2ee-secret";
    return `${sorted}-${salt}`;
@@ -84,7 +84,12 @@ export const decryptDM = (ciphertext: string, key: string): string => {
 };
 
 // --- Image Compression Helper ---
-export const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<Blob> => {
+export const compressImage = (
+   file: File,
+   maxWidth = 800,
+   maxHeight = 800,
+   quality = 0.75,
+): Promise<Blob> => {
    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -120,7 +125,7 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quali
                   else reject(new Error("Canvas compression failed"));
                },
                "image/jpeg",
-               quality
+               quality,
             );
          };
          img.onerror = (err) => reject(err);
@@ -130,9 +135,27 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quali
 };
 
 const defaultCores: ChatGroup[] = [
-   { id: '00000000-0000-0000-0000-000000000001', name: 'General', type: 'general', is_core: true, created_at: new Date(0).toISOString() },
-   { id: '00000000-0000-0000-0000-000000000002', name: 'Game Analysis', type: 'game_analysis', is_core: true, created_at: new Date(0).toISOString() },
-   { id: '00000000-0000-0000-0000-000000000003', name: 'Bugs & Features', type: 'bugs_features', is_core: true, created_at: new Date(0).toISOString() }
+   {
+      id: "00000000-0000-0000-0000-000000000001",
+      name: "General",
+      type: "general",
+      is_core: true,
+      created_at: new Date(0).toISOString(),
+   },
+   {
+      id: "00000000-0000-0000-0000-000000000002",
+      name: "Game Analysis",
+      type: "game_analysis",
+      is_core: true,
+      created_at: new Date(0).toISOString(),
+   },
+   {
+      id: "00000000-0000-0000-0000-000000000003",
+      name: "Bugs & Features",
+      type: "bugs_features",
+      is_core: true,
+      created_at: new Date(0).toISOString(),
+   },
 ];
 
 // --- Core Custom Hook ---
@@ -140,11 +163,15 @@ export const useChat = (userId: string) => {
    const globalMessages = useAppStore((state) => state.globalMessages);
    const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
    const [invites, setInvites] = useState<any[]>([]);
-   const [activeRoomId, setActiveRoomId] = useState<string>("00000000-0000-0000-0000-000000000001");
-   const [users, setUsers] = useState<{ username: string; avatar_url: string; id: string }[]>([]);
+   const [activeRoomId, setActiveRoomId] = useState<string>(
+      "00000000-0000-0000-0000-000000000001",
+   );
+   const [users, setUsers] = useState<
+      { username: string; avatar_url: string; id: string }[]
+   >([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
    const [dailyGuesses, setDailyGuesses] = useState<any[]>([]);
-   
+
    const [typingUsers, setTypingUsers] = useState<string[]>([]);
    const channelRef = useRef<any>(null);
    const { setUnreadCount, date } = useApp();
@@ -152,11 +179,18 @@ export const useChat = (userId: string) => {
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
 
-   const activeRoom = groups.find(g => g.id === activeRoomId) || null;
+   useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFirstUnreadId(null);
+   }, [activeRoomId]);
 
-   const getLastSeen = useCallback(() =>
-      safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) || new Date(0).toISOString(), 
-      [userId, activeRoomId]
+   const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
+
+   const getLastSeen = useCallback(
+      () =>
+         safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) ||
+         new Date(0).toISOString(),
+      [userId, activeRoomId],
    );
 
    // Check if user played today (unlock Game Analysis)
@@ -203,19 +237,22 @@ export const useChat = (userId: string) => {
       // 2. Fetch custom/dm memberships
       const { data: memberData } = await supabase
          .from("chat_group_members")
-         .select("group_id, status, chat_groups(*, creator:profiles!created_by(username))")
+         .select(
+            "group_id, status, chat_groups(*, creator:profiles!created_by(username))",
+         )
          .eq("user_id", userId);
 
-      const activeGroups: ChatGroup[] = coreData && coreData.length > 0
-         ? coreData.map(cg => ({
-            id: cg.id,
-            name: cg.name,
-            type: cg.type,
-            created_by: cg.created_by,
-            created_at: cg.created_at,
-            is_core: true
-         }))
-         : defaultCores;
+      const activeGroups: ChatGroup[] =
+         coreData && coreData.length > 0
+            ? coreData.map((cg) => ({
+                 id: cg.id,
+                 name: cg.name,
+                 type: cg.type,
+                 created_by: cg.created_by,
+                 created_at: cg.created_at,
+                 is_core: true,
+              }))
+            : defaultCores;
 
       const incomingInvites: any[] = [];
 
@@ -228,7 +265,7 @@ export const useChat = (userId: string) => {
                incomingInvites.push({
                   id: cg.id,
                   name: cg.name,
-                  creator: cg.creator?.username || "Someone"
+                  creator: cg.creator?.username || "Someone",
                });
             } else if (m.status === "joined") {
                // If type is DM, resolve the dm partner's profile
@@ -245,7 +282,11 @@ export const useChat = (userId: string) => {
 
                   if (partner && partner.profiles) {
                      const p = partner.profiles as any;
-                     dmPartner = { id: partner.user_id, username: p.username, avatar_url: p.avatar_url };
+                     dmPartner = {
+                        id: partner.user_id,
+                        username: p.username,
+                        avatar_url: p.avatar_url,
+                     };
                      groupName = p.username;
                   }
                }
@@ -257,7 +298,7 @@ export const useChat = (userId: string) => {
                   created_by: cg.created_by,
                   created_at: cg.created_at,
                   is_core: false,
-                  dm_partner: dmPartner
+                  dm_partner: dmPartner,
                });
             }
          }
@@ -268,6 +309,7 @@ export const useChat = (userId: string) => {
    }, [userId]);
 
    useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchGroups();
    }, [fetchGroups]);
 
@@ -279,10 +321,15 @@ export const useChat = (userId: string) => {
          .channel("realtime_chat_structures")
          .on(
             "postgres_changes",
-            { event: "*", schema: "public", table: "chat_group_members", filter: `user_id=eq.${userId}` },
+            {
+               event: "*",
+               schema: "public",
+               table: "chat_group_members",
+               filter: `user_id=eq.${userId}`,
+            },
             () => {
                fetchGroups();
-            }
+            },
          )
          .subscribe();
 
@@ -293,11 +340,13 @@ export const useChat = (userId: string) => {
 
    // Filter messages by active group room and decrypt DMs
    const activeMessages = useMemo(() => {
-      const filtered = globalMessages.filter((m) => m.group_id === activeRoomId);
+      const filtered = globalMessages.filter(
+         (m) => m.group_id === activeRoomId,
+      );
 
       if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
          const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
-         return filtered.map(m => {
+         return filtered.map((m) => {
             if (m.content && m.content.startsWith("e2ee:")) {
                return { ...m, content: decryptDM(m.content, key) };
             }
@@ -311,11 +360,21 @@ export const useChat = (userId: string) => {
    useEffect(() => {
       if (!userId) return;
       const lastSeen = getLastSeen();
+      console.log(lastSeen, "lastSeen");
+
       const unreads = activeMessages.filter(
-         (m: any) => m.user_id !== userId && m.created_at > lastSeen
+         (m: any) => m.user_id !== userId && m.created_at > lastSeen,
       );
-      if (unreads.length > 0 && !firstUnreadId) {
-         setFirstUnreadId(unreads[0].id);
+
+      if (unreads.length > 0) {
+         if (!firstUnreadId) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFirstUnreadId(unreads[0].id);
+         }
+      } else {
+         if (firstUnreadId) {
+            setFirstUnreadId(null);
+         }
       }
    }, [userId, activeMessages, getLastSeen, firstUnreadId]);
 
@@ -324,7 +383,9 @@ export const useChat = (userId: string) => {
       if (!userId || !activeRoomId) return;
 
       const channelId = `chat_room_${activeRoomId}`;
-      const existingChannel = supabase.getChannels().find(c => (c as any).topic === `realtime:${channelId}`);
+      const existingChannel = supabase
+         .getChannels()
+         .find((c) => (c as any).topic === `realtime:${channelId}`);
 
       if (existingChannel) {
          supabase.removeChannel(existingChannel);
@@ -341,7 +402,9 @@ export const useChat = (userId: string) => {
 
             Object.keys(state).forEach((key) => {
                const sessions = state[key] as any[];
-               const latest = sessions.sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+               const latest = sessions.sort(
+                  (a, b) => (b.ts || 0) - (a.ts || 0),
+               )[0];
 
                if (latest?.isTyping && latest?.username) {
                   typingNames.add(latest.username);
@@ -366,7 +429,11 @@ export const useChat = (userId: string) => {
       if (!isTyping) {
          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
          isCurrentlyTypingLocally.current = false;
-         channelRef.current.track({ isTyping: false, username, ts: Date.now() });
+         channelRef.current.track({
+            isTyping: false,
+            username,
+            ts: Date.now(),
+         });
          return;
       }
 
@@ -379,12 +446,22 @@ export const useChat = (userId: string) => {
 
       typingTimeoutRef.current = window.setTimeout(() => {
          isCurrentlyTypingLocally.current = false;
-         channelRef.current?.track({ isTyping: false, username, ts: Date.now() });
+         channelRef.current?.track({
+            isTyping: false,
+            username,
+            ts: Date.now(),
+         });
       }, 2000);
    }, []);
 
    // Send Message
-   const sendMessage = async (content: string, replyToId?: string, mentions?: string[], voiceUrl?: string, imageUrl?: string) => {
+   const sendMessage = async (
+      content: string,
+      replyToId?: string,
+      mentions?: string[],
+      voiceUrl?: string,
+      imageUrl?: string,
+   ) => {
       if (!content.trim() && !voiceUrl && !imageUrl) return;
 
       let finalContent = content;
@@ -405,7 +482,8 @@ export const useChat = (userId: string) => {
          voice_url: voiceUrl,
          image_url: imageUrl,
          group_id: activeRoomId,
-         profiles: globalMessages.find(m => m.user_id === userId)?.profiles || { username: 'Me', avatar_url: '', id: userId }
+         profiles: globalMessages.find((m) => m.user_id === userId)
+            ?.profiles || { username: "Me", avatar_url: "", id: userId },
       };
 
       useAppStore.getState().addGlobalMessage(optimisticMessage);
@@ -420,7 +498,7 @@ export const useChat = (userId: string) => {
             is_read: false,
             voice_url: voiceUrl,
             image_url: imageUrl,
-            group_id: activeRoomId
+            group_id: activeRoomId,
          },
       ]);
 
@@ -440,18 +518,24 @@ export const useChat = (userId: string) => {
          const { error: uploadErr } = await supabase.storage
             .from("chat-images")
             .upload(fileName, compressedBlob, {
-               contentType: 'image/jpeg',
-               cacheControl: '3600'
+               contentType: "image/jpeg",
+               cacheControl: "3600",
             });
 
          if (uploadErr) throw uploadErr;
 
-         const { data: { publicUrl } } = supabase.storage
-            .from("chat-images")
-            .getPublicUrl(fileName);
+         const {
+            data: { publicUrl },
+         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
 
          // 3. Send message
-         await sendMessage("[Image]", undefined, undefined, undefined, publicUrl);
+         await sendMessage(
+            "[Image]",
+            undefined,
+            undefined,
+            undefined,
+            publicUrl,
+         );
       } catch (err) {
          console.error("Failed to upload/send image:", err);
       }
@@ -460,7 +544,7 @@ export const useChat = (userId: string) => {
    // Reaction
    const reactToMessage = async (messageId: string, emoji: string | null) => {
       if (!userId) return;
-      const msg = globalMessages.find(m => m.id === messageId);
+      const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
       const currentReactions = { ...(msg.reactions || {}) };
@@ -470,7 +554,9 @@ export const useChat = (userId: string) => {
          delete currentReactions[userId];
       }
 
-      useAppStore.getState().updateGlobalMessage({ id: messageId, reactions: currentReactions });
+      useAppStore
+         .getState()
+         .updateGlobalMessage({ id: messageId, reactions: currentReactions });
 
       const { error } = await supabase
          .from("messages")
@@ -492,7 +578,11 @@ export const useChat = (userId: string) => {
          finalContent = encryptDM(newContent, key);
       }
 
-      useAppStore.getState().updateGlobalMessage({ id: messageId, content: newContent, is_edited: true });
+      useAppStore.getState().updateGlobalMessage({
+         id: messageId,
+         content: newContent,
+         is_edited: true,
+      });
 
       const { error } = await supabase
          .from("messages")
@@ -507,24 +597,24 @@ export const useChat = (userId: string) => {
    // Delete message
    const deleteMessage = async (messageId: string) => {
       if (!userId) return;
-      
-      useAppStore.getState().updateGlobalMessage({ 
-         id: messageId, 
-         content: "🚫 This message was deleted", 
-         is_deleted: true, 
-         voice_url: null, 
-         image_url: null, 
-         reactions: {} 
+
+      useAppStore.getState().updateGlobalMessage({
+         id: messageId,
+         content: "🚫 This message was deleted",
+         is_deleted: true,
+         voice_url: null,
+         image_url: null,
+         reactions: {},
       });
 
       const { error } = await supabase
          .from("messages")
-         .update({ 
-            content: "🚫 This message was deleted", 
-            is_deleted: true, 
-            voice_url: null, 
-            image_url: null, 
-            reactions: {} 
+         .update({
+            content: "🚫 This message was deleted",
+            is_deleted: true,
+            voice_url: null,
+            image_url: null,
+            reactions: {},
          })
          .eq("id", messageId);
 
@@ -535,7 +625,10 @@ export const useChat = (userId: string) => {
 
    // Mark room as read
    const markAsRead = async (messageId: string) => {
-      safeLocalStorage.setItem(`lastSeen_${userId}_${activeRoomId}`, new Date().toISOString());
+      safeLocalStorage.setItem(
+         `lastSeen_${userId}_${activeRoomId}`,
+         new Date().toISOString(),
+      );
       setUnreadCount(0);
       setFirstUnreadId(null);
       await supabase
@@ -545,9 +638,14 @@ export const useChat = (userId: string) => {
    };
 
    // Custom group creation
-   const createCustomGroup = async (name: string, inviteeIds: string[]): Promise<boolean> => {
+   const createCustomGroup = async (
+      name: string,
+      inviteeIds: string[],
+   ): Promise<boolean> => {
       if (inviteeIds.length < 2) {
-         alert("Groups must have at least 3 people (including you). Select at least 2 users.");
+         alert(
+            "Groups must have at least 3 people (including you). Select at least 2 users.",
+         );
          return false;
       }
 
@@ -564,15 +662,17 @@ export const useChat = (userId: string) => {
       }
 
       // Add self as joined member
-      await supabase.from("chat_group_members").insert([
-         { group_id: newGroup.id, user_id: userId, status: "joined" }
-      ]);
+      await supabase
+         .from("chat_group_members")
+         .insert([
+            { group_id: newGroup.id, user_id: userId, status: "joined" },
+         ]);
 
       // Add other invited users
-      const memberInserts = inviteeIds.map(id => ({
+      const memberInserts = inviteeIds.map((id) => ({
          group_id: newGroup.id,
          user_id: id,
-         status: "invited"
+         status: "invited",
       }));
 
       await supabase.from("chat_group_members").insert(memberInserts);
@@ -651,7 +751,7 @@ export const useChat = (userId: string) => {
       // Add memberships
       await supabase.from("chat_group_members").insert([
          { group_id: newGroup.id, user_id: userId, status: "joined" },
-         { group_id: newGroup.id, user_id: partnerId, status: "joined" }
+         { group_id: newGroup.id, user_id: partnerId, status: "joined" },
       ]);
 
       await fetchGroups();
@@ -665,7 +765,7 @@ export const useChat = (userId: string) => {
          const { data } = await supabase
             .from("profiles")
             .select("username, avatar_url, id");
-         if (data) setUsers(data.filter(u => u.id !== userId));
+         if (data) setUsers(data.filter((u) => u.id !== userId));
       };
       fetchUsers();
    }, [userId]);
@@ -693,6 +793,6 @@ export const useChat = (userId: string) => {
       startDM,
       users,
       hasPlayedToday,
-      dailyGuesses
+      dailyGuesses,
    };
 };

@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useChat, type Message } from "../hooks/useChat";
+import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
 import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
@@ -7,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
 import { useConfirmation } from "../hooks/useConfirmation";
+import { useAppStore } from "../store/useAppStore";
 
 // Sub-components
 import ChatHeader from "./chat/ChatHeader";
@@ -42,16 +44,19 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         dailyGuesses
     } = useChat(user?.id);
 
+    const globalMessages = useAppStore((state) => state.globalMessages);
+
     const [showSidebar, setShowSidebar] = useState(true);
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [isCreatingDM, setIsCreatingDM] = useState(false);
     const [dmSearchQuery, setDmSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-    
+
     const [showUnreadLine, setShowUnreadLine] = useState(true);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     const { signInWithGoogle } = useAuth();
 
     // Clear unread count when chat is opened
@@ -64,6 +69,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     useEffect(() => {
         if (firstUnreadId) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowUnreadLine(true);
             const timer = setTimeout(() => {
                 setShowUnreadLine(false);
@@ -78,27 +84,71 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     };
 
-    // Auto-scroll on mount and new messages
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTo({
-                top: scrollRef.current.scrollHeight,
-                behavior: messages.length > 50 ? "auto" : "smooth"
-            });
-        }
-    }, [messages.length, showSidebar]);
+    const lastRoomIdRef = useRef<string | null>(null);
 
+    // Handle scrolling when entering a room or toggling sidebar (once messages are loaded)
     useEffect(() => {
-        if (scrollRef.current) {
-            const isAtBottom = scrollRef.current.scrollHeight - scrollRef.current.scrollTop <= scrollRef.current.clientHeight + 150;
+        if (showSidebar) {
+            lastRoomIdRef.current = null;
+            return;
+        }
+
+        if (activeRoomId && lastRoomIdRef.current !== activeRoomId) {
+            const timer = setTimeout(() => {
+                const unreadEl = document.getElementById("unread-line");
+                if (unreadEl && showUnreadLine) {
+                    unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
+                } else {
+                    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+                }
+
+                // Only mark as scrolled if messages have been populated
+                if (messages.length > 0) {
+                    lastRoomIdRef.current = activeRoomId;
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [activeRoomId, showSidebar, messages.length, showUnreadLine]);
+
+    // Handle scroll to bottom on new incoming messages or typing changes only if already at the bottom
+    useEffect(() => {
+        // Check scrollNode instead of scrollRef.current
+        if (lastRoomIdRef.current === activeRoomId && scrollNode) {
+            const isAtBottom = scrollNode.scrollHeight - scrollNode.scrollTop <= scrollNode.clientHeight + 250;
+
             if (isAtBottom) {
-                scrollRef.current.scrollTo({
-                    top: scrollRef.current.scrollHeight,
-                    behavior: "smooth"
+                // Using requestAnimationFrame ensures the DOM has updated and rendered 
+                // the new message before we attempt to smoothly scroll past it
+                requestAnimationFrame(() => {
+                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
                 });
             }
         }
-    }, [typingUsers]);
+    }, [messages.length, activeRoomId, typingUsers, scrollNode]);
+
+    // Triggers the exact millisecond the DOM element is painted and available
+    useEffect(() => {
+        if (showSidebar || !activeRoomId || messages.length === 0 || firstUnreadId || !scrollNode) {
+            return;
+        }
+
+        // Immediate scroll to bottom now that the node is alive
+        scrollNode.scrollTo({ top: scrollNode.scrollHeight });
+
+        // Handle Framer Motion transition scaling
+        const resizeObserver = new ResizeObserver(() => {
+            scrollNode.scrollTo({ top: scrollNode.scrollHeight });
+        });
+
+        resizeObserver.observe(scrollNode);
+        const timer = setTimeout(() => resizeObserver.disconnect(), 400);
+
+        return () => {
+            resizeObserver.disconnect();
+            clearTimeout(timer);
+        };
+    }, [activeRoomId, showSidebar, messages.length, firstUnreadId, scrollNode]); // <-- Watches the element directly
 
     const nameOfUser = user?.user_metadata?.full_name as string;
 
@@ -116,10 +166,56 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const filteredDMSearchUsers = useMemo(() => {
         if (!dmSearchQuery.trim()) return users;
         const q = dmSearchQuery.toLowerCase();
-        return users.filter(u => 
+        return users.filter(u =>
             u.username.toLowerCase().includes(q)
         );
     }, [users, dmSearchQuery]);
+
+    const lastMessages = useMemo(() => {
+        const map: Record<string, any> = {};
+        globalMessages.forEach((m) => {
+            const existing = map[m.group_id];
+            if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
+                map[m.group_id] = m;
+            }
+        });
+        return map;
+    }, [globalMessages]);
+
+    const renderLastMessage = (room: any) => {
+        const lastMsg = lastMessages[room.id];
+        if (!lastMsg) return <span className="text-[10px] text-white/30 italic">No messages yet</span>;
+
+        if (lastMsg.is_deleted) {
+            return <span className="text-[10px] text-white/30 italic flex items-center gap-1">🚫 Message deleted</span>;
+        }
+        if (lastMsg.image_url) {
+            return <span className="text-[10px] text-correct font-semibold flex items-center gap-1">📷 Photo</span>;
+        }
+        if (lastMsg.voice_url) {
+            return <span className="text-[10px] text-correct font-semibold flex items-center gap-1">🎤 Voice note</span>;
+        }
+
+        let text = lastMsg.content || "";
+        if (room.type === "dm" && room.dm_partner && text.startsWith("e2ee:")) {
+            const key = getDMRoomKey(user.id, room.dm_partner.id);
+            text = decryptDM(text, key);
+        }
+
+        // Clean Guess tags
+        if (text.startsWith("[guess:")) {
+            text = "🎯 Shared guess board";
+        }
+
+        const sender = lastMsg.user_id === user.id ? "You" : lastMsg.profiles?.username || "";
+        const prefix = sender ? `${sender}: ` : "";
+        const truncated = text.length > 25 ? text.slice(0, 25) + "..." : text;
+        return (
+            <span className="text-[12px] text-white/80 truncate max-w-[200px] mt-0.5 block">
+                {prefix}{truncated}
+            </span>
+        );
+    };
 
     const handleCreateGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -182,16 +278,16 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     }
 
     return (
-        <div 
+        <div
             className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative"
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
         >
             {/* Background WhatsApp pattern */}
-            <div 
-                className="absolute inset-0 opacity-[0.05] pointer-events-none" 
-                style={{ 
+            <div
+                className="absolute inset-0 opacity-[0.05] pointer-events-none"
+                style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath fill-rule='evenodd' d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm1-61c3.148 0 5.7-2.552 5.7-5.7 0-3.148-2.552-5.7-5.7-5.7-3.148 0-5.7 2.552-5.7 5.7 0 3.148 2.552 5.7 5.7 5.7zm50 17c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM25 50c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm14 7c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm36-20c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM51 8c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-2 42c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-12-9c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM70 70c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM30 30c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z'/%3E%3C/g%3E%3C/svg%3E")`
-            }}
+                }}
             />
 
             <AnimatePresence mode="wait">
@@ -266,15 +362,13 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                             }}
                                             className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0">
                                                     #
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
-                                                    <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
-                                                        Core Channel
-                                                    </span>
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                    <span className="text-base font-bold text-white tracking-tight truncate uppercase">{room.name}</span>
+                                                    {renderLastMessage(room)}
                                                 </div>
                                             </div>
                                         </button>
@@ -286,7 +380,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between pl-2 mb-2">
                                     <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Direct Messages</h3>
-                                    <button 
+                                    <button
                                         onClick={() => setIsCreatingDM(true)}
                                         className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
                                         title="Start DM"
@@ -295,7 +389,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     </button>
                                 </div>
                                 {dms.length === 0 ? (
-                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/[0.02] rounded-xl border border-white/5 text-center">No DMs yet. Click + to start one.</div>
+                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/2 rounded-xl border border-white/5 text-center">No DMs yet. Click + to start one.</div>
                                 ) : (
                                     dms.map(room => {
                                         const isActive = activeRoomId === room.id;
@@ -308,18 +402,15 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 }}
                                                 className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300 shrink-0">
                                                         <User size={18} />
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
-                                                        <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
-                                                            Direct Message
-                                                        </span>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <span className="text-sm font-bold text-white tracking-tight truncate">{room.name}</span>
+                                                        {renderLastMessage(room)}
                                                     </div>
                                                 </div>
-                                                <span title="End-to-End Encrypted"><Lock size={12} className="text-white/30" /></span>
                                             </button>
                                         );
                                     })
@@ -330,7 +421,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between pl-2 mb-2">
                                     <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Groups</h3>
-                                    <button 
+                                    <button
                                         onClick={() => setIsCreatingGroup(true)}
                                         className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
                                         title="Create Group"
@@ -339,7 +430,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     </button>
                                 </div>
                                 {customs.length === 0 ? (
-                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/[0.02] rounded-xl border border-white/5 text-center">No custom groups. Click + to create one.</div>
+                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/2 rounded-xl border border-white/5 text-center">No custom groups. Click + to create one.</div>
                                 ) : (
                                     customs.map(room => {
                                         const isActive = activeRoomId === room.id;
@@ -352,15 +443,13 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 }}
                                                 className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
                                                         <Users size={18} />
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
-                                                        <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
-                                                            Group Chat
-                                                        </span>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <span className="text-sm font-bold text-white tracking-tight truncate">{room.name}</span>
+                                                        {renderLastMessage(room)}
                                                     </div>
                                                 </div>
                                             </button>
@@ -382,11 +471,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     <div className="space-y-6 flex-1 overflow-y-auto">
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-lg font-black uppercase tracking-wider text-white">Start a DM</h3>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     setIsCreatingDM(false);
                                                     setDmSearchQuery("");
-                                                }} 
+                                                }}
                                                 className="text-white/60 hover:text-white text-xs font-black uppercase"
                                             >
                                                 Cancel
@@ -585,7 +674,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <>
                                 {/* Message Area */}
                                 <div
-                                    ref={scrollRef}
+                                    ref={setScrollNode}
                                     onScroll={handleScroll}
                                     className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide z-10"
                                 >
@@ -598,6 +687,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 <div key={msg.id}>
                                                     {msg.id === firstUnreadId && showUnreadLine && (
                                                         <motion.div
+                                                            id="unread-line"
                                                             initial={{ opacity: 0, scale: 0.8 }}
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             className="flex items-center my-6 gap-4 px-4"
@@ -637,6 +727,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                             );
                                         })}
                                     </AnimatePresence>
+                                    <div ref={messagesEndRef} />
                                 </div>
 
                                 {/* Input Area */}
