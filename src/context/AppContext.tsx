@@ -408,7 +408,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 .from('chat_read_receipts')
                 .select('group_id, last_seen_at')
                 .eq('user_id', user.id);
-            
+
             const receipts: Record<string, string> = {};
             if (receiptData) {
                 receiptData.forEach(r => {
@@ -422,7 +422,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 .select('*, profiles(username, avatar_url)')
                 .order('created_at', { ascending: false })
                 .limit(300);
-            
+
             if (data) {
                 const chronData = data.reverse();
                 useAppStore.getState().setGlobalMessages(chronData);
@@ -440,13 +440,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 async (payload) => {
                     console.log("Realtime message event:", payload.eventType, payload);
 
+                    // 1. Extract the group ID
+                    //@ts-ignore
+                    const groupId = payload.new?.group_id || payload.old?.group_id;
+
+                    // 2. Check if the user already has active messages for this group in their store
+                    const allMsgs = useAppStore.getState().globalMessages;
+                    const belongsToUser = allMsgs.some((m) => m.group_id === groupId);
+
+                    // 3. Early return if this is an entirely unrelated group
+                    if (!belongsToUser) return;
+
                     if (payload.eventType === 'INSERT') {
                         const newMessage = payload.new as any;
                         let profile = null;
 
                         const allMsgs = useAppStore.getState().globalMessages;
                         const existingMsg = allMsgs.find(m => m.user_id === newMessage.user_id && m.profiles);
-                        
+
                         if (existingMsg) {
                             profile = existingMsg.profiles;
                         } else {
@@ -457,7 +468,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                 .single();
                             profile = fetchedProfile;
                         }
-                        
+
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
 
@@ -491,7 +502,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                         const newReceipt = payload.new as any;
                         useAppStore.getState().updateReadReceipt(newReceipt.group_id, newReceipt.last_seen_at);
-                        
+
                         // Recalculate unreads
                         const allMsgs = useAppStore.getState().globalMessages;
                         const currentReceipts = useAppStore.getState().readReceipts;
@@ -528,7 +539,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         profile,
         preferences,
         loading: isProfileLoading,
-        refreshProfile: async () => {},
+        refreshProfile: async () => { },
         toast,
         triggerToast,
         setToast,
