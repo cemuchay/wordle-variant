@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { Clock, Lock } from 'lucide-react';
+import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
@@ -25,7 +26,7 @@ const FinisherAvatar = memo(function FinisherAvatar({ p, index, onPreview }: { p
             className="w-6 h-6 rounded-full border-2 border-gray-900 bg-gray-800 overflow-hidden hover:scale-110 hover:z-10 transition-transform relative group"
         >
             {p.profiles?.avatar_url ? (
-                <img src={p.profiles.avatar_url} alt={p.profiles.username} className="w-full h-full object-cover" />
+                <ProtectedAvatar src={p.profiles.avatar_url} username={p.profiles.username} className="w-full h-full object-cover" />
             ) : (
                 <div className="w-full h-full flex items-center justify-center text-[8px] font-black uppercase text-gray-400">
                     {p.profiles?.username?.[0] || '?'}

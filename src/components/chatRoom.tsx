@@ -14,6 +14,7 @@ import { useAppStore } from "../store/useAppStore";
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
 import MessageInput from "./chat/MessageInput";
+import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
     const { setUnreadCount, setIsChallengeOpen } = useApp();
@@ -511,7 +512,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 }}
                                                                 className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
                                                             >
-                                                                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}`} className="w-8 h-8 rounded-full border border-white/10" alt="avatar" />
+                                                                <ProtectedAvatar 
+                                                                    src={u.avatar_url} 
+                                                                    username={u.username} 
+                                                                    className="w-8 h-8 rounded-full border border-white/10" 
+                                                                />
                                                                 <span className="text-sm font-bold text-white">{u.username}</span>
                                                             </button>
                                                         ))
@@ -563,7 +568,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 onClick={() => toggleSelectUser(u.id)}
                                                                 className={`p-2.5 border rounded-xl text-left flex items-center gap-2 truncate cursor-pointer transition-all ${isSelected ? 'bg-correct border-correct text-black' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`}
                                                             >
-                                                                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}`} className="w-5 h-5 rounded-full border border-white/10" alt="avatar" />
+                                                                <ProtectedAvatar 
+                                                                    src={u.avatar_url} 
+                                                                    username={u.username} 
+                                                                    className="w-5 h-5 rounded-full border border-white/10" 
+                                                                />
                                                                 <span className="text-[10.5px] font-bold truncate">{u.username}</span>
                                                             </button>
                                                         );

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Clock, Phone, Users, Check, X, PhoneOff } from 'lucide-react';
+import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -133,9 +134,9 @@ export const DynamicIslandStatus = () => {
                             activeCall.status === 'ringing' ? (
                                 <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                        <img
-                                            src={activeCall.targetUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCall.targetUser?.username || '')}`}
-                                            alt=""
+                                        <ProtectedAvatar
+                                            src={activeCall.targetUser?.avatar_url}
+                                            username={activeCall.targetUser?.username || ''}
                                             className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                         />
                                         <span className="text-[9px] font-bold text-white truncate max-w-[80px]">
@@ -183,9 +184,9 @@ export const DynamicIslandStatus = () => {
                             )
                         ) : currentVoiceSession ? (
                             <div className="flex items-center gap-1.5">
-                                <img
+                                <ProtectedAvatar
                                     src={currentVoiceSession.user.avatar_url}
-                                    alt=""
+                                    username={currentVoiceSession.user.username}
                                     className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                 />
                                 <span className="text-[10px] font-black text-white uppercase tracking-tighter">
@@ -195,9 +196,9 @@ export const DynamicIslandStatus = () => {
                             </div>
                         ) : otherOnlineUsers.length === 1 ? (
                             <>
-                                <img
+                                <ProtectedAvatar
                                     src={otherOnlineUsers[0].avatar_url}
-                                    alt=""
+                                    username={otherOnlineUsers[0].username}
                                     className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                 />
                                 <span className="text-[9px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
@@ -208,12 +209,11 @@ export const DynamicIslandStatus = () => {
                             <>
                                 <div className="flex -space-x-1 shrink-0">
                                     {otherOnlineUsers.slice(0, 2).map((u, i) => (
-                                        <img
+                                        <ProtectedAvatar
                                             key={u.id}
                                             src={u.avatar_url}
-                                            alt=""
+                                            username={u.username}
                                             className="w-4 h-4 rounded-full border border-black shrink-0"
-                                            style={{ zIndex: 2 - i }}
                                         />
                                     ))}
                                 </div>
@@ -236,9 +236,9 @@ export const DynamicIslandStatus = () => {
                                 {activeCall.status === 'ringing' ? (
                                     <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                         <div className="relative">
-                                            <img
-                                                src={activeCall.targetUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCall.targetUser?.username || '')}`}
-                                                alt=""
+                                            <ProtectedAvatar
+                                                src={activeCall.targetUser?.avatar_url}
+                                                username={activeCall.targetUser?.username || ''}
                                                 className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse"
                                             />
                                             <div className="absolute -bottom-1 -right-1 bg-emerald-500 p-1.5 rounded-full border border-black text-black">
@@ -269,9 +269,9 @@ export const DynamicIslandStatus = () => {
                                 ) : activeCall.status === 'calling' ? (
                                     <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                         <div className="relative">
-                                            <img
-                                                src={activeCall.targetUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCall.targetUser?.username || '')}`}
-                                                alt=""
+                                            <ProtectedAvatar
+                                                src={activeCall.targetUser?.avatar_url}
+                                                username={activeCall.targetUser?.username || ''}
                                                 className="w-16 h-16 rounded-full border-2 border-zinc-500 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
                                             />
                                             <div className="absolute -bottom-1 -right-1 bg-zinc-800 p-1.5 rounded-full border border-black text-zinc-400">
@@ -319,9 +319,9 @@ export const DynamicIslandStatus = () => {
                             <div className="mb-6 pb-6 border-b border-white/10">
                                 <div className="flex flex-col items-center text-center gap-4">
                                     <div className="relative">
-                                        <img
+                                        <ProtectedAvatar
                                             src={currentVoiceSession.user.avatar_url}
-                                            alt=""
+                                            username={currentVoiceSession.user.username}
                                             className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                                         />
                                         <div className="absolute -bottom-1 -right-1 bg-black p-1 rounded-full border border-emerald-500">
@@ -380,9 +380,9 @@ export const DynamicIslandStatus = () => {
                                                         }
                                                     }}
                                                 >
-                                                    <img
+                                                    <ProtectedAvatar
                                                         src={p.avatar_url}
-                                                        alt=""
+                                                        username={p.username}
                                                         className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}
                                                     />
                                                     {isOnline && (
