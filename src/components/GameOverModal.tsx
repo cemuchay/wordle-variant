@@ -98,8 +98,8 @@ export const GameOverModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto">
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 shadow-2xl text-center ">
-        <div className="mb-3 mt-2 flex flex-col items-center pt-8">
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-12 shadow-2xl text-center ">
+        <div className="mb-3 mt-8 flex flex-col items-center pt-12">
           {showWord ? (
             <h2 className="text-2xl font-serif font-bold text-white tracking-widest animate-in fade-in zoom-in duration-300">
               {config?.word || "???"}
