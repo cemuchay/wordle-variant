@@ -5,6 +5,7 @@ import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-re
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 import { ProtectedAvatar } from "./ProtectedAvatar";
+import { calculateSkillIndex } from '../../lib/game-logic';
 
 interface ChatMessageProps {
     msg: Message;
@@ -143,39 +144,109 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
         if (!content) return null;
 
         // Render Guess tag inline
-        const guessMatch = content.match(/\[guess:([a-zA-Z0-9-]+)\]/);
+        const guessMatch = content.match(/\[guess:([a-zA-Z0-9-_]+)\]/);
         if (guessMatch && dailyGuesses) {
-            const guessData = dailyGuesses.find(dg => dg.user_id === guessMatch[1]);
+            const guessIdentifier = guessMatch[1];
+            // Find by user_id OR profiles.username (case-insensitive)
+            const guessData = dailyGuesses.find(dg => 
+                dg.user_id === guessIdentifier || 
+                dg.profiles?.username?.toLowerCase() === guessIdentifier.toLowerCase()
+            );
             if (guessData) {
                 const username = guessData.profiles?.username || "Player";
                 const won = guessData.status === "won";
-                const score = won ? guessData.guesses.length : "X";
-                const grid = guessData.guesses.map((row: any[], rIdx: number) => (
-                    <div key={rIdx} className="flex gap-0.5 justify-center">
-                        {row.map((cell: any, cIdx: number) => (
-                            <div
-                                key={cIdx}
-                                className={`w-3.5 h-3.5 rounded-sm ${cell.status === "correct"
+                const attempts = won ? guessData.guesses.length : "X";
+                
+                // Security check: only show letters/points if it's our own board, OR we have played today's game
+                const isOwner = guessData.user_id === currentUserId;
+                const viewerGuess = dailyGuesses.find(dg => dg.user_id === currentUserId);
+                const viewerHasPlayed = viewerGuess?.status === "won" || viewerGuess?.status === "lost";
+                const showDetails = isOwner || viewerHasPlayed;
+
+                if (showDetails) {
+                    const breakdown = calculateSkillIndex({
+                        attempts: guessData.guesses.length || 0,
+                        maxAttempts: 6,
+                        guesses: guessData.guesses || [],
+                        usedHint: guessData.hint_record !== null,
+                        hintRecord: guessData.hint_record || null,
+                    });
+
+                    const grid = guessData.guesses.map((row: any[], rIdx: number) => {
+                        const rowScore = breakdown.rows[rIdx];
+                        return (
+                            <div key={rIdx} className="flex gap-3 items-center justify-between w-full">
+                                <div className="flex gap-1">
+                                    {row.map((cell: any, cIdx: number) => (
+                                        <div
+                                            key={cIdx}
+                                            className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black uppercase shadow-inner ${cell.status === "correct"
+                                                ? "bg-correct text-white"
+                                                : cell.status === "present"
+                                                    ? "bg-present text-white"
+                                                    : "bg-gray-800 text-gray-400 border border-gray-700"
+                                                }`}
+                                        >
+                                            {cell.letter}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div
+                                    className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded-full shrink-0 ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
+                                >
+                                    {rowScore > 0 ? `+${rowScore}` : rowScore}
+                                </div>
+                            </div>
+                        );
+                    });
+
+                    return (
+                        <div className="bg-black/40 border border-white/10 rounded-2xl p-4 my-2 text-center shadow-inner max-w-full w-[260px] mx-auto">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className="text-[10px] font-black uppercase text-correct tracking-wider">
+                                    🎯 {username}'s Guess Board
+                                </span>
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-correct text-black rounded-full select-none">
+                                    Score: {guessData.skill_score || 0}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1.5 bg-black/20 p-2.5 rounded-xl">
+                                {grid}
+                            </div>
+                        </div>
+                    );
+                } else {
+                    // Hide letters/points to prevent peeking
+                    const grid = guessData.guesses.map((row: any[], rIdx: number) => (
+                        <div key={rIdx} className="flex gap-0.5 justify-center">
+                            {row.map((cell: any, cIdx: number) => (
+                                <div
+                                    key={cIdx}
+                                    className={`w-3.5 h-3.5 rounded-sm ${cell.status === "correct"
                                         ? "bg-correct"
                                         : cell.status === "present"
                                             ? "bg-present"
                                             : "bg-gray-700/50"
-                                    }`}
-                            />
-                        ))}
-                    </div>
-                ));
-
-                return (
-                    <div className="bg-black/40 border border-white/10 rounded-2xl p-4 my-2 text-center shadow-inner max-w-full">
-                        <p className="text-[10px] font-black uppercase text-correct tracking-wider mb-3">
-                            🎯 {username}'s Guess Board ({score}/6)
-                        </p>
-                        <div className="flex flex-col gap-0.5 bg-black/20 p-3 rounded-xl inline-block">
-                            {grid}
+                                        }`}
+                                />
+                            ))}
                         </div>
-                    </div>
-                );
+                    ));
+
+                    return (
+                        <div className="bg-black/40 border border-white/10 rounded-2xl p-4 my-2 text-center shadow-inner max-w-full">
+                            <p className="text-[10px] font-black uppercase text-correct tracking-wider mb-3">
+                                🎯 {username}'s Guess Board ({attempts}/6)
+                            </p>
+                            <div className="flex flex-col gap-0.5 bg-black/20 p-3 rounded-xl inline-block">
+                                {grid}
+                            </div>
+                            <p className="text-[9px] font-bold text-white/40 mt-2">
+                                🔒 Play daily to reveal letters & points
+                            </p>
+                        </div>
+                    );
+                }
             }
         }
 
@@ -331,9 +402,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            if (confirm("Delete this message?")) {
-                                                onDelete();
-                                            }
+                                            onDelete()
                                         }}
                                         className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
                                         title="Delete message"
@@ -493,9 +562,9 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                             msg.status === "sending" ? (
                                 <span className="animate-spin text-white/50 text-[10px] select-none" title="Sending...">⌛</span>
                             ) : msg.status === "failed" ? (
-                                <span 
-                                    className="text-red-400 text-[11px] font-black cursor-pointer hover:scale-110 active:scale-95 transition-transform flex items-center gap-0.5 select-none" 
-                                    title="Failed. Click to retry." 
+                                <span
+                                    className="text-red-400 text-[11px] font-black cursor-pointer hover:scale-110 active:scale-95 transition-transform flex items-center gap-0.5 select-none"
+                                    title="Failed. Click to retry."
                                     onClick={() => onResend?.(msg.id)}
                                 >
                                     ⚠️ Retry

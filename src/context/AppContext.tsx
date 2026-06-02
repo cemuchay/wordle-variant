@@ -420,11 +420,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const { data } = await supabase
                 .from('messages')
                 .select('*, profiles(username, avatar_url)')
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false })
+                .limit(300);
             
             if (data) {
-                useAppStore.getState().setGlobalMessages(data);
-                setUnreadCount(calculateUnreads(data, receipts));
+                const chronData = data.reverse();
+                useAppStore.getState().setGlobalMessages(chronData);
+                setUnreadCount(calculateUnreads(chronData, receipts));
             }
         };
 
@@ -440,19 +442,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                     if (payload.eventType === 'INSERT') {
                         const newMessage = payload.new as any;
-                        const { data: profile } = await supabase
-                            .from('profiles')
-                            .select('id, username, avatar_url')
-                            .eq('id', newMessage.user_id)
-                            .single();
+                        let profile = null;
+
+                        const allMsgs = useAppStore.getState().globalMessages;
+                        const existingMsg = allMsgs.find(m => m.user_id === newMessage.user_id && m.profiles);
+                        
+                        if (existingMsg) {
+                            profile = existingMsg.profiles;
+                        } else {
+                            const { data: fetchedProfile } = await supabase
+                                .from('profiles')
+                                .select('id, username, avatar_url')
+                                .eq('id', newMessage.user_id)
+                                .single();
+                            profile = fetchedProfile;
+                        }
                         
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
 
-                        // Recalculate unread count dynamically
-                        const allMsgs = useAppStore.getState().globalMessages;
-                        const currentReceipts = useAppStore.getState().readReceipts;
-                        setUnreadCount(calculateUnreads(allMsgs, currentReceipts));
+                        // Incrementally update unread count instead of recalculating all
+                        if (newMessage.user_id !== user.id) {
+                            const currentReceipts = useAppStore.getState().readReceipts;
+                            const lastSeen = currentReceipts[newMessage.group_id] || new Date(0).toISOString();
+                            if (newMessage.created_at > lastSeen) {
+                                setUnreadCount(useAppStore.getState().unreadCount + 1);
+                            }
+                        }
                     } else if (payload.eventType === 'UPDATE') {
                         // Merge the updated columns in global store
                         useAppStore.getState().updateGlobalMessage(payload.new);

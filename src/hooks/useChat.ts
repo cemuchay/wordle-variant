@@ -216,7 +216,7 @@ export const useChat = (userId: string) => {
       const fetchGuesses = async () => {
          const { data } = await supabase
             .from("scores")
-            .select("user_id, guesses, status, profiles(username)")
+            .select("user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score")
             .eq("game_date", date);
          if (data) {
             setDailyGuesses(data);
