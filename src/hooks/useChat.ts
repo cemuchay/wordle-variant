@@ -2,7 +2,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
-import { safeLocalStorage } from "../utils/storage";
 import { useAppStore } from "../store/useAppStore";
 
 export interface Message {
@@ -161,6 +160,8 @@ const defaultCores: ChatGroup[] = [
 // --- Core Custom Hook ---
 export const useChat = (userId: string) => {
    const globalMessages = useAppStore((state) => state.globalMessages);
+   const readReceipts = useAppStore((state) => state.readReceipts);
+   const updateReadReceipt = useAppStore((state) => state.updateReadReceipt);
    const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
    const [invites, setInvites] = useState<any[]>([]);
    const [activeRoomId, setActiveRoomId] = useState<string>(
@@ -352,33 +353,60 @@ export const useChat = (userId: string) => {
    // Find the first unread message ID when activeRoomId changes
    useEffect(() => {
       if (!userId || !activeRoomId) return;
-      const lastSeen = safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) || new Date(0).toISOString();
+      const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const unreads = activeMessages.filter(
          (m: any) => m.user_id !== userId && m.created_at > lastSeen,
       );
       if (unreads.length > 0) {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          setFirstUnreadId(unreads[0].id);
       } else {
          setFirstUnreadId(null);
       }
-   }, [userId, activeRoomId]);
+   }, [userId, activeRoomId, readReceipts, activeMessages]);
 
    // Mark active room as read and update global unreads
    useEffect(() => {
       if (!userId || !activeRoomId) return;
 
       const newLastSeen = new Date().toISOString();
-      safeLocalStorage.setItem(`lastSeen_${userId}_${activeRoomId}`, newLastSeen);
+
+      // Optimistically update store
+      updateReadReceipt(activeRoomId, newLastSeen);
+
+      // Perform background database update
+      supabase
+         .from("chat_read_receipts")
+         .upsert(
+            {
+               user_id: userId,
+               group_id: activeRoomId,
+               last_seen_at: newLastSeen,
+            },
+            { onConflict: "user_id,group_id" },
+         )
+         .then(({ error }) => {
+            if (error)
+               console.error("Failed to update read receipt:", error.message);
+         });
 
       const unreads = globalMessages.filter((m) => {
          if (m.user_id === userId) return false;
-         const lastSeen = m.group_id === activeRoomId
-            ? newLastSeen
-            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         const lastSeen =
+            m.group_id === activeRoomId
+               ? newLastSeen
+               : readReceipts[m.group_id] || new Date(0).toISOString();
          return m.created_at > lastSeen;
       });
       setUnreadCount(unreads.length);
-   }, [userId, activeRoomId, activeMessages.length, globalMessages, setUnreadCount]);
+   }, [
+      userId,
+      activeRoomId,
+      activeMessages.length,
+      globalMessages,
+      setUnreadCount,
+      readReceipts,
+   ]);
 
    // Presence & typing updates
    useEffect(() => {
@@ -628,16 +656,32 @@ export const useChat = (userId: string) => {
    // Mark room as read
    const markAsRead = async (messageId: string) => {
       const newLastSeen = new Date().toISOString();
-      safeLocalStorage.setItem(
-         `lastSeen_${userId}_${activeRoomId}`,
-         newLastSeen,
-      );
-      
+
+      // Optimistically update store
+      updateReadReceipt(activeRoomId, newLastSeen);
+
+      // Perform background database update
+      supabase
+         .from("chat_read_receipts")
+         .upsert(
+            {
+               user_id: userId,
+               group_id: activeRoomId,
+               last_seen_at: newLastSeen,
+            },
+            { onConflict: "user_id,group_id" },
+         )
+         .then(({ error }) => {
+            if (error)
+               console.error("Failed to update read receipt:", error.message);
+         });
+
       const unreads = globalMessages.filter((m) => {
          if (m.user_id === userId) return false;
-         const lastSeen = m.group_id === activeRoomId
-            ? newLastSeen
-            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         const lastSeen =
+            m.group_id === activeRoomId
+               ? newLastSeen
+               : readReceipts[m.group_id] || new Date(0).toISOString();
          return m.created_at > lastSeen;
       });
       setUnreadCount(unreads.length);
