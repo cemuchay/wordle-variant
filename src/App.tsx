@@ -93,7 +93,7 @@ export default function App() {
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [isWeeklyWrappedOpen, setIsWeeklyWrappedOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [navLoading, setNavLoading] = useState<{ active: boolean; message: string }>({
+  const [navLoading] = useState<{ active: boolean; message: string }>({
     active: false,
     message: "",
   });

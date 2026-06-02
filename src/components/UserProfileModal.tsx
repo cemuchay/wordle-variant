@@ -625,9 +625,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                 </div>
                             )}
 
-                        </div>
-                    </>
-                )}
+                        </>
+                    )}
+                </div>
             </motion.div>
             {isWrappedOpen && (
                 <WeeklyWrappedModal

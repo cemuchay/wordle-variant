@@ -396,6 +396,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!user?.id) return;
 
+        const calculateUnreads = (messages: any[]) => {
+            return messages.filter((m) => {
+                if (m.user_id === user.id) return false;
+                const lastSeen = safeLocalStorage.getItem(`lastSeen_${user.id}_${m.group_id}`) || new Date(0).toISOString();
+                return m.created_at > lastSeen;
+            }).length;
+        };
+
         const fetchMessages = async () => {
             const { data } = await supabase
                 .from('messages')
@@ -404,11 +412,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             
             if (data) {
                 useAppStore.getState().setGlobalMessages(data);
-                const lastSeen = safeLocalStorage.getItem(`lastSeen_${user.id}`) || new Date(0).toISOString();
-                const unreads = data.filter(
-                    (m) => m.user_id !== user.id && m.created_at > lastSeen
-                );
-                setUnreadCount(unreads.length);
+                setUnreadCount(calculateUnreads(data));
             }
         };
 
@@ -433,10 +437,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
 
-                        const currentIsChatOpen = useAppStore.getState().isChatOpen;
-                        if (newMessage.user_id !== user.id && !currentIsChatOpen) {
-                            setUnreadCount(useAppStore.getState().unreadCount + 1);
-                        }
+                        // Recalculate unread count dynamically
+                        const allMsgs = useAppStore.getState().globalMessages;
+                        setUnreadCount(calculateUnreads(allMsgs));
                     } else if (payload.eventType === 'UPDATE') {
                         // Merge the updated columns in global store
                         useAppStore.getState().updateGlobalMessage(payload.new);
