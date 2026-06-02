@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { WeeklyWrappedModal } from './WeeklyWrappedModal';
+import { ProfileSkeleton } from './common/Skeletons';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -408,30 +409,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     )}
                 </div>
 
-                {loading ? (
-                    <div className="flex-1 p-8 flex items-center justify-center">
-                        <div className="w-8 h-8 border-4 border-correct border-t-transparent rounded-full animate-spin" />
-                    </div>
-                ) : (
-                    <>
-                        {/* Tab Selector */}
-                        <div className="flex border-b border-white/5 bg-gray-900/40 p-1 shrink-0">
-                            <button
-                                onClick={() => setActiveTab('daily')}
-                                className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'daily' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                            >
-                                Daily Stats
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('challenge')}
-                                className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'challenge' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
-                            >
-                                Challenge Stats
-                            </button>
-                        </div>
+                {/* Tab Selector */}
+                <div className="flex border-b border-white/5 bg-gray-900/40 p-1 shrink-0">
+                    <button
+                        onClick={() => !loading && setActiveTab('daily')}
+                        className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'daily' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'} ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        Daily Stats
+                    </button>
+                    <button
+                        onClick={() => !loading && setActiveTab('challenge')}
+                        className={`flex-1 py-2.5 sm:py-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all rounded-2xl ${activeTab === 'challenge' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white'} ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        Challenge Stats
+                    </button>
+                </div>
 
-                        {/* Modal Body */}
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 scrollbar-hide">
+                {/* Modal Body */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 scrollbar-hide">
+                    {loading ? (
+                        <ProfileSkeleton />
+                    ) : (
+                        <>
 
                             {/* Head to Head (H2H) comparison - show only for other players */}
                             {currentUser && currentUser.id !== userId && stats.h2hPlayed > 0 && (
@@ -626,9 +625,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                 </div>
                             )}
 
-                        </div>
-                    </>
-                )}
+                        </>
+                    )}
+                </div>
             </motion.div>
             {isWrappedOpen && (
                 <WeeklyWrappedModal

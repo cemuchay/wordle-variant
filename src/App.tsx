@@ -12,6 +12,7 @@ import { TransitionLoader } from "./components/layout/TransitionLoader";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { Toast } from "./components/Toast";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
+import { ChatSkeleton } from "./components/common/Skeletons";
 import { LandscapeBlocker } from "./components/LandscapeBlocker";
 import { useApp } from "./context/AppContext";
 import { useAuth } from "./hooks/useAuth";
@@ -92,7 +93,7 @@ export default function App() {
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [isWeeklyWrappedOpen, setIsWeeklyWrappedOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [navLoading, setNavLoading] = useState<{ active: boolean; message: string }>({
+  const [navLoading] = useState<{ active: boolean; message: string }>({
     active: false,
     message: "",
   });
@@ -176,32 +177,10 @@ export default function App() {
       window.removeEventListener("open-user-profile", handleOpenProfile);
   }, [user, triggerToast]);
 
-  // Intercept notifications open to show transition loader
+  // Intercept notifications open
   useEffect(() => {
-    if (isNotificationsOpen && !showNotifications) {
-      const loadTimer = setTimeout(() => {
-        setNavLoading({ active: true, message: "Retrieving notifications..." });
-      }, 0);
-
-      const timer = setTimeout(() => {
-        setShowNotifications(true);
-        const hideTimer = setTimeout(() => {
-          setNavLoading({ active: false, message: "" });
-        }, 100);
-        return () => clearTimeout(hideTimer);
-      }, 300);
-
-      return () => {
-        clearTimeout(loadTimer);
-        clearTimeout(timer);
-      };
-    } else if (!isNotificationsOpen && showNotifications) {
-      const closeTimer = setTimeout(() => {
-        setShowNotifications(false);
-      }, 0);
-      return () => clearTimeout(closeTimer);
-    }
-  }, [isNotificationsOpen, showNotifications]);
+    setShowNotifications(isNotificationsOpen);
+  }, [isNotificationsOpen]);
 
   // Stats Logic
   const { stats } = useWordleStats(user, isStatsOpen, date as string);
@@ -256,32 +235,16 @@ export default function App() {
       return;
     }
 
-    const messages: Record<typeof item, string> = {
-      play: "Loading gameplay grid...",
-      chat: "Retrieving community chatroom...",
-      leaderboard: "Syncing global leaderboard...",
-      challenges: "Fetching active challenges...",
-      info: "Opening rules manual..."
-    };
-
-    setNavLoading({ active: true, message: messages[item] });
-
-    setTimeout(() => {
-      if (item === "chat") {
-        setUnreadCount(0);
-      }
-      setIsChatOpen(item === "chat");
-      setIsChallengeOpen(item === "challenges");
-      setIsStatsOpen(item === "leaderboard");
-      setIsInfoOpen(item === "info");
-      if (item === "leaderboard") {
-        setStatsActiveTab("leaderboard");
-      }
-
-      setTimeout(() => {
-        setNavLoading({ active: false, message: "" });
-      }, 100);
-    }, 300);
+    if (item === "chat") {
+      setUnreadCount(0);
+    }
+    setIsChatOpen(item === "chat");
+    setIsChallengeOpen(item === "challenges");
+    setIsStatsOpen(item === "leaderboard");
+    setIsInfoOpen(item === "info");
+    if (item === "leaderboard") {
+      setStatsActiveTab("leaderboard");
+    }
   };
 
   if (isLoadingDate || !isHydrated) {
@@ -454,7 +417,7 @@ export default function App() {
           </main>
         ) : (
           <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
-            <Suspense fallback={null}>
+            <Suspense fallback={<ChatSkeleton />}>
               <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
             </Suspense>
           </div>

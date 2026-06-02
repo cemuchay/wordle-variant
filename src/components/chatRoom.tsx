@@ -6,7 +6,6 @@ import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../context/AppContext";
-import { safeLocalStorage } from "../utils/storage";
 import { useConfirmation } from "../hooks/useConfirmation";
 import { useAppStore } from "../store/useAppStore";
 
@@ -17,7 +16,7 @@ import MessageInput from "./chat/MessageInput";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setUnreadCount, setIsChallengeOpen } = useApp();
+    const { setIsChallengeOpen } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -60,13 +59,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const { signInWithGoogle } = useAuth();
 
-    // Clear unread count when chat is opened
-    useEffect(() => {
-        if (user?.id) {
-            safeLocalStorage.setItem(`lastSeen_${user.id}_${activeRoomId}`, new Date().toISOString());
-            setUnreadCount(0);
-        }
-    }, [user?.id, activeRoomId, setUnreadCount]);
+
 
     useEffect(() => {
         if (firstUnreadId) {

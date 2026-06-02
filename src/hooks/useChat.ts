@@ -186,13 +186,6 @@ export const useChat = (userId: string) => {
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
-   const getLastSeen = useCallback(
-      () =>
-         safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) ||
-         new Date(0).toISOString(),
-      [userId, activeRoomId],
-   );
-
    // Check if user played today (unlock Game Analysis)
    useEffect(() => {
       if (!userId || !date) return;
@@ -356,27 +349,36 @@ export const useChat = (userId: string) => {
       return filtered;
    }, [globalMessages, activeRoomId, activeRoom, userId]);
 
-   // Auto-mark first unread inside the active room
+   // Find the first unread message ID when activeRoomId changes
    useEffect(() => {
-      if (!userId) return;
-      const lastSeen = getLastSeen();
-      console.log(lastSeen, "lastSeen");
-
+      if (!userId || !activeRoomId) return;
+      const lastSeen = safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) || new Date(0).toISOString();
       const unreads = activeMessages.filter(
          (m: any) => m.user_id !== userId && m.created_at > lastSeen,
       );
-
       if (unreads.length > 0) {
-         if (!firstUnreadId) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setFirstUnreadId(unreads[0].id);
-         }
+         setFirstUnreadId(unreads[0].id);
       } else {
-         if (firstUnreadId) {
-            setFirstUnreadId(null);
-         }
+         setFirstUnreadId(null);
       }
-   }, [userId, activeMessages, getLastSeen, firstUnreadId]);
+   }, [userId, activeRoomId]);
+
+   // Mark active room as read and update global unreads
+   useEffect(() => {
+      if (!userId || !activeRoomId) return;
+
+      const newLastSeen = new Date().toISOString();
+      safeLocalStorage.setItem(`lastSeen_${userId}_${activeRoomId}`, newLastSeen);
+
+      const unreads = globalMessages.filter((m) => {
+         if (m.user_id === userId) return false;
+         const lastSeen = m.group_id === activeRoomId
+            ? newLastSeen
+            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         return m.created_at > lastSeen;
+      });
+      setUnreadCount(unreads.length);
+   }, [userId, activeRoomId, activeMessages.length, globalMessages, setUnreadCount]);
 
    // Presence & typing updates
    useEffect(() => {
@@ -625,11 +627,20 @@ export const useChat = (userId: string) => {
 
    // Mark room as read
    const markAsRead = async (messageId: string) => {
+      const newLastSeen = new Date().toISOString();
       safeLocalStorage.setItem(
          `lastSeen_${userId}_${activeRoomId}`,
-         new Date().toISOString(),
+         newLastSeen,
       );
-      setUnreadCount(0);
+      
+      const unreads = globalMessages.filter((m) => {
+         if (m.user_id === userId) return false;
+         const lastSeen = m.group_id === activeRoomId
+            ? newLastSeen
+            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         return m.created_at > lastSeen;
+      });
+      setUnreadCount(unreads.length);
       setFirstUnreadId(null);
       await supabase
          .from("messages")
