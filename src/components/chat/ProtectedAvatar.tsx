@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 
 interface ProtectedAvatarProps {
@@ -17,25 +18,25 @@ export const ProtectedAvatar: React.FC<ProtectedAvatarProps> = ({
     const avatarUrl = src || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
 
     return (
-        <div 
+        <div
             className={`relative overflow-hidden select-none cursor-pointer ${className}`}
             onClick={onClick}
             onContextMenu={(e) => e.preventDefault()}
             style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
         >
             {/* The actual image container rendered as a CSS background-image */}
-            <div 
+            <div
                 className="w-full h-full bg-cover bg-center pointer-events-none select-none"
-                style={{ 
+                style={{
                     backgroundImage: `url("${avatarUrl}")`,
                     WebkitUserDrag: 'none',
-                }}
+                } as any}
             />
             {/* Overlay transparent div to intercept drag-and-drop / pointer clicks / right clicks */}
-            <div 
+            <div
                 className="absolute inset-0 bg-transparent pointer-events-auto select-none"
                 draggable={false}
-                style={{ WebkitUserDrag: 'none' }}
+                style={{ WebkitUserDrag: 'none' } as any}
             />
         </div>
     );

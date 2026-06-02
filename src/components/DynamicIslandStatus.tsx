@@ -208,7 +208,7 @@ export const DynamicIslandStatus = () => {
                         ) : (
                             <>
                                 <div className="flex -space-x-1 shrink-0">
-                                    {otherOnlineUsers.slice(0, 2).map((u, i) => (
+                                    {otherOnlineUsers.slice(0, 2).map((u,) => (
                                         <ProtectedAvatar
                                             key={u.id}
                                             src={u.avatar_url}
@@ -371,7 +371,7 @@ export const DynamicIslandStatus = () => {
                                     return (
                                         <div key={p.id} className="flex items-center justify-between group">
                                             <div className="flex items-center gap-3">
-                                                <div 
+                                                <div
                                                     className="relative cursor-pointer hover:scale-105 transition-transform"
                                                     onClick={(e) => {
                                                         if (p.id) {
@@ -390,7 +390,7 @@ export const DynamicIslandStatus = () => {
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span 
+                                                    <span
                                                         className="text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
                                                         onClick={(e) => {
                                                             if (p.id) {
