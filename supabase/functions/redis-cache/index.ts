@@ -259,7 +259,7 @@ serve(async (req) => {
       // Cache Miss: Query Database
       const { data: score, error } = await supabaseClient
         .from("scores")
-        .select("guesses, hints_used, skill_score, hint_record")
+        .select("guesses, hints_used, skill_score, hint_record, game_message")
         .eq("user_id", userId)
         .eq("game_date", date)
         .maybeSingle();

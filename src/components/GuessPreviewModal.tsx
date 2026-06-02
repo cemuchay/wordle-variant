@@ -70,6 +70,7 @@ const GuessPreviewModal: React.FC<{
       skill_score: number;
       hint_record: { letter: string; index: number; row?: number } | null;
       time_taken?: number | null;
+      game_message?: string | null;
     } | null>(null);
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
@@ -163,6 +164,7 @@ const GuessPreviewModal: React.FC<{
             skill_score: prog.score || 0,
             hint_record: prog.hint_record || null,
             time_taken: prog.time_taken,
+            game_message: prog.game_message || null,
           });
         } else {
           setGameData(null);
@@ -178,6 +180,7 @@ const GuessPreviewModal: React.FC<{
           skill_score: initialData.skill_score || 0,
           hint_record: initialData.hint_record || null,
           time_taken: initialData.time_taken,
+          game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
         });
         setLoading(false);
         return;
@@ -427,6 +430,17 @@ const GuessPreviewModal: React.FC<{
                   </button>
                 )}
               </div>
+
+              {/* Roast Message */}
+              {gameData?.game_message && (
+                <div className="mb-4 p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-center relative overflow-hidden shadow-inner animate-in fade-in zoom-in duration-300">
+                  <div className="absolute top-1 left-2 text-[20px] text-indigo-500/20 font-serif select-none pointer-events-none">“</div>
+                  <p className="text-xs italic text-indigo-200 font-serif leading-relaxed px-4">
+                    {gameData.game_message}
+                  </p>
+                  <div className="absolute bottom-0 right-2 text-[20px] text-indigo-500/20 font-serif select-none pointer-events-none">”</div>
+                </div>
+              )}
 
               {/* Breakdown Section */}
               <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 mb-4 space-y-2">

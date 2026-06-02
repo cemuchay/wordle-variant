@@ -11,6 +11,32 @@ import type { GuessResult } from "../types/game";
  * 
  * @adjustment Tip: If you switch to light-mode support, consider replacing '⬛' with '⬜'.
  */
+/**
+ * Obfuscates letter clues in the roast message (characters wrapped in double quotes)
+ * by replacing alphabetical characters inside quotes with '░' to prevent giving clues.
+ */
+export const censorRoast = (message: string): string => {
+   if (!message) return "";
+   return message.replace(/"([^"]+)"/g, (match, group) => {
+      // Avoid censoring non-clue phrases like memes
+      if (group.toLowerCase().includes("google")) {
+         return match;
+      }
+      return `"${group.replace(/[a-zA-Z]/g, "░")}"`;
+   });
+};
+
+/**
+ * Generates a formatted text summary of the game result for clipboard sharing.
+ * 
+ * @what Creates the "Grid" of emojis (🟩🟨⬛) synonymous with Wordle, 
+ * along with metadata like the date, word length, and attempt count.
+ * 
+ * @param params - Game result metadata.
+ * @returns A multi-line string formatted for social sharing.
+ * 
+ * @adjustment Tip: If you switch to light-mode support, consider replacing '⬛' with '⬜'.
+ */
 export const generateShareText = ({
    date,
    guesses,
@@ -53,5 +79,6 @@ export const generateShareText = ({
       })
       .join("\n");
    const footer = usedHint ? "\n* assisted by a hint" : "";
-   return `${header}\n${grid}${footer}\n\n"${gameMessage}"`;
+   const censoredMessage = gameMessage ? censorRoast(gameMessage) : "";
+   return `${header}\n${grid}${footer}\n\n${censoredMessage ? `"${censoredMessage}"` : ""}`;
 };
