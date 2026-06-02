@@ -200,14 +200,22 @@ export const useChat = (userId: string) => {
          .select("group_id, status, chat_groups(*, creator:profiles!created_by(username))")
          .eq("user_id", userId);
 
-      const activeGroups: ChatGroup[] = (coreData || []).map(cg => ({
-         id: cg.id,
-         name: cg.name,
-         type: cg.type,
-         created_by: cg.created_by,
-         created_at: cg.created_at,
-         is_core: true
-      }));
+      const defaultCores: ChatGroup[] = [
+         { id: '00000000-0000-0000-0000-000000000001', name: 'General', type: 'general', is_core: true, created_at: new Date(0).toISOString() },
+         { id: '00000000-0000-0000-0000-000000000002', name: 'Game Analysis', type: 'game_analysis', is_core: true, created_at: new Date(0).toISOString() },
+         { id: '00000000-0000-0000-0000-000000000003', name: 'Bugs & Features', type: 'bugs_features', is_core: true, created_at: new Date(0).toISOString() }
+      ];
+
+      const activeGroups: ChatGroup[] = coreData && coreData.length > 0
+         ? coreData.map(cg => ({
+            id: cg.id,
+            name: cg.name,
+            type: cg.type,
+            created_by: cg.created_by,
+            created_at: cg.created_at,
+            is_core: true
+         }))
+         : defaultCores;
 
       const incomingInvites: any[] = [];
 

@@ -44,6 +44,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     const [showSidebar, setShowSidebar] = useState(true);
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [isCreatingDM, setIsCreatingDM] = useState(false);
+    const [dmSearchQuery, setDmSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
     
@@ -106,13 +108,18 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     };
 
-    // Sorting: Core groups -> DMs -> Regular groups
-    const sortedRooms = useMemo(() => {
-        const cores = groups.filter(g => g.is_core);
-        const dms = groups.filter(g => g.type === "dm");
-        const customs = groups.filter(g => g.type === "custom");
-        return [...cores, ...dms, ...customs];
-    }, [groups]);
+    // Sorting/filtering by room category
+    const cores = useMemo(() => groups.filter(g => g.is_core), [groups]);
+    const dms = useMemo(() => groups.filter(g => g.type === "dm"), [groups]);
+    const customs = useMemo(() => groups.filter(g => g.type === "custom"), [groups]);
+
+    const filteredDMSearchUsers = useMemo(() => {
+        if (!dmSearchQuery.trim()) return users;
+        const q = dmSearchQuery.toLowerCase();
+        return users.filter(u => 
+            u.username.toLowerCase().includes(q)
+        );
+    }, [users, dmSearchQuery]);
 
     const handleCreateGroupSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -184,7 +191,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                 className="absolute inset-0 opacity-[0.05] pointer-events-none" 
                 style={{ 
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath fill-rule='evenodd' d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm1-61c3.148 0 5.7-2.552 5.7-5.7 0-3.148-2.552-5.7-5.7-5.7-3.148 0-5.7 2.552-5.7 5.7 0 3.148 2.552 5.7 5.7 5.7zm50 17c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM25 50c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm14 7c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm36-20c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM51 8c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-2 42c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-12-9c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM70 70c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM30 30c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z'/%3E%3C/g%3E%3C/svg%3E")`
-                }}
+            }}
             />
 
             <AnimatePresence mode="wait">
@@ -203,13 +210,6 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 <MessageSquare className="text-correct" size={20} /> Messages
                             </h2>
                             <div className="flex gap-2">
-                                <button
-                                    onClick={() => setIsCreatingGroup(true)}
-                                    className="w-8 h-8 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                                    title="Create Group"
-                                >
-                                    <Plus size={16} className="text-white" />
-                                </button>
                                 {onClose && (
                                     <button
                                         onClick={onClose}
@@ -222,7 +222,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         </div>
 
                         {/* Rooms & Invites list */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-5">
                             {/* Invites Section */}
                             {invites.length > 0 && (
                                 <div className="space-y-2">
@@ -252,10 +252,10 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 </div>
                             )}
 
-                            {/* Chat Rooms Section */}
+                            {/* Core Channels Section */}
                             <div className="space-y-1">
-                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-2 mb-2">Chats & Groups</h3>
-                                {sortedRooms.map(room => {
+                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-2 mb-2">Core Channels</h3>
+                                {cores.map(room => {
                                     const isActive = activeRoomId === room.id;
                                     return (
                                         <button
@@ -267,42 +267,173 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                             className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${room.is_core ? 'bg-correct text-black font-black' : room.type === 'dm' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/10 text-white'}`}>
-                                                    {room.is_core ? "#" : room.type === 'dm' ? <User size={18} /> : <Users size={18} />}
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black">
+                                                    #
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
                                                     <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
-                                                        {room.type === 'dm' ? 'Direct Message' : room.type === 'custom' ? 'Group Chat' : 'Core Channel'}
+                                                        Core Channel
                                                     </span>
                                                 </div>
                                             </div>
-                                            {room.type === 'dm' && <span title="End-to-End Encrypted"><Lock size={12} className="text-white/30" /></span>}
                                         </button>
                                     );
                                 })}
                             </div>
 
-                            {/* DM directory selector */}
-                            <div className="pt-2">
-                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-2 mb-2">Start a DM</h3>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {users.map(u => (
-                                        <button
-                                            key={u.id}
-                                            onClick={async () => {
-                                                const id = await startDM(u.id);
-                                                if (id) setShowSidebar(false);
-                                            }}
-                                            className="p-2.5 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-2 truncate cursor-pointer transition-all"
-                                        >
-                                            <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}`} className="w-5 h-5 rounded-full border border-white/10" alt="avatar" />
-                                            <span className="text-[10.5px] font-bold text-white truncate">{u.username}</span>
-                                        </button>
-                                    ))}
+                            {/* Direct Messages Section */}
+                            <div className="space-y-1">
+                                <div className="flex items-center justify-between pl-2 mb-2">
+                                    <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Direct Messages</h3>
+                                    <button 
+                                        onClick={() => setIsCreatingDM(true)}
+                                        className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
+                                        title="Start DM"
+                                    >
+                                        <Plus size={14} className="text-white" />
+                                    </button>
                                 </div>
+                                {dms.length === 0 ? (
+                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/[0.02] rounded-xl border border-white/5 text-center">No DMs yet. Click + to start one.</div>
+                                ) : (
+                                    dms.map(room => {
+                                        const isActive = activeRoomId === room.id;
+                                        return (
+                                            <button
+                                                key={room.id}
+                                                onClick={() => {
+                                                    setActiveRoomId(room.id);
+                                                    setShowSidebar(false);
+                                                }}
+                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300">
+                                                        <User size={18} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
+                                                        <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
+                                                            Direct Message
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span title="End-to-End Encrypted"><Lock size={12} className="text-white/30" /></span>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Groups Section */}
+                            <div className="space-y-1">
+                                <div className="flex items-center justify-between pl-2 mb-2">
+                                    <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Groups</h3>
+                                    <button 
+                                        onClick={() => setIsCreatingGroup(true)}
+                                        className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
+                                        title="Create Group"
+                                    >
+                                        <Plus size={14} className="text-white" />
+                                    </button>
+                                </div>
+                                {customs.length === 0 ? (
+                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/[0.02] rounded-xl border border-white/5 text-center">No custom groups. Click + to create one.</div>
+                                ) : (
+                                    customs.map(room => {
+                                        const isActive = activeRoomId === room.id;
+                                        return (
+                                            <button
+                                                key={room.id}
+                                                onClick={() => {
+                                                    setActiveRoomId(room.id);
+                                                    setShowSidebar(false);
+                                                }}
+                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white">
+                                                        <Users size={18} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-white tracking-tight">{room.name}</span>
+                                                        <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">
+                                                            Group Chat
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })
+                                )}
                             </div>
                         </div>
+
+                        {/* Sliding overlay panel for Starting DM */}
+                        <AnimatePresence>
+                            {isCreatingDM && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 50 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 50 }}
+                                    className="absolute inset-0 bg-[#0b141a] z-50 p-6 flex flex-col justify-between"
+                                >
+                                    <div className="space-y-6 flex-1 overflow-y-auto">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-lg font-black uppercase tracking-wider text-white">Start a DM</h3>
+                                            <button 
+                                                onClick={() => {
+                                                    setIsCreatingDM(false);
+                                                    setDmSearchQuery("");
+                                                }} 
+                                                className="text-white/60 hover:text-white text-xs font-black uppercase"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <input
+                                                type="text"
+                                                value={dmSearchQuery}
+                                                onChange={e => setDmSearchQuery(e.target.value)}
+                                                placeholder="Search users by name..."
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                            />
+
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Select User</label>
+                                                <div className="grid grid-cols-1 gap-2 max-h-[55vh] overflow-y-auto pr-1">
+                                                    {filteredDMSearchUsers.length === 0 ? (
+                                                        <div className="text-xs text-white/40 py-4 text-center">No users match your search.</div>
+                                                    ) : (
+                                                        filteredDMSearchUsers.map(u => (
+                                                            <button
+                                                                key={u.id}
+                                                                onClick={async () => {
+                                                                    const id = await startDM(u.id);
+                                                                    setIsCreatingDM(false);
+                                                                    setDmSearchQuery("");
+                                                                    if (id) {
+                                                                        setActiveRoomId(id);
+                                                                        setShowSidebar(false);
+                                                                    }
+                                                                }}
+                                                                className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
+                                                            >
+                                                                <img src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}`} className="w-8 h-8 rounded-full border border-white/10" alt="avatar" />
+                                                                <span className="text-sm font-bold text-white">{u.username}</span>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         {/* Group Creation Popup Panel */}
                         <AnimatePresence>

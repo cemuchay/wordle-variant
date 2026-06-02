@@ -75,6 +75,18 @@ EXECUTE FUNCTION public.check_user_custom_group_limit();
 ALTER TABLE public.chat_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_group_members ENABLE ROW LEVEL SECURITY;
 
+-- 9.5 Create helper function to check membership bypassing RLS (SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION public.is_group_member(group_uuid UUID, user_uuid UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 
+        FROM public.chat_group_members 
+        WHERE group_id = group_uuid AND user_id = user_uuid AND status = 'joined'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 10. RLS Policies for chat_groups
 DROP POLICY IF EXISTS "Anyone can select core groups, members can select custom/dms" ON public.chat_groups;
 CREATE POLICY "Anyone can select core groups, members can select custom/dms"
@@ -82,10 +94,7 @@ ON public.chat_groups FOR SELECT
 TO public
 USING (
     is_core = true 
-    OR EXISTS (
-        SELECT 1 FROM public.chat_group_members 
-        WHERE group_id = id AND user_id = auth.uid() AND status = 'joined'
-    )
+    OR public.is_group_member(id, auth.uid())
     OR created_by = auth.uid()
 );
 
@@ -114,10 +123,7 @@ ON public.chat_group_members FOR SELECT
 TO public
 USING (
     user_id = auth.uid() 
-    OR EXISTS (
-        SELECT 1 FROM public.chat_group_members 
-        WHERE group_id = chat_group_members.group_id AND user_id = auth.uid() AND status = 'joined'
-    )
+    OR public.is_group_member(group_id, auth.uid())
 );
 
 DROP POLICY IF EXISTS "Creators can add members, users can invite themselves" ON public.chat_group_members;
