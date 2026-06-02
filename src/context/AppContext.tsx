@@ -420,6 +420,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'messages' },
                 async (payload) => {
+                    console.log("Realtime message event:", payload.eventType, payload);
+
                     if (payload.eventType === 'INSERT') {
                         const newMessage = payload.new as any;
                         const { data: profile } = await supabase
@@ -436,7 +438,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                             setUnreadCount(useAppStore.getState().unreadCount + 1);
                         }
                     } else if (payload.eventType === 'UPDATE') {
+                        // Merge the updated columns in global store
                         useAppStore.getState().updateGlobalMessage(payload.new);
+                    } else if (payload.eventType === 'DELETE') {
+                        // Remove deleted records (e.g. from 24h cron purges)
+                        useAppStore.setState((state) => ({
+                            globalMessages: state.globalMessages.filter((m) => m.id !== payload.old.id)
+                        }));
                     }
                 }
             )

@@ -129,10 +129,16 @@ export const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quali
    });
 };
 
+const defaultCores: ChatGroup[] = [
+   { id: '00000000-0000-0000-0000-000000000001', name: 'General', type: 'general', is_core: true, created_at: new Date(0).toISOString() },
+   { id: '00000000-0000-0000-0000-000000000002', name: 'Game Analysis', type: 'game_analysis', is_core: true, created_at: new Date(0).toISOString() },
+   { id: '00000000-0000-0000-0000-000000000003', name: 'Bugs & Features', type: 'bugs_features', is_core: true, created_at: new Date(0).toISOString() }
+];
+
 // --- Core Custom Hook ---
 export const useChat = (userId: string) => {
    const globalMessages = useAppStore((state) => state.globalMessages);
-   const [groups, setGroups] = useState<ChatGroup[]>([]);
+   const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
    const [invites, setInvites] = useState<any[]>([]);
    const [activeRoomId, setActiveRoomId] = useState<string>("00000000-0000-0000-0000-000000000001");
    const [users, setUsers] = useState<{ username: string; avatar_url: string; id: string }[]>([]);
@@ -199,12 +205,6 @@ export const useChat = (userId: string) => {
          .from("chat_group_members")
          .select("group_id, status, chat_groups(*, creator:profiles!created_by(username))")
          .eq("user_id", userId);
-
-      const defaultCores: ChatGroup[] = [
-         { id: '00000000-0000-0000-0000-000000000001', name: 'General', type: 'general', is_core: true, created_at: new Date(0).toISOString() },
-         { id: '00000000-0000-0000-0000-000000000002', name: 'Game Analysis', type: 'game_analysis', is_core: true, created_at: new Date(0).toISOString() },
-         { id: '00000000-0000-0000-0000-000000000003', name: 'Bugs & Features', type: 'bugs_features', is_core: true, created_at: new Date(0).toISOString() }
-      ];
 
       const activeGroups: ChatGroup[] = coreData && coreData.length > 0
          ? coreData.map(cg => ({
