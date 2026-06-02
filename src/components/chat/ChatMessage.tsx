@@ -4,6 +4,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-mo
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
+import { ProtectedAvatar } from "./ProtectedAvatar";
 
 interface ChatMessageProps {
     msg: Message;
@@ -380,10 +381,10 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
 
                     {/* Sender profile header inside the bubble container */}
                     <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>
-                        <img
+                        <ProtectedAvatar
                             src={msg.profiles?.avatar_url}
-                            className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform"
-                            alt="avatar"
+                            username={msg.profiles?.username}
+                            className="w-4 h-4 rounded-full border border-white/10 hover:scale-105 transition-transform"
                             onClick={(e) => {
                                 if (msg.user_id) {
                                     e.stopPropagation();

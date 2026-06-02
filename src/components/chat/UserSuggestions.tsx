@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { ProtectedAvatar } from "./ProtectedAvatar";
 
 interface User {
     username: string;
@@ -42,7 +43,7 @@ const UserSuggestions = ({ users, filter, onSelect, isVisible, currentInput }: U
                             onClick={() => onSelect(user.username)}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/2 last:border-none"
                         >
-                            <img src={user.avatar_url} className="w-9 h-9 rounded-full border border-white/10" alt={user.username} />
+                            <ProtectedAvatar src={user.avatar_url} username={user.username} className="w-9 h-9 rounded-full border border-white/10" />
                             <div>
                                 <p className="text-[14px] font-bold text-[#e9edef]">@{user.username}</p>
                                 <p className="text-[10px] text-[#8696a0]">Player</p>

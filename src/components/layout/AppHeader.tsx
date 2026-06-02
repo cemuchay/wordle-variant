@@ -5,6 +5,7 @@ import { NotificationBell } from '../notifications/NotificationBell';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { CloudSyncMenu } from '../SyncCloudModal';
 import type { SyncStatus } from '../../types/game';
+import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -143,9 +144,9 @@ export const AppHeader = ({
                     {user ? (
                         <div className="flex items-center gap-1 bg-white/5 pl-0.5 pr-2 py-0.5 rounded-full border border-white/10 group relative max-w-[80px] min-[360px]:max-w-[100px] min-[400px]:max-w-[120px] sm:max-w-none">
                             {user.user_metadata.avatar_url ? (
-                                <img
+                                <ProtectedAvatar
                                     src={user.user_metadata.avatar_url}
-                                    alt="Profile"
+                                    username={user.user_metadata.full_name || user.email}
                                     className="w-4 h-4 rounded-full border border-white/10"
                                 />
                             ) : (

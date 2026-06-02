@@ -4,6 +4,7 @@ import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarD
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
+import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 interface UserProfileModalProps {
     userId: string;
@@ -354,12 +355,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     ) : (
                         profile && (
                             <div className="flex items-center gap-5 w-full">
-                                <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
-                                    <img
-                                        src={profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username)}`}
-                                        alt={profile.username}
-                                        className={`w-16 h-16 rounded-full border-2 object-cover ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
-                                    />
+                                    <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
+                                        <ProtectedAvatar
+                                            src={profile.avatar_url}
+                                            username={profile.username}
+                                            className={`w-16 h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
+                                        />
                                     {isOnline && (
                                         <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-gray-950" />
                                     )}
