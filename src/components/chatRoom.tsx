@@ -41,7 +41,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         startDM,
         users,
         hasPlayedToday,
-        dailyGuesses
+        dailyGuesses,
+        resendMessage
     } = useChat(user?.id);
 
     const globalMessages = useAppStore((state) => state.globalMessages);
@@ -724,6 +725,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                             }
                                                         }}
                                                         dailyGuesses={dailyGuesses}
+                                                        onResend={resendMessage}
                                                     />
                                                 </div>
                                             );

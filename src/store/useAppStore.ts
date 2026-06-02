@@ -59,6 +59,8 @@ interface AppState {
    globalMessages: any[];
    isGlobalMessagesLoaded: boolean;
    readReceipts: Record<string, string>;
+   failedMessageIds: string[];
+   pendingReadReceipts: Record<string, string>;
 
    // Actions
    triggerToast: (message: string, duration?: number) => void;
@@ -82,6 +84,11 @@ interface AppState {
    updateGlobalMessage: (message: any) => void;
    setReadReceipts: (receipts: Record<string, string>) => void;
    updateReadReceipt: (groupId: string, timestamp: string) => void;
+   addFailedMessageId: (id: string) => void;
+   removeFailedMessageId: (id: string) => void;
+   setPendingReadReceipts: (receipts: Record<string, string>) => void;
+   updatePendingReadReceipt: (groupId: string, timestamp: string) => void;
+   removePendingReadReceipt: (groupId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -102,6 +109,15 @@ export const useAppStore = create<AppState>((set) => ({
    globalMessages: [],
    isGlobalMessagesLoaded: false,
    readReceipts: {},
+   failedMessageIds: [],
+   pendingReadReceipts: (() => {
+      try {
+         const val = localStorage.getItem('pendingReadReceipts');
+         return val ? JSON.parse(val) : {};
+      } catch {
+         return {};
+      }
+   })(),
 
    // Actions
    triggerToast: (message, duration) =>
@@ -142,4 +158,31 @@ export const useAppStore = create<AppState>((set) => ({
       set((state) => ({
          readReceipts: { ...state.readReceipts, [groupId]: timestamp },
       })),
+   addFailedMessageId: (id) => set((state) => ({
+      failedMessageIds: [...state.failedMessageIds, id]
+   })),
+   removeFailedMessageId: (id) => set((state) => ({
+      failedMessageIds: state.failedMessageIds.filter((mid) => mid !== id)
+   })),
+   setPendingReadReceipts: (pendingReadReceipts) => {
+      try {
+         localStorage.setItem('pendingReadReceipts', JSON.stringify(pendingReadReceipts));
+      } catch {}
+      set({ pendingReadReceipts });
+   },
+   updatePendingReadReceipt: (groupId, timestamp) => set((state) => {
+      const next = { ...state.pendingReadReceipts, [groupId]: timestamp };
+      try {
+         localStorage.setItem('pendingReadReceipts', JSON.stringify(next));
+      } catch {}
+      return { pendingReadReceipts: next };
+   }),
+   removePendingReadReceipt: (groupId) => set((state) => {
+      const next = { ...state.pendingReadReceipts };
+      delete next[groupId];
+      try {
+         localStorage.setItem('pendingReadReceipts', JSON.stringify(next));
+      } catch {}
+      return { pendingReadReceipts: next };
+   }),
 }));

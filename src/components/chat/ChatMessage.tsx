@@ -18,6 +18,7 @@ interface ChatMessageProps {
     onEdit: (newContent: string) => Promise<void>;
     onDelete: () => Promise<void>;
     dailyGuesses?: any[];
+    onResend?: (id: string) => void;
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
@@ -109,7 +110,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses }: ChatMessageProps) => {
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
 
@@ -489,10 +490,22 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                         )}
                         {time}
                         {isMe && (
-                            <CheckCheck
-                                size={14}
-                                className={msg.is_read ? "text-blue-400" : "text-white/40"}
-                            />
+                            msg.status === "sending" ? (
+                                <span className="animate-spin text-white/50 text-[10px] select-none" title="Sending...">⌛</span>
+                            ) : msg.status === "failed" ? (
+                                <span 
+                                    className="text-red-400 text-[11px] font-black cursor-pointer hover:scale-110 active:scale-95 transition-transform flex items-center gap-0.5 select-none" 
+                                    title="Failed. Click to retry." 
+                                    onClick={() => onResend?.(msg.id)}
+                                >
+                                    ⚠️ Retry
+                                </span>
+                            ) : (
+                                <CheckCheck
+                                    size={14}
+                                    className={msg.is_read ? "text-blue-400" : "text-white/40"}
+                                />
+                            )
                         )}
                     </div>
 
