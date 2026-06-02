@@ -1,24 +1,30 @@
-import { useState, useRef, useEffect } from "react";
-import { SendIcon, X, Mic, Trash2 } from "lucide-react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useRef, useEffect, useMemo } from "react";
+import { SendIcon, X, Mic, Trash2, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../../hooks/useChat";
 import UserSuggestions from "./UserSuggestions";
+import { useApp } from "../../context/AppContext";
 
 interface MessageInputProps {
     onSend: (content: string, replyToId?: string, mentions?: string[]) => void;
     onSendVoice: (audioBlob: Blob) => void;
+    onSendImage?: (file: File) => void;
     onTyping: (isTyping: boolean) => void;
     replyingTo: Message | null;
     onCancelReply: () => void;
     users: { username: string; avatar_url: string; id: string }[];
+    isGameAnalysis?: boolean;
+    dailyGuesses?: any[];
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 
-const MessageInput = ({ onSend, onSendVoice, onTyping, replyingTo, onCancelReply, users }: MessageInputProps) => {
+const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, onCancelReply, users, isGameAnalysis, dailyGuesses }: MessageInputProps) => {
+    const { profile } = useApp();
     const [input, setInput] = useState("");
     const [mentionState, setMentionState] = useState<{ isVisible: boolean; filter: string; cursorPosition: number } | null>(null);
-    
+
     // Voice recording states
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
@@ -27,6 +33,7 @@ const MessageInput = ({ onSend, onSendVoice, onTyping, replyingTo, onCancelReply
     const timerRef = useRef<number | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
 
     const handleScroll = () => {
@@ -199,8 +206,26 @@ const MessageInput = ({ onSend, onSendVoice, onTyping, replyingTo, onCancelReply
         return highlighted + (text.endsWith('\n') ? '\n ' : '');
     };
 
+    const hasDailyScore = useMemo(() => {
+        if (!dailyGuesses || !profile?.id) return false;
+        return dailyGuesses.some(dg => dg.user_id === profile.id);
+    }, [dailyGuesses, profile]);
+
     return (
         <div className="px-3 pb-4 pt-2 bg-[#0b141a] relative">
+            {/* Quick Actions for Game Analysis */}
+            {isGameAnalysis && hasDailyScore && profile?.id && (
+                <div className="mx-2 mb-2.5 flex justify-start">
+                    <button
+                        type="button"
+                        onClick={() => onSend(`[guess:${profile.id}]`)}
+                        className="px-3 py-1.5 bg-correct/10 hover:bg-correct/20 border border-correct/30 rounded-full text-[10px] font-black uppercase text-correct tracking-wider cursor-pointer flex items-center gap-1.5 transition-all"
+                    >
+                        📊 Share My Guess Board
+                    </button>
+                </div>
+            )}
+
             <AnimatePresence>
                 {replyingTo && (
                     <motion.div
@@ -230,6 +255,30 @@ const MessageInput = ({ onSend, onSendVoice, onTyping, replyingTo, onCancelReply
                 />
 
                 <div className="flex items-end gap-2 px-2">
+                    {/* Image Attachment Trigger */}
+                    {!isRecording && onSendImage && (
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-[#2a3942] hover:bg-white/10 text-white/60 hover:text-white h-[44px] w-[44px] rounded-full flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer border border-white/5"
+                            title="Share Image"
+                        >
+                            <ImageIcon size={20} />
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        onSendImage(file);
+                                        if (fileInputRef.current) fileInputRef.current.value = "";
+                                    }
+                                }}
+                            />
+                        </button>
+                    )}
                     {isRecording ? (
                         <div className="flex-1 flex items-center justify-between bg-[#2a3942] rounded-[24px] px-4 py-[10px] min-h-[44px] text-white">
                             <div className="flex items-center gap-2">

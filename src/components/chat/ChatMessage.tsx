@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useMemo, useState, useRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ interface ChatMessageProps {
     currentUserId: string;
     onEdit: (newContent: string) => Promise<void>;
     onDelete: () => Promise<void>;
+    dailyGuesses?: any[];
 }
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
@@ -40,7 +42,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
 
     const handleSpeedChange = () => {
         if (!audioRef.current) return;
-        let nextRate = 1;
+        let nextRate: number;
         if (playbackRate === 1) nextRate = 1.5;
         else if (playbackRate === 1.5) nextRate = 2;
         else nextRate = 1;
@@ -65,16 +67,16 @@ const AudioPlayer = ({ url }: { url: string }) => {
                 onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                 onEnded={() => setIsPlaying(false)}
             />
-            <button 
+            <button
                 type="button"
-                onClick={togglePlay} 
+                onClick={togglePlay}
                 className="w-8 h-8 rounded-full bg-correct text-black flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
             >
                 {isPlaying ? <Pause size={14} fill="black" /> : <Play size={14} fill="black" className="ml-0.5" />}
             </button>
             <div className="flex-1 flex flex-col gap-1">
                 {/* Seek Bar */}
-                <div 
+                <div
                     className="h-1.5 w-full bg-white/20 rounded-full cursor-pointer relative"
                     onClick={(e) => {
                         if (!audioRef.current || duration === 0) return;
@@ -85,7 +87,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
                         setCurrentTime(newTime);
                     }}
                 >
-                    <div 
+                    <div
                         className="h-full bg-correct rounded-full"
                         style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
                     />
@@ -95,9 +97,9 @@ const AudioPlayer = ({ url }: { url: string }) => {
                     <span>{formatTime(duration)}</span>
                 </div>
             </div>
-            <button 
+            <button
                 type="button"
-                onClick={handleSpeedChange} 
+                onClick={handleSpeedChange}
                 className="text-[10px] font-black bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-md transition-colors border border-white/5 cursor-pointer"
             >
                 {playbackRate}x
@@ -106,14 +108,15 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete }: ChatMessageProps) => {
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses }: ChatMessageProps) => {
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
-    
+
     // Inline edit and menu states
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
+    const [zoomOpen, setZoomOpen] = useState(false);
 
     // Transform x position to reply icon properties (swipe to right)
     const replyIconOpacity = useTransform(x, [0, 50], [0, 1]);
@@ -126,6 +129,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     }, [users, msg.profiles?.username]);
 
     const isWithinTimeLimit = useMemo(() => {
+        // eslint-disable-next-line react-hooks/purity
         const elapsed = Date.now() - new Date(msg.created_at).getTime();
         return elapsed < 5 * 60 * 1000; // 5 minutes
     }, [msg.created_at]);
@@ -135,7 +139,44 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     const renderedContent = useMemo(() => {
         const content = msg.content;
         if (!content) return null;
-        
+
+        // Render Guess tag inline
+        const guessMatch = content.match(/\[guess:([a-zA-Z0-9-]+)\]/);
+        if (guessMatch && dailyGuesses) {
+            const guessData = dailyGuesses.find(dg => dg.user_id === guessMatch[1]);
+            if (guessData) {
+                const username = guessData.profiles?.username || "Player";
+                const won = guessData.status === "won";
+                const score = won ? guessData.guesses.length : "X";
+                const grid = guessData.guesses.map((row: any[], rIdx: number) => (
+                    <div key={rIdx} className="flex gap-0.5 justify-center">
+                        {row.map((cell: any, cIdx: number) => (
+                            <div
+                                key={cIdx}
+                                className={`w-3.5 h-3.5 rounded-sm ${cell.status === "correct"
+                                        ? "bg-correct"
+                                        : cell.status === "present"
+                                            ? "bg-present"
+                                            : "bg-gray-700/50"
+                                    }`}
+                            />
+                        ))}
+                    </div>
+                ));
+
+                return (
+                    <div className="bg-black/40 border border-white/10 rounded-2xl p-4 my-2 text-center shadow-inner max-w-full">
+                        <p className="text-[10px] font-black uppercase text-correct tracking-wider mb-3">
+                            🎯 {username}'s Guess Board ({score}/6)
+                        </p>
+                        <div className="flex flex-col gap-0.5 bg-black/20 p-3 rounded-xl inline-block">
+                            {grid}
+                        </div>
+                    </div>
+                );
+            }
+        }
+
         const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
         let parts: (string | JSX.Element)[] = [content];
 
@@ -209,6 +250,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
         });
 
         return finalParts;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [msg.content, users, isMe]);
 
     return (
@@ -338,10 +380,10 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
 
                     {/* Sender profile header inside the bubble container */}
                     <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>
-                        <img 
-                            src={msg.profiles?.avatar_url} 
-                            className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform" 
-                            alt="avatar" 
+                        <img
+                            src={msg.profiles?.avatar_url}
+                            className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform"
+                            alt="avatar"
                             onClick={(e) => {
                                 if (msg.user_id) {
                                     e.stopPropagation();
@@ -349,10 +391,10 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                                 }
                             }}
                         />
-                        <span 
+                        <span
                             className="text-[9px] font-black uppercase tracking-wider cursor-pointer hover:underline text-left"
-                            style={{ 
-                                color: isMe 
+                            style={{
+                                color: isMe
                                     ? '#82e0aa' // Outgoing gets a light green sender name
                                     : senderColor // Incoming gets their custom mention color
                             }}
@@ -405,6 +447,36 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                             </div>
                         ) : msg.voice_url ? (
                             <AudioPlayer url={msg.voice_url} />
+                        ) : msg.image_url ? (
+                            <>
+                                <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setZoomOpen(true)}>
+                                    <img
+                                        src={msg.image_url}
+                                        className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
+                                        alt="shared file"
+                                    />
+                                </div>
+                                <AnimatePresence>
+                                    {zoomOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            onClick={() => setZoomOpen(false)}
+                                            className="fixed inset-0 bg-black/90 z-200 flex items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
+                                        >
+                                            <motion.img
+                                                initial={{ scale: 0.9 }}
+                                                animate={{ scale: 1 }}
+                                                exit={{ scale: 0.9 }}
+                                                src={msg.image_url}
+                                                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                                                alt="zoomed shared file"
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </>
                         ) : (
                             renderedContent
                         )}
