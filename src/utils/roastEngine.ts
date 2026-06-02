@@ -181,7 +181,7 @@ export function generateRoast(
     if (analysis.grayReuses.length > 0) {
         const letters = analysis.grayReuses.slice(0, 2).join(', ');
         const grayRoasts = [
-            `Reusing gray letters (${letters})? Are you allergic to the process of elimination?`,
+            `Reusing gray letters ("${letters}")? Are you allergic to the process of elimination?`,
             `Guessed dead letters like "${letters}" again? Stop guessing letters that are already marked gray!`,
             `Those gray tiles aren't just for decoration. Why did you reuse "${letters}"?`
         ];
