@@ -2,7 +2,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
-import { safeLocalStorage } from "../utils/storage";
 import { useAppStore } from "../store/useAppStore";
 
 export interface Message {
@@ -20,6 +19,7 @@ export interface Message {
    is_edited?: boolean;
    is_deleted?: boolean;
    group_id: string;
+   status?: "sending" | "sent" | "failed";
 }
 
 export interface ChatGroup {
@@ -160,8 +160,16 @@ const defaultCores: ChatGroup[] = [
 
 // --- Core Custom Hook ---
 export const useChat = (userId: string) => {
-   const globalMessages = useAppStore((state) => state.globalMessages);
-   const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
+    const globalMessages = useAppStore((state) => state.globalMessages);
+    const readReceipts = useAppStore((state) => state.readReceipts);
+    const updateReadReceipt = useAppStore((state) => state.updateReadReceipt);
+    const failedMessageIds = useAppStore((state) => state.failedMessageIds);
+    const addFailedMessageId = useAppStore((state) => state.addFailedMessageId);
+    const removeFailedMessageId = useAppStore((state) => state.removeFailedMessageId);
+    const pendingReadReceipts = useAppStore((state) => state.pendingReadReceipts);
+    const updatePendingReadReceipt = useAppStore((state) => state.updatePendingReadReceipt);
+    const removePendingReadReceipt = useAppStore((state) => state.removePendingReadReceipt);
+    const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
    const [invites, setInvites] = useState<any[]>([]);
    const [activeRoomId, setActiveRoomId] = useState<string>(
       "00000000-0000-0000-0000-000000000001",
@@ -208,7 +216,7 @@ export const useChat = (userId: string) => {
       const fetchGuesses = async () => {
          const { data } = await supabase
             .from("scores")
-            .select("user_id, guesses, status, profiles(username)")
+            .select("user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score")
             .eq("game_date", date);
          if (data) {
             setDailyGuesses(data);
@@ -352,33 +360,96 @@ export const useChat = (userId: string) => {
    // Find the first unread message ID when activeRoomId changes
    useEffect(() => {
       if (!userId || !activeRoomId) return;
-      const lastSeen = safeLocalStorage.getItem(`lastSeen_${userId}_${activeRoomId}`) || new Date(0).toISOString();
+      const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const unreads = activeMessages.filter(
          (m: any) => m.user_id !== userId && m.created_at > lastSeen,
       );
       if (unreads.length > 0) {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          setFirstUnreadId(unreads[0].id);
       } else {
          setFirstUnreadId(null);
       }
-   }, [userId, activeRoomId]);
+   }, [userId, activeRoomId, readReceipts, activeMessages]);
 
    // Mark active room as read and update global unreads
    useEffect(() => {
       if (!userId || !activeRoomId) return;
 
+      const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
+      const hasUnread = activeMessages.some(
+         (m: any) => m.user_id !== userId && m.created_at > lastSeen
+      );
+      if (!hasUnread) return;
+
       const newLastSeen = new Date().toISOString();
-      safeLocalStorage.setItem(`lastSeen_${userId}_${activeRoomId}`, newLastSeen);
+
+      // Optimistically update store
+      updateReadReceipt(activeRoomId, newLastSeen);
+
+      // Perform background database update
+      supabase
+         .from("chat_read_receipts")
+         .upsert(
+            {
+               user_id: userId,
+               group_id: activeRoomId,
+               last_seen_at: newLastSeen,
+            },
+            { onConflict: "user_id,group_id" },
+         )
+         .then(({ error }) => {
+            if (error) {
+               console.error("Failed to update read receipt:", error.message);
+               updatePendingReadReceipt(activeRoomId, newLastSeen);
+            } else {
+               removePendingReadReceipt(activeRoomId);
+            }
+         });
 
       const unreads = globalMessages.filter((m) => {
          if (m.user_id === userId) return false;
-         const lastSeen = m.group_id === activeRoomId
-            ? newLastSeen
-            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         const lastSeen =
+            m.group_id === activeRoomId
+               ? newLastSeen
+               : readReceipts[m.group_id] || new Date(0).toISOString();
          return m.created_at > lastSeen;
       });
       setUnreadCount(unreads.length);
-   }, [userId, activeRoomId, activeMessages.length, globalMessages, setUnreadCount]);
+   }, [
+      userId,
+      activeRoomId,
+      activeMessages,
+      globalMessages,
+      setUnreadCount,
+      readReceipts,
+   ]);
+
+   // Flush pending read receipts on load or network restore
+   useEffect(() => {
+      if (!userId || Object.keys(pendingReadReceipts).length === 0) return;
+
+      const flushReceipts = async () => {
+         const keys = Object.keys(pendingReadReceipts);
+         for (const groupId of keys) {
+            const timestamp = pendingReadReceipts[groupId];
+            const { error } = await supabase.from("chat_read_receipts").upsert({
+               user_id: userId,
+               group_id: groupId,
+               last_seen_at: timestamp
+            }, { onConflict: "user_id,group_id" });
+
+            if (!error) {
+               removePendingReadReceipt(groupId);
+            }
+         }
+      };
+
+      flushReceipts();
+
+      window.addEventListener("online", flushReceipts);
+      return () => window.removeEventListener("online", flushReceipts);
+   }, [userId, pendingReadReceipts]);
 
    // Presence & typing updates
    useEffect(() => {
@@ -456,6 +527,26 @@ export const useChat = (userId: string) => {
       }, 2000);
    }, []);
 
+    const sendWithRetry = async (
+       messageId: string,
+       messagePayload: any,
+       retries = 3,
+       delay = 1000
+    ): Promise<boolean> => {
+       for (let i = 0; i < retries; i++) {
+          try {
+             const { error } = await supabase.from("messages").insert([messagePayload]);
+             if (!error) return true;
+             throw error;
+          } catch (err) {
+             console.warn(`Retry ${i + 1}/${retries} failed for message ${messageId}:`, err);
+             if (i === retries - 1) return false;
+             await new Promise((resolve) => setTimeout(resolve, delay * Math.pow(2, i)));
+          }
+       }
+       return false;
+    };
+
    // Send Message
    const sendMessage = async (
       content: string,
@@ -484,28 +575,70 @@ export const useChat = (userId: string) => {
          voice_url: voiceUrl,
          image_url: imageUrl,
          group_id: activeRoomId,
+         status: "sending",
          profiles: globalMessages.find((m) => m.user_id === userId)
             ?.profiles || { username: "Me", avatar_url: "", id: userId },
       };
 
       useAppStore.getState().addGlobalMessage(optimisticMessage);
 
-      const { error } = await supabase.from("messages").insert([
-         {
-            id: tempId,
-            content: finalContent,
-            user_id: userId,
-            reply_to: replyToId,
-            mentions: mentions,
-            is_read: false,
-            voice_url: voiceUrl,
-            image_url: imageUrl,
-            group_id: activeRoomId,
-         },
-      ]);
+      const messagePayload = {
+         id: tempId,
+         content: finalContent,
+         user_id: userId,
+         reply_to: replyToId,
+         mentions: mentions,
+         is_read: false,
+         voice_url: voiceUrl,
+         image_url: imageUrl,
+         group_id: activeRoomId,
+      };
 
-      if (error) {
-         console.error("Failed to send message:", error);
+      const success = await sendWithRetry(tempId, messagePayload);
+
+      if (success) {
+         useAppStore.getState().updateGlobalMessage({ id: tempId, status: "sent" });
+      } else {
+         useAppStore.getState().updateGlobalMessage({ id: tempId, status: "failed" });
+         addFailedMessageId(tempId);
+         useAppStore.getState().triggerToast("Failed to send message. Tap to retry.", 4000);
+      }
+   };
+
+   // Resend Message
+   const resendMessage = async (messageId: string) => {
+      const msg = globalMessages.find((m) => m.id === messageId);
+      if (!msg) return;
+
+      useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sending" });
+      removeFailedMessageId(messageId);
+
+      let finalContent = msg.content;
+      if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
+         const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
+         finalContent = encryptDM(msg.content, key);
+      }
+
+      const messagePayload = {
+         id: messageId,
+         content: finalContent,
+         user_id: userId,
+         reply_to: msg.reply_to,
+         mentions: msg.mentions,
+         is_read: false,
+         voice_url: msg.voice_url,
+         image_url: msg.image_url,
+         group_id: msg.group_id,
+      };
+
+      const success = await sendWithRetry(messageId, messagePayload);
+
+      if (success) {
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "sent" });
+      } else {
+         useAppStore.getState().updateGlobalMessage({ id: messageId, status: "failed" });
+         addFailedMessageId(messageId);
+         useAppStore.getState().triggerToast("Resend failed.", 4000);
       }
    };
 
@@ -628,16 +761,32 @@ export const useChat = (userId: string) => {
    // Mark room as read
    const markAsRead = async (messageId: string) => {
       const newLastSeen = new Date().toISOString();
-      safeLocalStorage.setItem(
-         `lastSeen_${userId}_${activeRoomId}`,
-         newLastSeen,
-      );
-      
+
+      // Optimistically update store
+      updateReadReceipt(activeRoomId, newLastSeen);
+
+      // Perform background database update
+      supabase
+         .from("chat_read_receipts")
+         .upsert(
+            {
+               user_id: userId,
+               group_id: activeRoomId,
+               last_seen_at: newLastSeen,
+            },
+            { onConflict: "user_id,group_id" },
+         )
+         .then(({ error }) => {
+            if (error)
+               console.error("Failed to update read receipt:", error.message);
+         });
+
       const unreads = globalMessages.filter((m) => {
          if (m.user_id === userId) return false;
-         const lastSeen = m.group_id === activeRoomId
-            ? newLastSeen
-            : (safeLocalStorage.getItem(`lastSeen_${userId}_${m.group_id}`) || new Date(0).toISOString());
+         const lastSeen =
+            m.group_id === activeRoomId
+               ? newLastSeen
+               : readReceipts[m.group_id] || new Date(0).toISOString();
          return m.created_at > lastSeen;
       });
       setUnreadCount(unreads.length);
@@ -789,6 +938,8 @@ export const useChat = (userId: string) => {
       setActiveRoomId,
       messages: activeMessages,
       sendMessage,
+      resendMessage,
+      failedMessageIds,
       sendImageMessage,
       reactToMessage,
       editMessage,

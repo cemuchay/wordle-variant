@@ -41,10 +41,12 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         startDM,
         users,
         hasPlayedToday,
-        dailyGuesses
+        dailyGuesses,
+        resendMessage
     } = useChat(user?.id);
 
     const globalMessages = useAppStore((state) => state.globalMessages);
+    const readReceipts = useAppStore((state) => state.readReceipts);
 
     const [showSidebar, setShowSidebar] = useState(true);
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -152,19 +154,6 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     };
 
-    // Sorting/filtering by room category
-    const cores = useMemo(() => groups.filter(g => g.is_core), [groups]);
-    const dms = useMemo(() => groups.filter(g => g.type === "dm"), [groups]);
-    const customs = useMemo(() => groups.filter(g => g.type === "custom"), [groups]);
-
-    const filteredDMSearchUsers = useMemo(() => {
-        if (!dmSearchQuery.trim()) return users;
-        const q = dmSearchQuery.toLowerCase();
-        return users.filter(u =>
-            u.username.toLowerCase().includes(q)
-        );
-    }, [users, dmSearchQuery]);
-
     const lastMessages = useMemo(() => {
         const map: Record<string, any> = {};
         globalMessages.forEach((m) => {
@@ -175,6 +164,47 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         });
         return map;
     }, [globalMessages]);
+
+    const unreadCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        globalMessages.forEach((m) => {
+            if (m.user_id !== user?.id) {
+                const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+                if (m.created_at > lastSeen) {
+                    counts[m.group_id] = (counts[m.group_id] || 0) + 1;
+                }
+            }
+        });
+        return counts;
+    }, [globalMessages, readReceipts, user?.id]);
+
+    const sortRooms = (rooms: any[]) => {
+        return [...rooms].sort((a, b) => {
+            const aUnread = unreadCounts[a.id] || 0;
+            const bUnread = unreadCounts[b.id] || 0;
+            if (aUnread > 0 && bUnread === 0) return -1;
+            if (bUnread > 0 && aUnread === 0) return 1;
+
+            const aLastMsg = lastMessages[a.id];
+            const bLastMsg = lastMessages[b.id];
+            const aTime = aLastMsg ? new Date(aLastMsg.created_at).getTime() : 0;
+            const bTime = bLastMsg ? new Date(bLastMsg.created_at).getTime() : 0;
+            return bTime - aTime;
+        });
+    };
+
+    // Sorting/filtering by room category
+    const cores = useMemo(() => sortRooms(groups.filter(g => g.is_core)), [groups, unreadCounts, lastMessages]);
+    const dms = useMemo(() => sortRooms(groups.filter(g => g.type === "dm")), [groups, unreadCounts, lastMessages]);
+    const customs = useMemo(() => sortRooms(groups.filter(g => g.type === "custom")), [groups, unreadCounts, lastMessages]);
+
+    const filteredDMSearchUsers = useMemo(() => {
+        if (!dmSearchQuery.trim()) return users;
+        const q = dmSearchQuery.toLowerCase();
+        return users.filter(u =>
+            u.username.toLowerCase().includes(q)
+        );
+    }, [users, dmSearchQuery]);
 
     const renderLastMessage = (room: any) => {
         const lastMsg = lastMessages[room.id];
@@ -347,6 +377,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-2 mb-2">Core Channels</h3>
                                 {cores.map(room => {
                                     const isActive = activeRoomId === room.id;
+                                    const unreadCount = unreadCounts[room.id] || 0;
                                     return (
                                         <button
                                             key={room.id}
@@ -354,16 +385,21 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 setActiveRoomId(room.id);
                                                 setShowSidebar(false);
                                             }}
-                                            className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                            className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                         >
                                             <div className="flex items-center gap-3 min-w-0 flex-1">
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0">
                                                     #
                                                 </div>
                                                 <div className="flex flex-col min-w-0 flex-1">
-                                                    <span className="text-base font-bold text-white tracking-tight truncate uppercase">{room.name}</span>
+                                                    <span className={`text-base font-bold tracking-tight truncate uppercase ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
                                                     {renderLastMessage(room)}
                                                 </div>
+                                                {unreadCount > 0 && (
+                                                    <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
+                                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                                    </div>
+                                                )}
                                             </div>
                                         </button>
                                     );
@@ -387,6 +423,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 ) : (
                                     dms.map(room => {
                                         const isActive = activeRoomId === room.id;
+                                        const unreadCount = unreadCounts[room.id] || 0;
                                         return (
                                             <button
                                                 key={room.id}
@@ -394,16 +431,21 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                     setActiveRoomId(room.id);
                                                     setShowSidebar(false);
                                                 }}
-                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300 shrink-0">
                                                         <User size={18} />
                                                     </div>
                                                     <div className="flex flex-col min-w-0 flex-1">
-                                                        <span className="text-sm font-bold text-white tracking-tight truncate">{room.name}</span>
+                                                        <span className={`text-sm font-bold tracking-tight truncate ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
                                                         {renderLastMessage(room)}
                                                     </div>
+                                                    {unreadCount > 0 && (
+                                                        <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
+                                                            {unreadCount > 99 ? '99+' : unreadCount}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </button>
                                         );
@@ -428,6 +470,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 ) : (
                                     customs.map(room => {
                                         const isActive = activeRoomId === room.id;
+                                        const unreadCount = unreadCounts[room.id] || 0;
                                         return (
                                             <button
                                                 key={room.id}
@@ -435,16 +478,21 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                     setActiveRoomId(room.id);
                                                     setShowSidebar(false);
                                                 }}
-                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
                                                         <Users size={18} />
                                                     </div>
                                                     <div className="flex flex-col min-w-0 flex-1">
-                                                        <span className="text-sm font-bold text-white tracking-tight truncate">{room.name}</span>
+                                                        <span className={`text-sm font-bold tracking-tight truncate ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
                                                         {renderLastMessage(room)}
                                                     </div>
+                                                    {unreadCount > 0 && (
+                                                        <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
+                                                            {unreadCount > 99 ? '99+' : unreadCount}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </button>
                                         );
@@ -724,6 +772,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                             }
                                                         }}
                                                         dailyGuesses={dailyGuesses}
+                                                        onResend={resendMessage}
                                                     />
                                                 </div>
                                             );
