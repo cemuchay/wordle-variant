@@ -934,11 +934,30 @@ export const calculateSkillIndex = ({
                      item.letter === cell.letter,
                );
 
+               const oldGreen = wordsAwardedPoints.find(
+                  (item) =>
+                     item.status === "correct" &&
+                     item.letter === cell.letter &&
+                     !item.isChecked,
+               );
+
                /* letter not present or isChecked */
-               const freshYellow = !awardedOldYellow ? true : false;
+               let freshYellow = !awardedOldYellow ? true : false;
+
+               if (oldGreen && freshYellow) {
+                  freshYellow = false;
+               }
 
                if (awardedOldYellow) {
                   awardedOldYellow.isChecked = true;
+                  localDecisions.push({
+                     letter: cell.letter,
+                     status: `${cell.status} [no deduction or addition as points have already been given]`,
+                     pointDeduction: 0,
+                  });
+               }
+
+               if (oldGreen) {
                   localDecisions.push({
                      letter: cell.letter,
                      status: `${cell.status} [no deduction or addition as points have already been given]`,
