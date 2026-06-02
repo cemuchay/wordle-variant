@@ -905,11 +905,6 @@ export const calculateSkillIndex = ({
             (item) => item.awardRow < rowIndex,
          );
 
-         if (rowIndex === 1) {
-            console.log(relevantAwardedWords, "relevantAwardedWords");
-            console.log(wordsAwardedPoints, "wordsAwardedPoints");
-         }
-
          let points = 0;
          const localDecisions: Array<{
             letter: string;
