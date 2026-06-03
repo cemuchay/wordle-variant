@@ -129,6 +129,7 @@ export const ModalsManager = ({
                     usedHint={gameContext.usedHint}
                     gameMessage={gameContext.gameMessage}
                     stats={gameContext.stats}
+                    isAuthenticated={gameContext.user ? true : false}
                 />
             )}
             {viewedProfileId && (

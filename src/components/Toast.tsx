@@ -20,7 +20,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
 
   const style = useMemo(() => {
     const lower = message.toLowerCase();
-    
+
     // Alert / Error keywords
     if (
       lower.includes('failed') ||
@@ -41,7 +41,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
         label: 'ALERT'
       };
     }
-    
+
     // Success keywords
     if (
       lower.includes('success') ||
@@ -59,7 +59,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
         label: 'SUCCESS'
       };
     }
-    
+
     // Default Info notice
     return {
       icon: <Info className="w-4 h-4 text-blue-400" />,
@@ -72,7 +72,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
   return (
     <AnimatePresence>
       {isVisible && (
-        <div 
+        <div
           className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 flex justify-center pointer-events-none"
           style={{ zIndex: Z_INDEX.TOAST }}
         >
@@ -87,29 +87,24 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
             `}
           >
             {/* Left Accent indicator line */}
-            <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${
-              style.label === 'ALERT' ? 'bg-red-500' : style.label === 'SUCCESS' ? 'bg-correct' : 'bg-blue-500'
-            }`} />
+            <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${style.label === 'ALERT' ? 'bg-red-500' : style.label === 'SUCCESS' ? 'bg-correct' : 'bg-blue-500'
+              }`} />
 
             {/* Icon Group */}
             <div className="flex items-center justify-center p-1.5 bg-white/5 rounded-xl shrink-0">
               {style.icon}
             </div>
-            
+
             {/* Content Group */}
             <div className="flex-1 min-w-0">
-              <span className={`text-[9px] font-black uppercase tracking-widest block leading-none pb-1 ${
-                style.label === 'ALERT' ? 'text-red-500' : style.label === 'SUCCESS' ? 'text-correct' : 'text-blue-500'
-              }`}>
-                {style.label}
-              </span>
+
               <p className="text-[11px] text-gray-200 font-extrabold uppercase tracking-wider leading-relaxed">
                 {message}
               </p>
             </div>
 
             {/* Close action */}
-            <button 
+            <button
               onClick={onClose}
               className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0 self-center"
               aria-label="Close"
