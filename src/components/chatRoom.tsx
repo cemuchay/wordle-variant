@@ -554,6 +554,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
                                                             >
                                                                 <ProtectedAvatar 
+                                                                    userId={u.id}
                                                                     src={u.avatar_url} 
                                                                     username={u.username} 
                                                                     className="w-8 h-8 rounded-full border border-white/10" 
@@ -610,6 +611,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 className={`p-2.5 border rounded-xl text-left flex items-center gap-2 truncate cursor-pointer transition-all ${isSelected ? 'bg-correct border-correct text-black' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`}
                                                             >
                                                                 <ProtectedAvatar 
+                                                                    userId={u.id}
                                                                     src={u.avatar_url} 
                                                                     username={u.username} 
                                                                     className="w-5 h-5 rounded-full border border-white/10" 

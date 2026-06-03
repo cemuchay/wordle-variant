@@ -209,7 +209,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                     <div className="flex flex-wrap gap-2">
                         {invitedProfiles.map(p => (
                             <div key={p.id} className="bg-correct/20 border border-correct/30 px-3 py-1.5 rounded-full flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                                <ProtectedAvatar src={p.avatar_url} username={p.username} className="w-4 h-4 rounded-full" />
+                                <ProtectedAvatar userId={p.id} src={p.avatar_url} username={p.username} className="w-4 h-4 rounded-full" />
                                 <span className="text-[10px] font-black uppercase text-correct">{p.username}</span>
                                 <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors">
                                     <X size={12} />
@@ -251,7 +251,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                                         onClick={() => handleToggle(p.id)}
                                         className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left"
                                     >
-                                        <ProtectedAvatar src={p.avatar_url} username={p.username} className="w-8 h-8 rounded-full border border-white/10" />
+                                        <ProtectedAvatar userId={p.id} src={p.avatar_url} username={p.username} className="w-8 h-8 rounded-full border border-white/10" />
                                         <div>
                                             <p className="text-xs font-black text-white">{p.username}</p>
                                             <p className="text-[9px] text-white/80 uppercase font-bold">Available</p>

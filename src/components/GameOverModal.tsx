@@ -3,7 +3,7 @@ import { generateShareText } from "../lib/share";
 import { getServerDate } from "../lib/time";
 import type { GameConfig, GameStats, GuessResult } from "../types/game";
 import { ShareButton } from "./ShareButton";
-import { Eye, Trophy } from "lucide-react";
+import { Eye, Trophy, X } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -14,6 +14,7 @@ interface Props {
   usedHint: boolean;
   gameMessage: string;
   stats: GameStats;
+  isAuthenticated: boolean;
 }
 
 export const GameOverModal: React.FC<Props> = ({
@@ -25,6 +26,7 @@ export const GameOverModal: React.FC<Props> = ({
   usedHint,
   gameMessage,
   stats,
+  isAuthenticated,
 }) => {
   const won =
     guesses[guesses.length - 1]?.every((r) => r.status === "correct") ?? false;
@@ -98,8 +100,15 @@ export const GameOverModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto">
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-12 shadow-2xl text-center ">
-        <div className="mb-3 mt-8 flex flex-col items-center pt-12">
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-2 shadow-2xl text-center relative my-auto">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-red-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+        <div className="mb-3 mt-3 flex flex-col items-center">
           {showWord ? (
             <h2 className="text-2xl font-serif font-bold text-white tracking-widest animate-in fade-in zoom-in duration-300">
               {config?.word || "???"}
@@ -147,13 +156,15 @@ export const GameOverModal: React.FC<Props> = ({
             <StatBox value={stats?.currentStreak ?? 0} label="Streak" />
             <StatBox value={stats?.maxStreak ?? 0} label="Max" />
           </div>
-          <button
-            onClick={handleOpenLeaderboard}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 active:scale-95 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-300 transition-all border border-white/5"
-          >
-            <Trophy size={14} className="text-yellow-500" /> See your place in
-            the leaderboard
-          </button>
+          {
+            isAuthenticated && (<button
+              onClick={handleOpenLeaderboard}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 active:scale-95 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-300 transition-all border border-white/5"
+            >
+              <Trophy size={14} className="text-yellow-500" /> See your place in
+              the leaderboard
+            </button>)
+          }
         </div>
 
         {/* Guess Distribution */}

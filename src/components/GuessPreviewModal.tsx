@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Loader2, X } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { MAX_ATTEMPTS } from "../constants/game";
 import { Z_INDEX } from "../constants/ui";
 import { useApp } from "../context/AppContext";
@@ -8,6 +8,7 @@ import {
   calculateSkillIndex,
   deobfuscateWord,
   getDailyConfig,
+  decryptGuesses,
 } from "../lib/game-logic";
 import { supabase } from "../lib/supabaseClient";
 import { parseMarathonGames } from "../utils/marathon";
@@ -64,6 +65,9 @@ const GuessPreviewModal: React.FC<{
       return marathonGames[marathonGameIndex] || null;
     }, [isMarathon, marathonGames, marathonGameIndex]);
 
+    const fetchedCacheRef = useRef<Record<number, any>>({});
+    const lastEntryIdRef = useRef<string | null>(null);
+
     const [gameData, setGameData] = useState<{
       guesses: any[] | null;
       hints_used: boolean;
@@ -71,7 +75,19 @@ const GuessPreviewModal: React.FC<{
       hint_record: { letter: string; index: number; row?: number } | null;
       time_taken?: number | null;
       game_message?: string | null;
-    } | null>(null);
+    } | null>(() => {
+      if (initialData && !isMarathon) {
+        return {
+          guesses: initialData.guesses,
+          hints_used: initialData.hints_used || false,
+          skill_score: initialData.skill_score || 0,
+          hint_record: initialData.hint_record || null,
+          time_taken: initialData.time_taken,
+          game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
+        };
+      }
+      return null;
+    });
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
     const [viewerHasFinished, setViewerHasFinished] = useState(
@@ -143,77 +159,166 @@ const GuessPreviewModal: React.FC<{
       date,
     ]);
 
-    useEffect(() => {
-      if (isMarathon) {
-        const isMe = entry.user_id === myParticipation?.user_id;
-        const myProg = myParticipation?.marathon_progress?.find(
-          (p: any) => p.game_index === marathonGameIndex,
-        );
-        const myFinished =
-          myProg?.status === "completed" || myProg?.status === "timed_out";
+     useEffect(() => {
+      if (lastEntryIdRef.current !== entry.id) {
+        fetchedCacheRef.current = {};
+        lastEntryIdRef.current = entry.id;
+      }
 
-        const prog = entry.marathon_progress?.find(
-          (p: any) => p.game_index === marathonGameIndex,
-        );
-
-        if (prog && (isMe || myFinished || isCreator)) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setGameData({
-            guesses: prog.guesses || [],
-            hints_used: prog.hints_used || false,
-            skill_score: prog.score || 0,
-            hint_record: prog.hint_record || null,
-            time_taken: prog.time_taken,
-            game_message: prog.game_message || null,
-          });
-        } else {
-          setGameData(null);
+      const loadChallengeGuesses = async () => {
+        if (isMarathon && fetchedCacheRef.current[marathonGameIndex] !== undefined) {
+          setGameData(fetchedCacheRef.current[marathonGameIndex]);
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
-      }
 
-      if (initialData) {
-        setGameData({
-          guesses: initialData.guesses,
-          hints_used: initialData.hints_used || false,
-          skill_score: initialData.skill_score || 0,
-          hint_record: initialData.hint_record || null,
-          time_taken: initialData.time_taken,
-          game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
-        });
-        setLoading(false);
-        return;
-      }
-
-      const fetchGuesses = async () => {
         setLoading(true);
         try {
-          const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
-            body: { action: "get-user-score", userId: entry.user_id, date: targetDate },
-          });
-          if (edgeRes && edgeRes.data) {
-            setGameData(edgeRes.data);
-          } else if (error) {
-            console.error("Failed to fetch guesses from redis-cache:", error);
+          const word = isMarathon
+            ? activeGame?.word
+            : (targetWord && salt ? deobfuscateWord(targetWord, salt) : "");
+          const key = word + (salt || "");
+
+          if (isMarathon) {
+            const isMe = entry.user_id === myParticipation?.user_id || entry.guest_id === myParticipation?.guest_id;
+            const myProg = myParticipation?.marathon_progress?.find(
+              (p: any) => p.game_index === marathonGameIndex
+            );
+            const myFinished = myProg?.status === "completed" || myProg?.status === "timed_out";
+
+            const prog = entry.marathon_progress?.find(
+              (p: any) => p.game_index === marathonGameIndex
+            );
+
+            if (prog && (isMe || myFinished || isCreator)) {
+              let guessesToUse = prog.guesses;
+              let hintRecordToUse = prog.hint_record;
+
+              // If guesses are not loaded or are in encrypted string format
+              if (!Array.isArray(guessesToUse)) {
+                const { data, error } = await supabase
+                  .from("challenge_participants_marathon")
+                  .select("guesses, hint_record")
+                  .eq("participation_id", entry.id)
+                  .eq("game_index", marathonGameIndex)
+                  .maybeSingle();
+
+                if (!error && data) {
+                  guessesToUse = data.guesses;
+                  hintRecordToUse = data.hint_record;
+                }
+              }
+
+              const decrypted = decryptGuesses(guessesToUse, key);
+
+              const resolvedData = {
+                guesses: decrypted || [],
+                hints_used: prog.hints_used || false,
+                skill_score: prog.score || 0,
+                hint_record: hintRecordToUse || null,
+                time_taken: prog.time_taken,
+                game_message: prog.game_message || null,
+              };
+
+              fetchedCacheRef.current[marathonGameIndex] = resolvedData;
+              setGameData(resolvedData);
+            } else {
+              fetchedCacheRef.current[marathonGameIndex] = null;
+              setGameData(null);
+            }
+          } else {
+            // Regular Challenge Mode
+            const isMe = entry.user_id === myParticipation?.user_id || entry.guest_id === myParticipation?.guest_id;
+            const myFinished =
+              myParticipation?.status === "completed" ||
+              myParticipation?.status === "timed_out" ||
+              myParticipation?.status === "won" ||
+              myParticipation?.status === "lost";
+
+            if (isMe || myFinished || isCreator) {
+              let guessesToUse = entry.guesses;
+              let hintRecordToUse = entry.hint_record;
+
+              if (!Array.isArray(guessesToUse)) {
+                const { data, error } = await supabase
+                  .from("challenge_participants")
+                  .select("guesses, hint_record")
+                  .eq("id", entry.id)
+                  .single();
+
+                if (!error && data) {
+                  guessesToUse = data.guesses;
+                  hintRecordToUse = data.hint_record;
+                }
+              }
+
+              const decrypted = decryptGuesses(guessesToUse, key);
+
+              setGameData({
+                guesses: decrypted || [],
+                hints_used: entry.hints_used || false,
+                skill_score: entry.score || 0,
+                hint_record: hintRecordToUse || null,
+                time_taken: entry.time_taken,
+                game_message: entry.game_message || null,
+              });
+            } else {
+              setGameData(null);
+            }
           }
         } catch (err) {
-          console.error("Error invoking redis-cache for guesses:", err);
+          console.error("Error fetching/decrypting guesses:", err);
         } finally {
           setLoading(false);
         }
       };
 
-      fetchGuesses();
+      const isChallenge = !!myParticipation || !!entry.challenge_id;
+      if (isChallenge) {
+        loadChallengeGuesses();
+      } else {
+        // Daily game flow
+        if (!initialData) {
+          const fetchGuesses = async () => {
+            setLoading(true);
+            try {
+              const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
+                body: { action: "get-user-score", userId: entry.user_id, date: targetDate },
+              });
+              if (edgeRes && edgeRes.data) {
+                setGameData(edgeRes.data);
+              } else if (error) {
+                console.error("Failed to fetch guesses from redis-cache:", error);
+              }
+            } catch (err) {
+              console.error("Error invoking redis-cache for guesses:", err);
+            } finally {
+              setLoading(false);
+            }
+          };
+          fetchGuesses();
+        }
+      }
     }, [
       targetDate,
+      entry.id,
       entry.user_id,
+      entry.guest_id,
+      entry.guesses,
+      entry.hint_record,
+      entry.hints_used,
+      entry.score,
+      entry.time_taken,
+      entry.game_message,
+      entry.marathon_progress,
+      entry.challenge_id,
       initialData,
       marathonGameIndex,
       isMarathon,
-      entry.marathon_progress,
-      myParticipation?.user_id,
-      myParticipation?.marathon_progress,
+      activeGame,
+      targetWord,
+      salt,
+      myParticipation,
       isCreator,
     ]);
 
@@ -249,7 +354,7 @@ const GuessPreviewModal: React.FC<{
         grid.push(rowLetters);
       }
       return grid;
-    }, [targetWordToUse]);
+    }, []);
 
     const breakdown = calculateSkillIndex({
       attempts: gameData?.guesses?.length || 0,

@@ -452,6 +452,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     {/* Sender profile header inside the bubble container */}
                     <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>
                         <ProtectedAvatar
+                            userId={msg.user_id}
                             src={msg.profiles?.avatar_url}
                             username={msg.profiles?.username}
                             className="w-4 h-4 rounded-full border border-white/10 hover:scale-105 transition-transform"

@@ -142,7 +142,14 @@ export const useChallenge = (_user: AppUser | null) => {
 
                     const { data: parts, error: pError } = await supabase
                         .from('challenge_participants')
-                        .select('*, profiles(username, avatar_url), guest_profiles(username, avatar_url), marathon_progress:challenge_participants_marathon(*)')
+                        .select(`
+                            id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                            profiles(username, avatar_url),
+                            guest_profiles(username, avatar_url),
+                            marathon_progress:challenge_participants_marathon(
+                                id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                            )
+                        `)
                         .eq('challenge_id', challengeId)
                         .order('score', { ascending: false });
 
