@@ -107,10 +107,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 // 4. Fetch challenge participations of target user
                 const { data: partsData } = await supabase
                     .from('challenge_participants')
-                    .select('*, challenge:challenges(*)')
+                    .select('id, challenge_id, user_id, status, score, attempts, completed_at, challenge:challenges(*)')
                     .eq('user_id', userId);
 
-                const validParts = (partsData || []) as ChallengeParticipation[];
+                const validParts = (partsData || []) as unknown as ChallengeParticipation[];
                 if (validParts && isMounted) setChallengeParticipations(validParts);
 
                 // 5. Fetch all participants for the challenges target user participated in

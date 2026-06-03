@@ -201,6 +201,66 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
 };
 
 /**
+ * Encrypts guesses client-side using a key derived from the target word + salt.
+ */
+export const encryptGuesses = (guesses: any[], key: string) => {
+   if (!guesses) return null;
+   const plaintext = JSON.stringify(guesses);
+   if (!key) return plaintext;
+   try {
+      const encrypted = btoa(
+         plaintext
+            .split("")
+            .map((char, i) => {
+               const charCode = char.charCodeAt(0);
+               const keyCode = key.charCodeAt(i % key.length);
+               return String.fromCharCode(charCode ^ keyCode);
+            })
+            .join("")
+      );
+      return `enc:${encrypted}`;
+   } catch (e) {
+      console.error("Encryption failed:", e);
+      return plaintext;
+   }
+};
+
+/**
+ * Decrypts guesses client-side using the key target word + salt.
+ * If not encrypted (two-tier legacy support), parses as regular JSON.
+ */
+export const decryptGuesses = (encryptedStr: any, key: string) => {
+   if (!encryptedStr) return [];
+   if (typeof encryptedStr !== "string" || !encryptedStr.startsWith("enc:")) {
+      try {
+         return typeof encryptedStr === "string" ? JSON.parse(encryptedStr) : encryptedStr;
+      } catch (e) {
+         return encryptedStr;
+      }
+   }
+   if (!key) {
+      console.warn("Decryption key is missing");
+      return [];
+   }
+   try {
+      const ciphertext = encryptedStr.substring(4);
+      const decoded = atob(ciphertext);
+      const plaintext = decoded
+         .split("")
+         .map((char, i) => {
+            const charCode = char.charCodeAt(0);
+            const keyCode = key.charCodeAt(i % key.length);
+            return String.fromCharCode(charCode ^ keyCode);
+         })
+         .join("");
+      return JSON.parse(plaintext);
+   } catch (e) {
+      console.error("Decryption failed:", e);
+      return [];
+   }
+};
+
+/**
  * The primary entry point for determining today's game configuration.
  *
  * @what Includes a collision check to ensure today's word hasn't appeared

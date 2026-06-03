@@ -444,10 +444,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                             *, 
                             profiles!creator_id(username, avatar_url),
                             participants:challenge_participants(
-                                *,
+                                id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
                                 profiles(username, avatar_url),
                                 guest_profiles(username, avatar_url),
-                                marathon_progress:challenge_participants_marathon(*)
+                                marathon_progress:challenge_participants_marathon(
+                                    id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                                )
                             )
                         `)
                         .eq('id', id)
@@ -496,10 +498,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                             participation = await participationPromise;
                         } else if (isExpired) {
                             participation = challenge.participants?.find((p: any) => p.user_id === currentUser.id || p.guest_id === currentUser.id) || null;
-                        } else {
-                            participationPromise.then(p => {
-                                setMyParticipation(normalizeParticipation(p, challenge));
-                            });
                         }
 
                         const normalizedPart = normalizeParticipation(participation, challenge);

@@ -68,18 +68,22 @@ export const useMyChallenges = (userId: string | undefined) => {
                .from("challenge_participants")
                .select(
                   `
-                        *,
+                        id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
                         guest_profiles(username, avatar_url),
                         profiles(username, avatar_url),
-                        marathon_progress:challenge_participants_marathon(*),
+                        marathon_progress:challenge_participants_marathon(
+                            id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                        ),
                         challenge:challenges(
                             *,
                             creator:profiles!creator_id(username, avatar_url),
                             participants:challenge_participants(
-                                *,
+                                id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
                                 profiles(username, avatar_url),
                                 guest_profiles(username, avatar_url),
-                                marathon_progress:challenge_participants_marathon(*)
+                                marathon_progress:challenge_participants_marathon(
+                                    id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                                )
                             )
                         )
                     `,
@@ -95,13 +99,15 @@ export const useMyChallenges = (userId: string | undefined) => {
                .select(
                   `
                         *,
-                        creator:profiles!creator_id(username, avatar_url),
-                        participants:challenge_participants(
-                            *,
-                            profiles(username, avatar_url),
-                            guest_profiles(username, avatar_url),
-                            marathon_progress:challenge_participants_marathon(*)
-                        )
+                         creator:profiles!creator_id(username, avatar_url),
+                         participants:challenge_participants(
+                             id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                             profiles(username, avatar_url),
+                             guest_profiles(username, avatar_url),
+                             marathon_progress:challenge_participants_marathon(
+                                 id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                             )
+                         )
                     `,
                )
                .eq("creator_id", userId);
@@ -143,10 +149,12 @@ export const useMyChallenges = (userId: string | undefined) => {
                         *,
                         creator:profiles!creator_id(username, avatar_url),
                         participants:challenge_participants(
-                            *,
+                            id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
                             profiles(username, avatar_url),
                             guest_profiles(username, avatar_url),
-                            marathon_progress:challenge_participants_marathon(*)
+                            marathon_progress:challenge_participants_marathon(
+                                id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                            )
                         )
                     `,
                )
@@ -230,14 +238,27 @@ export const useChallengeData = (challengeId: string | null) => {
       queryKey: ["challenge", challengeId],
       queryFn: async () => {
          if (!challengeId) return null;
-         const { data: edgeRes, error } = await supabase.functions.invoke(
-            "redis-cache",
-            {
-               body: { action: "get-challenge", challengeId },
-            },
-         );
+         const { data, error } = await supabase
+            .from("challenges")
+            .select(
+               `
+                     *,
+                     creator:profiles!creator_id(username, avatar_url),
+                     participants:challenge_participants(
+                         id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                         profiles(username, avatar_url),
+                         guest_profiles(username, avatar_url),
+                         marathon_progress:challenge_participants_marathon(
+                             id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                         )
+                     )
+                 `,
+            )
+            .eq("id", challengeId)
+            .maybeSingle();
+
          if (error) throw error;
-         const mapped = mapChallenge(edgeRes?.data) as Challenge;
+         const mapped = mapChallenge(data) as Challenge;
          try {
             safeSessionStorage.setItem(
                `wordle_challenge_detail_${challengeId}`,
@@ -278,13 +299,15 @@ export const useDiscoverChallenges = () => {
             .select(
                `
                     *,
-                    creator:profiles!creator_id(username, avatar_url),
-                    participants:challenge_participants(
-                        *,
-                        profiles(username, avatar_url),
-                        guest_profiles(username, avatar_url),
-                        marathon_progress:challenge_participants_marathon(*)
-                    )
+                     creator:profiles!creator_id(username, avatar_url),
+                     participants:challenge_participants(
+                         id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                         profiles(username, avatar_url),
+                         guest_profiles(username, avatar_url),
+                         marathon_progress:challenge_participants_marathon(
+                             id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                         )
+                     )
                 `,
             )
             .or(`is_public.eq.true,is_bot_marathon.eq.true`)
@@ -576,7 +599,13 @@ export const useChallengeMutations = () => {
          const { data: existing, error: fetchError } = await supabase
             .from("challenge_participants")
             .select(
-               "*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)",
+               `
+                  id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                  challenge:challenges(*),
+                  marathon_progress:challenge_participants_marathon(
+                     id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                  )
+               `,
             )
             .eq("challenge_id", challengeId)
             .eq(isGuest ? "guest_id" : "user_id", userId)
@@ -624,7 +653,13 @@ export const useChallengeMutations = () => {
             .from("challenge_participants")
             .insert([insertData])
             .select(
-               "*, challenge:challenges(*), marathon_progress:challenge_participants_marathon(*)",
+               `
+                  id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                  challenge:challenges(*),
+                  marathon_progress:challenge_participants_marathon(
+                     id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                  )
+               `,
             )
             .single();
 
