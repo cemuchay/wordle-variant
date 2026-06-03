@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Loader2, X } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { MAX_ATTEMPTS } from "../constants/game";
 import { Z_INDEX } from "../constants/ui";
 import { useApp } from "../context/AppContext";
@@ -65,6 +65,9 @@ const GuessPreviewModal: React.FC<{
       return marathonGames[marathonGameIndex] || null;
     }, [isMarathon, marathonGames, marathonGameIndex]);
 
+    const fetchedCacheRef = useRef<Record<number, any>>({});
+    const lastEntryIdRef = useRef<string | null>(null);
+
     const [gameData, setGameData] = useState<{
       guesses: any[] | null;
       hints_used: boolean;
@@ -72,7 +75,19 @@ const GuessPreviewModal: React.FC<{
       hint_record: { letter: string; index: number; row?: number } | null;
       time_taken?: number | null;
       game_message?: string | null;
-    } | null>(null);
+    } | null>(() => {
+      if (initialData && !isMarathon) {
+        return {
+          guesses: initialData.guesses,
+          hints_used: initialData.hints_used || false,
+          skill_score: initialData.skill_score || 0,
+          hint_record: initialData.hint_record || null,
+          time_taken: initialData.time_taken,
+          game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
+        };
+      }
+      return null;
+    });
 
     const [loading, setLoading] = useState(!initialData || isMarathon);
     const [viewerHasFinished, setViewerHasFinished] = useState(
@@ -144,8 +159,19 @@ const GuessPreviewModal: React.FC<{
       date,
     ]);
 
-    useEffect(() => {
+     useEffect(() => {
+      if (lastEntryIdRef.current !== entry.id) {
+        fetchedCacheRef.current = {};
+        lastEntryIdRef.current = entry.id;
+      }
+
       const loadChallengeGuesses = async () => {
+        if (isMarathon && fetchedCacheRef.current[marathonGameIndex] !== undefined) {
+          setGameData(fetchedCacheRef.current[marathonGameIndex]);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         try {
           const word = isMarathon
@@ -185,15 +211,19 @@ const GuessPreviewModal: React.FC<{
 
               const decrypted = decryptGuesses(guessesToUse, key);
 
-              setGameData({
+              const resolvedData = {
                 guesses: decrypted || [],
                 hints_used: prog.hints_used || false,
                 skill_score: prog.score || 0,
                 hint_record: hintRecordToUse || null,
                 time_taken: prog.time_taken,
                 game_message: prog.game_message || null,
-              });
+              };
+
+              fetchedCacheRef.current[marathonGameIndex] = resolvedData;
+              setGameData(resolvedData);
             } else {
+              fetchedCacheRef.current[marathonGameIndex] = null;
               setGameData(null);
             }
           } else {
@@ -248,17 +278,7 @@ const GuessPreviewModal: React.FC<{
         loadChallengeGuesses();
       } else {
         // Daily game flow
-        if (initialData) {
-          setGameData({
-            guesses: initialData.guesses,
-            hints_used: initialData.hints_used || false,
-            skill_score: initialData.skill_score || 0,
-            hint_record: initialData.hint_record || null,
-            time_taken: initialData.time_taken,
-            game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
-          });
-          setLoading(false);
-        } else {
+        if (!initialData) {
           const fetchGuesses = async () => {
             setLoading(true);
             try {
@@ -334,7 +354,7 @@ const GuessPreviewModal: React.FC<{
         grid.push(rowLetters);
       }
       return grid;
-    }, [targetWordToUse]);
+    }, []);
 
     const breakdown = calculateSkillIndex({
       attempts: gameData?.guesses?.length || 0,

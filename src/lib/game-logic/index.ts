@@ -202,14 +202,17 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
 
 /**
  * Encrypts guesses client-side using a key derived from the target word + salt.
+ * Uses unicode-safe binary string encoding to prevent crashes on non-Latin1 text.
  */
 export const encryptGuesses = (guesses: any[], key: string) => {
    if (!guesses) return null;
    const plaintext = JSON.stringify(guesses);
    if (!key) return plaintext;
    try {
+      // Convert to UTF-8 binary string to support unicode characters securely
+      const utf8String = unescape(encodeURIComponent(plaintext));
       const encrypted = btoa(
-         plaintext
+         utf8String
             .split("")
             .map((char, i) => {
                const charCode = char.charCodeAt(0);
@@ -245,7 +248,7 @@ export const decryptGuesses = (encryptedStr: any, key: string) => {
    try {
       const ciphertext = encryptedStr.substring(4);
       const decoded = atob(ciphertext);
-      const plaintext = decoded
+      const decryptedBinary = decoded
          .split("")
          .map((char, i) => {
             const charCode = char.charCodeAt(0);
@@ -253,6 +256,8 @@ export const decryptGuesses = (encryptedStr: any, key: string) => {
             return String.fromCharCode(charCode ^ keyCode);
          })
          .join("");
+      // Decode the UTF-8 binary string back to original unicode plaintext
+      const plaintext = decodeURIComponent(escape(decryptedBinary));
       return JSON.parse(plaintext);
    } catch (e) {
       console.error("Decryption failed:", e);
