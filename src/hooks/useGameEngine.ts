@@ -43,9 +43,8 @@ export const useGameEngine = (date: string) => {
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    const performSync = useCallback(
-      async (gamePayload: any) => {
+      async (gamePayload: { status: string }) => {
          if (!user || !date) return;
          dispatch({ type: "SET_SYNC_STATUS", status: "syncing" });
          try {
@@ -176,6 +175,7 @@ export const useGameEngine = (date: string) => {
    // Hydration & Authentication Swap Logic
    useEffect(() => {
       if (!date || isAuthLoading) {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          setIsHydrated(false);
          return;
       }
@@ -359,8 +359,10 @@ export const useGameEngine = (date: string) => {
          return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const alreadyGuessed = state.guesses.some((guess: any) => {
          const word = guess
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .map((charObj: any) => charObj.letter)
             .join("")
             .toUpperCase();
@@ -448,21 +450,25 @@ export const useGameEngine = (date: string) => {
          await refresh();
 
          // Only show reveal after sync attempt (successful or failed-but-locally-saved)
-         if (lost)
+         if (lost) {
             triggerToast(
                `The word is: ${config.word}`,
-               TOAST_DURATION.LONG + 1000,
+               TOAST_DURATION.LONG + 1000, // 5 seconds
             );
+         }
 
-         // Calculate delay: wordLength * 150ms + 600ms (last tile flip) + padding
-         const revealDelay = (config.length - 1) * 150 + 600 + 500;
+         // Calculate delay: wordLength * 300ms + 600ms (last tile flip) + padding
+         const revealDelay = (config.length - 1) * 300 + 600 + 600;
 
          setTimeout(() => {
             dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
-            triggerToast(
-               message || state.gameMessage,
-               TOAST_DURATION.LONG + 1000,
-            );
+
+            if (won) {
+               triggerToast(
+                  message || state.gameMessage,
+                  TOAST_DURATION.LONG + 1000,
+               );
+            }
          }, revealDelay);
       }
    }, [

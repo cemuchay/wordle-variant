@@ -17,7 +17,7 @@ interface KeyProps {
 
 const Key = memo(({ char, status, onClick, compact }: KeyProps) => {
   const isWide = char === 'ENTER' || char === 'DELETE';
-  
+
   const getStyle = () => {
     switch (status) {
       case 'correct': return 'bg-correct border-correct text-white';
@@ -29,7 +29,7 @@ const Key = memo(({ char, status, onClick, compact }: KeyProps) => {
 
   const dynamicClass = compact
     ? `${isWide ? 'px-1.5 text-[9px] min-w-[50px] sm:min-w-[58px]' : 'flex-1 min-w-[24px] sm:min-w-[28px]'} h-10 sm:h-11`
-    : `${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-12 sm:h-13`;
+    : `${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-12 sm:h-10`;
 
   return (
     <button
