@@ -1,33 +1,31 @@
-import { Suspense, useEffect, useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { AdminPage } from "./components/admin/AdminPage";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
+import { ChatSkeleton } from "./components/common/Skeletons";
 import { DynamicIslandStatus } from "./components/DynamicIslandStatus";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
+import { LandscapeBlocker } from "./components/LandscapeBlocker";
 import { AppHeader } from "./components/layout/AppHeader";
+import { AppNavigation } from "./components/layout/AppNavigation";
 import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
-import { AppNavigation } from "./components/layout/AppNavigation";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
-import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
-import { Toast } from "./components/Toast";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { ChatSkeleton } from "./components/common/Skeletons";
-import { LandscapeBlocker } from "./components/LandscapeBlocker";
+import { Toast } from "./components/Toast";
+import { UnsubscribePage } from "./components/UnsubscribePage";
+import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { useApp } from "./context/AppContext";
+import { useDiscoverChallenges, useMyChallenges } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
 import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
-import { type AppUser, type Challenge } from "./types/game";
-import { useMyChallenges, useDiscoverChallenges } from "./hooks/queries/useChallengeQueries";
-import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
-import { safeLazy } from "./utils/safeLazy";
 import { supabase } from "./lib/supabaseClient";
+import { type AppUser, type Challenge } from "./types/game";
+import { safeLazy } from "./utils/safeLazy";
+import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
-import { AdminPage } from "./components/admin/AdminPage";
-import { UnsubscribePage } from "./components/UnsubscribePage";
 
 export default function App() {
   const { user } = useAuth();
@@ -179,6 +177,7 @@ export default function App() {
 
   // Intercept notifications open
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowNotifications(isNotificationsOpen);
   }, [isNotificationsOpen]);
 
@@ -247,6 +246,7 @@ export default function App() {
     }
   };
 
+
   if (isLoadingDate || !isHydrated) {
     return (
       <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
@@ -313,51 +313,10 @@ export default function App() {
               }
               syncStatus={state.syncStatus}
               isMonday={isMonday}
+
             />
 
-            {state.isGameOver && activeDailyMarathon && (
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300"
-              >
-                <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                <div className="flex items-center justify-between gap-4 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
-                      <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
-                          Active Marathon
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          Daily Challenge
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
-                        Bot Marathon Event
-                      </h3>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Test your skills across multiple word lengths!
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setSelectedChallengeId(activeDailyMarathon.id);
-                      setIsChallengeOpen(true);
-                    }}
-                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
-                  >
-                    Play
-                  </button>
-                </div>
-              </motion.div>
-            )}
 
             <GameArea
               wordLength={config.length}
@@ -372,6 +331,9 @@ export default function App() {
               onChar={actions.onChar}
               onDelete={actions.onDelete}
               onEnter={actions.onEnter}
+              activeDailyMarathon={activeDailyMarathon}
+              setSelectedChallengeId={setSelectedChallengeId}
+              setIsChallengeOpen={setIsChallengeOpen}
             />
             <ModalsManager
               modals={{

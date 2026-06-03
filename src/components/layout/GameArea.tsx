@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, Sparkles, X } from 'lucide-react';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
+import { motion } from 'framer-motion';
 
 interface GameAreaProps {
     wordLength: number;
@@ -17,6 +19,9 @@ interface GameAreaProps {
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
+    activeDailyMarathon: any;
+    setIsChallengeOpen: any;
+    setSelectedChallengeId: any;
 }
 
 export const GameArea = ({
@@ -31,9 +36,13 @@ export const GameArea = ({
     isSaving,
     onChar,
     onDelete,
-    onEnter
+    onEnter,
+    activeDailyMarathon,
+    setIsChallengeOpen,
+    setSelectedChallengeId
 }: GameAreaProps) => {
     const wasGameOverOnMount = useRef(isGameOver);
+    // eslint-disable-next-line react-hooks/refs
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [showHelp, setShowHelp] = useState(false);
     const helpRef = useRef<HTMLDivElement>(null);
@@ -60,6 +69,7 @@ export const GameArea = ({
                 return () => clearTimeout(timer);
             }
         } else {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setHideKeyboard(false);
             wasGameOverOnMount.current = false;
         }
@@ -67,6 +77,50 @@ export const GameArea = ({
 
     return (
         <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
+            {isGameOver && activeDailyMarathon && hideKeyboard && (
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300"
+                >
+                    <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="flex items-center justify-between gap-4 relative z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
+                                <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                                        Active Marathon
+                                    </span>
+                                    <span className="text-[10px] text-gray-400 font-medium">
+                                        Daily Challenge
+                                    </span>
+                                </div>
+                                <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
+                                    Bot Marathon Event
+                                </h3>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    Test your skills across multiple word lengths!
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setSelectedChallengeId(activeDailyMarathon.id);
+                                setIsChallengeOpen(true);
+                            }}
+                            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        >
+                            Play
+                        </button>
+                    </div>
+                </motion.div>
+            )}
+
             <div className="relative">
                 <Grid
                     wordLength={wordLength}
@@ -87,7 +141,7 @@ export const GameArea = ({
                     >
                         <HelpCircle size={15} />
                     </button>
-                    
+
                     {showHelp && (
                         <div className="absolute right-0 mt-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-top-1 duration-150">
                             <div className="flex items-center justify-between mb-2">
