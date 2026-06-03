@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 import { ProfileSkeleton } from './common/Skeletons';
+import formatLastSeen from '../utils/formatLastSeen';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -86,55 +87,53 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         const fetchProfileData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch profile details
-                const { data: edgeRes, error: profileErr } = await supabase.functions.invoke('redis-cache', {
+                // 1. Kick off both network requests concurrently
+                const edgePromise = supabase.functions.invoke('redis-cache', {
                     body: { action: 'get-user-profile', userId }
                 });
 
-                if (profileErr) throw profileErr;
-                if (isMounted && edgeRes && edgeRes.data) {
-                    setProfile(edgeRes.data);
-                }
+                // 2. Fetch the pre-aggregated data from your security-compliant view
+                const viewPromise = supabase
+                    .from('user_dashboard_stats')
+                    .select('daily_scores, challenge_participations, all_challenge_participations')
+                    .eq('user_id', userId)
+                    .single();
 
-                // 2. Fetch daily scores of target user
-                const { data: scoresData } = await supabase
-                    .from('scores')
-                    .select('game_date, status, skill_score, attempts')
-                    .eq('user_id', userId);
-
-                if (scoresData && isMounted) setDailyScores(scoresData);
-
-                // 4. Fetch challenge participations of target user
-                const { data: partsData } = await supabase
-                    .from('challenge_participants')
-                    .select('id, challenge_id, user_id, status, score, attempts, completed_at, challenge:challenges(*)')
-                    .eq('user_id', userId);
-
-                const validParts = (partsData || []) as unknown as ChallengeParticipation[];
-                if (validParts && isMounted) setChallengeParticipations(validParts);
-
-                // 5. Fetch all participants for the challenges target user participated in
-                const challengeIds = validParts
-                    .filter(p => p.status === 'completed' || p.status === 'timed_out')
-                    .map(p => p.challenge_id);
-
-                if (challengeIds.length > 0) {
-                    const { data: allPartsData } = await supabase
-                        .from('challenge_participants')
-                        .select('challenge_id, user_id, score, status')
-                        .in('challenge_id', challengeIds);
-
-                    if (allPartsData && isMounted) setAllChallengeParticipations(allPartsData);
-                }
-
-                // 6. Fetch logged-in user's challenge participations for H2H
-                if (currentUser && currentUser.id !== userId) {
-                    const { data: currUserParts } = await supabase
+                // 3. Conditional Head-to-Head request (only if viewing another user's profile)
+                const h2hPromise = (currentUser && currentUser.id !== userId)
+                    ? supabase
                         .from('challenge_participants')
                         .select('challenge_id, score, status')
-                        .eq('user_id', currentUser.id);
+                        .eq('user_id', currentUser.id)
+                    : Promise.resolve({ data: null, error: null });
 
-                    if (currUserParts && isMounted) setCurrentUserChallenges(currUserParts);
+                // Fire all requests in parallel
+                const [edgeResult, viewResult, h2hResult] = await Promise.all([
+                    edgePromise,
+                    viewPromise,
+                    h2hPromise
+                ]);
+
+                // Error Handling
+                if (edgeResult.error) throw edgeResult.error;
+                if (viewResult.error) throw viewResult.error;
+
+                // Commit to state only if component is still mounted
+                if (isMounted) {
+                    if (edgeResult.data?.data) {
+                        setProfile(edgeResult.data.data);
+                    }
+
+                    // The view returns clean arrays directly mapping to your states
+                    if (viewResult.data) {
+                        setDailyScores(viewResult.data.daily_scores);
+                        setChallengeParticipations(viewResult.data.challenge_participations);
+                        setAllChallengeParticipations(viewResult.data.all_challenge_participations);
+                    }
+
+                    if (h2hResult.data) {
+                        setCurrentUserChallenges(h2hResult.data);
+                    }
                 }
 
             } catch (err) {
@@ -155,22 +154,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const isOnline = useMemo(() => {
         return onlineUsers.some(u => u.id === userId);
     }, [onlineUsers, userId]);
-
-    const formatLastSeen = (dateStr: string) => {
-        if (!dateStr) return 'Unknown';
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString();
-    };
 
 
     // Computations
@@ -356,13 +339,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     ) : (
                         profile && (
                             <div className="flex items-center gap-5 w-full">
-                                    <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
-                                        <ProtectedAvatar
-                                            userId={profile.id}
-                                            src={profile.avatar_url}
-                                            username={profile.username}
-                                            className={`w-16 h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
-                                        />
+                                <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
+                                    <ProtectedAvatar
+                                        userId={profile.id}
+                                        src={profile.avatar_url}
+                                        username={profile.username}
+                                        className={`w-16 h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
+                                    />
                                     {isOnline && (
                                         <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-gray-950" />
                                     )}
@@ -447,15 +430,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     <div className="grid grid-cols-3 gap-2 text-center">
                                         <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
                                             <div className="text-lg sm:text-xl font-black text-white">{stats.h2hWins}</div>
-                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Wins</div>
+                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">They won</div>
                                         </div>
                                         <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
                                             <div className="text-lg sm:text-xl font-black text-gray-400">{stats.h2hTies}</div>
                                             <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Ties</div>
                                         </div>
                                         <div className="bg-white/5 rounded-xl p-2 sm:p-2.5">
-                                            <div className="text-lg sm:text-xl font-black text-red-400">{stats.h2hLosses}</div>
-                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">Losses</div>
+                                            <div className="text-lg sm:text-xl font-black text-green-500">{stats.h2hLosses}</div>
+                                            <div className="text-[8px] sm:text-[9px] font-black uppercase text-gray-500">You won</div>
                                         </div>
                                     </div>
                                 </div>
@@ -501,7 +484,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                                                 initial={{ width: 0 }}
                                                                 animate={{ width: `${pct}%` }}
                                                                 transition={{ duration: 0.8, ease: 'easeOut' }}
-                                                                className={`h-full flex items-center justify-end pr-2 font-mono font-bold text-[9px] sm:text-[10px] text-black ${count > 0 ? 'bg-correct' : 'bg-transparent text-gray-500'}`}
+                                                                className={`h-full flex items-center justify-end pr-2 font-mono font-bold text-[11px] sm:text-[12px] text-white ${count > 0 ? 'bg-correct' : 'bg-transparent text-gray-500'}`}
                                                                 style={{ minWidth: count > 0 ? '20px' : '0%' }}
                                                             >
                                                                 {count}

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
+import formatLastSeen from '../utils/formatLastSeen';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -64,18 +65,7 @@ export const DynamicIslandStatus = () => {
         setIsExpanded(false);
     };
 
-    const formatLastSeen = (dateString?: string) => {
-        if (!dateString) return 'Never';
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
-        if (diffInMinutes < 1) return 'Just now';
-        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-        const diffInHours = Math.floor(diffInMinutes / 60);
-        if (diffInHours < 24) return `${diffInHours}h ago`;
-        return date.toLocaleDateString();
-    };
 
     const sortedProfiles = [...allProfiles].sort((a, b) => {
         const aOnline = onlineUsers.some(u => u.id === a.id);
