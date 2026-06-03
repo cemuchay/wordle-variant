@@ -135,6 +135,7 @@ export const DynamicIslandStatus = () => {
                                 <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1.5 min-w-0">
                                         <ProtectedAvatar
+                                            userId={activeCall.targetUser?.id}
                                             src={activeCall.targetUser?.avatar_url}
                                             username={activeCall.targetUser?.username || ''}
                                             className="w-4 h-4 rounded-full border border-white/20 shrink-0"
@@ -185,6 +186,7 @@ export const DynamicIslandStatus = () => {
                         ) : currentVoiceSession ? (
                             <div className="flex items-center gap-1.5">
                                 <ProtectedAvatar
+                                    userId={currentVoiceSession.user.id}
                                     src={currentVoiceSession.user.avatar_url}
                                     username={currentVoiceSession.user.username}
                                     className="w-4 h-4 rounded-full border border-white/20 shrink-0"
@@ -197,6 +199,7 @@ export const DynamicIslandStatus = () => {
                         ) : otherOnlineUsers.length === 1 ? (
                             <>
                                 <ProtectedAvatar
+                                    userId={otherOnlineUsers[0].id}
                                     src={otherOnlineUsers[0].avatar_url}
                                     username={otherOnlineUsers[0].username}
                                     className="w-4 h-4 rounded-full border border-white/20 shrink-0"
@@ -211,6 +214,7 @@ export const DynamicIslandStatus = () => {
                                     {otherOnlineUsers.slice(0, 2).map((u,) => (
                                         <ProtectedAvatar
                                             key={u.id}
+                                            userId={u.id}
                                             src={u.avatar_url}
                                             username={u.username}
                                             className="w-4 h-4 rounded-full border border-black shrink-0"
@@ -237,6 +241,7 @@ export const DynamicIslandStatus = () => {
                                     <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                         <div className="relative">
                                             <ProtectedAvatar
+                                                userId={activeCall.targetUser?.id}
                                                 src={activeCall.targetUser?.avatar_url}
                                                 username={activeCall.targetUser?.username || ''}
                                                 className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse"
@@ -270,6 +275,7 @@ export const DynamicIslandStatus = () => {
                                     <div className="w-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
                                         <div className="relative">
                                             <ProtectedAvatar
+                                                userId={activeCall.targetUser?.id}
                                                 src={activeCall.targetUser?.avatar_url}
                                                 username={activeCall.targetUser?.username || ''}
                                                 className="w-16 h-16 rounded-full border-2 border-zinc-500 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
@@ -320,6 +326,7 @@ export const DynamicIslandStatus = () => {
                                 <div className="flex flex-col items-center text-center gap-4">
                                     <div className="relative">
                                         <ProtectedAvatar
+                                            userId={currentVoiceSession.user.id}
                                             src={currentVoiceSession.user.avatar_url}
                                             username={currentVoiceSession.user.username}
                                             className="w-16 h-16 rounded-full border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
@@ -381,6 +388,7 @@ export const DynamicIslandStatus = () => {
                                                     }}
                                                 >
                                                     <ProtectedAvatar
+                                                        userId={p.id}
                                                         src={p.avatar_url}
                                                         username={p.username}
                                                         className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}

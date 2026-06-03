@@ -26,7 +26,7 @@ const FinisherAvatar = memo(function FinisherAvatar({ p, index, onPreview }: { p
             className="w-6 h-6 rounded-full border-2 border-gray-900 bg-gray-800 overflow-hidden hover:scale-110 hover:z-10 transition-transform relative group"
         >
             {p.profiles?.avatar_url ? (
-                <ProtectedAvatar src={p.profiles.avatar_url} username={p.profiles.username} className="w-full h-full object-cover" />
+                <ProtectedAvatar userId={p.user_id || p.guest_id || p.profiles?.id} src={p.profiles.avatar_url} username={p.profiles.username} className="w-full h-full object-cover" />
             ) : (
                 <div className="w-full h-full flex items-center justify-center text-[8px] font-black uppercase text-gray-400">
                     {p.profiles?.username?.[0] || '?'}

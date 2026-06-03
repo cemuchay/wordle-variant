@@ -358,6 +358,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                             <div className="flex items-center gap-5 w-full">
                                     <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
                                         <ProtectedAvatar
+                                            userId={profile.id}
                                             src={profile.avatar_url}
                                             username={profile.username}
                                             className={`w-16 h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}

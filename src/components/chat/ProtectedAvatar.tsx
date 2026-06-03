@@ -2,6 +2,7 @@
 import React from 'react';
 
 interface ProtectedAvatarProps {
+    userId?: string;
     src?: string;
     username?: string;
     className?: string;
@@ -9,13 +10,26 @@ interface ProtectedAvatarProps {
 }
 
 export const ProtectedAvatar: React.FC<ProtectedAvatarProps> = ({
+    userId,
     src,
     username = '',
     className = 'w-8 h-8 rounded-full',
     onClick
 }) => {
     // Generate fallback UI avatar if src is missing or empty
-    const avatarUrl = src || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
+    let avatarUrl = src || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
+
+    // If userId is provided, route Google and external avatars through the avatar-proxy edge function
+    if (userId) {
+       const isExternal = src && (
+          src.startsWith("http://") || 
+          src.startsWith("https://")
+       ) && !src.includes("supabase.co") && !src.includes("dicebear.com") && !src.includes("ui-avatars.com");
+       
+       if (isExternal || !src) {
+          avatarUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/avatar-proxy?uid=${userId}`;
+       }
+    }
 
     return (
         <div
