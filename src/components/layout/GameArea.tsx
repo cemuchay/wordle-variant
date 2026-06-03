@@ -22,6 +22,7 @@ interface GameAreaProps {
     activeDailyMarathon: any;
     setIsChallengeOpen: any;
     setSelectedChallengeId: any;
+    isAuthenticated: boolean;
 }
 
 export const GameArea = ({
@@ -39,7 +40,8 @@ export const GameArea = ({
     onEnter,
     activeDailyMarathon,
     setIsChallengeOpen,
-    setSelectedChallengeId
+    setSelectedChallengeId,
+    isAuthenticated,
 }: GameAreaProps) => {
     const wasGameOverOnMount = useRef(isGameOver);
     // eslint-disable-next-line react-hooks/refs
@@ -77,7 +79,7 @@ export const GameArea = ({
 
     return (
         <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
-            {isGameOver && activeDailyMarathon && hideKeyboard && (
+            {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}

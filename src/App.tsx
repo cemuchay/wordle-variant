@@ -334,6 +334,7 @@ export default function App() {
               activeDailyMarathon={activeDailyMarathon}
               setSelectedChallengeId={setSelectedChallengeId}
               setIsChallengeOpen={setIsChallengeOpen}
+              isAuthenticated={user ? true : false}
             />
             <ModalsManager
               modals={{
