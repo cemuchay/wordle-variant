@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
-import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap } from "lucide-react";
+import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap, Search } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,6 +52,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [isCreatingDM, setIsCreatingDM] = useState(false);
     const [dmSearchQuery, setDmSearchQuery] = useState("");
+    const [chatSearchQuery, setChatSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
@@ -170,7 +171,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         globalMessages.forEach((m) => {
             if (m.user_id !== user?.id) {
                 const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
-                if (m.created_at > lastSeen) {
+                if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
                     counts[m.group_id] = (counts[m.group_id] || 0) + 1;
                 }
             }
@@ -193,10 +194,28 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         });
     };
 
-    // Sorting/filtering by room category
-    const cores = useMemo(() => sortRooms(groups.filter(g => g.is_core)), [groups, unreadCounts, lastMessages]);
-    const dms = useMemo(() => sortRooms(groups.filter(g => g.type === "dm")), [groups, unreadCounts, lastMessages]);
-    const customs = useMemo(() => sortRooms(groups.filter(g => g.type === "custom")), [groups, unreadCounts, lastMessages]);
+    // Unified chats list sorted by unread first, then latest message timestamp
+    const sortedAllRooms = useMemo(() => sortRooms(groups), [groups, unreadCounts, lastMessages]);
+
+    // Filtered chats list based on search query
+    const filteredAllRooms = useMemo(() => {
+        if (!chatSearchQuery.trim()) return sortedAllRooms;
+        const q = chatSearchQuery.toLowerCase();
+        return sortedAllRooms.filter(room =>
+            room.name.toLowerCase().includes(q)
+        );
+    }, [sortedAllRooms, chatSearchQuery]);
+
+    // Calculate unread messages in other rooms
+    const otherUnreadCount = useMemo(() => {
+        let total = 0;
+        Object.entries(unreadCounts).forEach(([roomId, count]) => {
+            if (roomId !== activeRoomId) {
+                total += count;
+            }
+        });
+        return total;
+    }, [unreadCounts, activeRoomId]);
 
     const filteredDMSearchUsers = useMemo(() => {
         if (!dmSearchQuery.trim()) return users;
@@ -341,6 +360,20 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             </div>
                         </div>
 
+                        {/* Chat Search Box */}
+                        <div className="px-6 py-3 border-b border-white/5 shrink-0 bg-[#0b141a]/60">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={chatSearchQuery}
+                                    onChange={(e) => setChatSearchQuery(e.target.value)}
+                                    placeholder="Search chats..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                />
+                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                            </div>
+                        </div>
+
                         {/* Rooms & Invites list */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-5">
                             {/* Invites Section */}
@@ -372,58 +405,57 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 </div>
                             )}
 
-                            {/* Core Channels Section */}
+                            {/* Merged Chats Section */}
                             <div className="space-y-1">
-                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-2 mb-2">Core Channels</h3>
-                                {cores.map(room => {
-                                    const isActive = activeRoomId === room.id;
-                                    const unreadCount = unreadCounts[room.id] || 0;
-                                    return (
+                                <div className="flex items-center justify-between pl-2 mb-2">
+                                    <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Chats</h3>
+                                    <div className="flex items-center gap-1.5">
                                         <button
-                                            key={room.id}
-                                            onClick={() => {
-                                                setActiveRoomId(room.id);
-                                                setShowSidebar(false);
-                                            }}
-                                            className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                                            onClick={() => setIsCreatingDM(true)}
+                                            className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
+                                            title="Start DM"
                                         >
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <Plus size={14} className="text-white" />
+                                        </button>
+                                        <button
+                                            onClick={() => setIsCreatingGroup(true)}
+                                            className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
+                                            title="Create Group"
+                                        >
+                                            <Users size={14} className="text-white" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {filteredAllRooms.length === 0 ? (
+                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/2 rounded-xl border border-white/5 text-center">
+                                        {chatSearchQuery ? "No matching chats found." : "No chats yet."}
+                                    </div>
+                                ) : (
+                                    filteredAllRooms.map(room => {
+                                        const isActive = activeRoomId === room.id;
+                                        const unreadCount = unreadCounts[room.id] || 0;
+
+                                        let icon = null;
+                                        if (room.is_core) {
+                                            icon = (
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0">
                                                     #
                                                 </div>
-                                                <div className="flex flex-col min-w-0 flex-1">
-                                                    <span className={`text-base font-bold tracking-tight truncate uppercase ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
-                                                    {renderLastMessage(room)}
+                                            );
+                                        } else if (room.type === "dm") {
+                                            icon = (
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300 shrink-0">
+                                                    <User size={18} />
                                                 </div>
-                                                {unreadCount > 0 && (
-                                                    <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
-                                                        {unreadCount > 99 ? '99+' : unreadCount}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                            );
+                                        } else {
+                                            icon = (
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
+                                                    <Users size={18} />
+                                                </div>
+                                            );
+                                        }
 
-                            {/* Direct Messages Section */}
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between pl-2 mb-2">
-                                    <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Direct Messages</h3>
-                                    <button
-                                        onClick={() => setIsCreatingDM(true)}
-                                        className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                                        title="Start DM"
-                                    >
-                                        <Plus size={14} className="text-white" />
-                                    </button>
-                                </div>
-                                {dms.length === 0 ? (
-                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/2 rounded-xl border border-white/5 text-center">No DMs yet. Click + to start one.</div>
-                                ) : (
-                                    dms.map(room => {
-                                        const isActive = activeRoomId === room.id;
-                                        const unreadCount = unreadCounts[room.id] || 0;
                                         return (
                                             <button
                                                 key={room.id}
@@ -434,58 +466,9 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-300 shrink-0">
-                                                        <User size={18} />
-                                                    </div>
+                                                    {icon}
                                                     <div className="flex flex-col min-w-0 flex-1">
-                                                        <span className={`text-sm font-bold tracking-tight truncate ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
-                                                        {renderLastMessage(room)}
-                                                    </div>
-                                                    {unreadCount > 0 && (
-                                                        <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
-                                                            {unreadCount > 99 ? '99+' : unreadCount}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </button>
-                                        );
-                                    })
-                                )}
-                            </div>
-
-                            {/* Groups Section */}
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between pl-2 mb-2">
-                                    <h3 className="text-[10px] font-black uppercase text-white/40 tracking-widest">Groups</h3>
-                                    <button
-                                        onClick={() => setIsCreatingGroup(true)}
-                                        className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                                        title="Create Group"
-                                    >
-                                        <Plus size={14} className="text-white" />
-                                    </button>
-                                </div>
-                                {customs.length === 0 ? (
-                                    <div className="text-[10px] text-white/30 pl-2 py-2 italic bg-white/2 rounded-xl border border-white/5 text-center">No custom groups. Click + to create one.</div>
-                                ) : (
-                                    customs.map(room => {
-                                        const isActive = activeRoomId === room.id;
-                                        const unreadCount = unreadCounts[room.id] || 0;
-                                        return (
-                                            <button
-                                                key={room.id}
-                                                onClick={() => {
-                                                    setActiveRoomId(room.id);
-                                                    setShowSidebar(false);
-                                                }}
-                                                className={`w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all ${isActive ? 'bg-[#005c4b]/30 border border-correct/30 shadow-[0_0_15px_rgba(0,255,0,0.05)]' : unreadCount > 0 ? 'bg-correct/10 border border-correct/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
-                                            >
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
-                                                        <Users size={18} />
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0 flex-1">
-                                                        <span className={`text-sm font-bold tracking-tight truncate ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
+                                                        <span className={`text-sm font-bold tracking-tight truncate ${room.is_core ? 'uppercase' : ''} ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
                                                         {renderLastMessage(room)}
                                                     </div>
                                                     {unreadCount > 0 && (
@@ -650,10 +633,13 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <div className="absolute top-1/2 left-3 -translate-y-1/2 z-30 flex items-center">
                                 <button
                                     onClick={() => setShowSidebar(true)}
-                                    className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 text-white cursor-pointer transition-all"
+                                    className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 text-white cursor-pointer transition-all relative"
                                     title="Back to Chats"
                                 >
                                     <ChevronLeft size={16} />
+                                    {otherUnreadCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-gray-900 animate-pulse" />
+                                    )}
                                 </button>
                             </div>
 

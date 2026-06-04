@@ -395,12 +395,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!user?.id) return;
 
-        const calculateUnreads = (messages: any[], receipts: Record<string, string>) => {
-            return messages.filter((m) => {
+        const calculateUnreads = (messages: any[], receipts: Record<string, string>, joinedIds?: string[]) => {
+            const validGroupIds = joinedIds || useAppStore.getState().joinedGroupIds;
+            const validSet = new Set(validGroupIds);
+
+            const unreadsList = messages.filter((m) => {
                 if (m.user_id === user.id) return false;
+                if (!validSet.has(m.group_id)) return false;
                 const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-                return m.created_at > lastSeen;
-            }).length;
+                return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
+            });
+            return unreadsList.length;
         };
 
         const fetchMessagesAndReceipts = async () => {
@@ -417,6 +422,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
             useAppStore.getState().setReadReceipts(receipts);
 
+            // Fetch the user's joined groups
+            const { data: memberData } = await supabase
+                .from('chat_group_members')
+                .select('group_id')
+                .eq('user_id', user.id)
+                .eq('status', 'joined');
+
+            const joinedSet = new Set<string>();
+            joinedSet.add("00000000-0000-0000-0000-000000000001");
+            joinedSet.add("00000000-0000-0000-0000-000000000002");
+            joinedSet.add("00000000-0000-0000-0000-000000000003");
+            if (memberData) {
+                memberData.forEach(m => joinedSet.add(m.group_id));
+            }
+            const joinedArray = Array.from(joinedSet);
+            useAppStore.getState().setJoinedGroupIds(joinedArray);
+
             const { data } = await supabase
                 .from('messages')
                 .select('*, profiles(username, avatar_url)')
@@ -426,7 +448,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (data) {
                 const chronData = data.reverse();
                 useAppStore.getState().setGlobalMessages(chronData);
-                setUnreadCount(calculateUnreads(chronData, receipts));
+                setUnreadCount(calculateUnreads(chronData, receipts, joinedArray));
             }
         };
 
@@ -438,15 +460,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'messages' },
                 async (payload) => {
-                    console.log("Realtime message event:", payload.eventType, payload);
 
                     // 1. Extract the group ID
                     //@ts-ignore
                     const groupId = payload.new?.group_id || payload.old?.group_id;
 
-                    // 2. Check if the user already has active messages for this group in their store
-                    const allMsgs = useAppStore.getState().globalMessages;
-                    const belongsToUser = allMsgs.some((m) => m.group_id === groupId);
+                    // 2. Check if the user is a member of the group
+                    const joinedIds = useAppStore.getState().joinedGroupIds;
+                    const belongsToUser = joinedIds.includes(groupId);
 
                     // 3. Early return if this is an entirely unrelated group
                     if (!belongsToUser) return;
@@ -476,7 +497,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         if (newMessage.user_id !== user.id) {
                             const currentReceipts = useAppStore.getState().readReceipts;
                             const lastSeen = currentReceipts[newMessage.group_id] || new Date(0).toISOString();
-                            if (newMessage.created_at > lastSeen) {
+                            const isNew = new Date(newMessage.created_at).getTime() > new Date(lastSeen).getTime();
+                            if (isNew) {
                                 setUnreadCount(useAppStore.getState().unreadCount + 1);
                             }
                         }
