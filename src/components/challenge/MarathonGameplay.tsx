@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useState, useCallback, useMemo, useEffect } from 'react';
-import { Clock, Lock } from 'lucide-react';
+import { Clock, Lock, Play } from 'lucide-react';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
@@ -72,7 +72,7 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                     <div className="text-left">
                         <p className="text-xs font-black uppercase">Game #{index + 1} ({game.wordLength}L)</p>
                         <p className="text-[10px] text-gray-500">
-                            {!isUnlocked 
+                            {!isUnlocked
                                 ? (lockReason || 'Locked (Play games in order)')
                                 : isFinished
                                     ? (isCompleted ? 'Completed (View Results)' : 'Failed (View Results)')
@@ -244,6 +244,148 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         }
     }, [challenge.created_at, appDate]);
 
+    // Active day tab state for daily bot challenges (Day 1, Day 2 etc., or 'all')
+    const [activeDayTab, setActiveDayTab] = useState<'all' | number>(() => {
+        if (challenge.is_bot_marathon) {
+            if (appDate) {
+                try {
+                    const createdLagos = new Intl.DateTimeFormat("en-CA", {
+                        timeZone: "Africa/Lagos",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                    }).format(new Date(challenge.created_at));
+
+                    const createdDate = new Date(createdLagos + "T00:00:00");
+                    const currentDate = new Date(appDate + "T00:00:00");
+                    const diffMs = currentDate.getTime() - createdDate.getTime();
+                    const day = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+
+                    const created = new Date(challenge.created_at).getTime();
+                    const expires = new Date(challenge.expires_at).getTime();
+                    const diffHours = (expires - created) / (1000 * 60 * 60);
+                    const totalDays = Math.max(1, Math.round(diffHours / 24));
+
+                    return Math.min(day, totalDays);
+                } catch (e) {
+                    console.error("Failed to compute calendar currentDay inside initializer", e);
+                }
+            }
+            return 1;
+        }
+        return 'all';
+    });
+
+    // Sub-filtering tabs state (All, Unplayed, Played)
+    const [subFilter, setSubFilter] = useState<'all' | 'unplayed' | 'played'>('all');
+
+    // Compute basic statuses sequentially to build an enhanced list of games
+    const gamesWithMetadata = useMemo(() => {
+        const results: any[] = [];
+        for (let idx = 0; idx < marathonGames.length; idx++) {
+            const game = marathonGames[idx];
+            const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+            const isCompleted = prog?.status === 'completed';
+            const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
+            const isFinished = isCompleted || isFailed;
+
+            let isUnlocked = true;
+            let lockReason = '';
+
+            if (challenge.is_bot_marathon) {
+                const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+                const gameDay = Math.floor(idx / baseSequenceLength) + 1;
+                if (gameDay > currentDay) {
+                    isUnlocked = false;
+                    lockReason = `Locked until Day ${gameDay}`;
+                }
+            }
+
+            if (isUnlocked && challenge.marathon_force_order && idx > 0) {
+                const prev = results[idx - 1];
+                if (!prev || !prev.isFinished) {
+                    isUnlocked = false;
+                    lockReason = 'Locked (Play games in order)';
+                }
+            }
+
+            results.push({
+                ...game,
+                idx,
+                prog,
+                isCompleted,
+                isFailed,
+                isFinished,
+                isUnlocked,
+                lockReason
+            });
+        }
+        return results;
+    }, [marathonGames, participation.marathon_progress, challenge.is_bot_marathon, challenge.marathon_force_order, numDays, currentDay]);
+
+    // Compute stats/counts for sub-filters dynamically based on active day tab selection
+    const counts = useMemo(() => {
+        let list = gamesWithMetadata;
+        if (challenge.is_bot_marathon && activeDayTab !== 'all') {
+            const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+            list = list.filter(g => {
+                const gameDay = Math.floor(g.idx / baseSequenceLength) + 1;
+                return gameDay === activeDayTab;
+            });
+        }
+        const total = list.length;
+        const unplayed = list.filter(g => !g.isFinished).length;
+        const played = list.filter(g => g.isFinished).length;
+        return { total, unplayed, played };
+    }, [gamesWithMetadata, challenge.is_bot_marathon, activeDayTab, marathonGames.length, numDays]);
+
+    // Apply Day filters and sub-filters to get current games view
+    const filteredGames = useMemo(() => {
+        let list = gamesWithMetadata;
+
+        // 1. Day filter (only for daily challenges)
+        if (challenge.is_bot_marathon && activeDayTab !== 'all') {
+            const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+            list = list.filter(g => {
+                const gameDay = Math.floor(g.idx / baseSequenceLength) + 1;
+                return gameDay === activeDayTab;
+            });
+        }
+
+        // 2. Sub-filter
+        if (subFilter === 'unplayed') {
+            list = list.filter(g => !g.isFinished);
+        } else if (subFilter === 'played') {
+            list = list.filter(g => g.isFinished);
+        }
+
+        return list;
+    }, [gamesWithMetadata, challenge.is_bot_marathon, activeDayTab, subFilter, marathonGames.length, numDays]);
+
+    // Split games into Featured ("Next Up" unplayed game), remaining queue (unplayed), and completed/timed out (played)
+    const { featuredGame, remainingUnplayed, playedGames } = useMemo(() => {
+        let featuredGame: any = null;
+        const remainingUnplayed: any[] = [];
+        const playedGames: any[] = [];
+
+        // Global next up eligible unplayed game
+        const globalNextUp = gamesWithMetadata.find(g => g.isUnlocked && !g.isFinished);
+
+        filteredGames.forEach(g => {
+            if (g.isFinished) {
+                playedGames.push(g);
+            } else {
+                if (globalNextUp && g.idx === globalNextUp.idx) {
+                    featuredGame = g;
+                } else {
+                    remainingUnplayed.push(g);
+                }
+            }
+        });
+
+        return { featuredGame, remainingUnplayed, playedGames };
+    }, [filteredGames, gamesWithMetadata]);
+
     if (selectedGameIndex !== null) {
         return (
             <RegularGameplay
@@ -265,52 +407,159 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 <p className="text-gray-500 text-xs">Complete all lengths to finish the challenge.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5">
-                {marathonGames.map((game, idx) => {
-                    const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-                    
-                    let isUnlocked = true;
-                    let lockReason = '';
+            {/* Daily Challenge - Day Tabs Navigation */}
+            {challenge.is_bot_marathon && (
+                <div className="flex flex-wrap bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
+                    <button
+                        onClick={() => {
+                            setActiveDayTab('all');
+                            setSubFilter('all');
+                        }}
+                        className={`px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${activeDayTab === 'all'
+                            ? "bg-correct text-black font-extrabold shadow-md"
+                            : "text-white/70 hover:text-white hover:bg-white/5"
+                            }`}
+                    >
+                        All Days
+                    </button>
+                    {Array.from({ length: numDays }, (_, i) => i + 1).map((dayNum) => (
+                        <button
+                            key={dayNum}
+                            onClick={() => {
+                                setActiveDayTab(dayNum);
+                                setSubFilter('all');
+                            }}
+                            className={`px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${activeDayTab === dayNum
+                                ? "bg-correct text-black font-extrabold shadow-md"
+                                : "text-white/70 hover:text-white hover:bg-white/5"
+                                }`}
+                        >
+                            Day {dayNum} {dayNum === currentDay && "•"}
+                        </button>
+                    ))}
+                </div>
+            )}
 
-                    if (challenge.is_bot_marathon) {
-                        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
-                        const gameDay = Math.floor(idx / baseSequenceLength) + 1;
-                        if (gameDay > currentDay) {
-                            isUnlocked = false;
-                            lockReason = `Locked until Day ${gameDay}`;
-                        }
-                    }
-                    
-                    if (isUnlocked && challenge.marathon_force_order && idx > 0) {
-                        const prevProg = participation.marathon_progress?.find((p: any) => p.game_index === idx - 1);
-                        if (!prevProg) {
-                            isUnlocked = false;
-                            lockReason = 'Locked (Play games in order)';
-                        } else {
-                            const prevCompleted = prevProg.status === 'completed';
-                            const prevFailed = prevProg.status === 'timed_out' || (prevProg.attempts >= MAX_ATTEMPTS && !prevCompleted);
-                            if (!prevCompleted && !prevFailed) {
-                                isUnlocked = false;
-                                lockReason = 'Locked (Play games in order)';
-                            }
-                        }
-                    }
-
+            {/* Sub-Filters Tabs: All, Unplayed, Played */}
+            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
+                {(['all', 'unplayed', 'played'] as const).map((filter) => {
+                    const count = filter === 'all' ? counts.total : filter === 'unplayed' ? counts.unplayed : counts.played;
                     return (
-                        <MarathonLengthItem
-                            key={idx}
-                            game={game}
-                            index={idx}
-                            prog={prog}
-                            challenge={challenge}
-                            finishers={finishersByGameIndex[idx] || []}
-                            onSelect={handleSelect}
-                            onPreview={handlePreview}
-                            isUnlocked={isUnlocked}
-                            lockReason={lockReason}
-                        />
+                        <button
+                            key={filter}
+                            onClick={() => setSubFilter(filter)}
+                            className={`flex-1 py-1.5 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${subFilter === filter
+                                ? "bg-white/10 text-white font-extrabold border border-white/5"
+                                : "text-white/60 hover:text-white hover:bg-white/5"
+                                }`}
+                        >
+                            <span>{filter}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold">
+                                {"("} {count}{")"}
+                            </span>
+                        </button>
                     );
                 })}
+            </div>
+
+            {/* Games Listing Container */}
+            <div className="flex flex-col gap-4">
+                {/* 1. Featured Next Up Game */}
+                {(subFilter === 'all' || subFilter === 'unplayed') && featuredGame && (
+                    <div className="space-y-2 mb-4 animate-in fade-in duration-200">
+                        <h4 className="text-[9px] font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1.5 pl-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-ping" />
+                            Next Playable Game
+                        </h4>
+                        <div className="relative group overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-transparent p-4 sm:p-5 transition-all hover:border-yellow-500/50">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 blur-2xl -mr-8 -mt-8 pointer-events-none" />
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black bg-yellow-500 text-black text-lg shadow-lg shadow-yellow-500/20">
+                                        {featuredGame.wordLength}
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-black uppercase text-white tracking-tight">Game #{featuredGame.idx + 1} ({featuredGame.wordLength}L)</p>
+                                        <p className="text-[10px] text-yellow-500/80 font-black uppercase tracking-wider">
+                                            {featuredGame.prog ? 'In Progress' : 'Ready to Play'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleSelect(featuredGame.idx, false)}
+                                    className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-yellow-500/20"
+                                >
+                                    Play <Play size={12} fill="currentColor" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. Unplayed Queue / Other games */}
+                <div className="grid grid-cols-1 gap-2.5">
+                    {remainingUnplayed.length > 0 && (
+                        <>
+                            {subFilter === 'all' && featuredGame && (
+                                <div className="flex items-center gap-4 my-1.5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 whitespace-nowrap pl-1">
+                                        Locked & Remaining Games
+                                    </span>
+                                    <div className="h-px bg-white/5 flex-1" />
+                                </div>
+                            )}
+                            {remainingUnplayed.map((g) => (
+                                <MarathonLengthItem
+                                    key={g.idx}
+                                    game={g}
+                                    index={g.idx}
+                                    prog={g.prog}
+                                    challenge={challenge}
+                                    finishers={finishersByGameIndex[g.idx] || []}
+                                    onSelect={handleSelect}
+                                    onPreview={handlePreview}
+                                    isUnlocked={g.isUnlocked}
+                                    lockReason={g.lockReason}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* 3. Played/Timed Out Divider & Items */}
+                    {playedGames.length > 0 && (
+                        <>
+                            {(subFilter === 'all' || remainingUnplayed.length > 0 || featuredGame) && (
+                                <div className="flex items-center gap-4 mt-3 mb-1.5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 whitespace-nowrap pl-1">
+                                        Completed & Timed Out
+                                    </span>
+                                    <div className="h-px bg-white/5 flex-1" />
+                                </div>
+                            )}
+                            {playedGames.map((g) => (
+                                <MarathonLengthItem
+                                    key={g.idx}
+                                    game={g}
+                                    index={g.idx}
+                                    prog={g.prog}
+                                    challenge={challenge}
+                                    finishers={finishersByGameIndex[g.idx] || []}
+                                    onSelect={handleSelect}
+                                    onPreview={handlePreview}
+                                    isUnlocked={g.isUnlocked}
+                                    lockReason={g.lockReason}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* Empty State */}
+                    {filteredGames.length === 0 && (
+                        <div className="py-12 text-center text-white/40 text-xs font-black uppercase tracking-wider">
+                            No games match this filter.
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between shrink-0">
@@ -320,7 +569,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 </div>
                 <button
                     onClick={onFinish}
-                    className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors"
+                    className="bg-white/5 border border-white/10 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors cursor-pointer"
                 >
                     Exit to Lobby
                 </button>
