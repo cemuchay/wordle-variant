@@ -34,4 +34,21 @@ export const ANNOUNCEMENTS: Announcement[] = [
             <p>This change will retoractively apply to yesterday, 18th May 2026, so this week is consistent</p>
         `
     },
+    {
+        id: 'marathon-games-list-revamp',
+        title: 'Marathon Game Selection Revamp! 🏃‍♂️💨',
+        date: '2026-06-04',
+        type: 'update',
+        content: `
+            <h3>Better Marathon & Daily Challenge Navigation!</h3>
+            <p>We've redesigned the marathon games list to make playing through large sets of words feel much more seamless.</p>
+            
+            <h3>What's New?</h3>
+            <ul>
+                <li><strong>Intelligent "Next Up" Game:</strong> The first unlocked, unplayed game is now automatically displayed right at the top for instant play. No more scrolling down to find where you left off!</li>
+                <li><strong>Categorization Filters:</strong> Quickly toggle the game list view between <strong>All</strong>, <strong>Unplayed</strong>, and <strong>Played / Timed Out</strong> games.</li>
+                <li><strong>Daily Event Tabs:</strong> Daily marathon challenges are now organized by days (Day 1, Day 2, etc.), defaulting automatically to the current active day.</li>
+            </ul>
+        `
+    },
 ];
