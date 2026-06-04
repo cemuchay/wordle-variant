@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import {
+   useCallback,
+   useEffect,
+   useMemo,
+   useReducer,
+   useRef,
+   useState,
+} from "react";
 import { useApp } from "../context/AppContext";
 import { getWordLists } from "../data/words";
 import { useAuth } from "../hooks/useAuth";
@@ -36,6 +43,8 @@ const getLocalSalt = (date: string, userId: string | undefined) => {
 export const useGameEngine = (date: string) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
+   const hydratedUserRef = useRef<string | undefined>(undefined);
+   const hydratedDateRef = useRef<string | null>(null);
    const { user, loading: isAuthLoading } = useAuth();
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
@@ -180,7 +189,17 @@ export const useGameEngine = (date: string) => {
          return;
       }
 
+      if (
+         isHydrated &&
+         hydratedUserRef.current === user?.id &&
+         hydratedDateRef.current === date
+      ) {
+         return;
+      }
+
       setIsHydrated(false);
+      hydratedUserRef.current = user?.id;
+      hydratedDateRef.current = date;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
@@ -281,6 +300,7 @@ export const useGameEngine = (date: string) => {
       };
 
       hydrate();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       date,
       user,
