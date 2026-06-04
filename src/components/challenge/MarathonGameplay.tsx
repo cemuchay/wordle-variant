@@ -471,7 +471,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-ping" />
                             Next Playable Game
                         </h4>
-                        <div className="relative group overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-transparent p-4 sm:p-5 transition-all hover:border-yellow-500/50">
+                        <div className="relative group overflow-hidden rounded-2xl border border-yellow-500/30 bg-linear-to-r from-yellow-500/10 to-transparent p-4 sm:p-5 transition-all hover:border-yellow-500/50">
                             <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 blur-2xl -mr-8 -mt-8 pointer-events-none" />
                             <div className="flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-4">

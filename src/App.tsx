@@ -391,7 +391,7 @@ export default function App() {
         activeItem={activeNavigationItem}
         onNavigate={handleNavigation}
         challengeUnreadCount={challengeUnreadCount}
-        chatUnreadCount={unreadCount}
+        chatUnreadCount={isChatOpen ? 0 : unreadCount}
       />
 
       {navLoading.active && <TransitionLoader message={navLoading.message} />}

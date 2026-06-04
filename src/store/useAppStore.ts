@@ -61,6 +61,7 @@ interface AppState {
    readReceipts: Record<string, string>;
    failedMessageIds: string[];
    pendingReadReceipts: Record<string, string>;
+   joinedGroupIds: string[];
 
    // Actions
    triggerToast: (message: string, duration?: number) => void;
@@ -89,6 +90,7 @@ interface AppState {
    setPendingReadReceipts: (receipts: Record<string, string>) => void;
    updatePendingReadReceipt: (groupId: string, timestamp: string) => void;
    removePendingReadReceipt: (groupId: string) => void;
+   setJoinedGroupIds: (ids: string[]) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -110,6 +112,7 @@ export const useAppStore = create<AppState>((set) => ({
    isGlobalMessagesLoaded: false,
    readReceipts: {},
    failedMessageIds: [],
+   joinedGroupIds: [],
    pendingReadReceipts: (() => {
       try {
          const val = localStorage.getItem('pendingReadReceipts');
@@ -185,4 +188,5 @@ export const useAppStore = create<AppState>((set) => ({
       } catch {}
       return { pendingReadReceipts: next };
    }),
+   setJoinedGroupIds: (joinedGroupIds) => set({ joinedGroupIds }),
 }));

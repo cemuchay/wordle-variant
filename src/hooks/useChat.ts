@@ -169,7 +169,15 @@ export const useChat = (userId: string) => {
     const pendingReadReceipts = useAppStore((state) => state.pendingReadReceipts);
     const updatePendingReadReceipt = useAppStore((state) => state.updatePendingReadReceipt);
     const removePendingReadReceipt = useAppStore((state) => state.removePendingReadReceipt);
-    const [groups, setGroups] = useState<ChatGroup[]>(defaultCores);
+    const [groups, setGroups] = useState<ChatGroup[]>(() => {
+       if (!userId) return defaultCores;
+       try {
+          const cached = localStorage.getItem(`chat_groups_${userId}`);
+          return cached ? JSON.parse(cached) : defaultCores;
+       } catch {
+          return defaultCores;
+       }
+    });
    const [invites, setInvites] = useState<any[]>([]);
    const [activeRoomId, setActiveRoomId] = useState<string>(
       "00000000-0000-0000-0000-000000000001",
@@ -307,6 +315,10 @@ export const useChat = (userId: string) => {
 
       setGroups(activeGroups);
       setInvites(incomingInvites);
+      useAppStore.getState().setJoinedGroupIds(activeGroups.map(g => g.id));
+      try {
+         localStorage.setItem(`chat_groups_${userId}`, JSON.stringify(activeGroups));
+      } catch {}
    }, [userId]);
 
    useEffect(() => {
@@ -362,7 +374,7 @@ export const useChat = (userId: string) => {
       if (!userId || !activeRoomId) return;
       const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const unreads = activeMessages.filter(
-         (m: any) => m.user_id !== userId && m.created_at > lastSeen,
+         (m: any) => m.user_id !== userId && new Date(m.created_at).getTime() > new Date(lastSeen).getTime(),
       );
       if (unreads.length > 0) {
          // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -378,7 +390,7 @@ export const useChat = (userId: string) => {
 
       const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const hasUnread = activeMessages.some(
-         (m: any) => m.user_id !== userId && m.created_at > lastSeen
+         (m: any) => m.user_id !== userId && new Date(m.created_at).getTime() > new Date(lastSeen).getTime()
       );
       if (!hasUnread) return;
 
@@ -400,7 +412,6 @@ export const useChat = (userId: string) => {
          )
          .then(({ error }) => {
             if (error) {
-               console.error("Failed to update read receipt:", error.message);
                updatePendingReadReceipt(activeRoomId, newLastSeen);
             } else {
                removePendingReadReceipt(activeRoomId);
@@ -409,11 +420,11 @@ export const useChat = (userId: string) => {
 
       const unreads = globalMessages.filter((m) => {
          if (m.user_id === userId) return false;
-         const lastSeen =
+         const lastSeenVal =
             m.group_id === activeRoomId
                ? newLastSeen
                : readReceipts[m.group_id] || new Date(0).toISOString();
-         return m.created_at > lastSeen;
+         return new Date(m.created_at).getTime() > new Date(lastSeenVal).getTime();
       });
       setUnreadCount(unreads.length);
    }, [
@@ -777,8 +788,9 @@ export const useChat = (userId: string) => {
             { onConflict: "user_id,group_id" },
          )
          .then(({ error }) => {
-            if (error)
-               console.error("Failed to update read receipt:", error.message);
+            if (error) {
+               // Fail silently
+            }
          });
 
       const unreads = globalMessages.filter((m) => {
@@ -787,7 +799,7 @@ export const useChat = (userId: string) => {
             m.group_id === activeRoomId
                ? newLastSeen
                : readReceipts[m.group_id] || new Date(0).toISOString();
-         return m.created_at > lastSeen;
+         return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
       });
       setUnreadCount(unreads.length);
       setFirstUnreadId(null);

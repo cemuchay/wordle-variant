@@ -59,8 +59,8 @@ export const AppNavigation = ({
                             {/* Icon Wrapper with bounce-on-hover / active scale */}
                             <div
                                 className={`transition-all duration-300 transform group-hover:scale-110 group-active:scale-95 ${isActive
-                                        ? 'text-correct scale-110 drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]'
-                                        : 'text-gray-400 group-hover:text-white'
+                                    ? 'text-correct scale-110 drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]'
+                                    : 'text-gray-400 group-hover:text-white'
                                     }`}
                             >
                                 <Icon size={18} className="stroke-[2.5]" />
@@ -69,8 +69,8 @@ export const AppNavigation = ({
                             {/* Badge */}
                             {item.badge !== undefined && item.badge > 0 && (
                                 <span className={`absolute top-0.5 right-1.5 sm:right-3 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-black animate-pulse ${item.id === 'chat'
-                                        ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.8)] hidden'
-                                        : 'bg-correct text-black shadow-[0_0_10px_rgba(46,204,113,0.5)]'
+                                    ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.8)] '
+                                    : 'bg-correct text-black shadow-[0_0_10px_rgba(46,204,113,0.5)]'
                                     }`}>
                                     {item.badge}
                                 </span>
@@ -79,8 +79,8 @@ export const AppNavigation = ({
                             {/* Text label */}
                             <span
                                 className={`text-[9px] uppercase font-black tracking-wider transition-colors duration-300 ${isActive
-                                        ? 'text-white'
-                                        : 'text-gray-500 group-hover:text-gray-300'
+                                    ? 'text-white'
+                                    : 'text-gray-500 group-hover:text-gray-300'
                                     }`}
                             >
                                 {item.label}
