@@ -165,7 +165,6 @@ export const RegularGameplay = memo(function RegularGameplay({
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                         letterStatuses={letterStatuses}
-                        compact={true}
                     />
                 </div>
             )}
