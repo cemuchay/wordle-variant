@@ -58,7 +58,7 @@ export const AppHeader = ({
     };
 
     return (
-        <header className="w-full max-w-lg mx-auto flex flex-col gap-2 mb-3 shrink-0">
+        <header className="w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 pt-6 shrink-0">
             <div className="w-full flex items-center justify-between gap-1 h-10 py-1 px-2 bg-white/5 rounded-2xl border border-white/10">
                 {/* Left Side: Logo & Sync Status */}
                 <div className="flex items-center gap-1.5 min-w-0">
