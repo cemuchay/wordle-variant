@@ -96,7 +96,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-150 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -104,17 +104,17 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-8 duration-300">
+            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-900 bg-gray-900/20">
+                <div className="flex items-center justify-between p-4 border-b border-gray-900 bg-gray-900/20 shrink-0">
                     <h2 className="text-lg font-black text-white tracking-tight">Settings</h2>
                     <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white">
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
                     {/* Security & Identity (Private Data) */}
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 mb-1">
@@ -253,7 +253,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 </div>
 
                 {/* Action Area */}
-                <div className="p-4 bg-gray-900/30 border-t border-gray-900 flex flex-col gap-3">
+                <div className="p-4 bg-gray-900/30 border-t border-gray-900 flex flex-col gap-3 shrink-0">
                     <button
                         onClick={handleSave}
                         disabled={loading}

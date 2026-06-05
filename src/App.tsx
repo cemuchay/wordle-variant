@@ -22,6 +22,7 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
 import { type AppUser, type Challenge } from "./types/game";
+import { useChallengeStore } from "./store/useChallengeStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 
@@ -29,6 +30,7 @@ const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 
 export default function App() {
   const { user } = useAuth();
+  const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const {
     toast,
     setToast,
@@ -398,12 +400,14 @@ export default function App() {
         )}
       </div>
 
-      <AppNavigation
-        activeItem={activeNavigationItem}
-        onNavigate={handleNavigation}
-        challengeUnreadCount={challengeUnreadCount}
-        chatUnreadCount={isChatOpen ? 0 : unreadCount}
-      />
+      {!isPlayingChallenge && (
+        <AppNavigation
+          activeItem={activeNavigationItem}
+          onNavigate={handleNavigation}
+          challengeUnreadCount={challengeUnreadCount}
+          chatUnreadCount={isChatOpen ? 0 : unreadCount}
+        />
+      )}
 
       {navLoading.active && <TransitionLoader message={navLoading.message} />}
 

@@ -809,6 +809,8 @@ export const ChallengeModal = ({
   onChallengeCreated,
   initialChallengeId,
 }: ChallengeModalProps) => {
+  const isPlaying = useChallengeStore((s) => s.isPlaying);
+
   if (!isOpen) return null;
 
   if (!user && !initialChallengeId && !hasRecentChallenges()) {
@@ -826,14 +828,22 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className="fixed inset-0 flex items-center justify-center p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(1rem+env(safe-area-inset-bottom,0))] bg-black/80 backdrop-blur-sm"
+        className={`fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-300 ${
+          isPlaying
+            ? "p-0"
+            : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
+        }`}
         style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-          className="bg-gray-900 border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-full sm:max-h-[90vh]"
+          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${
+            isPlaying
+              ? "h-[100svh] max-h-[100svh] rounded-none border-none"
+              : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
+          }`}
         >
           <ChallengeModalContent onClose={onClose} user={user} />
         </motion.div>
