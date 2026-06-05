@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useMemo, useEffect } from "react";
+import { memo, useState, useMemo, useEffect, useRef } from "react";
 import {
   X,
   Trophy,
@@ -147,6 +147,8 @@ const AuthenticatedChallengeContent = memo(
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
     const {
       setActiveTab,
       isPlaying,
@@ -182,6 +184,13 @@ const AuthenticatedChallengeContent = memo(
       dailyMarathonChallenge,
       initialChallengeId,
     } = useChallengeContext();
+
+    // Reset scroll position to top whenever active challenge changes
+    useEffect(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+    }, [selectedChallenge?.id]);
 
     const activeCount = useMemo(() => {
       return myChallenges.filter((item: any) => {
@@ -333,7 +342,7 @@ const AuthenticatedChallengeContent = memo(
                   <ChallengeGameplayContainer />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                   {error ? (
                     <ErrorFallback
                       message={error}

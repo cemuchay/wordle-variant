@@ -191,17 +191,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const lastProcessedMessageIdRef = useRef<string | null>(null);
-  const lobbyTopRef = useRef<HTMLDivElement>(null);
 
-  // Automatically scroll lobby top into view when lobby tab is active or challenge changes
-  useEffect(() => {
-    if (lobbyTab === 'lobby') {
-      const timer = setTimeout(() => {
-        lobbyTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [lobbyTab, selectedChallenge?.id]);
 
   // Clear unread count when switching to chat tab
   useEffect(() => {
@@ -320,7 +310,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
 
   return (
-    <div ref={lobbyTopRef} className="space-y-6">
+    <div className="space-y-6">
       <div className="bg-white/5 p-6 rounded-2xl border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
 
