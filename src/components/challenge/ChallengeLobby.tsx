@@ -191,6 +191,17 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const lastProcessedMessageIdRef = useRef<string | null>(null);
+  const lobbyTopRef = useRef<HTMLDivElement>(null);
+
+  // Automatically scroll lobby top into view when lobby tab is active or challenge changes
+  useEffect(() => {
+    if (lobbyTab === 'lobby') {
+      const timer = setTimeout(() => {
+        lobbyTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [lobbyTab, selectedChallenge?.id]);
 
   // Clear unread count when switching to chat tab
   useEffect(() => {
@@ -309,7 +320,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
 
   return (
-    <div className="space-y-6">
+    <div ref={lobbyTopRef} className="space-y-6">
       <div className="bg-white/5 p-6 rounded-2xl border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
 
@@ -535,7 +546,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <button
                   onClick={handleStartGame}
                   disabled={loading}
-                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Play size={18} fill="currentColor" />{" "}
                   {myParticipation?.status === "playing"

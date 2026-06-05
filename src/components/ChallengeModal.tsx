@@ -9,6 +9,7 @@ import {
   Plus,
   HelpCircle,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type Challenge } from "../hooks/useChallenge";
@@ -151,6 +152,7 @@ const AuthenticatedChallengeContent = memo(
       isPlaying,
       setIsPlaying,
       selectedChallenge,
+      setSelectedChallenge,
       myParticipation,
       filteredChallenges,
       myChallenges,
@@ -235,6 +237,15 @@ const AuthenticatedChallengeContent = memo(
           className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? "p-3 sm:p-4" : "p-4 sm:p-6"}`}
         >
           <div className="flex items-center gap-2 sm:gap-3">
+            {!isPlaying && selectedChallenge && (
+              <button
+                onClick={() => setSelectedChallenge(null)}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white cursor-pointer mr-1 flex items-center justify-center"
+                title="Back to List"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
             <div className="bg-correct/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
               <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
             </div>
@@ -244,17 +255,7 @@ const AuthenticatedChallengeContent = memo(
                   Challenges
                 </h2>
                 {isBackgroundFetching && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="flex items-center gap-1 bg-correct/10 px-2 py-0.5 rounded-full border border-correct/20"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />
-                    <span className="text-[8px] text-correct font-extrabold uppercase tracking-wider">
-                      Syncing
-                    </span>
-                  </motion.div>
+                  <Loader2 className="w-3.5 h-3.5 text-correct animate-spin" />
                 )}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 min-h-5">
@@ -373,7 +374,7 @@ const AuthenticatedChallengeContent = memo(
                             onClick={() => {
                               handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
                             }}
-                            className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-5 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
+                            className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-2 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
                             style={{
                               animationDuration: '2s'
                             }}
@@ -393,9 +394,7 @@ const AuthenticatedChallengeContent = memo(
                               <h3 className="text-lg font-black text-white uppercase tracking-tight">
                                 Today's Daily Marathon Challenge 🏃‍♂️💨
                               </h3>
-                              <p className="text-white/80 text-xs mt-1 leading-relaxed">
-                                Play today's curated sequence of words. Compete on the leaderboard to claim the top spot!
-                              </p>
+
                             </div>
 
                             <div className="flex items-center justify-between w-full border-t border-white/10 pt-2.5 mt-1">
@@ -836,10 +835,10 @@ export const ChallengeModal = ({
   if (inline) {
     return (
       <div
-        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden p-6 relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
-        <div className={`w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300 ${isPlaying ? 'bg-transparent border-none' : 'bg-gray-900 border border-white/10 rounded-3xl shadow-2xl'}`}>
+        <div className="w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300">
           {renderContent()}
         </div>
       </div>
@@ -853,22 +852,20 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className={`fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-300 ${
-          isPlaying
-            ? "p-0"
-            : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
-        }`}
+        className={`fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-300 ${isPlaying
+          ? "p-0"
+          : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
+          }`}
         style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${
-            isPlaying
-              ? "h-[100svh] max-h-[100svh] rounded-none border-none"
-              : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
-          }`}
+          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
+            ? "h-[100svh] max-h-[100svh] rounded-none border-none"
+            : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
+            }`}
         >
           <ChallengeModalContent onClose={onClose} user={user} />
         </motion.div>
