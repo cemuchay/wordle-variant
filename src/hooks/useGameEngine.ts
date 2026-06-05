@@ -40,6 +40,28 @@ const getLocalSalt = (date: string, userId: string | undefined) => {
    return Math.abs(hash).toString(16);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const areGuessesCoherent = (localGuesses: any[], dbGuesses: any[]) => {
+   if (!Array.isArray(localGuesses) || !Array.isArray(dbGuesses)) return false;
+   const minLength = Math.min(localGuesses.length, dbGuesses.length);
+   for (let i = 0; i < minLength; i++) {
+      const localWord = localGuesses[i]
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         .map((c: any) => c.letter)
+         .join("")
+         .toUpperCase();
+      const dbWord = dbGuesses[i]
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         .map((c: any) => c.letter)
+         .join("")
+         .toUpperCase();
+      if (localWord !== dbWord) {
+         return false;
+      }
+   }
+   return true;
+};
+
 export const useGameEngine = (date: string) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
@@ -203,6 +225,8 @@ export const useGameEngine = (date: string) => {
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
+         const cloudPayload = user ? await loadFromCloud() : null;
+
          if (saved) {
             try {
                const payload = JSON.parse(saved);
@@ -232,9 +256,76 @@ export const useGameEngine = (date: string) => {
                      );
                   }
 
-                  if (user) {
-                     const cloudPayload = await loadFromCloud();
-                     if (cloudPayload) {
+                  if (user && cloudPayload) {
+                     dispatch({ type: "LOAD_STATE", payload: cloudPayload });
+                     const localSalt = getLocalSalt(date, user.id);
+                     const savedPayload = {
+                        ...cloudPayload,
+                        config: {
+                           ...cloudPayload.config,
+                           word: obfuscateWord(
+                              cloudPayload.config.word,
+                              localSalt,
+                           ),
+                        },
+                     };
+                     safeLocalStorage.setItem(
+                        `wordle-${date}`,
+                        JSON.stringify(savedPayload),
+                     );
+                  } else {
+                     dispatch({ type: "LOAD_STATE", payload: initialState });
+                  }
+               } else {
+                  // Both local and cloud states exist: check coherence and harmonize
+                  if (user && cloudPayload) {
+                     const isCoherent = areGuessesCoherent(
+                        payload.guesses,
+                        cloudPayload.guesses,
+                     );
+                     if (isCoherent) {
+                        if (
+                           cloudPayload.guesses.length > payload.guesses.length
+                        ) {
+                           console.log(
+                              "[Engine] Cloud is ahead. Overwriting local state with cloud data.",
+                           );
+                           dispatch({
+                              type: "LOAD_STATE",
+                              payload: cloudPayload,
+                           });
+                           const localSalt = getLocalSalt(date, user.id);
+                           const savedPayload = {
+                              ...cloudPayload,
+                              config: {
+                                 ...cloudPayload.config,
+                                 word: obfuscateWord(
+                                    cloudPayload.config.word,
+                                    localSalt,
+                                 ),
+                              },
+                           };
+                           safeLocalStorage.setItem(
+                              `wordle-${date}`,
+                              JSON.stringify(savedPayload),
+                           );
+                        } else if (
+                           payload.guesses.length > cloudPayload.guesses.length
+                        ) {
+                           console.log(
+                              "[Engine] Local is ahead. Syncing local state to cloud.",
+                           );
+                           dispatch({ type: "LOAD_STATE", payload });
+                           performSync(payload);
+                        } else {
+                           // Equal and coherent
+                           dispatch({ type: "LOAD_STATE", payload });
+                        }
+                     } else {
+                        // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
+                        console.log(
+                           "[Engine] Guess conflict/tampering detected. Overwriting local state with cloud data.",
+                        );
                         dispatch({ type: "LOAD_STATE", payload: cloudPayload });
                         const localSalt = getLocalSalt(date, user.id);
                         const savedPayload = {
@@ -251,48 +342,42 @@ export const useGameEngine = (date: string) => {
                            `wordle-${date}`,
                            JSON.stringify(savedPayload),
                         );
-                     } else {
-                        dispatch({ type: "LOAD_STATE", payload: initialState });
                      }
                   } else {
-                     dispatch({ type: "LOAD_STATE", payload: initialState });
-                  }
-               } else {
-                  dispatch({ type: "LOAD_STATE", payload });
-
-                  // Auto-sync if data was left unsynced
-                  if (payload.needsSync && user) {
-                     console.log(
-                        "[Engine] Unsynced local data found, attempting background sync...",
-                     );
-                     performSync(payload);
+                     // No cloud payload exists (or guest)
+                     dispatch({ type: "LOAD_STATE", payload });
+                     if (
+                        user &&
+                        payload.guesses &&
+                        payload.guesses.length > 0
+                     ) {
+                        console.log(
+                           "[Engine] Local state exists but no cloud score found. Syncing local state to cloud.",
+                        );
+                        performSync(payload);
+                     }
                   }
                }
             } catch (e) {
                console.error("Failed to hydrate game state:", e);
             }
-         } else if (user) {
-            // No local state but authenticated: try to fetch from cloud
-            const cloudPayload = await loadFromCloud();
-            if (cloudPayload) {
-               dispatch({ type: "LOAD_STATE", payload: cloudPayload });
-               // Obfuscate config.word before saving to localStorage
-               const localSalt = getLocalSalt(date, user.id);
-               const savedPayload = {
-                  ...cloudPayload,
-                  config: {
-                     ...cloudPayload.config,
-                     word: obfuscateWord(cloudPayload.config.word, localSalt),
-                  },
-               };
-               safeLocalStorage.setItem(
-                  `wordle-${date}`,
-                  JSON.stringify(savedPayload),
-               );
-            } else {
-               dispatch({ type: "LOAD_STATE", payload: initialState });
-            }
+         } else if (user && cloudPayload) {
+            // No local state but authenticated and cloud payload exists
+            dispatch({ type: "LOAD_STATE", payload: cloudPayload });
+            const localSalt = getLocalSalt(date, user.id);
+            const savedPayload = {
+               ...cloudPayload,
+               config: {
+                  ...cloudPayload.config,
+                  word: obfuscateWord(cloudPayload.config.word, localSalt),
+               },
+            };
+            safeLocalStorage.setItem(
+               `wordle-${date}`,
+               JSON.stringify(savedPayload),
+            );
          } else {
+            // Fresh start
             dispatch({ type: "LOAD_STATE", payload: initialState });
          }
 

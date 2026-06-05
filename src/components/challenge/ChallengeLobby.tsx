@@ -192,6 +192,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const lastProcessedMessageIdRef = useRef<string | null>(null);
 
+
   // Clear unread count when switching to chat tab
   useEffect(() => {
     if (lobbyTab === 'chat') {
@@ -535,7 +536,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <button
                   onClick={handleStartGame}
                   disabled={loading}
-                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Play size={18} fill="currentColor" />{" "}
                   {myParticipation?.status === "playing"

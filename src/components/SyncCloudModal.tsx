@@ -21,7 +21,7 @@ export function CloudSyncMenu({ status, onRetry }: { status: SyncStatus, onRetry
           <CloudOff className="w-3 h-3 text-red-500" />
           <span>Sync Failed</span>
           {onRetry && (
-            <button 
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRetry();
@@ -37,7 +37,6 @@ export function CloudSyncMenu({ status, onRetry }: { status: SyncStatus, onRetry
       {status === 'idle' && (
         <>
           <Cloud className="w-3 h-3 opacity-50" />
-          <span>Ready</span>
         </>
       )}
     </div>

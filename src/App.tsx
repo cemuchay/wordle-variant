@@ -22,13 +22,31 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
 import { type AppUser, type Challenge } from "./types/game";
+import { useChallengeStore } from "./store/useChallengeStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
+import { motion, AnimatePresence } from "framer-motion";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
+const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
+const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
+const InfoModal = safeLazy(() => import("./components/InfoModal").then(m => ({ default: m.InfoModal })));
+
+const fadeVariants = {
+  initial: {
+    opacity: 0,
+  },
+  animate: {
+    opacity: 1,
+  },
+  exit: {
+    opacity: 0,
+  },
+};
 
 export default function App() {
   const { user } = useAuth();
+  const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const {
     toast,
     setToast,
@@ -238,6 +256,8 @@ export default function App() {
           ? "info"
           : "play";
 
+
+
   const handleNavigation = (
     item: "play" | "chat" | "leaderboard" | "challenges" | "info",
   ) => {
@@ -267,7 +287,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-svh flex flex-col text-white font-sans overflow-hidden">
+    <div className="h-svh flex flex-col text-white font-sans overflow-hidden bg-dark">
       <LandscapeBlocker />
       <DynamicIslandStatus />
       <AudioConnectionLog />
@@ -297,113 +317,178 @@ export default function App() {
           </div>
         </div>
       )}
-      <div className="flex-1 min-h-0 relative">
-        {!isChatOpen ? (
-          <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4 pt-12 sm:pt-4">
-            <Toast
-              isVisible={toast.show}
-              message={toast.message}
-              duration={toast.duration}
-              onClose={() => setToast({ ...toast, show: false })}
-            />
 
-            <AppHeader
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
-              onHint={actions.handleHint}
-              onReset={() => window.location.reload()}
-              onShare={() => actions.setGameOverModalOpen(true)}
-              onRetrySync={actions.retrySync}
-              isGameOver={state.isGameOver}
-              usedHint={state.usedHint}
-              canShowHint={state.guesses.length >= 2}
-              isHintLocked={
-                (state.guesses.length >= config.maxAttempts - 1 ||
-                  state.isHintDisabled) &&
-                !state.usedHint
-              }
-              syncStatus={state.syncStatus}
-              isMonday={isMonday}
-
-            />
-
-
-
-            <GameArea
-              wordLength={config.length}
-              maxAttempts={config.maxAttempts}
-              guesses={state.guesses}
-              currentGuess={state.currentGuess}
-              letterStatuses={state.letterStatuses}
-              hintRecord={state.hintRecord}
-              isGameOver={state.isGameOver}
-              isShake={state.isShake}
-              isSaving={state.syncStatus === "syncing"}
-              onChar={actions.onChar}
-              onDelete={actions.onDelete}
-              onEnter={actions.onEnter}
-              activeDailyMarathon={activeDailyMarathon}
-              setSelectedChallengeId={setSelectedChallengeId}
-              setIsChallengeOpen={setIsChallengeOpen}
-              isAuthenticated={user ? true : false}
-            />
-            <ModalsManager
-              modals={{
-                isSettingsOpen,
-                isInfoOpen,
-                isStatsOpen,
-                isChallengeOpen,
-                isNotificationsOpen: showNotifications,
-                isAuthOpen,
-                isGameOverOpen: state.isGameOverModalOpen,
-              }}
-              actions={{
-                setSettingsOpen: setIsSettingsOpen,
-                setInfoOpen: setIsInfoOpen,
-                setStatsOpen: setIsStatsOpen,
-                setChallengeOpen: (open) => {
-                  setIsChallengeOpen(open);
-                  if (!open) {
-                    setSelectedChallengeId(null);
-                  }
-                },
-                setNotificationsOpen: setIsNotificationsOpen,
-                setAuthOpen: setIsAuthOpen,
-                setGameOverOpen: actions.setGameOverModalOpen,
-              }}
-              gameContext={{
-                user: user as AppUser,
-                date: date as string,
-                guesses: state.guesses,
-                config,
-                usedHint: state.usedHint,
-                gameMessage: state.gameMessage,
-                stats,
-                isGameOver: state.isGameOver,
-                isGameOverOpen: state.isGameOverModalOpen,
-              }}
-              statsActiveTab={statsActiveTab}
-              onChallengeCreated={handleChallengeCreated}
-              viewedProfileId={viewedProfileId}
-              setViewedProfileId={setViewedProfileId}
-              initialChallengeId={selectedChallengeId}
-            />
-          </main>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
-            <Suspense fallback={<ChatSkeleton />}>
-              <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
-            </Suspense>
-          </div>
-        )}
+      {/* Global Persistent Header */}
+      <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
+        <AppHeader
+          hideGameplayActions={activeNavigationItem !== "play"}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
+          onHint={actions.handleHint}
+          onReset={() => window.location.reload()}
+          onShare={() => actions.setGameOverModalOpen(true)}
+          onRetrySync={actions.retrySync}
+          isGameOver={state.isGameOver}
+          usedHint={state.usedHint}
+          canShowHint={state.guesses.length >= 2}
+          isHintLocked={
+            (state.guesses.length >= config.maxAttempts - 1 ||
+              state.isHintDisabled) &&
+            !state.usedHint
+          }
+          syncStatus={state.syncStatus}
+          isMonday={isMonday}
+        />
       </div>
 
-      <AppNavigation
-        activeItem={activeNavigationItem}
-        onNavigate={handleNavigation}
-        challengeUnreadCount={challengeUnreadCount}
-        chatUnreadCount={isChatOpen ? 0 : unreadCount}
-      />
+      <div className="flex-1 min-h-0 relative overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeNavigationItem}
+            variants={fadeVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{
+              duration: 0.08,
+              ease: "linear",
+            }}
+            className="h-full w-full"
+          >
+            {activeNavigationItem === "play" && (
+              <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
+                <Toast
+                  isVisible={toast.show}
+                  message={toast.message}
+                  duration={toast.duration}
+                  onClose={() => setToast({ ...toast, show: false })}
+                />
+
+                <GameArea
+                  wordLength={config.length}
+                  maxAttempts={config.maxAttempts}
+                  guesses={state.guesses}
+                  currentGuess={state.currentGuess}
+                  letterStatuses={state.letterStatuses}
+                  hintRecord={state.hintRecord}
+                  isGameOver={state.isGameOver}
+                  isShake={state.isShake}
+                  isSaving={state.syncStatus === "syncing"}
+                  onChar={actions.onChar}
+                  onDelete={actions.onDelete}
+                  onEnter={actions.onEnter}
+                  activeDailyMarathon={activeDailyMarathon}
+                  setSelectedChallengeId={setSelectedChallengeId}
+                  setIsChallengeOpen={setIsChallengeOpen}
+                  isAuthenticated={user ? true : false}
+                />
+                
+                <ModalsManager
+                  modals={{
+                    isSettingsOpen,
+                    isInfoOpen: false,
+                    isStatsOpen: false,
+                    isChallengeOpen: false,
+                    isNotificationsOpen: showNotifications,
+                    isAuthOpen,
+                    isGameOverOpen: state.isGameOverModalOpen,
+                  }}
+                  actions={{
+                    setSettingsOpen: setIsSettingsOpen,
+                    setInfoOpen: setIsInfoOpen,
+                    setStatsOpen: setIsStatsOpen,
+                    setChallengeOpen: (open) => {
+                      setIsChallengeOpen(open);
+                      if (!open) {
+                        setSelectedChallengeId(null);
+                      }
+                    },
+                    setNotificationsOpen: setIsNotificationsOpen,
+                    setAuthOpen: setIsAuthOpen,
+                    setGameOverOpen: actions.setGameOverModalOpen,
+                  }}
+                  gameContext={{
+                    user: user as AppUser,
+                    date: date as string,
+                    guesses: state.guesses,
+                    config,
+                    usedHint: state.usedHint,
+                    gameMessage: state.gameMessage,
+                    stats,
+                    isGameOver: state.isGameOver,
+                    isGameOverOpen: state.isGameOverModalOpen,
+                  }}
+                  statsActiveTab={statsActiveTab}
+                  onChallengeCreated={handleChallengeCreated}
+                  viewedProfileId={viewedProfileId}
+                  setViewedProfileId={setViewedProfileId}
+                  initialChallengeId={selectedChallengeId}
+                />
+              </main>
+            )}
+
+            {activeNavigationItem === "chat" && (
+              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+                <Suspense fallback={<ChatSkeleton />}>
+                  <ChatRoom user={user as AppUser} onClose={() => setIsChatOpen(false)} />
+                </Suspense>
+              </div>
+            )}
+
+            {activeNavigationItem === "leaderboard" && (
+              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+                <Suspense fallback={null}>
+                  <StatsModal
+                    isOpen={true}
+                    inline={true}
+                    stats={stats}
+                    onClose={() => setIsStatsOpen(false)}
+                    user={user as AppUser}
+                    isGameOver={state.isGameOver}
+                    initialTab={statsActiveTab}
+                  />
+                </Suspense>
+              </div>
+            )}
+
+            {activeNavigationItem === "challenges" && (
+              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+                <Suspense fallback={null}>
+                  <ChallengeModal
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setIsChallengeOpen(false)}
+                    user={user as AppUser}
+                    onChallengeCreated={handleChallengeCreated}
+                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                  />
+                </Suspense>
+              </div>
+            )}
+
+            {activeNavigationItem === "info" && (
+              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+                <Suspense fallback={null}>
+                  <InfoModal
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setIsInfoOpen(false)}
+                  />
+                </Suspense>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {!isPlayingChallenge && (
+        <AppNavigation
+          activeItem={activeNavigationItem}
+          onNavigate={handleNavigation}
+          challengeUnreadCount={challengeUnreadCount}
+          chatUnreadCount={isChatOpen ? 0 : unreadCount}
+        />
+      )}
 
       {navLoading.active && <TransitionLoader message={navLoading.message} />}
 

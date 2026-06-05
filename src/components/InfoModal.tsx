@@ -4,22 +4,16 @@ import React from 'react';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  inline?: boolean;
 }
 
-export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) => {
+  if (!isOpen && !inline) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-110 p-4">
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
-          <X size={20} />
-        </button>
-
-        <h2 className="text-2xl  uppercase text-gray-100 tracking-tighter mb-6">Game Info</h2>
-
-        <div className="mt-3 space-y-6 text-sm">
-
+  const renderContent = () => (
+    <>
+        {/* Scrollable Content */}
+        <div className="p-6 pt-4 space-y-6 text-sm overflow-y-auto flex-1 scrollbar-hide">
           <div className="flex gap-4">
             <div className="bg-yellow-500/20 p-2 h-fit rounded-lg text-green-400">
               <Zap size={20} />
@@ -104,13 +98,48 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
           </div>
         </div>
+    </>
+  );
 
-        <button
-          onClick={onClose}
-          className="mt-8 w-full bg-white text-black font-black py-3 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-tighter"
-        >
-          Got it
-        </button>
+  if (inline) {
+    return (
+      <div
+        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden p-6 relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+      >
+        <div className="w-full max-w-sm mx-auto flex flex-col h-full relative overflow-hidden bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl">
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-800/60 shrink-0">
+            <h2 className="text-xl uppercase text-gray-100 tracking-tighter">Game Info</h2>
+          </div>
+          {renderContent()}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-110 p-4 pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75vh] sm:max-h-[85vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-800/60 shrink-0">
+          <h2 className="text-xl uppercase text-gray-100 tracking-tighter">Game Info</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        {renderContent()}
+
+        {/* Footer */}
+        <div className="p-6 pt-4 border-t border-gray-800/60 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full bg-white text-black font-black py-3 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-tighter"
+          >
+            Got it
+          </button>
+        </div>
       </div>
     </div>
   );

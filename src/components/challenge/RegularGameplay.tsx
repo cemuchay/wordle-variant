@@ -159,13 +159,12 @@ export const RegularGameplay = memo(function RegularGameplay({
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-lg mx-auto pb-0.5 shrink-0">
+                <div className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] shrink-0 px-2">
                     <Keyboard
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                         letterStatuses={letterStatuses}
-                        compact={true}
                     />
                 </div>
             )}
