@@ -13,6 +13,7 @@ import { useAppStore } from "../store/useAppStore";
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
 import MessageInput from "./chat/MessageInput";
+import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
@@ -225,7 +226,12 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         );
     }, [users, dmSearchQuery]);
 
+
     const renderLastMessage = (room: any) => {
+        if (room.type === "game_analysis" && !hasPlayedToday) {
+            return <span className="text-[10px] text-white/30 italic flex items-center gap-1">🔒 Play daily to unlock analysis</span>;
+        }
+
         const lastMsg = lastMessages[room.id];
         if (!lastMsg) return <span className="text-[10px] text-white/30 italic">No messages yet</span>;
 
@@ -471,11 +477,18 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         <span className={`text-sm font-bold tracking-tight truncate ${room.is_core ? 'uppercase' : ''} ${unreadCount > 0 ? 'text-correct' : 'text-white'}`}>{room.name}</span>
                                                         {renderLastMessage(room)}
                                                     </div>
-                                                    {unreadCount > 0 && (
-                                                        <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
-                                                            {unreadCount > 99 ? '99+' : unreadCount}
-                                                        </div>
-                                                    )}
+                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                        {lastMessages[room.id] && (
+                                                            <span className="text-[9px] text-white/40">
+                                                                {formatLastSeen(lastMessages[room.id].created_at)}
+                                                            </span>
+                                                        )}
+                                                        {unreadCount > 0 && (
+                                                            <div className="w-5 h-5 rounded-full bg-correct flex items-center justify-center text-[10px] font-black text-black shrink-0">
+                                                                {unreadCount > 99 ? '99+' : unreadCount}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </button>
                                         );

@@ -69,7 +69,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
   }, [onEnter, onDelete, onChar]);
 
   return (
-    <div className={`w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${compact ? 'pb-0.5' : 'pb-2'}`}>
+    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${compact ? 'pb-2' : 'pb-2'}`}>
       {ROWS.map((row, i) => (
         <div key={i} className={`flex justify-center ${compact ? 'mb-1 gap-0.5 sm:gap-1' : 'mb-1.5 gap-1 sm:gap-1.5'}`}>
           {row.map((key) => (

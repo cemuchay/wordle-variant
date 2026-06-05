@@ -98,26 +98,33 @@ export const DynamicIslandStatus = () => {
     return (
         <div className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none transition-transform duration-500 ${isExpanded ? 'translate-y-2' : ''}`}>
             <motion.div
-                layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
+                animate={{ 
+                    opacity: 1, 
+                    scale: 1, 
+                    y: 0,
+                    width: getPillWidth(),
+                    height: isExpanded ? 'min(75vh, 480px)' : '32px',
+                    borderRadius: isExpanded ? '32px' : '20px'
+                }}
+                transition={{
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 35
+                }}
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={`
                     pointer-events-auto cursor-pointer overflow-hidden
                     bg-black/20 backdrop-blur-md border border-white/10
                     shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                     flex flex-col items-center justify-center
-                    transition-all duration-500 ease-in-out
                 `}
-                style={{
-                    borderRadius: isExpanded ? '32px' : '20px',
-                    width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : '32px',
-                }}
             >
                 {!isExpanded ? (
                     <motion.div
-                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.15 }}
                         className="flex items-center gap-1.5 px-3 h-full w-full justify-center"
                     >
                         {activeCall ? (
@@ -221,7 +228,7 @@ export const DynamicIslandStatus = () => {
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 }}
+                        transition={{ duration: 0.15 }}
                         className="w-full h-full flex flex-col p-6 overflow-hidden"
                     >
                         {/* Call Handling / Setup Sections */}
