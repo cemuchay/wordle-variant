@@ -332,7 +332,7 @@ const AuthenticatedChallengeContent = memo(
                   <ChallengeGameplayContainer />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10">
+                <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                   {error ? (
                     <ErrorFallback
                       message={error}
@@ -551,7 +551,7 @@ const AuthenticatedChallengeContent = memo(
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide">
                 <ChallengeCreate
                   onSuccess={() => setIsCreatingChallenge(false)}
                 />
@@ -586,7 +586,7 @@ const AuthenticatedChallengeContent = memo(
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide">
                 <ChallengeCreate
                   editingChallenge={selectedChallenge}
                   onSuccess={() => setIsEditingChallenge(false)}
@@ -622,7 +622,7 @@ const AuthenticatedChallengeContent = memo(
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-white/10 space-y-6 text-sm text-white">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide space-y-6 text-sm text-white">
                 <section className="space-y-2">
                   <h4 className="text-sm font-black uppercase text-white tracking-wide">
                     🏆 What is Challenge Mode?
@@ -835,7 +835,10 @@ export const ChallengeModal = ({
 
   if (inline) {
     return (
-      <div className="h-full w-full flex flex-col bg-dark text-white p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0))] overflow-hidden">
+      <div
+        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden p-6 relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+      >
         <div className={`w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300 ${isPlaying ? 'bg-transparent border-none' : 'bg-gray-900 border border-white/10 rounded-3xl shadow-2xl'}`}>
           {renderContent()}
         </div>

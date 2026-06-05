@@ -483,8 +483,11 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
   if (inline) {
     return (
-      <div className="h-full w-full flex flex-col bg-dark text-white p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0))] overflow-hidden">
-        <div className="w-full max-w-md mx-auto flex flex-col h-full relative">
+      <div
+        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden p-6 relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+      >
+        <div className="w-full max-w-md mx-auto flex flex-col h-full relative overflow-hidden">
           <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100 shrink-0">Statistics</h2>
           {renderContent()}
         </div>
