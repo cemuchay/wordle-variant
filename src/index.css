@@ -364,7 +364,7 @@ code {
 /* Optimize grid cell and keyboard spacing for shorter devices (e.g. iPhone 8, SE with home buttons) */
 @media screen and (max-height: 720px) and (max-width: 480px) {
   /* Scale down grid cells inside GameArea and RegularGameplay containers */
-  .grid > div {
+  .game-board-grid > div {
     width: 7.5vw !important;
     height: 7.5vw !important;
     max-width: 32px !important;

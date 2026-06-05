@@ -99,7 +99,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
 
   return (
     <div
-      className={`grid mx-auto h-fit max-h-full items-center content-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
+      className={`game-board-grid grid mx-auto h-fit max-h-full items-center content-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
       style={{
         gridTemplateColumns: `repeat(${wordLength}, minmax(0, 1fr))`,
         width: 'max-content'
