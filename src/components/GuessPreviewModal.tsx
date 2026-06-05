@@ -20,6 +20,12 @@ const formatTime = (seconds: number | null) => {
   return `${m}:${String(s).padStart(2, "0")}`;
 };
 
+const getTileSizeClass = (length: number) => {
+  if (length >= 8) return "w-[22px] h-[22px] text-[8px] rounded-sm";
+  if (length >= 6) return "w-6 h-6 text-[9px] rounded-md";
+  return "w-7 h-7 text-[10px] rounded-lg";
+};
+
 const GuessPreviewModal: React.FC<{
   entry: any; // More flexible for challenge participants
   onClose: () => void;
@@ -378,12 +384,12 @@ const GuessPreviewModal: React.FC<{
 
     return (
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))]"
         style={{ zIndex: Z_INDEX.GUESS_PREVIEW }}
         onClick={onClose}
       >
         <div
-          className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto max-h-[90vh]"
+          className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 pb-[calc(2rem+env(safe-area-inset-bottom,0))] shadow-2xl relative flex flex-col overflow-y-auto max-h-[calc(100vh-4rem-env(safe-area-inset-top,0)-env(safe-area-inset-bottom,0))]"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -460,7 +466,7 @@ const GuessPreviewModal: React.FC<{
                       return (
                         <div
                           key={j}
-                          className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${status === "correct"
+                          className={`flex items-center justify-center font-black uppercase shadow-inner ${getTileSizeClass(targetWordToUse.length)} ${status === "correct"
                             ? "bg-correct text-white"
                             : status === "present"
                               ? "bg-present text-white"
@@ -513,7 +519,7 @@ const GuessPreviewModal: React.FC<{
                         .map((letter, i) => (
                           <div
                             key={i}
-                            className="w-7 h-7 rounded-lg bg-correct/10 border border-correct/20 flex items-center justify-center text-[10px] font-black text-correct"
+                            className={`flex items-center justify-center bg-correct/10 border border-correct/20 font-black text-correct ${getTileSizeClass(targetWordToUse.length)}`}
                           >
                             {letter}
                           </div>
@@ -631,7 +637,7 @@ const GuessPreviewModal: React.FC<{
                           {row.map((cell, j) => (
                             <div
                               key={j}
-                              className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-black uppercase shadow-inner ${cell.status === "correct"
+                              className={`flex items-center justify-center font-black uppercase shadow-inner ${getTileSizeClass(targetWordToUse.length)} ${cell.status === "correct"
                                 ? "bg-correct text-white"
                                 : cell.status === "present"
                                   ? "bg-present text-white"
