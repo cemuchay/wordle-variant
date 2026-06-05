@@ -106,6 +106,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const myParticipations = useAppStore(s => s.myParticipations);
     const setMyParticipations = useAppStore(s => s.setMyParticipations);
 
+    const globalMessages = useAppStore(s => s.globalMessages);
+    const readReceipts = useAppStore(s => s.readReceipts);
+    const joinedGroupIds = useAppStore(s => s.joinedGroupIds);
+
+    // Centralized reactive unread chat messages calculator
+    useEffect(() => {
+        if (!user?.id) {
+            setUnreadCount(0);
+            return;
+        }
+
+        const joinedSet = new Set(joinedGroupIds);
+        const count = globalMessages.filter((m) => {
+            if (m.user_id === user.id) return false;
+            if (!joinedSet.has(m.group_id)) return false;
+            const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+            return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
+        }).length;
+
+        setUnreadCount(count);
+    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount]);
+
     // Refs for signaling
     const signalingChannelRef = useRef<any>(null);
 
@@ -395,19 +417,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!user?.id) return;
 
-        const calculateUnreads = (messages: any[], receipts: Record<string, string>, joinedIds?: string[]) => {
-            const validGroupIds = joinedIds || useAppStore.getState().joinedGroupIds;
-            const validSet = new Set(validGroupIds);
-
-            const unreadsList = messages.filter((m) => {
-                if (m.user_id === user.id) return false;
-                if (!validSet.has(m.group_id)) return false;
-                const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-                return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
-            });
-            return unreadsList.length;
-        };
-
         const fetchMessagesAndReceipts = async () => {
             const { data: receiptData } = await supabase
                 .from('chat_read_receipts')
@@ -448,7 +457,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (data) {
                 const chronData = data.reverse();
                 useAppStore.getState().setGlobalMessages(chronData);
-                setUnreadCount(calculateUnreads(chronData, receipts, joinedArray));
             }
         };
 
@@ -492,16 +500,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
-
-                        // Incrementally update unread count instead of recalculating all
-                        if (newMessage.user_id !== user.id) {
-                            const currentReceipts = useAppStore.getState().readReceipts;
-                            const lastSeen = currentReceipts[newMessage.group_id] || new Date(0).toISOString();
-                            const isNew = new Date(newMessage.created_at).getTime() > new Date(lastSeen).getTime();
-                            if (isNew) {
-                                setUnreadCount(useAppStore.getState().unreadCount + 1);
-                            }
-                        }
                     } else if (payload.eventType === 'UPDATE') {
                         // Merge the updated columns in global store
                         useAppStore.getState().updateGlobalMessage(payload.new);
@@ -524,11 +522,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                         const newReceipt = payload.new as any;
                         useAppStore.getState().updateReadReceipt(newReceipt.group_id, newReceipt.last_seen_at);
-
-                        // Recalculate unreads
-                        const allMsgs = useAppStore.getState().globalMessages;
-                        const currentReceipts = useAppStore.getState().readReceipts;
-                        setUnreadCount(calculateUnreads(allMsgs, currentReceipts));
                     }
                 }
             )
@@ -540,7 +533,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             receiptsChannel.unsubscribe();
             supabase.removeChannel(receiptsChannel);
         };
-    }, [user?.id, setUnreadCount]);
+    }, [user?.id]);
 
     // Sync Query data with Store (Bridge)
     useEffect(() => {

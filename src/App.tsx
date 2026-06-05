@@ -36,7 +36,6 @@ export default function App() {
     date,
     isLoadingDate,
     unreadCount,
-    setUnreadCount,
     isChallengeOpen,
     setIsChallengeOpen,
     isChatOpen,
@@ -249,9 +248,6 @@ export default function App() {
       return;
     }
 
-    if (item === "chat") {
-      setUnreadCount(0);
-    }
     setIsChatOpen(item === "chat");
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
