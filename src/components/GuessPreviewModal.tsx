@@ -165,7 +165,7 @@ const GuessPreviewModal: React.FC<{
       date,
     ]);
 
-     useEffect(() => {
+    useEffect(() => {
       if (lastEntryIdRef.current !== entry.id) {
         fetchedCacheRef.current = {};
         lastEntryIdRef.current = entry.id;
@@ -389,7 +389,7 @@ const GuessPreviewModal: React.FC<{
         onClick={onClose}
       >
         <div
-          className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 pb-[calc(2rem+env(safe-area-inset-bottom,0))] shadow-2xl relative flex flex-col overflow-y-auto max-h-[calc(100vh-4rem-env(safe-area-inset-top,0)-env(safe-area-inset-bottom,0))]"
+          className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 pb-[calc(2rem+env(safe-area-inset-bottom,0))] shadow-2xl relative flex flex-col overflow-y-auto max-h-[calc(100dvh-4rem-env(safe-area-inset-top,0)-env(safe-area-inset-bottom,0))]"
           onClick={(e) => e.stopPropagation()}
         >
           <button
