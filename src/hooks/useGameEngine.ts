@@ -162,7 +162,7 @@ export const useGameEngine = (date: string) => {
             .select("*")
             .eq("user_id", user.id)
             .eq("game_date", date)
-            .single();
+            .maybeSingle();
 
          if (!error && data) {
             return {
