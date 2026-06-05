@@ -44,6 +44,7 @@ interface ChallengeModalProps {
     invitedIds: string[],
   ) => void;
   initialChallengeId?: string | null;
+  inline?: boolean;
 }
 
 const GameplayTimer = memo(() => {
@@ -808,10 +809,11 @@ export const ChallengeModal = ({
   user,
   onChallengeCreated,
   initialChallengeId,
+  inline = false,
 }: ChallengeModalProps) => {
   const isPlaying = useChallengeStore((s) => s.isPlaying);
 
-  if (!isOpen) return null;
+  if (!isOpen && !inline) return null;
 
   if (!user && !initialChallengeId && !hasRecentChallenges()) {
     const id = safeLocalStorage.getItem("wordle_anon_id");
@@ -819,6 +821,26 @@ export const ChallengeModal = ({
     if (!id || !username) {
       return <GuestChallengeView onClose={onClose} />;
     }
+  }
+
+  const renderContent = () => (
+    <ChallengeProvider
+      user={user}
+      onChallengeCreated={onChallengeCreated}
+      initialChallengeId={initialChallengeId}
+    >
+      <ChallengeModalContent onClose={onClose} user={user} />
+    </ChallengeProvider>
+  );
+
+  if (inline) {
+    return (
+      <div className="h-full w-full flex flex-col bg-dark text-white p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0))] overflow-hidden">
+        <div className={`w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300 ${isPlaying ? 'bg-transparent border-none' : 'bg-gray-900 border border-white/10 rounded-3xl shadow-2xl'}`}>
+          {renderContent()}
+        </div>
+      </div>
+    );
   }
 
   return (

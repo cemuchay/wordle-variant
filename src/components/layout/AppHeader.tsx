@@ -20,6 +20,7 @@ interface AppHeaderProps {
     isHintLocked?: boolean;
     syncStatus: SyncStatus;
     isMonday?: boolean;
+    hideGameplayActions?: boolean;
 }
 
 const ICON_SIZE = 16;
@@ -36,7 +37,8 @@ export const AppHeader = ({
     canShowHint,
     isHintLocked,
     syncStatus,
-    isMonday = false
+    isMonday = false,
+    hideGameplayActions = false
 }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
@@ -71,42 +73,46 @@ export const AppHeader = ({
                 {/* Right Side: Gameplay & App controls & Profile */}
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                     {/* Gameplay Actions */}
-                    <div className="flex items-center gap-0.5">
-                        {canShowHint && !isGameOver && (
-                            <button
-                                onClick={onHint}
-                                disabled={usedHint || isHintLocked}
-                                className={`p-1.5 transition-all rounded-lg relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                                title={usedHint ? "Hint Used" : isHintLocked ? "Hint Unavailable" : "Get Hint"}
-                            >
-                                <Lightbulb size={ICON_SIZE} />
-                                {isHintLocked && !usedHint && (
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
-                                    </div>
+                    {!hideGameplayActions && (
+                        <>
+                            <div className="flex items-center gap-0.5">
+                                {canShowHint && !isGameOver && (
+                                    <button
+                                        onClick={onHint}
+                                        disabled={usedHint || isHintLocked}
+                                        className={`p-1.5 transition-all rounded-lg relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                        title={usedHint ? "Hint Used" : isHintLocked ? "Hint Unavailable" : "Get Hint"}
+                                    >
+                                        <Lightbulb size={ICON_SIZE} />
+                                        {isHintLocked && !usedHint && (
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <div className="w-[80%] h-[1.5px] bg-red-600/60 rotate-45" />
+                                            </div>
+                                        )}
+                                    </button>
                                 )}
-                            </button>
-                        )}
-                        <button
-                            onClick={onReset}
-                            className="p-1.5 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500"
-                            title="Reset"
-                        >
-                            <RotateCcw size={ICON_SIZE} />
-                        </button>
-                        {isGameOver && (
-                            <button
-                                onClick={onShare}
-                                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all"
-                                title="Share"
-                            >
-                                <Share size={ICON_SIZE} />
-                            </button>
-                        )}
-                    </div>
+                                <button
+                                    onClick={onReset}
+                                    className="p-1.5 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500"
+                                    title="Reset"
+                                >
+                                    <RotateCcw size={ICON_SIZE} />
+                                </button>
+                                {isGameOver && (
+                                    <button
+                                        onClick={onShare}
+                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all"
+                                        title="Share"
+                                    >
+                                        <Share size={ICON_SIZE} />
+                                    </button>
+                                )}
+                            </div>
 
-                    {/* Divider */}
-                    <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+                            {/* Divider */}
+                            <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+                        </>
+                    )}
 
                     {/* App Controls */}
                     <div className="flex items-center gap-0.5">

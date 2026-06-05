@@ -4,23 +4,14 @@ import React from 'react';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  inline?: boolean;
 }
 
-export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) => {
+  if (!isOpen && !inline) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-110 p-4 pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75vh] sm:max-h-[85vh] overflow-hidden">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-800/60 shrink-0">
-          <h2 className="text-xl uppercase text-gray-100 tracking-tighter">Game Info</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
+  const renderContent = () => (
+    <>
         {/* Scrollable Content */}
         <div className="p-6 pt-4 space-y-6 text-sm overflow-y-auto flex-1 custom-scrollbar">
           <div className="flex gap-4">
@@ -107,6 +98,35 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
           </div>
         </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="h-full w-full flex flex-col bg-dark text-white p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0))] overflow-hidden">
+        <div className="w-full max-w-sm mx-auto flex flex-col h-full relative overflow-hidden bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl">
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-800/60 shrink-0">
+            <h2 className="text-xl uppercase text-gray-100 tracking-tighter">Game Info</h2>
+          </div>
+          {renderContent()}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-110 p-4 pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75vh] sm:max-h-[85vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-800/60 shrink-0">
+          <h2 className="text-xl uppercase text-gray-100 tracking-tighter">Game Info</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        {renderContent()}
 
         {/* Footer */}
         <div className="p-6 pt-4 border-t border-gray-800/60 shrink-0">
