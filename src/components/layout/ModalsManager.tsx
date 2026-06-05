@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import type { AppUser, GuessResult } from '../../types/game';
 import { safeLazy } from '../../utils/safeLazy';
 
@@ -63,6 +63,21 @@ export const ModalsManager = ({
     initialChallengeId
 }: ModalsManagerProps) => {
     const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
+
+    useEffect(() => {
+        const preloadComponents = () => {
+            StatsModal.preload?.();
+            ChallengeModal.preload?.();
+        };
+
+        if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(preloadComponents);
+        } else {
+            // 1.5 seconds
+            const timer = setTimeout(preloadComponents, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     return (
         <Suspense fallback={null}>
