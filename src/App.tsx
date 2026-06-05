@@ -96,6 +96,21 @@ export default function App() {
     message: "",
   });
 
+  // Preload ChatRoom in the background when the app is idle
+  useEffect(() => {
+    const preloadChat = () => {
+      ChatRoom.preload?.();
+    };
+
+    if ("requestIdleCallback" in window) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).requestIdleCallback(preloadChat);
+    } else {
+      const timer = setTimeout(preloadChat, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Auto-trigger weekly wrapped on Monday logins
   useEffect(() => {
     if (!user || !date) return;

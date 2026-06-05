@@ -1,17 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy } from 'react';
-import type { ComponentType } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import { safeLocalStorage } from './storage';
+
+export type PreloadableComponent<T extends ComponentType<any>> = LazyExoticComponent<T> & {
+  preload: () => Promise<any>;
+};
 
 /**
  * A wrapper around React.lazy that catches chunk loading errors (which typically
  * happen when a new deployment goes live and replaces old build hashes) and
  * forces a page reload to fetch the new asset versions.
+ * Exposes a .preload() method to trigger background preloading.
  */
 export const safeLazy = <T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T } | { [key: string]: any }>
-) => {
-  return lazy(async () => {
+): PreloadableComponent<T> => {
+  const LazyComponent = lazy(async () => {
     try {
       const module = await importFunc();
       if ('default' in module) {
@@ -34,4 +39,12 @@ export const safeLazy = <T extends ComponentType<any>>(
       throw error;
     }
   });
+
+  (LazyComponent as any).preload = () => {
+    return importFunc().catch((error) => {
+      console.warn('Failed to preload dynamic component:', error);
+    });
+  };
+
+  return LazyComponent as PreloadableComponent<T>;
 };
