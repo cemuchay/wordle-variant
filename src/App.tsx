@@ -32,21 +32,16 @@ const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const InfoModal = safeLazy(() => import("./components/InfoModal").then(m => ({ default: m.InfoModal })));
 
-const TAB_ORDER = ["play", "chat", "leaderboard", "challenges", "info"];
-
-const slideVariants = {
-  enter: (dir: number) => ({
-    x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+const fadeVariants = {
+  initial: {
     opacity: 0,
-  }),
-  center: {
-    x: 0,
+  },
+  animate: {
     opacity: 1,
   },
-  exit: (dir: number) => ({
-    x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+  exit: {
     opacity: 0,
-  }),
+  },
 };
 
 export default function App() {
@@ -261,15 +256,7 @@ export default function App() {
           ? "info"
           : "play";
 
-  const [prevTab, setPrevTab] = useState(activeNavigationItem);
-  const [direction, setDirection] = useState(0);
 
-  if (activeNavigationItem !== prevTab) {
-    const prevIndex = TAB_ORDER.indexOf(prevTab);
-    const currentIndex = TAB_ORDER.indexOf(activeNavigationItem);
-    setDirection(currentIndex > prevIndex ? 1 : -1);
-    setPrevTab(activeNavigationItem);
-  }
 
   const handleNavigation = (
     item: "play" | "chat" | "leaderboard" | "challenges" | "info",
@@ -358,14 +345,13 @@ export default function App() {
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={activeNavigationItem}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
+            variants={fadeVariants}
+            initial="initial"
+            animate="animate"
             exit="exit"
             transition={{
-              x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 }
+              duration: 0.08,
+              ease: "linear",
             }}
             className="h-full w-full"
           >
