@@ -351,3 +351,44 @@ code {
     transform: scale(1);
   }
 }
+
+/* Prevent iOS auto-zoom on focus by ensuring font-size is at least 16px on mobile viewports */
+@media screen and (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Optimize grid cell and keyboard spacing for shorter devices (e.g. iPhone 8, SE with home buttons) */
+@media screen and (max-height: 720px) and (max-width: 480px) {
+  /* Scale down grid cells inside GameArea and RegularGameplay containers */
+  .grid > div {
+    width: 7.5vw !important;
+    height: 7.5vw !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    font-size: 14px !important;
+    border-width: 1.5px !important;
+  }
+
+  /* Compact spacing for the game containers */
+  .p-2, .p-3, .p-4, .p-6 {
+    padding: 0.35rem !important;
+  }
+  .gap-2, .gap-3, .gap-4, .gap-6 {
+    gap: 0.25rem !important;
+  }
+
+  /* Shrink Virtual Keyboard height to prevent page cutoff */
+  button.h-12, button.h-10, button.h-11 {
+    height: 34px !important;
+    font-size: 11px !important;
+  }
+  
+  /* Shrink padding inside keyboard rows */
+  .mb-1\.5, .mb-1 {
+    margin-bottom: 0.2rem !important;
+  }
+}
