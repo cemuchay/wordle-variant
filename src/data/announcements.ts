@@ -4,6 +4,7 @@ export interface Announcement {
     date: string;
     content: string;
     type: 'feature' | 'update' | 'maintenance';
+    lifespanDays?: number;
 }
 
 export const ANNOUNCEMENTS: Announcement[] = [
@@ -49,6 +50,19 @@ export const ANNOUNCEMENTS: Announcement[] = [
                 <li><strong>Categorization Filters:</strong> Quickly toggle the game list view between <strong>All</strong>, <strong>Unplayed</strong>, and <strong>Played / Timed Out</strong> games.</li>
                 <li><strong>Daily Event Tabs:</strong> Daily marathon challenges are now organized by days (Day 1, Day 2, etc.), defaulting automatically to the current active day.</li>
             </ul>
+        `
+    },
+    {
+        id: 'challenge-mode-fixes-v1',
+        title: 'Challenge Mode Fixed! 🛠️',
+        date: '2026-06-06',
+        type: 'update',
+        lifespanDays: 7,
+        content: `
+            <h3>Bugs Squashed!</h3>
+            <p>We've successfully squashed several visual glitches and layout bugs in Challenge Mode gameplay. The updates have been rigorously tested across an array of different devices and browsers to ensure a seamless experience.</p>
+            <p>If you run into any other issues, or have ideas for features, please let us know in the <strong>Chat -> Bugs & Features</strong> group!</p>
+            <p>Happy playing!</p>
         `
     },
 ];
