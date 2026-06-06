@@ -78,7 +78,7 @@ export const GameArea = ({
     }, [isGameOver]);
 
     return (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
+        <div className="gameplay-container flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
             {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}

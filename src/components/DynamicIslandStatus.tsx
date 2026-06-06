@@ -96,21 +96,29 @@ export const DynamicIslandStatus = () => {
     };
 
     return (
-        <div className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none transition-transform duration-500 ${isExpanded ? 'translate-y-2' : ''}`}>
+        <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
             <motion.div
+                layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
                 animate={{ 
                     opacity: 1, 
                     scale: 1, 
-                    y: 0,
+                    y: isExpanded ? 8 : 0
+                }}
+                style={{
+                    borderRadius: isExpanded ? '32px' : '20px',
                     width: getPillWidth(),
                     height: isExpanded ? 'min(75vh, 480px)' : '32px',
-                    borderRadius: isExpanded ? '32px' : '20px'
                 }}
                 transition={{
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 35
+                    layout: {
+                        type: 'spring',
+                        stiffness: 380,
+                        damping: 35
+                    },
+                    opacity: { duration: 0.15 },
+                    scale: { duration: 0.15 },
+                    y: { type: 'spring', stiffness: 380, damping: 35 }
                 }}
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={`

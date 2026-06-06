@@ -8,6 +8,8 @@ import { Keyboard } from '../Keyboard';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { NetworkLog } from './ChallengeUIElements';
 import { getHandicapStarter } from '../../utils/marathon';
+import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -23,6 +25,11 @@ export const RegularGameplay = memo(function RegularGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onBack
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
+    const { user } = useAuth();
+    const { onlineUsers, activeCall, activeVoiceRooms } = useApp();
+
+    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
 
     const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
         challenge,
@@ -78,11 +85,11 @@ export const RegularGameplay = memo(function RegularGameplay({
     const showHint = guesses.length >= 2 && !isGameOver && !challenge.disable_hints;
 
     return (
-        <div className="flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
+        <div className={`gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0 ${isDynamicIslandVisible ? 'pt-12 sm:pt-14' : ''}`}>
             <NetworkLog logs={networkLogs} />
             
             {/* Sync Status Overlay */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+            <div className={`absolute left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 ${isDynamicIslandVisible ? 'top-12' : 'top-2'}`}>
                 {isSaving && (
                     <div className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
                         <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
@@ -106,8 +113,8 @@ export const RegularGameplay = memo(function RegularGameplay({
             </div>
 
             {(showHint || showStarter) && (
-                <div className="flex items-center justify-between px-4 shrink-0">
-                    <div className="flex items-center gap-3">
+                <div className={`absolute left-4 right-4 flex items-center justify-between pointer-events-none z-45 ${isDynamicIslandVisible ? 'top-12' : 'top-3'}`}>
+                    <div className="flex items-center gap-3 pointer-events-auto">
                         {showHint && (
                             <button
                                 onClick={actions.handleHint}
@@ -136,7 +143,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                                 // Type it letter by letter
                                 starter.split('').forEach((char: string) => actions.onChar(char));
                             }}
-                            className="bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
+                            className="pointer-events-auto bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 animate-in fade-in duration-300"
                         >
                             💡 Recommended Starter: {starterWord.toUpperCase()}
                         </button>

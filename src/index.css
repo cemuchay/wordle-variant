@@ -361,8 +361,8 @@ code {
   }
 }
 
-/* Optimize grid cell and keyboard spacing for shorter devices (e.g. iPhone 8, SE with home buttons) */
-@media screen and (max-device-height: 720px) and (max-width: 480px) {
+/* Optimize grid cell and keyboard spacing for shorter viewports (e.g. mobile keyboards or small screens) */
+@media screen and (max-height: 750px) and (max-width: 480px) {
   /* Scale down grid cells inside GameArea and RegularGameplay containers */
   .game-board-grid > div {
     width: 7.5vw !important;
@@ -386,17 +386,5 @@ code {
   .gameplay-container .gap-4, 
   .gameplay-container .gap-6 {
     gap: 0.25rem !important;
-  }
-
-  /* Shrink Virtual Keyboard height specifically inside the Wordle keyboard */
-  .game-keyboard button {
-    height: 34px !important;
-    font-size: 11px !important;
-  }
-  
-  /* Shrink padding inside keyboard rows */
-  .game-keyboard .mb-1\.5, 
-  .game-keyboard .mb-1 {
-    margin-bottom: 0.2rem !important;
   }
 }
