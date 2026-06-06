@@ -12,28 +12,45 @@ interface CellProps {
   isHinted?: boolean;
   isSaving?: boolean;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
+  wordLength: number;
 }
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact }: CellProps) => {
-  const tileClass = compact
-    ? `
-      w-[9vw] h-[9vw] 
-      max-w-[40px] max-h-[40px] 
-      sm:w-[5vh] sm:h-[5vh] 
-      sm:max-w-[46px] sm:max-h-[46px] 
-      flex items-center justify-center 
-      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
-      border-2 text-white
-    `
-    : `
-      w-[10vw] h-[10vw] 
-      max-w-[48px] max-h-[48px] 
-      sm:w-[5.5vh] sm:h-[5.5vh] 
-      sm:max-w-[54px] sm:max-h-[54px] 
-      flex items-center justify-center 
-      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
-      border-2 text-white
-    `;
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact, gameplayType, wordLength }: CellProps) => {
+  const isChallenge = gameplayType === 'challenge' || compact;
+
+  // Dynamic scaling based on word length to optimize mobile real estate
+  let sizeClass: string;
+  if (isChallenge) {
+    if (wordLength <= 4) {
+      sizeClass = 'w-[12vw] h-[12vw] max-w-[48px] max-h-[48px] sm:w-[5.8vh] sm:h-[5.8vh] sm:max-w-[52px] sm:max-h-[52px] text-lg';
+    } else if (wordLength === 5) {
+      sizeClass = 'w-[10vw] h-[10vw] max-w-[42px] max-h-[42px] sm:w-[5.2vh] sm:h-[5.2vh] sm:max-w-[48px] sm:max-h-[48px] text-base sm:text-lg';
+    } else if (wordLength === 6) {
+      sizeClass = 'w-[8.5vw] h-[8.5vw] max-w-[38px] max-h-[38px] sm:w-[4.8vh] sm:h-[4.8vh] sm:max-w-[44px] sm:max-h-[44px] text-sm sm:text-base';
+    } else { // 7+
+      sizeClass = 'w-[7.5vw] h-[7.5vw] max-w-[34px] max-h-[34px] sm:w-[4.2vh] sm:h-[4.2vh] sm:max-w-[40px] sm:max-h-[40px] text-xs sm:text-sm';
+    }
+  } else { // regular mode
+    if (wordLength <= 3) {
+      sizeClass = 'w-[22vw] h-[22vw] max-w-[82px] max-h-[82px] sm:w-[8.5vh] sm:h-[8.5vh] sm:max-w-[86px] sm:max-h-[86px] lg:w-[7.5vh] lg:h-[7.5vh] lg:max-w-[76px] lg:max-h-[76px] text-3xl';
+    } else if (wordLength === 4) {
+      sizeClass = 'w-[18vw] h-[18vw] max-w-[70px] max-h-[70px] sm:w-[7.5vh] sm:h-[7.5vh] sm:max-w-[74px] sm:max-h-[74px] lg:w-[6.2vh] lg:h-[6.2vh] lg:max-w-[62px] lg:max-h-[62px] text-2xl';
+    } else if (wordLength === 5) {
+      sizeClass = 'w-[15vw] h-[15vw] max-w-[62px] max-h-[62px] sm:w-[6.5vh] sm:h-[6.5vh] sm:max-w-[58px] sm:max-h-[58px] lg:w-[5.2vh] lg:h-[5.2vh] lg:max-w-[52px] lg:max-h-[52px] text-xl sm:text-2xl';
+    } else if (wordLength === 6) {
+      sizeClass = 'w-[12vw] h-[12vw] max-w-[54px] max-h-[54px] sm:w-[5.8vh] sm:h-[5.8vh] sm:max-w-[50px] sm:max-h-[50px] lg:w-[4.6vh] lg:h-[4.6vh] lg:max-w-[46px] lg:max-h-[46px] text-lg sm:text-xl';
+    } else { // 7+
+      sizeClass = 'w-[10.5vw] h-[10.5vw] max-w-[48px] max-h-[48px] sm:w-[5.2vh] sm:h-[5.2vh] sm:max-w-[44px] sm:max-h-[44px] lg:w-[4.2vh] lg:h-[4.2vh] lg:max-w-[40px] lg:max-h-[40px] text-base sm:text-lg';
+    }
+  }
+
+  const tileClass = `
+    ${sizeClass}
+    flex items-center justify-center 
+    font-bold uppercase transition-colors duration-300
+    border-2 text-white
+  `;
 
   let statusClass = 'border-gray-800';
   let animationClass = '';
@@ -78,9 +95,10 @@ interface GridProps {
   isShake?: boolean;
   isSaving?: boolean;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact }) => {
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact, gameplayType }) => {
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
@@ -127,19 +145,19 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   if (isWon) {
     mascotFace = "(★‿★)";
     mascotLabel = "Splendid job! 🎉";
-    animationClass = "animate-bounce text-correct border-correct/30 bg-correct/10";
+    animationClass = "animate-bounce text-correct";
   } else if (isLost) {
     mascotFace = "(✖╭╮✖)";
     mascotLabel = "Aww, maybe next time! 😢";
-    animationClass = "text-red-500 border-red-500/30 bg-red-500/10";
+    animationClass = "text-red-400";
   } else if (isOneAttemptLeft) {
     mascotFace = "(⊙_⊙;)";
     mascotLabel = "Yikes! Only 1 guess left! 😰";
-    animationClass = "animate-pulse scale-105 text-amber-500 border-amber-500/40 bg-amber-500/10";
+    animationClass = "animate-pulse text-amber-400";
   } else if (hasRepeatedLetters) {
     mascotFace = "(🤨)";
     mascotLabel = "Hmm... interesting choice. 🧐";
-    animationClass = "animate-shake text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
+    animationClass = "animate-shake text-yellow-400";
   } else if (attemptsCount > 0) {
     const defaultMascots = [
       { face: "(•_•)", label: "Thinking..." },
@@ -149,33 +167,26 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     const idx = (attemptsCount - 1) % defaultMascots.length;
     mascotFace = defaultMascots[idx].face;
     mascotLabel = defaultMascots[idx].label;
-    animationClass = "text-white/80 border-white/10 bg-white/5";
+    animationClass = "text-white/80";
   } else {
-    animationClass = "text-white/60 border-white/5 bg-white/5";
+    animationClass = "text-white/60";
   }
+
+  useEffect(() => {
+    // Notify Dynamic Island about the mascot state update
+    window.dispatchEvent(new CustomEvent('mascot-changed', {
+      detail: { mascotFace, mascotLabel, animationClass }
+    }));
+    return () => {
+      // Clear mascot when Grid is unmounted (e.g. user leaves play tab)
+      window.dispatchEvent(new CustomEvent('mascot-changed', {
+        detail: null
+      }));
+    };
+  }, [mascotFace, mascotLabel, animationClass]);
 
   return (
     <div className="relative mx-auto w-fit select-none shrink-0">
-      {/* Mascot bubble */}
-      {!isChallengeMode ? (
-        <div 
-          className={`absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 border px-3 py-0 rounded-full backdrop-blur-md shadow-sm transition-all duration-300 whitespace-nowrap z-10 ${animationClass}`}
-          style={isWon ? { animationIterationCount: 3 } : {}}
-        >
-          <span className="text-[8px] font-mono font-black select-none tracking-wide">{mascotFace}</span>
-          <span className="text-[7px] uppercase font-black tracking-widest opacity-80 select-none">{mascotLabel}</span>
-        </div>
-      ) : (
-        /* In challenge mode, show on top of grid ONLY on mobile (hidden on desktop) */
-        <div 
-          className={`absolute -top-8 left-1/2 -translate-x-1/2 md:hidden flex items-center gap-1 border px-3 py-0 rounded-full backdrop-blur-md shadow-sm transition-all duration-300 whitespace-nowrap z-10 ${animationClass}`}
-          style={isWon ? { animationIterationCount: 3 } : {}}
-        >
-          <span className="text-[8px] font-mono font-black select-none tracking-wide">{mascotFace}</span>
-          <span className="text-[7px] uppercase font-black tracking-widest opacity-80 select-none">{mascotLabel}</span>
-        </div>
-      )}
-
       <div
         className={`game-board-grid grid mx-auto h-fit max-h-full items-center content-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
         style={{
@@ -194,6 +205,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
               isRevealing={isRevealing}
               revealIndex={j}
               compact={compact}
+              gameplayType={gameplayType}
+              wordLength={wordLength}
             />
           ));
         })}
@@ -212,6 +225,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                 isShake={isShake}
                 isHinted={isHinted}
                 compact={compact}
+                gameplayType={gameplayType}
+                wordLength={wordLength}
               />
             );
           })
@@ -228,6 +243,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                   letter={isHinted ? hintRecord?.letter : ''}
                   isHinted={isHinted}
                   compact={compact}
+                  gameplayType={gameplayType}
+                  wordLength={wordLength}
                 />
               );
             })}

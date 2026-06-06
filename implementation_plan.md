@@ -1,102 +1,34 @@
-# Implementation Plan - Daily Bot Marathon Challenge by "Variant Bot"
+# Implementation Plan: Redo Grid Sizing via Fluid Aspect-Ratio Layout
 
-Introduce a system-managed daily marathon challenge created by a system account ("Variant Bot"). Authenticated users can join and compete in daily marathon sequences (word lengths 3 to 7) throughout a full Monday–Sunday cycle. The lobby will rank players by both their daily scores and weekly cumulative totals.
-
-## User Review Required
-
-> [!IMPORTANT]
-> **Existing Challenge Safety**:
-> All normal user-created and custom challenges will continue to function exactly as before. The database default for `play_date` is `'1970-01-01' NOT NULL`, making the new unique constraint `UNIQUE (participation_id, game_index, play_date)` behave identically to the old unique constraint `UNIQUE (participation_id, game_index)` for all standard challenges. No data migrations or query disruptions will occur for existing challenges.
-
-## Open Questions
-
-> [!NOTE]
-> We will seed a system profile in the database `profiles` table for **Variant Bot** with a static ID (`00000000-0000-0000-0000-000000000b0b`).
-> the daily games for the duration of the marathon should be selected at once , on creation of the challenge by the admin, hence all challenges by the variant bot will be pre-selected at creation time, this means when a user joins a marathon, all the games for that marathon will be available to be played, just like a normal marathon challenge. but limited by the day.
-> each marathon is for a week, from monday to sunday, and the user can play the games for the week, but only the games for the current day will be available to be played by the user.
-> each bot marathon challenge will have a clear expiry date , sunday max
-
----
+Completely replace the hardcoded viewport-based (`vw`/`vh`) grid cell sizing system with a container-driven, fluid layout using CSS `aspect-ratio`. This ensures that the grid always scales to fill the maximum possible space on any device (including small iPhones and large desktops) without overflowing or cutting off.
 
 ## Proposed Changes
 
-### Database & Schema (Supabase)
+### Grid Component
+#### [MODIFY] [Grid.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/Grid.tsx)
+- Modify the `Cell` component:
+  - Remove all conditional `sizeClass` string assignments and hardcoded sizes (like `w-[15vw]`, `sm:w-[6.5vh]`, etc.).
+  - Set the cell's class to `w-full aspect-square flex items-center justify-center font-bold uppercase border-2 text-white transition-colors duration-300` plus a responsive text size (`text-base xs:text-lg sm:text-xl md:text-2xl`).
+- Modify the `Grid` container:
+  - Remove the inline style `width: 'max-content'`.
+  - Apply a dynamic `aspect-ratio` inline style to the grid container based on `wordLength / maxAttempts`.
+  - Let the grid container scale to `width: 100%`, `height: 100%`.
+  - Set container limits on the outer wrapper:
+    - Regular Gameplay limits: `w-full max-w-[min(90vw,calc(${wordLength}*70px))] max-h-[50vh] xs:max-h-[55vh] sm:max-h-[60vh] lg:max-h-[55vh]`
+    - Challenge Gameplay limits: `w-full max-w-[min(85vw,calc(${wordLength}*50px))] max-h-[40vh] xs:max-h-[45vh] sm:max-h-[48vh]`
+  - Pass `gameplayType` or `compact` down to style the gaps (`gap-1` or `gap-1.5` or `gap-2`).
 
-#### [NEW] [33_bot_daily_marathon.sql](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/sql_scripts/33_bot_daily_marathon.sql)
-
-- Alter `public.challenges` to add `is_bot_marathon BOOLEAN DEFAULT FALSE NOT NULL`.
-- Alter `public.challenge_participants_marathon` to add `play_date DATE DEFAULT '1970-01-01' NOT NULL`.
-- Drop constraint `challenge_participants_marathon_participation_id_game_index_key` and replace it with `UNIQUE (participation_id, game_index, play_date)`.
-- Create `public.bot_marathon_daily_words` table to map daily generated obfuscated words and salts.
-- Insert/seed system profile `Variant Bot` with ID `00000000-0000-0000-0000-000000000b0b`.
-
----
-
-### Supabase Edge Functions
-
-#### [NEW] [generate-daily-bot-words/index.ts](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/supabase/functions/generate-daily-bot-words/index.ts)
-
-- Deno Edge Function executed daily at 00:00:00 Lagos Time.
-- Selects 5 random words of lengths 3, 4, 5, 6, 7 from standard vocabulary banks.
-- Generates a random salt, obfuscates the words, and inserts them into `bot_marathon_daily_words`.
-
----
-
-### Frontend Services & Queries
-
-#### [MODIFY] [useChallengeQueries.ts](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/hooks/queries/useChallengeQueries.ts)
-
-- Modify standard challenge detail queries (`useChallengeDetails`) to fetch today's entry from `bot_marathon_daily_words` if the challenge has `is_bot_marathon = true`. Overwrite `challenge.target_word` and `challenge.salt` in the mapped object.
-- Update `submitMarathonResult` mutation logic:
-   - Add `playDate?: string` parameter to the submission function.
-   - Set `play_date = playDate || '1970-01-01'` in the payload.
-   - Update on-conflict targets: `.upsert(data, { onConflict: "participation_id, game_index, play_date" })`.
-
-#### [MODIFY] [ChallengeContext.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/context/ChallengeContext.tsx)
-
-- Expose the daily `playDate` calculation based on Nigeria/Lagos timezone.
-- Pass the calculated `playDate` down in the `submitResult` callbacks when `selectedChallenge.is_bot_marathon` is active.
-
----
-
-### UI Components
-
-#### [MODIFY] [ChallengeModal.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/ChallengeModal.tsx)
-
-- Render the active `is_bot_marathon` challenge inside a prominent, pulsing Indigo banner card at the very top of the challenge view, above the segmented lists switcher.
-- Provide a high-visibility entry CTA ("Enter Weekly Event") so users can join immediately.
-
+### Layout & Page Containers
 #### [MODIFY] [GameArea.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/layout/GameArea.tsx)
+- Ensure the middle grid-wrapper flexbox container has a defined responsive height budget (`flex-1 min-h-0 w-full flex items-center justify-center`) so the grid can measure itself fluidly against it.
 
-- Import `useApp` and retrieve `setIsChallengeOpen`.
-- When `isGameOver` is true (the user has finished playing their regular/daily game), display a friendly indigo banner nudge directly above the game grid:
-   > _"Daily Word Finished! 🏁 Try today's Variant Bot Daily Marathon challenge to keep your streak going."_
-- Clicking "Play Marathon" opens the challenges modal overlay directly.
-
-#### [MODIFY] [ChallengeLobby.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/challenge/ChallengeLobby.tsx)
-
-- Check if `selectedChallenge.is_bot_marathon` is true.
-- Display a ranking switcher in the lobby: **Weekly Leaderboard** vs **Daily Leaderboard**.
-   - **Weekly**: Sums scores of all rows in the participant's `marathon_progress`.
-   - **Daily**: Sums scores of rows where `play_date` is Nigerian Today.
-
-#### [MODIFY] [AdminPage.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/admin/AdminPage.tsx)
-
-- Add a new "Bot Marathon Management" panel.
-- Allows admins to trigger next week's Bot Daily Marathon creation manually (sets start date, expiration date, generates first day words, and flags the challenge).
-
----
+#### [MODIFY] [RegularGameplay.tsx](file:///c:/Users/cemuc/Documents/WEB%20PROJECTS/wordle-variant/src/components/challenge/RegularGameplay.tsx)
+- Clean up the grid wrapper container classes to enable the same fluid layout metrics inside the challenge screen.
 
 ## Verification Plan
 
-### Automated Tests
-
-- Run `npm run build` to verify frontend TypeScript integration and successful bundle output.
-
 ### Manual Verification
-
-- Deploy database schema changes via local/staging SQL tools.
-- Verify standard user-created challenges (single and marathon) still record guesses, compute scores, and sync successfully without any constraint errors.
-- Test weekly bot marathon creation via the Admin portal dashboard.
-- Simulate daily word rollover by manually changing the client's current date and confirming words update without overriding historical user guesses.
-- Join the Bot Daily Marathon, play the sequence, and verify both daily scores and weekly accumulated score ranks calculate correctly.
+1. Open the game in standard play. Try changing the word length override to 3, 5, and 7. Verify the grid dynamically rescales to stay centered and square, filling the screen width/height optimally.
+2. Verify that there is zero vertical scrolling or overflow on small devices (e.g. iPhone SE / iPhone X responsive simulator).
+3. Verify that desktop monitors display a centered, crisp board without oversized cells.
+4. Run a full production build to ensure TypeScript types compile successfully.

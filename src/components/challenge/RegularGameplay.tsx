@@ -241,6 +241,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                     isShake={isShake}
                     isSaving={isSaving}
                     compact={true}
+                    gameplayType="challenge"
                 />
             </div>
 
@@ -251,6 +252,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
                         letterStatuses={keyboardStatuses}
+                        gameplayType="challenge"
                     />
                 </div>
             )}

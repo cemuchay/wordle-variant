@@ -25,6 +25,12 @@ export const DynamicIslandStatus = () => {
     } = useApp();
 
     const [isExpanded, setIsExpanded] = useState(false);
+    const [mascot, setMascot] = useState<{ mascotFace: string; mascotLabel: string; animationClass: string } | null>(null);
+    const [showOnlineNotification, setShowOnlineNotification] = useState(false);
+
+    // Filter out the current user from the online count
+    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+    const [lastOnlineCount, setLastOnlineCount] = useState(otherOnlineUsers.length);
 
     useEffect(() => {
         if (audioChat.error) {
@@ -42,14 +48,47 @@ export const DynamicIslandStatus = () => {
         }
     }, [activeCall?.status]);
 
-    // Filter out the current user from the online count
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+    // Listen to mascot changes from Grid gameplay
+    useEffect(() => {
+        const handleMascot = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail) {
+                setMascot(detail);
+            } else {
+                setMascot(null);
+            }
+        };
+        window.addEventListener('mascot-changed', handleMascot);
+        return () => window.removeEventListener('mascot-changed', handleMascot);
+    }, []);
+
+    // Clear mascot after 90 seconds (1.5 minutes) of inactivity
+    useEffect(() => {
+        if (mascot) {
+            const timer = setTimeout(() => {
+                setMascot(null);
+            }, 90000);
+            return () => clearTimeout(timer);
+        }
+    }, [mascot]);
+
+    // Trigger brief online notification when user count increases
+    useEffect(() => {
+        if (otherOnlineUsers.length > lastOnlineCount) {
+            setShowOnlineNotification(true);
+            const timer = setTimeout(() => {
+                setShowOnlineNotification(false);
+            }, 8000); // 8 seconds
+            return () => clearTimeout(timer);
+        }
+        setLastOnlineCount(otherOnlineUsers.length);
+    }, [otherOnlineUsers.length, lastOnlineCount]);
 
     // Get the first active voice room to show in the island
     const currentVoiceSession = activeVoiceRooms[0];
 
-    // Show island if: expanded OR online users > 0 OR active call OR someone is in a voice room I'm part of
-    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !currentVoiceSession) return null;
+    // Show island if: expanded OR online users > 0 OR active call OR someone is in a voice room I'm part of OR mascot is playing
+    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !currentVoiceSession && !mascot) return null;
 
     const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
@@ -92,6 +131,9 @@ export const DynamicIslandStatus = () => {
             return '140px'; // connecting / connected
         }
         if (currentVoiceSession) return '180px';
+        if (mascot && (!showOnlineNotification || otherOnlineUsers.length === 0)) {
+            return '170px';
+        }
         if (otherOnlineUsers.length === 1) return '150px';
         return '135px';
     };
@@ -101,9 +143,9 @@ export const DynamicIslandStatus = () => {
             <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
-                animate={{ 
-                    opacity: 1, 
-                    scale: 1, 
+                animate={{
+                    opacity: 1,
+                    scale: 1,
                     y: isExpanded ? 8 : 0
                 }}
                 style={{
@@ -202,36 +244,43 @@ export const DynamicIslandStatus = () => {
                                 </span>
                                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                             </div>
-                        ) : otherOnlineUsers.length === 1 ? (
-                            <>
-                                <ProtectedAvatar
-                                    userId={otherOnlineUsers[0].id}
-                                    src={otherOnlineUsers[0].avatar_url}
-                                    username={otherOnlineUsers[0].username}
-                                    className="w-4 h-4 rounded-full border border-white/20 shrink-0"
-                                />
-                                <span className="text-[9px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
-                                    {otherOnlineUsers[0].username} online
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex -space-x-1 shrink-0">
-                                    {otherOnlineUsers.slice(0, 2).map((u,) => (
-                                        <ProtectedAvatar
-                                            key={u.id}
-                                            userId={u.id}
-                                            src={u.avatar_url}
-                                            username={u.username}
-                                            className="w-4 h-4 rounded-full border border-black shrink-0"
-                                        />
-                                    ))}
-                                </div>
-                                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider whitespace-nowrap">
-                                    {otherOnlineUsers.length} ONLINE
-                                </span>
-                            </>
-                        )}
+                        ) : (otherOnlineUsers.length > 0 && (showOnlineNotification || !mascot)) ? (
+                            otherOnlineUsers.length === 1 ? (
+                                <>
+                                    <ProtectedAvatar
+                                        userId={otherOnlineUsers[0].id}
+                                        src={otherOnlineUsers[0].avatar_url}
+                                        username={otherOnlineUsers[0].username}
+                                        className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                    />
+                                    <span className="text-[9px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
+                                        {otherOnlineUsers[0].username} online
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex -space-x-1 shrink-0">
+                                        {otherOnlineUsers.slice(0, 2).map((u,) => (
+                                            <ProtectedAvatar
+                                                key={u.id}
+                                                userId={u.id}
+                                                src={u.avatar_url}
+                                                username={u.username}
+                                                className="w-4 h-4 rounded-full border border-black shrink-0"
+                                            />
+                                        ))}
+                                    </div>
+                                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider whitespace-nowrap">
+                                        {otherOnlineUsers.length} ONLINE
+                                    </span>
+                                </>
+                            )
+                        ) : mascot ? (
+                            <div className={`flex items-center gap-1 px-2.5 h-full w-full justify-center ${mascot.animationClass}`}>
+                                <span className="text-[9px] font-mono font-black text-correct shrink-0 tracking-wide select-none">{mascot.mascotFace}</span>
+                                <span className="text-[8px] uppercase font-black tracking-widest text-white/80 truncate max-w-[115px] select-none">{mascot.mascotLabel}</span>
+                            </div>
+                        ) : null}
                     </motion.div>
                 ) : (
                     <motion.div
