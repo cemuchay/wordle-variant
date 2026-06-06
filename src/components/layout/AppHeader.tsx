@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -44,10 +45,24 @@ export const AppHeader = ({
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
-    const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
+    const { activeCall, onlineUsers, activeVoiceRooms, triggerToast } = useApp();
+    const [isShaking, setIsShaking] = useState(false);
 
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
     const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
+
+    const handleLockedHintClick = () => {
+        setIsShaking(true);
+        const goofyMessages = [
+            "Not so fast! 🤫 Guess more words first!",
+            "No freebies yet! Keep trying! 🔒",
+            "Work for it! Guess at least 2 words! 💪",
+            "Nice try, lockpicker! 🗝️"
+        ];
+        const randomMsg = goofyMessages[Math.floor(Math.random() * goofyMessages.length)];
+        triggerToast(randomMsg, 3000);
+        setTimeout(() => setIsShaking(false), 500);
+    };
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -83,10 +98,16 @@ export const AppHeader = ({
                             <div className="flex items-center gap-0.5">
                                 {canShowHint && !isGameOver && (
                                     <button
-                                        onClick={onHint}
-                                        disabled={usedHint || isHintLocked}
-                                        className={`p-1.5 transition-all rounded-lg relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : (isHintLocked ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                                        title={usedHint ? "Hint Used" : isHintLocked ? "Hint Unavailable" : "Get Hint"}
+                                        onClick={isHintLocked && !usedHint ? handleLockedHintClick : onHint}
+                                        disabled={usedHint}
+                                        className={`p-1.5 transition-all rounded-lg relative ${
+                                            usedHint 
+                                                ? 'text-yellow-500/30 cursor-not-allowed' 
+                                                : isHintLocked 
+                                                    ? `text-gray-500 cursor-pointer opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 ${isShaking ? 'animate-shake' : ''}` 
+                                                    : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse'
+                                        }`}
+                                        title={usedHint ? "Hint Used" : isHintLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
                                     >
                                         <Lightbulb size={ICON_SIZE} />
                                         {isHintLocked && !usedHint && (

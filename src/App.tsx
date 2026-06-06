@@ -234,6 +234,61 @@ export default function App() {
     triggerToast(`Challenge created successfully`, 3000);
   };
 
+  // Delayed realtime disconnected warning & reconnect feedback
+  const [showDisconnectedUI, setShowDisconnectedUI] = useState(false);
+  const [reconnectStatus, setReconnectStatus] = useState<"idle" | "attempting" | "failed">("idle");
+
+  useEffect(() => {
+    if (realtimeStatus === "connected") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowDisconnectedUI(false);
+      setReconnectStatus("idle");
+      return;
+    }
+
+    let warningTimerId: number;
+
+    const handleAttemptReconnect = () => {
+      // Background reconnection attempt
+      supabase.realtime.connect();
+
+      // Start/restart grace period timer
+      if (warningTimerId) clearTimeout(warningTimerId);
+      warningTimerId = setTimeout(() => {
+        if (realtimeStatus === "disconnected") {
+          setShowDisconnectedUI(true);
+        }
+      }, 5000); // 5 seconds grace period
+    };
+
+    // Trigger attempt on mount/status change to disconnected
+    handleAttemptReconnect();
+
+    // Re-attempt on window focus
+    const handleFocus = () => {
+      handleAttemptReconnect();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearTimeout(warningTimerId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [realtimeStatus]);
+
+  const handleManualReconnect = () => {
+    setReconnectStatus("attempting");
+    supabase.realtime.connect();
+
+    setTimeout(() => {
+      if (realtimeStatus === "disconnected") {
+        setReconnectStatus("failed");
+      } else {
+        setReconnectStatus("idle");
+      }
+    }, 4000);
+  };
+
   const isPageAdmin = window.location.pathname === "/admin";
 
   if (isPageAdmin) {
@@ -299,23 +354,40 @@ export default function App() {
         duration={toast.duration}
         onClose={() => setToast({ ...toast, show: false })}
       />
-      {user && realtimeStatus === "disconnected" && (
+      {user && showDisconnectedUI && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3 bg-amber-950/90 backdrop-blur-md border border-amber-500/30 px-4 py-2.5 rounded-2xl shadow-xl">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            <span className={`w-2 h-2 rounded-full ${reconnectStatus === "failed" ? "bg-red-500 animate-pulse" : "bg-amber-500 animate-ping"}`} />
             <p className="text-[10px] uppercase font-black tracking-wide text-amber-200">
-              Live sync disconnected
+              {reconnectStatus === "attempting"
+                ? "Attempting to reconnect..."
+                : reconnectStatus === "failed"
+                  ? "Live sync failed. Please refresh."
+                  : "Live sync disconnected"}
             </p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => supabase.realtime.connect()}
-                className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Reconnect
-              </button>
+              {reconnectStatus !== "attempting" && reconnectStatus !== "failed" && (
+                <button
+                  onClick={handleManualReconnect}
+                  className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Reconnect
+                </button>
+              )}
+              {reconnectStatus === "failed" && (
+                <button
+                  onClick={handleManualReconnect}
+                  className="bg-amber-500/50 hover:bg-amber-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Retry
+                </button>
+              )}
               <button
                 onClick={() => window.location.reload()}
-                className="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer ${reconnectStatus === "failed"
+                  ? "bg-amber-500 hover:bg-amber-600 text-black animate-pulse"
+                  : "bg-white/10 hover:bg-white/20 text-white"
+                  }`}
               >
                 Refresh
               </button>
@@ -383,7 +455,7 @@ export default function App() {
                   setIsChallengeOpen={setIsChallengeOpen}
                   isAuthenticated={user ? true : false}
                 />
-                
+
                 <ModalsManager
                   modals={{
                     isSettingsOpen,
