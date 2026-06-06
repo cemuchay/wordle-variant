@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays } from 'lucide-react';
+import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -368,25 +368,40 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     </div>
                                 </div>
 
-                                {isOnline && currentUser && currentUser.id !== userId && (
-                                    <button
-                                        onClick={() => {
-                                            if (activeCall) {
-                                                triggerToast("You are already in a call.", 4000);
-                                                return;
-                                            }
-                                            initiatePrivateCall({
-                                                id: profile.id,
-                                                username: profile.username,
-                                                avatar_url: profile.avatar_url
-                                            });
-                                            onClose();
-                                        }}
-                                        className="flex items-center justify-center p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all mr-6 shrink-0"
-                                        title={`Call ${profile.username}`}
-                                    >
-                                        <Phone size={14} className="sm:w-4 sm:h-4" />
-                                    </button>
+                                {currentUser && currentUser.id !== userId && (
+                                    <div className="flex items-center gap-2 mr-6 shrink-0">
+                                        <button
+                                            onClick={() => {
+                                                window.dispatchEvent(new CustomEvent("start-direct-message", { detail: { userId: profile.id } }));
+                                                onClose();
+                                            }}
+                                            className="flex items-center justify-center p-2.5 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full shadow-lg hover:scale-105 transition-all"
+                                            title={`Message ${profile.username}`}
+                                        >
+                                            <MessageCircle size={14} className="sm:w-4 sm:h-4" />
+                                        </button>
+
+                                        {isOnline && (
+                                            <button
+                                                onClick={() => {
+                                                    if (activeCall) {
+                                                        triggerToast("You are already in a call.", 4000);
+                                                        return;
+                                                    }
+                                                    initiatePrivateCall({
+                                                        id: profile.id,
+                                                        username: profile.username,
+                                                        avatar_url: profile.avatar_url
+                                                    });
+                                                    onClose();
+                                                }}
+                                                className="flex items-center justify-center p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
+                                                title={`Call ${profile.username}`}
+                                            >
+                                                <Phone size={14} className="sm:w-4 sm:h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Clock, Phone, Users, Check, X, PhoneOff } from 'lucide-react';
+import { Clock, Phone, Users, Check, X, PhoneOff, MessageCircle } from 'lucide-react';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
@@ -20,7 +20,8 @@ export const DynamicIslandStatus = () => {
         activeVoiceRooms,
         acceptCall,
         rejectCall,
-        hangUpCall
+        hangUpCall,
+        initiatePrivateCall
     } = useApp();
 
     const [isExpanded, setIsExpanded] = useState(false);
@@ -429,14 +430,50 @@ export const DynamicIslandStatus = () => {
                                                 </div>
                                             </div>
 
-                                            {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
-                                                <button
-                                                    onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
-                                                    className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
-                                                >
-                                                    Join
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                {p.id !== user?.id && (
+                                                    <button
+                                                        onClick={() => {
+                                                            window.dispatchEvent(new CustomEvent('start-direct-message', { detail: { userId: p.id } }));
+                                                            setIsExpanded(false);
+                                                        }}
+                                                        className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
+                                                        title={`Message ${p.username}`}
+                                                    >
+                                                        <MessageCircle size={10} />
+                                                    </button>
+                                                )}
+
+                                                {isOnline && p.id !== user?.id && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (activeCall) {
+                                                                triggerToast("You are already in a call.", 4000);
+                                                                return;
+                                                            }
+                                                            initiatePrivateCall({
+                                                                id: p.id,
+                                                                username: p.username,
+                                                                avatar_url: p.avatar_url
+                                                            });
+                                                            setIsExpanded(false);
+                                                        }}
+                                                        className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-500 hover:text-black rounded-lg transition-all"
+                                                        title={`Call ${p.username}`}
+                                                    >
+                                                        <Phone size={10} />
+                                                    </button>
+                                                )}
+
+                                                {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
+                                                    <button
+                                                        onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
+                                                        className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
+                                                    >
+                                                        Join
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
