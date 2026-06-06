@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useRef } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 
@@ -81,20 +81,21 @@ interface GridProps {
 }
 
 export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact }) => {
-  const [revealingRowIndex, setRevealingRowIndex] = useState<number | null>(null);
-  const prevGuessesLength = useRef(guesses.length);
+  const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
-    if (guesses.length > prevGuessesLength.current) {
-      setRevealingRowIndex(guesses.length - 1);
+    if (guesses.length > revealedRowsCount) {
       const timer = setTimeout(() => {
-        setRevealingRowIndex(null);
+        setRevealedRowsCount(guesses.length);
       }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
       return () => clearTimeout(timer);
+    } else if (guesses.length < revealedRowsCount) {
+      setRevealedRowsCount(guesses.length);
     }
-    prevGuessesLength.current = guesses.length;
-  }, [guesses.length, wordLength]);
+  }, [guesses.length, revealedRowsCount, wordLength]);
 
+  const isCurrentRevealing = guesses.length > revealedRowsCount;
+  const revealingRowIndex = isCurrentRevealing ? guesses.length - 1 : null;
   const empties = Math.max(0, maxAttempts - guesses.length - (revealingRowIndex !== null ? 0 : 1));
 
   return (

@@ -6,6 +6,7 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { CloudSyncMenu } from '../SyncCloudModal';
 import type { SyncStatus } from '../../types/game';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
+import { useApp } from '../../context/AppContext';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -43,6 +44,10 @@ export const AppHeader = ({
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
+    const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
+
+    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -58,7 +63,7 @@ export const AppHeader = ({
     };
 
     return (
-        <header className="w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 pt-6 shrink-0">
+        <header className={`w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 shrink-0 ${isDynamicIslandVisible ? 'pt-6' : 'pt-2'}`}>
             <div className="w-full flex items-center justify-between gap-1 h-10 py-1 px-2 bg-white/5 rounded-2xl border border-white/10">
                 {/* Left Side: Logo & Sync Status */}
                 <div className="flex items-center gap-1.5 min-w-0">

@@ -62,7 +62,7 @@ export const ModalsManager = ({
     setViewedProfileId,
     initialChallengeId
 }: ModalsManagerProps) => {
-    const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements();
+    const { currentAnnouncement, isOpen: isAnnouncementOpen, markAsRead } = useAnnouncements(!!gameContext.user);
 
     useEffect(() => {
         const preloadComponents = () => {

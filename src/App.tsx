@@ -293,6 +293,12 @@ export default function App() {
       <AudioConnectionLog />
       <GlobalAudioPlayer />
       <NotificationsManager />
+      <Toast
+        isVisible={toast.show}
+        message={toast.message}
+        duration={toast.duration}
+        onClose={() => setToast({ ...toast, show: false })}
+      />
       {user && realtimeStatus === "disconnected" && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3 bg-amber-950/90 backdrop-blur-md border border-amber-500/30 px-4 py-2.5 rounded-2xl shadow-xl">
@@ -319,27 +325,29 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
-        <AppHeader
-          hideGameplayActions={activeNavigationItem !== "play"}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
-          onHint={actions.handleHint}
-          onReset={() => window.location.reload()}
-          onShare={() => actions.setGameOverModalOpen(true)}
-          onRetrySync={actions.retrySync}
-          isGameOver={state.isGameOver}
-          usedHint={state.usedHint}
-          canShowHint={state.guesses.length >= 2}
-          isHintLocked={
-            (state.guesses.length >= config.maxAttempts - 1 ||
-              state.isHintDisabled) &&
-            !state.usedHint
-          }
-          syncStatus={state.syncStatus}
-          isMonday={isMonday}
-        />
-      </div>
+      {!isPlayingChallenge && (
+        <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
+          <AppHeader
+            hideGameplayActions={activeNavigationItem !== "play"}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
+            onHint={actions.handleHint}
+            onReset={() => window.location.reload()}
+            onShare={() => actions.setGameOverModalOpen(true)}
+            onRetrySync={actions.retrySync}
+            isGameOver={state.isGameOver}
+            usedHint={state.usedHint}
+            canShowHint={state.guesses.length >= 2}
+            isHintLocked={
+              (state.guesses.length >= config.maxAttempts - 1 ||
+                state.isHintDisabled) &&
+              !state.usedHint
+            }
+            syncStatus={state.syncStatus}
+            isMonday={isMonday}
+          />
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 relative overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
@@ -357,13 +365,6 @@ export default function App() {
           >
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
-                <Toast
-                  isVisible={toast.show}
-                  message={toast.message}
-                  duration={toast.duration}
-                  onClose={() => setToast({ ...toast, show: false })}
-                />
-
                 <GameArea
                   wordLength={config.length}
                   maxAttempts={config.maxAttempts}

@@ -13,11 +13,11 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.ANNOUNCEMENT_MODAL }}>
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 h-[90vh]">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(4rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.ANNOUNCEMENT_MODAL }}>
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75vh] sm:max-h-[80vh]">
 
         {/* Header */}
-        <div className="bg-primary/20 p-6 border-b border-gray-800 flex items-center gap-4">
+        <div className="bg-primary/20 p-6 border-b border-gray-800 flex items-center gap-4 shrink-0">
           <div className="bg-primary/20 p-3 rounded-xl text-primary">
             <Bell size={24} />
           </div>
@@ -40,15 +40,15 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
         </div>
 
         {/* Content */}
-        <div className="p-2 max-h-[60vh] overflow-y-auto custom-scrollbar prose prose-invert prose-sm max-w-none">
+        <div className="p-6 overflow-y-auto custom-scrollbar prose prose-invert prose-sm max-w-none flex-1">
           <div
-            className="announcement-content"
+            className="announcement-content text-gray-300 space-y-4"
             dangerouslySetInnerHTML={{ __html: announcement.content }}
           />
         </div>
 
         {/* Footer */}
-        <div className="p-2 bg-gray-900/50 border-t border-gray-800">
+        <div className="p-6 bg-gray-900/50 border-t border-gray-800 shrink-0">
           <button
             onClick={onClose}
             className="w-full bg-white text-black font-black py-4 rounded-xl hover:bg-gray-200 transition-colors uppercase tracking-tighter shadow-lg active:scale-[0.98] transform"

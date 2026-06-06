@@ -751,7 +751,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
             {rank}
           </span>
           {isFirst && (
-            <div className="absolute -top-6.5 left-7.5 sm:-top-6 sm:left-8.5 text-[18px] w-[18px] flex justify-center select-none">
+            <div className="absolute top-[-24px] left-[33px] sm:-top-6 sm:left-8.5 text-[18px] w-[18px] flex justify-center select-none">
               <div style={tieCount > 1 ? {
                 clipPath: `inset(0 ${100 - pieceWidth * (tieIndex + 1)}% 0 ${pieceWidth * tieIndex}%)`,
                 transform: `translateX(${50 - (pieceWidth * tieIndex + pieceWidth / 2)}%)`,

@@ -23,6 +23,7 @@ import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
+import { useApp } from "../context/AppContext";
 
 // Sub-components
 import { ChallengeCreate } from "./challenge/ChallengeCreate";
@@ -147,6 +148,10 @@ const AuthenticatedChallengeContent = memo(
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
+    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const {
@@ -243,7 +248,7 @@ const AuthenticatedChallengeContent = memo(
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? "p-3 sm:p-4" : "p-4 sm:p-6"}`}
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? "p-3 sm:p-4" : "p-4 sm:p-6"} ${isDynamicIslandVisible ? 'pt-10 sm:pt-12' : ''}`}
         >
           <div className="flex items-center gap-2 sm:gap-3">
             {!isPlaying && selectedChallenge && (

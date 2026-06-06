@@ -5,6 +5,7 @@ import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
 import { motion } from 'framer-motion';
+import { ANIMATION_DURATION } from '../../constants/ui';
 
 interface GameAreaProps {
     wordLength: number;
@@ -49,6 +50,19 @@ export const GameArea = ({
     const [showHelp, setShowHelp] = useState(false);
     const helpRef = useRef<HTMLDivElement>(null);
 
+    const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
+
+    useEffect(() => {
+        if (guesses.length === 0) {
+            setKeyboardStatuses(letterStatuses);
+            return;
+        }
+        const timer = setTimeout(() => {
+            setKeyboardStatuses(letterStatuses);
+        }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+        return () => clearTimeout(timer);
+    }, [guesses.length, letterStatuses, wordLength]);
+
     useEffect(() => {
         if (!showHelp) return;
         const handleClickOutside = (e: MouseEvent) => {
@@ -78,7 +92,7 @@ export const GameArea = ({
     }, [isGameOver]);
 
     return (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
+        <div className="gameplay-container flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
             {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
@@ -180,7 +194,7 @@ export const GameArea = ({
                         onChar={onChar}
                         onDelete={onDelete}
                         onEnter={onEnter}
-                        letterStatuses={letterStatuses}
+                        letterStatuses={keyboardStatuses}
                     />
                 </div>
             )}

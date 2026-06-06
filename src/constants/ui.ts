@@ -17,5 +17,5 @@ export const Z_INDEX = {
 export const ANIMATION_DURATION = {
    FAST: 200,
    NORMAL: 300,
-   TILE_REVEAL: 275,
+   TILE_REVEAL: 350,
 } as const;
