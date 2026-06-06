@@ -5,6 +5,7 @@ import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
 import { motion } from 'framer-motion';
+import { ANIMATION_DURATION } from '../../constants/ui';
 
 interface GameAreaProps {
     wordLength: number;
@@ -48,6 +49,19 @@ export const GameArea = ({
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [showHelp, setShowHelp] = useState(false);
     const helpRef = useRef<HTMLDivElement>(null);
+
+    const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
+
+    useEffect(() => {
+        if (guesses.length === 0) {
+            setKeyboardStatuses(letterStatuses);
+            return;
+        }
+        const timer = setTimeout(() => {
+            setKeyboardStatuses(letterStatuses);
+        }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+        return () => clearTimeout(timer);
+    }, [guesses.length, letterStatuses, wordLength]);
 
     useEffect(() => {
         if (!showHelp) return;
@@ -180,7 +194,7 @@ export const GameArea = ({
                         onChar={onChar}
                         onDelete={onDelete}
                         onEnter={onEnter}
-                        letterStatuses={letterStatuses}
+                        letterStatuses={keyboardStatuses}
                     />
                 </div>
             )}

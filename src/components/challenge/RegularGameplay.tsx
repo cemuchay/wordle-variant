@@ -10,6 +10,7 @@ import { NetworkLog } from './ChallengeUIElements';
 import { getHandicapStarter } from '../../utils/marathon';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
+import { ANIMATION_DURATION } from '../../constants/ui';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -45,6 +46,18 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+    const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
+
+    useEffect(() => {
+        if (guesses.length === 0) {
+            setKeyboardStatuses(letterStatuses);
+            return;
+        }
+        const timer = setTimeout(() => {
+            setKeyboardStatuses(letterStatuses);
+        }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+        return () => clearTimeout(timer);
+    }, [guesses.length, letterStatuses, wordLength]);
 
     useEffect(() => {
         if (isGameOver) {
@@ -171,7 +184,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}
                         onEnter={actions.onEnter}
-                        letterStatuses={letterStatuses}
+                        letterStatuses={keyboardStatuses}
                     />
                 </div>
             )}
