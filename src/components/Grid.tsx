@@ -50,12 +50,12 @@ const TILE_SIZES = [
   },
   {
     length: 9,
-    mobile: { w: 2.2, h: 2.2 },
+    mobile: { w: 2, h: 2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 10,
-    mobile: { w: 2.2, h: 2.2 },
+    mobile: { w: 2, h: 2 },
     desktop: { w: 2, h: 2 }
   },
 ];

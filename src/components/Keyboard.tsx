@@ -31,7 +31,7 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
   const isChallenge = gameplayType === 'challenge' || compact;
 
   const dynamicClass = isChallenge
-    ? `${isWide ? 'px-1 text-[8px] sm:text-[9px] min-w-[44px] sm:min-w-[52px]' : 'flex-1 min-w-[22px] sm:min-w-[26px]'} h-9 sm:h-10 text-xs`
+    ? `${isWide ? 'px-1 text-[8px] sm:text-[9px] min-w-[44px] sm:min-w-[52px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-xs`
     : `${isWide ? 'px-2.5 text-[10px] sm:text-xs min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-sm sm:text-base`;
 
   return (
@@ -77,7 +77,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
   return (
     <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-4'}`}>
       {ROWS.map((row, i) => (
-        <div key={i} className={`flex justify-center ${isChallenge ? 'mb-1 gap-0.5 sm:gap-1' : 'mb-1.5 gap-1.5 sm:gap-2'}`}>
+        <div key={i} className={`flex justify-center ${isChallenge ? 'mb-1.5 gap-1.5 sm:gap-2' : 'mb-1.5 gap-1.5 sm:gap-2'}`}>
           {row.map((key) => (
             <Key
               key={key}

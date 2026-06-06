@@ -96,14 +96,9 @@ export const RegularGameplay = memo(function RegularGameplay({
         : challenge.handicap_starter;
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
     const showHint = guesses.length >= 2 && !isGameOver && !challenge.disable_hints;
-    // Mascot Face Reactions
-    const attemptsCount = guesses.length;
-    const isOneAttemptLeft = attemptsCount === 5 && !isGameOver;
-    const isWon = guesses.some(g => g.length === wordLength && g.every((res: any) => res.status === 'correct'));
-    const isLost = !isWon && attemptsCount === 6;
 
     const lastGuess = guesses[guesses.length - 1];
-    let hasRepeatedLetters = false;
+
     if (lastGuess) {
         const charCounts: Record<string, number> = {};
         for (const res of lastGuess) {
@@ -111,62 +106,18 @@ export const RegularGameplay = memo(function RegularGameplay({
                 const char = res.letter.toUpperCase();
                 charCounts[char] = (charCounts[char] || 0) + 1;
                 if (charCounts[char] >= 3) {
-                    hasRepeatedLetters = true;
+
                     break;
                 }
             }
         }
     }
 
-    let mascotFace = "(•‿•)";
-    let mascotLabel = "Looking good!";
-    let animationClass = "";
-
-    if (isWon) {
-        mascotFace = "(★‿★)";
-        mascotLabel = "Splendid job! 🎉";
-        animationClass = "animate-bounce text-correct border-correct/30 bg-correct/10";
-    } else if (isLost) {
-        mascotFace = "(✖╭╮✖)";
-        mascotLabel = "Aww, maybe next time! 😢";
-        animationClass = "text-red-500 border-red-500/30 bg-red-500/10";
-    } else if (isOneAttemptLeft) {
-        mascotFace = "(⊙_⊙;)";
-        mascotLabel = "Yikes! Only 1 guess left! 😰";
-        animationClass = "animate-pulse scale-105 text-amber-500 border-amber-500/40 bg-amber-500/10";
-    } else if (hasRepeatedLetters) {
-        mascotFace = "(🤨)";
-        mascotLabel = "Hmm... interesting choice. 🧐";
-        animationClass = "animate-shake text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
-    } else if (attemptsCount > 0) {
-        const defaultMascots = [
-            { face: "(•_•)", label: "Thinking..." },
-            { face: "(o_O)", label: "Let's see..." },
-            { face: "(^_-)", label: "Keep going! 😉" }
-        ];
-        const idx = (attemptsCount - 1) % defaultMascots.length;
-        mascotFace = defaultMascots[idx].face;
-        mascotLabel = defaultMascots[idx].label;
-        animationClass = "text-white/80 border-white/10 bg-white/5";
-    } else {
-        animationClass = "text-white/60 border-white/5 bg-white/5";
-    }
 
     return (
         <div className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
 
-            {/* Mascot on same level as Hint button */}
-            <div 
-                className={`hidden md:flex absolute ${showHint ? 'left-14' : 'left-4'} pointer-events-auto z-45 items-center gap-1 border px-3 py-1 rounded-full backdrop-blur-md shadow-sm transition-all duration-300 whitespace-nowrap ${
-                    isDynamicIslandVisible ? 'top-12' : 'top-3.5'
-                } ${animationClass}`}
-                style={isWon ? { animationIterationCount: 3 } : {}}
-            >
-                <span className="text-[8px] font-mono font-black select-none tracking-wide">{mascotFace}</span>
-                <span className="text-[7px] uppercase font-black tracking-widest opacity-80 select-none">{mascotLabel}</span>
-            </div>
-            
             {/* Sync Status Overlay */}
             <div className={`absolute left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 ${isDynamicIslandVisible ? 'top-12' : 'top-2'}`}>
                 {isSaving && (
@@ -179,7 +130,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                 )}
 
                 {syncFailed && !isSaving && (
-                    <button 
+                    <button
                         onClick={actions.retrySync}
                         className="bg-red-500/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-red-400/50 flex items-center gap-2 animate-bounce shadow-lg shadow-red-500/20 active:scale-95 transition-all"
                     >
