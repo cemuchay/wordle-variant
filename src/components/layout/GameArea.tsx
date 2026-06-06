@@ -93,16 +93,16 @@ export const GameArea = ({
     }, [isGameOver]);
 
     return (
-        <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-4 sm:pb-1 gap-2 sm:gap-4">
+        <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
             {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300 shrink-0"
+                    className="mb-2 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300 shrink-0"
                 >
                     <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                    <div className="flex items-center justify-between gap-4 relative z-10">
+                    <div className="flex items-center justify-between gap-2 relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
                                 <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
@@ -193,7 +193,7 @@ export const GameArea = ({
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-[500px] mx-auto pb-0.5 shrink-0 px-2">
+                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-4 shrink-0 px-2">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}

@@ -16,40 +16,84 @@ interface CellProps {
   wordLength: number;
 }
 
+// Sizing config supporting different widths/heights for mobile and desktop (sm)
+const TILE_SIZES = [
+  {
+    length: 3,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 4,
+    mobile: { w: 2.1, h: 2.1 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 5,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 6,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 7,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 8,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 9,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 10,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+];
+
+
+
+// A simple custom hook to check for the Tailwind 'sm' breakpoint (640px)
+const useIsDesktop = () => {
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isDesktop;
+};
+
 const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
+  const isDesktop = useIsDesktop(); // Detect responsive state
 
-  // Dynamic scaling based on word length to optimize mobile real estate
-  let sizeClass: string;
-  if (isChallenge) {
-    if (wordLength <= 4) {
-      sizeClass = 'w-[12vw] h-[12vw] max-w-[48px] max-h-[48px] sm:w-[5.8vh] sm:h-[5.8vh] sm:max-w-[52px] sm:max-h-[52px] text-lg';
-    } else if (wordLength === 5) {
-      sizeClass = 'w-[10vw] h-[10vw] max-w-[42px] max-h-[42px] sm:w-[5.2vh] sm:h-[5.2vh] sm:max-w-[48px] sm:max-h-[48px] text-base sm:text-lg';
-    } else if (wordLength === 6) {
-      sizeClass = 'w-[8.5vw] h-[8.5vw] max-w-[38px] max-h-[38px] sm:w-[4.8vh] sm:h-[4.8vh] sm:max-w-[44px] sm:max-h-[44px] text-sm sm:text-base';
-    } else { // 7+
-      sizeClass = 'w-[7.5vw] h-[7.5vw] max-w-[34px] max-h-[34px] sm:w-[4.2vh] sm:h-[4.2vh] sm:max-w-[40px] sm:max-h-[40px] text-xs sm:text-sm';
-    }
-  } else { // regular mode
-    if (wordLength <= 3) {
-      sizeClass = 'w-[22vw] h-[22vw] max-w-[82px] max-h-[82px] sm:w-[8.5vh] sm:h-[8.5vh] sm:max-w-[86px] sm:max-h-[86px] lg:w-[7.5vh] lg:h-[7.5vh] lg:max-w-[76px] lg:max-h-[76px] text-3xl';
-    } else if (wordLength === 4) {
-      sizeClass = 'w-[18vw] h-[18vw] max-w-[70px] max-h-[70px] sm:w-[7.5vh] sm:h-[7.5vh] sm:max-w-[74px] sm:max-h-[74px] lg:w-[6.2vh] lg:h-[6.2vh] lg:max-w-[62px] lg:max-h-[62px] text-2xl';
-    } else if (wordLength === 5) {
-      sizeClass = 'w-[15vw] h-[15vw] max-w-[62px] max-h-[62px] sm:w-[6.5vh] sm:h-[6.5vh] sm:max-w-[58px] sm:max-h-[58px] lg:w-[5.2vh] lg:h-[5.2vh] lg:max-w-[52px] lg:max-h-[52px] text-xl sm:text-2xl';
-    } else if (wordLength === 6) {
-      sizeClass = 'w-[12vw] h-[12vw] max-w-[54px] max-h-[54px] sm:w-[5.8vh] sm:h-[5.8vh] sm:max-w-[50px] sm:max-h-[50px] lg:w-[4.6vh] lg:h-[4.6vh] lg:max-w-[46px] lg:max-h-[46px] text-lg sm:text-xl';
-    } else { // 7+
-      sizeClass = 'w-[10.5vw] h-[10.5vw] max-w-[48px] max-h-[48px] sm:w-[5.2vh] sm:h-[5.2vh] sm:max-w-[44px] sm:max-h-[44px] lg:w-[4.2vh] lg:h-[4.2vh] lg:max-w-[40px] lg:max-h-[40px] text-base sm:text-lg';
-    }
-  }
+  // 1. Get the current size profile based on word length
+  const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
+
+  // 2. Select either desktop or mobile dimensions
+  const dimensions = isDesktop ? sizeConfig.desktop : sizeConfig.mobile;
+
+  // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
+  const scale = isChallenge ? 0.85 : 1;
+  const finalWidth = dimensions.w * scale;
+  const finalHeight = dimensions.h * scale;
 
   const tileClass = `
-    ${sizeClass}
     flex items-center justify-center 
     font-bold uppercase transition-colors duration-300
-    border-2 text-white
+    border-2 text-white rounded-md
   `;
 
   let statusClass = 'border-gray-800';
@@ -72,9 +116,16 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     animationClass = 'animate-pulse text-yellow-500/50 border-yellow-600/50';
   }
 
-  const style = isRevealing
-    ? { animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' }
-    : {};
+  // 4. Inject responsive widths and heights into inline styles
+  const style: React.CSSProperties = {
+    width: `${finalWidth}rem`,
+    height: `${finalHeight}rem`,
+    fontSize: `${finalWidth * 0.5}rem`, // Font sizes scale fluidly with width
+    ...(isRevealing ? {
+      animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`,
+      animationFillMode: 'both'
+    } : {})
+  };
 
   return (
     <div className={`${tileClass} ${statusClass} ${animationClass}`} style={style}>
@@ -108,9 +159,11 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
       return () => clearTimeout(timer);
     } else if (guesses.length < revealedRowsCount) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedRowsCount(guesses.length);
     }
   }, [guesses.length, revealedRowsCount, wordLength]);
+
 
   const isCurrentRevealing = guesses.length > revealedRowsCount;
   const revealingRowIndex = isCurrentRevealing ? guesses.length - 1 : null;

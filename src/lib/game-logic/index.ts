@@ -329,13 +329,6 @@ export function getDailyConfig(
    isAuthenticated: boolean,
    dateOverride?: string,
 ): GameConfig {
-   const testWord = "TRY"; // e.g., "TRY", "CODE", "REACT", "SCALES", "SURROUND"
-   return {
-      word: testWord,
-      length: testWord.length as any,
-      maxAttempts: 6, // Or MAX_ATTEMPTS
-   };
-
    const dateStr = dateOverride || formatDateString(new Date());
 
    const cacheKey = `${dateStr}_auth_${isAuthenticated}`;
