@@ -326,6 +326,39 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [msg.content, users, isMe]);
 
+    // Long press logic for mobile reaction toggling
+    const longPressTimeoutRef = useRef<any>(null);
+    const hasDraggedRef = useRef<boolean>(false);
+
+    const handleTouchStart = () => {
+        hasDraggedRef.current = false;
+        if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = setTimeout(() => {
+            if (!hasDraggedRef.current) {
+                setShowReactionsMenu(prev => !prev);
+                // Vibrate if browser supports it
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            }
+        }, 500); // 500ms hold
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimeoutRef.current) {
+            clearTimeout(longPressTimeoutRef.current);
+            longPressTimeoutRef.current = null;
+        }
+    };
+
+    const handleTouchMove = () => {
+        hasDraggedRef.current = true;
+        if (longPressTimeoutRef.current) {
+            clearTimeout(longPressTimeoutRef.current);
+            longPressTimeoutRef.current = null;
+        }
+    };
+
     return (
         <div className="relative group overflow-visible">
             {/* Swipe Reply Indicator */}
@@ -361,7 +394,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     <div className={`text-[10px] mb-1.5 flex items-center gap-2 text-white/60 bg-white/5 px-3 py-1.5 rounded-t-xl border-l-2 border-correct/40 max-w-[80%] ${isMe ? 'flex-row-reverse' : ''}`}>
                         <Reply size={10} className="text-correct shrink-0" />
                         <span className="opacity-60 truncate">
-                            {replyMsg.profiles?.username}: {replyMsg.content}
+                             {replyMsg.profiles?.username}: {replyMsg.content}
                         </span>
                     </div>
                 )}
@@ -444,10 +477,16 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     </AnimatePresence>
                 </div>
 
-                <div className={`relative max-w-[85%] p-3 px-4 shadow-lg transition-all ${isMe
+                <div
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchMove}
+                    onTouchCancel={handleTouchEnd}
+                    className={`relative max-w-[85%] p-3 px-4 shadow-lg transition-all ${isMe
                     ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
                     : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
-                    }`}>
+                    }`}
+                >
 
                     {/* Sender profile header inside the bubble container */}
                     <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>

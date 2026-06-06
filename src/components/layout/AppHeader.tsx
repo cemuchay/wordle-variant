@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -47,9 +47,19 @@ export const AppHeader = ({
     const { isAdmin } = useAdminStatus(user?.id);
     const { activeCall, onlineUsers, activeVoiceRooms, triggerToast } = useApp();
     const [isShaking, setIsShaking] = useState(false);
+    const [hasMascot, setHasMascot] = useState(false);
+
+    useEffect(() => {
+        const handleMascot = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            setHasMascot(!!detail);
+        };
+        window.addEventListener('mascot-changed', handleMascot);
+        return () => window.removeEventListener('mascot-changed', handleMascot);
+    }, []);
 
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
 
     const handleLockedHintClick = () => {
         setIsShaking(true);
@@ -78,7 +88,7 @@ export const AppHeader = ({
     };
 
     return (
-        <header className={`w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 shrink-0 ${isDynamicIslandVisible ? 'pt-6' : 'pt-2'}`}>
+        <header className={`w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 shrink-0 ${isDynamicIslandVisible ? 'pt-6.5 sm:pt-8' : 'pt-2'}`}>
             <div className="w-full flex items-center justify-between gap-1 h-10 py-1 px-2 bg-white/5 rounded-2xl border border-white/10">
                 {/* Left Side: Logo & Sync Status */}
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -100,13 +110,12 @@ export const AppHeader = ({
                                     <button
                                         onClick={isHintLocked && !usedHint ? handleLockedHintClick : onHint}
                                         disabled={usedHint}
-                                        className={`p-1.5 transition-all rounded-lg relative ${
-                                            usedHint 
-                                                ? 'text-yellow-500/30 cursor-not-allowed' 
-                                                : isHintLocked 
-                                                    ? `text-gray-500 cursor-pointer opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 ${isShaking ? 'animate-shake' : ''}` 
-                                                    : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse'
-                                        }`}
+                                        className={`p-1.5 transition-all rounded-lg relative ${usedHint
+                                            ? 'text-yellow-500/30 cursor-not-allowed'
+                                            : isHintLocked
+                                                ? `text-gray-500 cursor-pointer opacity-70 hover:opacity-100 hover:bg-white/5 active:scale-95 ${isShaking ? 'animate-shake' : ''}`
+                                                : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse'
+                                            }`}
                                         title={usedHint ? "Hint Used" : isHintLocked ? "Unlock hint by guessing 2+ words" : "Get Hint"}
                                     >
                                         <Lightbulb size={ICON_SIZE} />

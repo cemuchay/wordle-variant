@@ -76,6 +76,19 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     }, [firstUnreadId]);
 
+    // Handle incoming start-direct-message request
+    useEffect(() => {
+        const handleStartDM = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.userId) {
+                startDM(detail.userId);
+                setShowSidebar(false);
+            }
+        };
+        window.addEventListener("start-direct-message", handleStartDM);
+        return () => window.removeEventListener("start-direct-message", handleStartDM);
+    }, [startDM]);
+
     const handleScroll = () => {
         if (showUnreadLine) {
             setShowUnreadLine(false);

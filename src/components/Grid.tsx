@@ -12,28 +12,89 @@ interface CellProps {
   isHinted?: boolean;
   isSaving?: boolean;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
+  wordLength: number;
 }
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact }: CellProps) => {
-  const tileClass = compact
-    ? `
-      w-[9vw] h-[9vw] 
-      max-w-[40px] max-h-[40px] 
-      sm:w-[5vh] sm:h-[5vh] 
-      sm:max-w-[46px] sm:max-h-[46px] 
-      flex items-center justify-center 
-      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
-      border-2 text-white
-    `
-    : `
-      w-[10vw] h-[10vw] 
-      max-w-[48px] max-h-[48px] 
-      sm:w-[5.5vh] sm:h-[5.5vh] 
-      sm:max-w-[54px] sm:max-h-[54px] 
-      flex items-center justify-center 
-      text-lg sm:text-xl font-bold uppercase transition-colors duration-300
-      border-2 text-white
-    `;
+// Sizing config supporting different widths/heights for mobile and desktop (sm)
+const TILE_SIZES = [
+  {
+    length: 3,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 4,
+    mobile: { w: 2.1, h: 2.1 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 5,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 6,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 7,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 8,
+    mobile: { w: 2.2, h: 2.2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 9,
+    mobile: { w: 2, h: 2 },
+    desktop: { w: 2, h: 2 }
+  },
+  {
+    length: 10,
+    mobile: { w: 2, h: 2 },
+    desktop: { w: 2, h: 2 }
+  },
+];
+
+
+
+// A simple custom hook to check for the Tailwind 'sm' breakpoint (640px)
+const useIsDesktop = () => {
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isDesktop;
+};
+
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact, gameplayType, wordLength }: CellProps) => {
+  const isChallenge = gameplayType === 'challenge' || compact;
+  const isDesktop = useIsDesktop(); // Detect responsive state
+
+  // 1. Get the current size profile based on word length
+  const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
+
+  // 2. Select either desktop or mobile dimensions
+  const dimensions = isDesktop ? sizeConfig.desktop : sizeConfig.mobile;
+
+  // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
+  const scale = isChallenge ? 0.85 : 1;
+  const finalWidth = dimensions.w * scale;
+  const finalHeight = dimensions.h * scale;
+
+  const tileClass = `
+    flex items-center justify-center 
+    font-bold uppercase transition-colors duration-300
+    border-2 text-white rounded-md
+  `;
 
   let statusClass = 'border-gray-800';
   let animationClass = '';
@@ -55,9 +116,16 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     animationClass = 'animate-pulse text-yellow-500/50 border-yellow-600/50';
   }
 
-  const style = isRevealing
-    ? { animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`, animationFillMode: 'both' }
-    : {};
+  // 4. Inject responsive widths and heights into inline styles
+  const style: React.CSSProperties = {
+    width: `${finalWidth}rem`,
+    height: `${finalHeight}rem`,
+    fontSize: `${finalWidth * 0.5}rem`, // Font sizes scale fluidly with width
+    ...(isRevealing ? {
+      animationDelay: `${revealIndex * ANIMATION_DURATION.TILE_REVEAL}ms`,
+      animationFillMode: 'both'
+    } : {})
+  };
 
   return (
     <div className={`${tileClass} ${statusClass} ${animationClass}`} style={style}>
@@ -78,9 +146,10 @@ interface GridProps {
   isShake?: boolean;
   isSaving?: boolean;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact }) => {
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact, gameplayType }) => {
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
@@ -90,9 +159,11 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
       return () => clearTimeout(timer);
     } else if (guesses.length < revealedRowsCount) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedRowsCount(guesses.length);
     }
   }, [guesses.length, revealedRowsCount, wordLength]);
+
 
   const isCurrentRevealing = guesses.length > revealedRowsCount;
   const revealingRowIndex = isCurrentRevealing ? guesses.length - 1 : null;
@@ -127,19 +198,19 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   if (isWon) {
     mascotFace = "(★‿★)";
     mascotLabel = "Splendid job! 🎉";
-    animationClass = "animate-bounce text-correct border-correct/30 bg-correct/10";
+    animationClass = "animate-bounce text-correct";
   } else if (isLost) {
     mascotFace = "(✖╭╮✖)";
     mascotLabel = "Aww, maybe next time! 😢";
-    animationClass = "text-red-500 border-red-500/30 bg-red-500/10";
+    animationClass = "text-red-400";
   } else if (isOneAttemptLeft) {
     mascotFace = "(⊙_⊙;)";
     mascotLabel = "Yikes! Only 1 guess left! 😰";
-    animationClass = "animate-pulse scale-105 text-amber-500 border-amber-500/40 bg-amber-500/10";
+    animationClass = "animate-pulse text-amber-400";
   } else if (hasRepeatedLetters) {
     mascotFace = "(🤨)";
     mascotLabel = "Hmm... interesting choice. 🧐";
-    animationClass = "animate-shake text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
+    animationClass = "animate-shake text-yellow-400";
   } else if (attemptsCount > 0) {
     const defaultMascots = [
       { face: "(•_•)", label: "Thinking..." },
@@ -149,33 +220,26 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     const idx = (attemptsCount - 1) % defaultMascots.length;
     mascotFace = defaultMascots[idx].face;
     mascotLabel = defaultMascots[idx].label;
-    animationClass = "text-white/80 border-white/10 bg-white/5";
+    animationClass = "text-white/80";
   } else {
-    animationClass = "text-white/60 border-white/5 bg-white/5";
+    animationClass = "text-white/60";
   }
+
+  useEffect(() => {
+    // Notify Dynamic Island about the mascot state update
+    window.dispatchEvent(new CustomEvent('mascot-changed', {
+      detail: { mascotFace, mascotLabel, animationClass }
+    }));
+    return () => {
+      // Clear mascot when Grid is unmounted (e.g. user leaves play tab)
+      window.dispatchEvent(new CustomEvent('mascot-changed', {
+        detail: null
+      }));
+    };
+  }, [mascotFace, mascotLabel, animationClass]);
 
   return (
     <div className="relative mx-auto w-fit select-none shrink-0">
-      {/* Mascot bubble */}
-      {!isChallengeMode ? (
-        <div 
-          className={`absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 border px-3 py-0 rounded-full backdrop-blur-md shadow-sm transition-all duration-300 whitespace-nowrap z-10 ${animationClass}`}
-          style={isWon ? { animationIterationCount: 3 } : {}}
-        >
-          <span className="text-[8px] font-mono font-black select-none tracking-wide">{mascotFace}</span>
-          <span className="text-[7px] uppercase font-black tracking-widest opacity-80 select-none">{mascotLabel}</span>
-        </div>
-      ) : (
-        /* In challenge mode, show on top of grid ONLY on mobile (hidden on desktop) */
-        <div 
-          className={`absolute -top-8 left-1/2 -translate-x-1/2 md:hidden flex items-center gap-1 border px-3 py-0 rounded-full backdrop-blur-md shadow-sm transition-all duration-300 whitespace-nowrap z-10 ${animationClass}`}
-          style={isWon ? { animationIterationCount: 3 } : {}}
-        >
-          <span className="text-[8px] font-mono font-black select-none tracking-wide">{mascotFace}</span>
-          <span className="text-[7px] uppercase font-black tracking-widest opacity-80 select-none">{mascotLabel}</span>
-        </div>
-      )}
-
       <div
         className={`game-board-grid grid mx-auto h-fit max-h-full items-center content-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
         style={{
@@ -194,6 +258,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
               isRevealing={isRevealing}
               revealIndex={j}
               compact={compact}
+              gameplayType={gameplayType}
+              wordLength={wordLength}
             />
           ));
         })}
@@ -212,6 +278,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                 isShake={isShake}
                 isHinted={isHinted}
                 compact={compact}
+                gameplayType={gameplayType}
+                wordLength={wordLength}
               />
             );
           })
@@ -228,6 +296,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                   letter={isHinted ? hintRecord?.letter : ''}
                   isHinted={isHinted}
                   compact={compact}
+                  gameplayType={gameplayType}
+                  wordLength={wordLength}
                 />
               );
             })}

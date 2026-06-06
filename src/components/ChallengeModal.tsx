@@ -148,9 +148,20 @@ const AuthenticatedChallengeContent = memo(
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [hasMascot, setHasMascot] = useState(false);
+
+    useEffect(() => {
+        const handleMascot = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            setHasMascot(!!detail);
+        };
+        window.addEventListener('mascot-changed', handleMascot);
+        return () => window.removeEventListener('mascot-changed', handleMascot);
+    }, []);
+
     const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 

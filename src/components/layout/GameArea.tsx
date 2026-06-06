@@ -54,6 +54,7 @@ export const GameArea = ({
 
     useEffect(() => {
         if (guesses.length === 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setKeyboardStatuses(letterStatuses);
             return;
         }
@@ -92,16 +93,16 @@ export const GameArea = ({
     }, [isGameOver]);
 
     return (
-        <div className="gameplay-container flex-1 flex flex-col items-center justify-center min-h-0 w-full px-2 gap-3 sm:gap-4">
+        <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
             {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300"
+                    className="mb-2 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300 shrink-0"
                 >
                     <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                    <div className="flex items-center justify-between gap-4 relative z-10">
+                    <div className="flex items-center justify-between gap-2 relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
                                 <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
@@ -137,64 +138,68 @@ export const GameArea = ({
                 </motion.div>
             )}
 
-            <div className="relative">
-                <Grid
-                    wordLength={wordLength}
-                    maxAttempts={maxAttempts}
-                    guesses={guesses}
-                    currentGuess={currentGuess}
-                    hintRecord={hintRecord}
-                    isShake={isShake}
-                    isSaving={isSaving}
-                />
+            <div className="flex-1 flex items-center justify-center min-h-0 w-full relative pt-6">
+                <div className="relative">
+                    <Grid
+                        wordLength={wordLength}
+                        maxAttempts={maxAttempts}
+                        guesses={guesses}
+                        currentGuess={currentGuess}
+                        hintRecord={hintRecord}
+                        isShake={isShake}
+                        isSaving={isSaving}
+                        gameplayType="regular"
+                    />
 
-                {/* Help Icon Popover Nudge */}
-                <div className="absolute -right-7 top-0 sm:-right-8" ref={helpRef}>
-                    <button
-                        onClick={() => setShowHelp(!showHelp)}
-                        className="p-1 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all cursor-pointer focus:outline-none"
-                        title="Quick rules"
-                    >
-                        <HelpCircle size={15} />
-                    </button>
+                    {/* Help Icon Popover Nudge */}
+                    <div className="absolute -right-7 top-0 sm:-right-8" ref={helpRef}>
+                        <button
+                            onClick={() => setShowHelp(!showHelp)}
+                            className="p-1 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all cursor-pointer focus:outline-none"
+                            title="Quick rules"
+                        >
+                            <HelpCircle size={15} />
+                        </button>
 
-                    {showHelp && (
-                        <div className="absolute right-0 mt-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-top-1 duration-150">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[9px] font-black uppercase tracking-wider text-correct">Quick Rules</span>
-                                <button onClick={() => setShowHelp(false)} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
-                                    <X size={10} />
-                                </button>
+                        {showHelp && (
+                            <div className="absolute right-0 mt-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-correct">Quick Rules</span>
+                                    <button onClick={() => setShowHelp(false)} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
+                                        <X size={10} />
+                                    </button>
+                                </div>
+                                <p className="text-[9px] text-gray-400 uppercase font-black tracking-wide mb-2 leading-relaxed">
+                                    Guess the word in {maxAttempts} tries. Colors show status:
+                                </p>
+                                <ul className="text-[9px] text-gray-300 space-y-1 font-black uppercase tracking-wide">
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded bg-correct shrink-0 border border-white/10" />
+                                        <span>Correct Spot</span>
+                                    </li>
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded bg-present shrink-0 border border-white/10" />
+                                        <span>Wrong Spot</span>
+                                    </li>
+                                    <li className="flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded bg-absent shrink-0 border border-white/10" />
+                                        <span>Not In Word</span>
+                                    </li>
+                                </ul>
                             </div>
-                            <p className="text-[9px] text-gray-400 uppercase font-black tracking-wide mb-2 leading-relaxed">
-                                Guess the word in {maxAttempts} tries. Colors show status:
-                            </p>
-                            <ul className="text-[9px] text-gray-300 space-y-1 font-black uppercase tracking-wide">
-                                <li className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded bg-correct shrink-0 border border-white/10" />
-                                    <span>Correct Spot</span>
-                                </li>
-                                <li className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded bg-present shrink-0 border border-white/10" />
-                                    <span>Wrong Spot</span>
-                                </li>
-                                <li className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded bg-absent shrink-0 border border-white/10" />
-                                    <span>Not In Word</span>
-                                </li>
-                            </ul>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-125 mx-auto pb-4 sm:pb-6 shrink-0">
+                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-4 shrink-0 px-2">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}
                         onEnter={onEnter}
                         letterStatuses={keyboardStatuses}
+                        gameplayType="regular"
                     />
                 </div>
             )}

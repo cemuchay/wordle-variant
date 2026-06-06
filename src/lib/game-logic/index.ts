@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
    GameConfig,
    GameStats,
@@ -219,7 +220,7 @@ export const encryptGuesses = (guesses: any[], key: string) => {
                const keyCode = key.charCodeAt(i % key.length);
                return String.fromCharCode(charCode ^ keyCode);
             })
-            .join("")
+            .join(""),
       );
       return `enc:${encrypted}`;
    } catch (e) {
@@ -236,7 +237,9 @@ export const decryptGuesses = (encryptedStr: any, key: string) => {
    if (!encryptedStr) return [];
    if (typeof encryptedStr !== "string" || !encryptedStr.startsWith("enc:")) {
       try {
-         return typeof encryptedStr === "string" ? JSON.parse(encryptedStr) : encryptedStr;
+         return typeof encryptedStr === "string"
+            ? JSON.parse(encryptedStr)
+            : encryptedStr;
       } catch (e) {
          return encryptedStr;
       }

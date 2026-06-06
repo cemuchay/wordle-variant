@@ -178,6 +178,18 @@ export default function App() {
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
   }, []);
 
+  // Listen to custom event to navigate to direct message chat room
+  useEffect(() => {
+    const handleStartDM = () => {
+      setIsChatOpen(true);
+      setIsChallengeOpen(false);
+      setIsStatsOpen(false);
+      setIsInfoOpen(false);
+    };
+    window.addEventListener("start-direct-message", handleStartDM);
+    return () => window.removeEventListener("start-direct-message", handleStartDM);
+  }, [setIsChatOpen, setIsChallengeOpen, setIsStatsOpen, setIsInfoOpen]);
+
   // Re-open challenge modal after successful login/signup if initiated from the challenge screen
   useEffect(() => {
     if (user) {

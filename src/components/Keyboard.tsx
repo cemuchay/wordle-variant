@@ -13,9 +13,10 @@ interface KeyProps {
   status?: LetterStatus;
   onClick: (char: string) => void;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
 }
 
-const Key = memo(({ char, status, onClick, compact }: KeyProps) => {
+const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) => {
   const isWide = char === 'ENTER' || char === 'DELETE';
 
   const getStyle = () => {
@@ -27,9 +28,11 @@ const Key = memo(({ char, status, onClick, compact }: KeyProps) => {
     }
   };
 
-  const dynamicClass = compact
-    ? `${isWide ? 'px-1.5 text-[9px] min-w-[50px] sm:min-w-[58px]' : 'flex-1 min-w-[24px] sm:min-w-[28px]'} h-10 sm:h-11`
-    : `${isWide ? 'px-2 text-[10px] min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-12 sm:h-10`;
+  const isChallenge = gameplayType === 'challenge' || compact;
+
+  const dynamicClass = isChallenge
+    ? `${isWide ? 'px-1 text-[8px] sm:text-[9px] min-w-[44px] sm:min-w-[52px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-xs`
+    : `${isWide ? 'px-2.5 text-[10px] sm:text-xs min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-sm sm:text-base`;
 
   return (
     <button
@@ -59,19 +62,22 @@ interface Props {
   onEnter: () => void;
   letterStatuses: Record<string, LetterStatus>;
   compact?: boolean;
+  gameplayType?: 'regular' | 'challenge';
 }
 
-export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact }) => {
+export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact, gameplayType }) => {
   const handleKeyClick = React.useCallback((key: string) => {
     if (key === 'ENTER') onEnter();
     else if (key === 'DELETE') onDelete();
     else onChar(key);
   }, [onEnter, onDelete, onChar]);
 
+  const isChallenge = gameplayType === 'challenge' || compact;
+
   return (
-    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${compact ? 'pb-2' : 'pb-2'}`}>
+    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-4'}`}>
       {ROWS.map((row, i) => (
-        <div key={i} className={`flex justify-center ${compact ? 'mb-1 gap-0.5 sm:gap-1' : 'mb-1.5 gap-1 sm:gap-1.5'}`}>
+        <div key={i} className={`flex justify-center ${isChallenge ? 'mb-1.5 gap-1.5 sm:gap-2' : 'mb-1.5 gap-1.5 sm:gap-2'}`}>
           {row.map((key) => (
             <Key
               key={key}
@@ -79,6 +85,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
               status={letterStatuses[key]}
               onClick={handleKeyClick}
               compact={compact}
+              gameplayType={gameplayType}
             />
           ))}
         </div>

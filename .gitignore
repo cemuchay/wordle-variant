@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+implementation_plan.md
 dev-dist/
 twl.txt/
 research/
