@@ -28,9 +28,19 @@ export const RegularGameplay = memo(function RegularGameplay({
     const { setBackAction } = useChallengeContext();
     const { user } = useAuth();
     const { onlineUsers, activeCall, activeVoiceRooms } = useApp();
+    const [hasMascot, setHasMascot] = useState(false);
+
+    useEffect(() => {
+        const handleMascot = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            setHasMascot(!!detail);
+        };
+        window.addEventListener('mascot-changed', handleMascot);
+        return () => window.removeEventListener('mascot-changed', handleMascot);
+    }, []);
 
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0;
+    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
 
     const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
         challenge,
