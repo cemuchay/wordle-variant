@@ -35,16 +35,17 @@ const restoreSelection = (element: HTMLElement, offset: number) => {
     const range = document.createRange();
     range.setStart(element, 0);
     range.collapse(true);
-    const nodeStack = [element];
-    let node;
+    const nodeStack: Node[] = [element];
+    let node: Node | undefined;
     let foundStart = false;
     let stop = false;
 
     while (!stop && (node = nodeStack.pop())) {
-        if (node.nodeType === 3) {
-            const nextCharIndex = charIndex + node.length;
+        if (node.nodeType === Node.TEXT_NODE) {
+            const textNode = node as Text;
+            const nextCharIndex = charIndex + textNode.length;
             if (!foundStart && offset >= charIndex && offset <= nextCharIndex) {
-                range.setStart(node, offset - charIndex);
+                range.setStart(textNode, offset - charIndex);
                 range.collapse(true);
                 foundStart = true;
                 stop = true;

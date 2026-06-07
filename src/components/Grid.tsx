@@ -20,41 +20,49 @@ interface CellProps {
 const TILE_SIZES = [
   {
     length: 3,
+    small: { w: 1.87, h: 1.87 },
     mobile: { w: 2.2, h: 2.2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 4,
+    small: { w: 1.78, h: 1.78 },
     mobile: { w: 2.1, h: 2.1 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 5,
+    small: { w: 1.87, h: 1.87 },
     mobile: { w: 2.2, h: 2.2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 6,
+    small: { w: 1.87, h: 1.87 },
     mobile: { w: 2.2, h: 2.2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 7,
+    small: { w: 1.87, h: 1.87 },
     mobile: { w: 2.2, h: 2.2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 8,
+    small: { w: 1.87, h: 1.87 },
     mobile: { w: 2.2, h: 2.2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 9,
+    small: { w: 1.7, h: 1.7 },
     mobile: { w: 2, h: 2 },
     desktop: { w: 2, h: 2 }
   },
   {
     length: 10,
+    small: { w: 1.7, h: 1.7 },
     mobile: { w: 2, h: 2 },
     desktop: { w: 2, h: 2 }
   },
@@ -62,28 +70,34 @@ const TILE_SIZES = [
 
 
 
-// A simple custom hook to check for the Tailwind 'sm' breakpoint (640px)
-const useIsDesktop = () => {
-  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 640);
+// A simple custom hook to check for responsive breakpoints
+const useIsResponsive = () => {
+  const [state, setState] = useState({
+    isDesktop: window.innerWidth >= 640,
+    isSmall: window.innerWidth <= 375
+  });
 
   useEffect(() => {
-    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    const handleResize = () => setState({
+      isDesktop: window.innerWidth >= 640,
+      isSmall: window.innerWidth <= 375
+    });
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  return isDesktop;
+  return state;
 };
 
 const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
-  const isDesktop = useIsDesktop(); // Detect responsive state
+  const { isDesktop, isSmall } = useIsResponsive(); // Detect responsive state
 
   // 1. Get the current size profile based on word length
   const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
 
-  // 2. Select either desktop or mobile dimensions
-  const dimensions = isDesktop ? sizeConfig.desktop : sizeConfig.mobile;
+  // 2. Select dimensions based on device size
+  const dimensions = isDesktop ? sizeConfig.desktop : (isSmall ? sizeConfig.small : sizeConfig.mobile);
 
   // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
   const scale = isChallenge ? 0.85 : 1;
