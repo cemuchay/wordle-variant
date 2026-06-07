@@ -1,19 +1,19 @@
 export interface Announcement {
-    id: string;
-    title: string;
-    date: string;
-    content: string;
-    type: 'feature' | 'update' | 'maintenance';
-    lifespanDays?: number;
+   id: string;
+   title: string;
+   date: string;
+   content: string;
+   type: "feature" | "update" | "maintenance";
+   lifespanDays?: number;
 }
 
 export const ANNOUNCEMENTS: Announcement[] = [
-    {
-        id: 'scoring-system-revamp-v3',
-        title: 'Scoring System Update! 💎',
-        date: '2026-05-19',
-        type: 'update',
-        content: `
+   {
+      id: "scoring-system-revamp-v3",
+      title: "Scoring System Update! 💎",
+      date: "2026-05-19",
+      type: "update",
+      content: `
             <h3>The Ultimate Skill Index Update!</h3>
     
             <p>The Skill Index calculation has been updated to better reward strategic brilliance and early game intuition.</p>
@@ -33,14 +33,14 @@ export const ANNOUNCEMENTS: Announcement[] = [
             </ul>
             
             <p>This change will retoractively apply to yesterday, 18th May 2026, so this week is consistent</p>
-        `
-    },
-    {
-        id: 'marathon-games-list-revamp',
-        title: 'Marathon Game Selection Revamp! 🏃‍♂️💨',
-        date: '2026-06-04',
-        type: 'update',
-        content: `
+        `,
+   },
+   {
+      id: "marathon-games-list-revamp",
+      title: "Marathon Game Selection Revamp! 🏃‍♂️💨",
+      date: "2026-06-04",
+      type: "update",
+      content: `
             <h3>Better Marathon & Daily Challenge Navigation!</h3>
             <p>We've redesigned the marathon games list to make playing through large sets of words feel much more seamless.</p>
             
@@ -50,19 +50,36 @@ export const ANNOUNCEMENTS: Announcement[] = [
                 <li><strong>Categorization Filters:</strong> Quickly toggle the game list view between <strong>All</strong>, <strong>Unplayed</strong>, and <strong>Played / Timed Out</strong> games.</li>
                 <li><strong>Daily Event Tabs:</strong> Daily marathon challenges are now organized by days (Day 1, Day 2, etc.), defaulting automatically to the current active day.</li>
             </ul>
-        `
-    },
-    {
-        id: 'challenge-mode-fixes-v1',
-        title: 'Challenge Mode Fixed! 🛠️',
-        date: '2026-06-06',
-        type: 'update',
-        lifespanDays: 7,
-        content: `
+        `,
+   },
+   {
+      id: "challenge-mode-fixes-v1",
+      title: "Challenge Mode Fixed! 🛠️",
+      date: "2026-06-06",
+      type: "update",
+      lifespanDays: 7,
+      content: `
             <h3>Bugs Squashed!</h3>
             <p>We've successfully squashed several visual glitches and layout bugs in Challenge Mode gameplay. The updates have been rigorously tested across an array of different devices and browsers to ensure a seamless experience.</p>
             <p>If you run into any other issues, or have ideas for features, please let us know in the <strong>Chat -> Bugs & Features</strong> group!</p>
             <p>Happy playing!</p>
-        `
-    },
+        `,
+   },
+   {
+      id: "daily-cycle-length-update",
+      title: "Daily Game Update! 📅",
+      date: "2026-06-07",
+      type: "update",
+      content: `
+            <h3>Refreshing the Daily Cycle!</h3>
+            <p>Starting from <strong>June 8th, 2026</strong>, we are making a small shift to the daily word selection loop to keep things challenging and engaging.</p>
+            
+            <h3>What's Changing?</h3>
+            <ul>
+                <li><strong>3-Letter Words Retired:</strong> 3-letter words are being removed from the main daily game cycle. They'll still be available in challenge mode.</li>
+                <li><strong>Updated Distribution:</strong> The daily loop will now focus exclusively on 4, 5, 6, and 7 letter words, providing a more consistent experience.</li>
+            </ul>
+            <p>Goodluck in the new week!</p>
+        `,
+   },
 ];

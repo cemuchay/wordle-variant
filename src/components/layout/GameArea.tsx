@@ -51,6 +51,38 @@ export const GameArea = ({
     const helpRef = useRef<HTMLDivElement>(null);
 
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
+    const [timeLeft, setTimeLeft] = useState<string>('');
+
+    useEffect(() => {
+        if (!activeDailyMarathon?.expires_at) return;
+
+        const calculateTimeLeft = () => {
+            const expiresAt = new Date(activeDailyMarathon.expires_at).getTime();
+            const now = new Date().getTime();
+            const difference = expiresAt - now;
+
+            if (difference <= 0) {
+                setTimeLeft('Expired');
+                return;
+            }
+
+            const hours = Math.floor(difference / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            const parts = [];
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+            parts.push(`${seconds}s`);
+
+            setTimeLeft(parts.join(' '));
+        };
+
+        calculateTimeLeft();
+        const timer = setInterval(calculateTimeLeft, 1000);
+
+        return () => clearInterval(timer);
+    }, [activeDailyMarathon?.expires_at]);
 
     useEffect(() => {
         if (guesses.length === 0) {
@@ -113,7 +145,7 @@ export const GameArea = ({
                                         Active Marathon
                                     </span>
                                     <span className="text-[10px] text-gray-400 font-medium">
-                                        Daily Challenge
+                                        Daily Challenge • {timeLeft && <span className="text-indigo-400 font-black tabular-nums">{timeLeft} left</span>}
                                     </span>
                                 </div>
                                 <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
