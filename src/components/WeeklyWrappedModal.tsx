@@ -1,8 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useConfirmation } from '../hooks/useConfirmation';
+
+const getWeekNumber = (d: Date): number => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return weekNo;
+};
 
 class TechHouseSynth {
     public ctx: AudioContext | null = null;
@@ -13,11 +22,13 @@ class TechHouseSynth {
     private bpm = 124;
     private recorderDest: MediaStreamAudioDestinationNode | null = null;
     private mainGain: GainNode | null = null;
+    private trackIndex = 0;
 
     private resumeHandler: (() => void) | null = null;
 
-    start(recorderDestNode?: MediaStreamAudioDestinationNode) {
+    start(trackIndex = 0, recorderDestNode?: MediaStreamAudioDestinationNode) {
         if (this.isPlaying) return;
+        this.trackIndex = trackIndex % 5;
         // @ts-expect-error undefined
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AudioContextClass();
@@ -80,9 +91,9 @@ class TechHouseSynth {
         this.mainGain = null;
     }
 
-    resumeContext() {
+    resumeContext(trackIndex = 0) {
         if (!this.isPlaying) {
-            this.start();
+            this.start(trackIndex);
         } else if (this.ctx && this.ctx.state === 'suspended') {
             this.ctx.resume().catch(e => console.log("Failed to resume context:", e));
         }
@@ -131,23 +142,32 @@ class TechHouseSynth {
             this.playHiHat(time);
         }
 
-        // 3. Bassline
-        const bassPattern = [
-            36, 0, 36, 0,
-            39, 0, 39, 39,
-            41, 0, 41, 0,
-            43, 41, 39, 36
+        // 3. Bassline & 4. Chord Pad
+        const bassPatterns = [
+            [36, 0, 36, 0, 39, 0, 39, 39, 41, 0, 41, 0, 43, 41, 39, 36],
+            [36, 36, 0, 36, 34, 34, 0, 34, 32, 32, 0, 32, 31, 31, 34, 34],
+            [36, 0, 0, 36, 0, 0, 36, 0, 36, 0, 0, 36, 0, 0, 39, 41],
+            [36, 36, 36, 36, 39, 39, 39, 39, 41, 41, 41, 41, 43, 43, 43, 43],
+            [36, 0, 36, 36, 36, 0, 36, 36, 34, 0, 34, 34, 34, 0, 34, 34]
         ];
+
+        const padPatterns = [
+            [48, 48 + 3, 48 + 7, 48 + 10], // Cm7
+            [48, 48 + 4, 48 + 7, 48 + 11], // CMaj7
+            [48, 48 + 3, 48 + 7, 48 + 8],  // Cm(addb6)
+            [48, 48 + 5, 48 + 7, 48 + 12], // Csus4
+            [48, 48 + 2, 48 + 7, 48 + 9]   // Cadd9
+        ];
+
+        const bassPattern = bassPatterns[this.trackIndex];
         const midiNote = bassPattern[beat];
         if (midiNote > 0) {
             const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
             this.playBass(freq, time);
         }
 
-        // 4. Chord Pad
         if (beat === 0) {
-            const root = 48; // C3
-            const notes = [root, root + 3, root + 7, root + 10]; // Cm7
+            const notes = padPatterns[this.trackIndex];
             notes.forEach(n => {
                 const freq = 440 * Math.pow(2, (n - 69) / 12);
                 this.playPad(freq, time, 3.8);
@@ -290,9 +310,18 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     isEasterEgg = false,
     gameDate
 }) => {
+    const { ask } = useConfirmation();
     const [loading, setLoading] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
-    const [isPlayingMusic, setIsPlayingMusic] = useState(true);
+    const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth <= 375);
+
+    useEffect(() => {
+        const handleResize = () => setIsSmallScreen(window.innerWidth <= 375);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const [isMusicPlaying, setIsMusicPlaying] = useState(true);
     const [weeklyScores, setWeeklyScores] = useState<ScoreRecord[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [userRank, setUserRank] = useState<{ rank: number; entry: LeaderboardEntry } | null>(null);
@@ -303,11 +332,17 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const [generatedVideoFile, setGeneratedVideoFile] = useState<File | null>(null);
     const [showVideoOverlay, setShowVideoOverlay] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const weeklyTrackIndex = useMemo(() => getWeekNumber(new Date()) % 5, []);
     const [avatarLoaded, setAvatarLoaded] = useState(false);
     const avatarImageRef = useRef<HTMLImageElement | null>(null);
 
     const synthRef = useRef<TechHouseSynth | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const isMusicPlayingRef = useRef(isMusicPlaying);
+
+    useEffect(() => {
+        isMusicPlayingRef.current = isMusicPlaying;
+    }, [isMusicPlaying]);
 
     const recordingIntervalRef = useRef<any>(null);
     const preRecordIntervalRef = useRef<any>(null);
@@ -411,8 +446,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             synthRef.current = new TechHouseSynth();
         }
 
-        if (isPlayingMusic) {
-            synthRef.current.start();
+        if (isMusicPlaying) {
+            synthRef.current.start(weeklyTrackIndex);
         } else {
             synthRef.current.stop();
         }
@@ -431,7 +466,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 recordingIntervalRef.current = null;
             }
         };
-    }, [isOpen, isPlayingMusic]);
+    }, [isOpen, isMusicPlaying, weeklyTrackIndex]);
 
     // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
     useEffect(() => {
@@ -778,11 +813,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             // Draw Wordle grid of guesses
             const guesses = dayScore.guesses;
             const rows = guesses.length;
-            const cols = 5;
+            const cols = guesses[0]?.length || 5;
 
             // Scale tiles and gap to canvas resolution to guarantee visual quality
-            const tileSize = Math.round(width * 0.10); // 108px for 1080 width
-            const tileGap = Math.round(width * 0.015); // 16px for 1080 width
+            // Scale down if word length > 8 to prevent horizontal overflow on 1080px canvas
+            const scaleFactor = cols > 8 ? 0.8 : 1.0;
+            const tileSize = Math.round(width * 0.10 * scaleFactor); // 108px (standard) or 86px (scaled)
+            const tileGap = Math.round(width * 0.015 * scaleFactor); // 16px (standard) or 13px (scaled)
             const boardWidth = (cols * tileSize) + ((cols - 1) * tileGap);
             const startX = (width - boardWidth) / 2;
             const startY = height * 0.35;
@@ -959,6 +996,19 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             return;
         }
         if (isRecording) return;
+
+        // Prompt user if they are about to record a silent video
+        if (!isMusicPlayingRef.current) {
+            const confirmed = await ask({
+                title: 'No Audio Detected',
+                message: 'This video has no sound, do you still want to download it without sound?',
+                confirmLabel: 'Download Anyway',
+                cancelLabel: 'Cancel',
+                type: 'info'
+            });
+            if (!confirmed) return;
+        }
+
         setIsRecording(true);
         setShowVideoOverlay(true);
         setRecordingProgress(0);
@@ -983,7 +1033,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         // Try to capture audio from the synth by connecting to its active context
         let audioStream: MediaStream | null = null;
         try {
-            if (synthRef.current && synthRef.current.ctx && isPlayingMusic) {
+            if (synthRef.current && synthRef.current.ctx && isMusicPlayingRef.current) {
                 const dest = synthRef.current.ctx.createMediaStreamDestination();
                 synthRef.current.connectRecorder(dest);
                 audioStream = dest.stream;
@@ -1087,7 +1137,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 preRecordIntervalRef.current = null;
             }
 
-            // Play through all slides programmatically for the video recording (2.0 seconds per slide)
+            // Play through all slides programmatically for the video recording (4.0 seconds per slide)
             const slideDuration = 4000; // ms
             const totalDuration = totalSlides * slideDuration;
 
@@ -1133,15 +1183,16 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 });
             } catch (err) {
                 console.log('Video share failed, falling back to download:', err);
-                downloadGeneratedVideo();
+                await downloadGeneratedVideo();
             }
         } else {
-            downloadGeneratedVideo();
+            await downloadGeneratedVideo();
         }
     };
 
-    const downloadGeneratedVideo = () => {
+    const downloadGeneratedVideo = async () => {
         if (!generatedVideoFile) return;
+
         const url = URL.createObjectURL(generatedVideoFile);
         const a = document.createElement('a');
         a.href = url;
@@ -1155,13 +1206,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     return (
         <div
             onClick={() => {
-                if (synthRef.current) {
-                    synthRef.current.resumeContext();
+                if (synthRef.current && isMusicPlayingRef.current) {
+                    synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
             onTouchStart={() => {
-                if (synthRef.current) {
-                    synthRef.current.resumeContext();
+                if (synthRef.current && isMusicPlayingRef.current) {
+                    synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
             className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
@@ -1211,7 +1262,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-black uppercase tracking-widest text-correct">Generating Shareable Video</h3>
-                                        <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
+                                        <p className="text-xs text-gray-500">Compiling slides {isMusicPlaying ? "with" : "without"} music: {recordingProgress}%</p>
                                     </div>
                                     <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
@@ -1230,20 +1281,29 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     </div>
                                     <div className="space-y-2.5 w-full">
                                         <button
-                                            onClick={shareGeneratedVideo}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                shareGeneratedVideo();
+                                            }}
                                             className="w-full py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                                         >
                                             <Share2 size={14} />
                                             Share Video 🎬
                                         </button>
                                         <button
-                                            onClick={downloadGeneratedVideo}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                downloadGeneratedVideo();
+                                            }}
                                             className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
                                         >
                                             Download Locally
                                         </button>
                                         <button
-                                            onClick={() => setShowVideoOverlay(false)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowVideoOverlay(false);
+                                            }}
                                             className="w-full py-3 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer"
                                         >
                                             Close
@@ -1268,24 +1328,33 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     {/* Volume Mute Toggle, Video Export, and Close Buttons */}
                     <div className="absolute top-8 inset-x-6 flex items-center justify-between z-50">
                         <button
-                            onClick={onClose}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
                             className="p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                         >
                             <X size={16} />
                         </button>
                         <div className="flex gap-2">
                             <button
-                                onClick={exportWrappedVideo}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    exportWrappedVideo();
+                                }}
                                 className={`p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-correct hover:scale-105 transition-all cursor-pointer ${isRecording ? 'opacity-50 pointer-events-none' : ''}`}
                                 title="Download as Video"
                             >
                                 <Film size={16} />
                             </button>
                             <button
-                                onClick={() => setIsPlayingMusic(!isPlayingMusic)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMusicPlaying(!isMusicPlaying);
+                                }}
                                 className="p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                             >
-                                {isPlayingMusic ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                                {isMusicPlaying ? <Volume2 size={16} /> : <VolumeX size={16} />}
                             </button>
                         </div>
                     </div>
@@ -1308,7 +1377,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                             className="w-6 h-6 rounded-full border border-white/20 object-cover"
                                             alt={username}
                                         />
-                                        <span className="text-xs font-bold text-gray-400/60 uppercase tracking-widest">
+                                        <span className="text-sm mb-2 font-bold text-gray-400/60 uppercase tracking-widest">
                                             @{username}
                                         </span>
                                     </div>
@@ -1432,7 +1501,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                                                 <div className="pt-2">
                                                     <button
-                                                        onClick={exportWrappedVideo}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            exportWrappedVideo();
+                                                        }}
                                                         disabled={isRecording}
                                                         className="w-full flex items-center justify-center gap-2 py-3 bg-linear-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
                                                     >
@@ -1451,11 +1523,15 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                         const score = weeklyScores[currentSlide - 1];
                                         const dateLabel = score.game_date;
                                         const dayName = getDayName(score.game_date);
+                                        const wordLength = score.guesses[0]?.length || 0;
+                                        const shouldScale = isSmallScreen && wordLength > 5;
+                                        const cellSize = shouldScale ? 'w-9 h-9 text-xs' : 'w-11 h-11 text-sm';
+
                                         return (
                                             <div className="flex flex-col justify-between h-full">
                                                 {/* Header */}
                                                 <div className="text-center space-y-1">
-                                                    <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest">{dateLabel}</span>
+                                                    <span className="text-[10px] py-2 font-bold text-pink-400 uppercase tracking-widest">{dateLabel}</span>
                                                     <h2 className="text-3xl font-black text-white uppercase">{dayName}</h2>
                                                 </div>
 
@@ -1466,7 +1542,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                             {row.map((charObj, cIdx) => (
                                                                 <div
                                                                     key={cIdx}
-                                                                    className={`w-11 h-11 flex items-center justify-center font-bold text-sm rounded-md border
+                                                                    className={`${cellSize} flex items-center justify-center font-bold rounded-md border
                                                                         ${charObj.status === 'correct' ? 'animate-reveal-wrapped-correct' :
                                                                             charObj.status === 'present' ? 'animate-reveal-wrapped-present' :
                                                                                 'animate-reveal-wrapped-absent'}`}
@@ -1502,7 +1578,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     {/* Navigation and Share Actions (Bottom Area) */}
                     <div className="absolute bottom-6 inset-x-6 flex items-center justify-between z-50">
                         <button
-                            onClick={prevSlide}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                prevSlide();
+                            }}
                             disabled={currentSlide === 0}
                             className="p-3 bg-black/40 hover:bg-black/60 border border-white/5 rounded-full text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
                         >
@@ -1510,7 +1589,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                         </button>
 
                         <button
-                            onClick={exportSlideImage}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                exportSlideImage();
+                            }}
                             className="flex items-center gap-2 px-5 py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 cursor-pointer"
                         >
                             <Share2 size={14} />
@@ -1519,14 +1601,20 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                         {currentSlide < totalSlides - 1 ? (
                             <button
-                                onClick={nextSlide}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    nextSlide();
+                                }}
                                 className="p-3 bg-black/40 hover:bg-black/60 border border-white/5 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                             >
                                 <ChevronRight size={18} />
                             </button>
                         ) : (
                             <button
-                                onClick={onClose}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
                                 className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-white transition-all cursor-pointer"
                                 title="Finish Wrapped"
                             >
