@@ -33,7 +33,9 @@ export interface ChatGroup {
 }
 
 // --- Encryption Helpers for DMs (Client-Side E2EE) ---
-const rc4EncryptDecrypt = (key: string, str: string): string => {
+// Using RC4 for simple E2EE obfuscation. 
+// NOTE: For true high-security applications, AES-GCM via WebCrypto is preferred.
+const rc4EncryptDecrypt = (key: string, data: Uint8Array): Uint8Array => {
    const s: number[] = [];
    for (let i = 0; i < 256; i++) s[i] = i;
    let j = 0;
@@ -45,15 +47,15 @@ const rc4EncryptDecrypt = (key: string, str: string): string => {
    }
    let i = 0;
    j = 0;
-   let res = "";
-   for (let y = 0; y < str.length; y++) {
+   const res = new Uint8Array(data.length);
+   for (let y = 0; y < data.length; y++) {
       i = (i + 1) % 256;
       j = (j + s[i]) % 256;
       const temp = s[i];
       s[i] = s[j];
       s[j] = temp;
       const k = s[(s[i] + s[j]) % 256];
-      res += String.fromCharCode(str.charCodeAt(y) ^ k);
+      res[y] = data[y] ^ k;
    }
    return res;
 };
@@ -64,23 +66,48 @@ export const getDMRoomKey = (user1Id: string, user2Id: string): string => {
    return `${sorted}-${salt}`;
 };
 
+/**
+ * Encrypts DM text using RC4 and hex encoding.
+ * Now supports UTF-8 (emojis/special chars) via TextEncoder.
+ */
 export const encryptDM = (text: string, key: string): string => {
-   const enc = rc4EncryptDecrypt(key, text);
-   let hex = "";
-   for (let i = 0; i < enc.length; i++) {
-      hex += enc.charCodeAt(i).toString(16).padStart(2, "0");
+   try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      const encryptedData = rc4EncryptDecrypt(key, data);
+      
+      // Convert to hex for storage
+      let hex = "";
+      for (let i = 0; i < encryptedData.length; i++) {
+         hex += encryptedData[i].toString(16).padStart(2, "0");
+      }
+      return `e2ee:${hex}`;
+   } catch (e) {
+      console.error("Encryption failed:", e);
+      return text; // Fallback to plain text if encryption fails
    }
-   return `e2ee:${hex}`;
 };
 
+/**
+ * Decrypts DM text.
+ * Safely handles UTF-8 reconstruction via TextDecoder.
+ */
 export const decryptDM = (ciphertext: string, key: string): string => {
    if (!ciphertext.startsWith("e2ee:")) return ciphertext;
-   const hex = ciphertext.slice(5);
-   let enc = "";
-   for (let i = 0; i < hex.length; i += 2) {
-      enc += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+   try {
+      const hex = ciphertext.slice(5);
+      const encryptedData = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+         encryptedData[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+      }
+      
+      const decryptedData = rc4EncryptDecrypt(key, encryptedData);
+      const decoder = new TextDecoder();
+      return decoder.decode(decryptedData);
+   } catch (e) {
+      console.error("Decryption failed:", e);
+      return "[Decryption Error]";
    }
-   return rc4EncryptDecrypt(key, enc);
 };
 
 // --- Image Compression Helper ---
