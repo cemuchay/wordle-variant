@@ -294,6 +294,14 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const { ask } = useConfirmation();
     const [loading, setLoading] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
+    const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth <= 375);
+
+    useEffect(() => {
+        const handleResize = () => setIsSmallScreen(window.innerWidth <= 375);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const [isMusicPlaying, setIsMusicPlaying] = useState(true);
     const [weeklyScores, setWeeklyScores] = useState<ScoreRecord[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -785,11 +793,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             // Draw Wordle grid of guesses
             const guesses = dayScore.guesses;
             const rows = guesses.length;
-            const cols = 5;
+            const cols = guesses[0]?.length || 5;
 
             // Scale tiles and gap to canvas resolution to guarantee visual quality
-            const tileSize = Math.round(width * 0.10); // 108px for 1080 width
-            const tileGap = Math.round(width * 0.015); // 16px for 1080 width
+            // Scale down if word length > 8 to prevent horizontal overflow on 1080px canvas
+            const scaleFactor = cols > 8 ? 0.8 : 1.0;
+            const tileSize = Math.round(width * 0.10 * scaleFactor); // 108px (standard) or 86px (scaled)
+            const tileGap = Math.round(width * 0.015 * scaleFactor); // 16px (standard) or 13px (scaled)
             const boardWidth = (cols * tileSize) + ((cols - 1) * tileGap);
             const startX = (width - boardWidth) / 2;
             const startY = height * 0.35;
@@ -1347,7 +1357,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                             className="w-6 h-6 rounded-full border border-white/20 object-cover"
                                             alt={username}
                                         />
-                                        <span className="text-xs font-bold text-gray-400/60 uppercase tracking-widest">
+                                        <span className="text-sm mb-2 font-bold text-gray-400/60 uppercase tracking-widest">
                                             @{username}
                                         </span>
                                     </div>
@@ -1493,11 +1503,15 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                         const score = weeklyScores[currentSlide - 1];
                                         const dateLabel = score.game_date;
                                         const dayName = getDayName(score.game_date);
+                                        const wordLength = score.guesses[0]?.length || 0;
+                                        const shouldScale = isSmallScreen && wordLength > 5;
+                                        const cellSize = shouldScale ? 'w-9 h-9 text-xs' : 'w-11 h-11 text-sm';
+
                                         return (
                                             <div className="flex flex-col justify-between h-full">
                                                 {/* Header */}
                                                 <div className="text-center space-y-1">
-                                                    <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest">{dateLabel}</span>
+                                                    <span className="text-[10px] py-2 font-bold text-pink-400 uppercase tracking-widest">{dateLabel}</span>
                                                     <h2 className="text-3xl font-black text-white uppercase">{dayName}</h2>
                                                 </div>
 
@@ -1508,7 +1522,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                             {row.map((charObj, cIdx) => (
                                                                 <div
                                                                     key={cIdx}
-                                                                    className={`w-11 h-11 flex items-center justify-center font-bold text-sm rounded-md border
+                                                                    className={`${cellSize} flex items-center justify-center font-bold rounded-md border
                                                                         ${charObj.status === 'correct' ? 'animate-reveal-wrapped-correct' :
                                                                             charObj.status === 'present' ? 'animate-reveal-wrapped-present' :
                                                                                 'animate-reveal-wrapped-absent'}`}
