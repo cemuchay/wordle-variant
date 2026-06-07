@@ -294,7 +294,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const { ask } = useConfirmation();
     const [loading, setLoading] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
-    const [isPlayingMusic, setIsPlayingMusic] = useState(true);
+    const [isMusicPlaying, setIsMusicPlaying] = useState(true);
     const [weeklyScores, setWeeklyScores] = useState<ScoreRecord[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [userRank, setUserRank] = useState<{ rank: number; entry: LeaderboardEntry } | null>(null);
@@ -310,6 +310,11 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
     const synthRef = useRef<TechHouseSynth | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const isMusicPlayingRef = useRef(isMusicPlaying);
+
+    useEffect(() => {
+        isMusicPlayingRef.current = isMusicPlaying;
+    }, [isMusicPlaying]);
 
     const recordingIntervalRef = useRef<any>(null);
     const preRecordIntervalRef = useRef<any>(null);
@@ -413,7 +418,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             synthRef.current = new TechHouseSynth();
         }
 
-        if (isPlayingMusic) {
+        if (isMusicPlaying) {
             synthRef.current.start();
         } else {
             synthRef.current.stop();
@@ -433,7 +438,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 recordingIntervalRef.current = null;
             }
         };
-    }, [isOpen, isPlayingMusic]);
+    }, [isOpen, isMusicPlaying]);
 
     // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
     useEffect(() => {
@@ -961,6 +966,19 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             return;
         }
         if (isRecording) return;
+
+        // Prompt user if they are about to record a silent video
+        if (!isMusicPlayingRef.current) {
+            const confirmed = await ask({
+                title: 'No Audio Detected',
+                message: 'This video has no sound, do you still want to download it without sound?',
+                confirmLabel: 'Download Anyway',
+                cancelLabel: 'Cancel',
+                type: 'info'
+            });
+            if (!confirmed) return;
+        }
+
         setIsRecording(true);
         setShowVideoOverlay(true);
         setRecordingProgress(0);
@@ -985,7 +1003,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         // Try to capture audio from the synth by connecting to its active context
         let audioStream: MediaStream | null = null;
         try {
-            if (synthRef.current && synthRef.current.ctx && isPlayingMusic) {
+            if (synthRef.current && synthRef.current.ctx && isMusicPlayingRef.current) {
                 const dest = synthRef.current.ctx.createMediaStreamDestination();
                 synthRef.current.connectRecorder(dest);
                 audioStream = dest.stream;
@@ -1089,7 +1107,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 preRecordIntervalRef.current = null;
             }
 
-            // Play through all slides programmatically for the video recording (2.0 seconds per slide)
+            // Play through all slides programmatically for the video recording (4.0 seconds per slide)
             const slideDuration = 4000; // ms
             const totalDuration = totalSlides * slideDuration;
 
@@ -1145,17 +1163,6 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const downloadGeneratedVideo = async () => {
         if (!generatedVideoFile) return;
 
-        if (!isPlayingMusic) {
-            const confirmed = await ask({
-                title: 'No Audio Detected',
-                message: 'This video has no sound, do you still want to download it without sound?',
-                confirmLabel: 'Download Anyway',
-                cancelLabel: 'Cancel',
-                type: 'info'
-            });
-            if (!confirmed) return;
-        }
-
         const url = URL.createObjectURL(generatedVideoFile);
         const a = document.createElement('a');
         a.href = url;
@@ -1169,12 +1176,12 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     return (
         <div
             onClick={() => {
-                if (synthRef.current) {
+                if (synthRef.current && isMusicPlayingRef.current) {
                     synthRef.current.resumeContext();
                 }
             }}
             onTouchStart={() => {
-                if (synthRef.current) {
+                if (synthRef.current && isMusicPlayingRef.current) {
                     synthRef.current.resumeContext();
                 }
             }}
@@ -1225,7 +1232,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin" />
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-black uppercase tracking-widest text-correct">Generating Shareable Video</h3>
-                                        <p className="text-xs text-gray-500">Compiling slides with music: {recordingProgress}%</p>
+                                        <p className="text-xs text-gray-500">Compiling slides {isMusicPlaying ? "with" : "without"} music: {recordingProgress}%</p>
                                     </div>
                                     <div className="w-full max-w-[200px] h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <div className="h-full bg-correct" style={{ width: `${recordingProgress}%` }} />
@@ -1244,20 +1251,29 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                     </div>
                                     <div className="space-y-2.5 w-full">
                                         <button
-                                            onClick={shareGeneratedVideo}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                shareGeneratedVideo();
+                                            }}
                                             className="w-full py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                                         >
                                             <Share2 size={14} />
                                             Share Video 🎬
                                         </button>
                                         <button
-                                            onClick={downloadGeneratedVideo}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                downloadGeneratedVideo();
+                                            }}
                                             className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
                                         >
                                             Download Locally
                                         </button>
                                         <button
-                                            onClick={() => setShowVideoOverlay(false)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowVideoOverlay(false);
+                                            }}
                                             className="w-full py-3 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer"
                                         >
                                             Close
@@ -1282,24 +1298,33 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     {/* Volume Mute Toggle, Video Export, and Close Buttons */}
                     <div className="absolute top-8 inset-x-6 flex items-center justify-between z-50">
                         <button
-                            onClick={onClose}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
                             className="p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                         >
                             <X size={16} />
                         </button>
                         <div className="flex gap-2">
                             <button
-                                onClick={exportWrappedVideo}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    exportWrappedVideo();
+                                }}
                                 className={`p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-correct hover:scale-105 transition-all cursor-pointer ${isRecording ? 'opacity-50 pointer-events-none' : ''}`}
                                 title="Download as Video"
                             >
                                 <Film size={16} />
                             </button>
                             <button
-                                onClick={() => setIsPlayingMusic(!isPlayingMusic)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMusicPlaying(!isMusicPlaying);
+                                }}
                                 className="p-2 bg-black/40 border border-white/5 hover:bg-black/60 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                             >
-                                {isPlayingMusic ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                                {isMusicPlaying ? <Volume2 size={16} /> : <VolumeX size={16} />}
                             </button>
                         </div>
                     </div>
@@ -1446,7 +1471,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                                                 <div className="pt-2">
                                                     <button
-                                                        onClick={exportWrappedVideo}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            exportWrappedVideo();
+                                                        }}
                                                         disabled={isRecording}
                                                         className="w-full flex items-center justify-center gap-2 py-3 bg-linear-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
                                                     >
@@ -1516,7 +1544,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     {/* Navigation and Share Actions (Bottom Area) */}
                     <div className="absolute bottom-6 inset-x-6 flex items-center justify-between z-50">
                         <button
-                            onClick={prevSlide}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                prevSlide();
+                            }}
                             disabled={currentSlide === 0}
                             className="p-3 bg-black/40 hover:bg-black/60 border border-white/5 rounded-full text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
                         >
@@ -1524,7 +1555,10 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                         </button>
 
                         <button
-                            onClick={exportSlideImage}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                exportSlideImage();
+                            }}
                             className="flex items-center gap-2 px-5 py-3 bg-correct hover:bg-correct-dark text-black text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg hover:scale-105 cursor-pointer"
                         >
                             <Share2 size={14} />
@@ -1533,14 +1567,20 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
                         {currentSlide < totalSlides - 1 ? (
                             <button
-                                onClick={nextSlide}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    nextSlide();
+                                }}
                                 className="p-3 bg-black/40 hover:bg-black/60 border border-white/5 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
                             >
                                 <ChevronRight size={18} />
                             </button>
                         ) : (
                             <button
-                                onClick={onClose}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
                                 className="p-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-white transition-all cursor-pointer"
                                 title="Finish Wrapped"
                             >
