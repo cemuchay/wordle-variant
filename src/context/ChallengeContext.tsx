@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge, useDiscoverChallenges } from '../hooks/queries/useChallengeQueries';
+import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge, useDiscoverChallenges, useBulkChallengeParticipants, CHALLENGE_DETAILS_SELECT } from '../hooks/queries/useChallengeQueries';
 import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
@@ -10,7 +10,8 @@ import { parseMarathonGames } from '../utils/marathon';
 import { safeLocalStorage } from '../utils/storage';
 
 interface ChallengeContextType {
-    // UI State
+    // ... rest of interface
+
     activeTab: 'my' | 'create' | 'join';
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
     isPlaying: boolean;
@@ -190,6 +191,16 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // 1. Server Data (TanStack Query)
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError } = useMyChallenges(effectiveUser?.id);
     const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError } = useDiscoverChallenges();
+
+    // Parallel fetch for all participants in the visible challenges list
+    const challengeIds = useMemo(() => {
+        const myIds = myChallengesData?.map((item: any) => item.challenge_id) || [];
+        const discoverIds = discoverChallengesData?.map((c: any) => c.id) || [];
+        return Array.from(new Set([...myIds, ...discoverIds]));
+    }, [myChallengesData, discoverChallengesData]);
+
+    const { data: participantsMap, isFetching: isParticipantsBulkFetching } = useBulkChallengeParticipants(challengeIds);
+
     const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
         createChallenge: createMutation,
@@ -208,6 +219,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const isBackgroundFetching =
         (isChallengesFetching && !isChallengesLoading) ||
         (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) ||
+        isParticipantsBulkFetching ||
         loadingParticipants;
 
     const error = (listColumn === 'open' ? discoverChallengesError : myChallengesError)
@@ -217,9 +229,28 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const channelRef = useRef<any>(null);
     const initialProcessed = useRef(false);
 
-    // 3. Computed State
-    const myChallenges = useMemo(() => myChallengesData || [], [myChallengesData]);
-    const discoverChallenges = useMemo(() => discoverChallengesData || [], [discoverChallengesData]);
+    // 3. Computed State (Merged with participants)
+    const myChallenges = useMemo(() => {
+        if (!myChallengesData) return [];
+        if (!participantsMap) return myChallengesData;
+        return myChallengesData.map((item: any) => ({
+            ...item,
+            challenge: {
+                ...item.challenge,
+                participants: participantsMap[item.challenge_id] || []
+            }
+        }));
+    }, [myChallengesData, participantsMap]);
+
+    const discoverChallenges = useMemo(() => {
+        if (!discoverChallengesData) return [];
+        if (!participantsMap) return discoverChallengesData;
+        return discoverChallengesData.map((c: any) => ({
+            ...c,
+            participants: participantsMap[c.id] || []
+        }));
+    }, [discoverChallengesData, participantsMap]);
+
     const availableProfiles = useMemo(() => profilesData || [], [profilesData]);
 
     const myChallengesRef = useRef(myChallenges);
@@ -440,25 +471,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 queryFn: async () => {
                     const { data, error } = await supabase
                         .from('challenges')
-                        .select(`
-                            *, 
-                            profiles!creator_id(username, avatar_url),
-                            participants:challenge_participants(
-                                id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                                profiles(username, avatar_url),
-                                guest_profiles(username, avatar_url),
-                                marathon_progress:challenge_participants_marathon(
-                                    id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                                )
-                            )
-                        `)
+                        .select(CHALLENGE_DETAILS_SELECT)
                         .eq('id', id)
                         .maybeSingle();
 
                     if (error) throw error;
                     if (data) {
                         const c = mapChallenge(data) as any;
-                        c.participants = c.participants.map((p: any) => normalizeParticipation(p, c));
                         return c as Challenge;
                     }
                     return null;
@@ -571,11 +590,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Auto-join when selectedChallenge is active and effectiveUser becomes available
     useEffect(() => {
-        if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending) {
+        if (selectedChallenge && effectiveUser && !myParticipation && !joinMutation.isPending && !loadingParticipants) {
             const isCreatorOfCustom = selectedChallenge.creator_id === effectiveUser.id && selectedChallenge.is_custom_word;
             const isExpired = new Date(selectedChallenge.expires_at) < new Date();
             if (!isCreatorOfCustom) {
-                const alreadyParticipant = selectedChallenge.participants?.find((p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id);
+                // Use the participants array from context (which is synced via subscribeToParticipants)
+                const alreadyParticipant = participants.find((p: any) => p.user_id === effectiveUser.id || p.guest_id === effectiveUser.id);
                 if (alreadyParticipant) {
                     setMyParticipation(normalizeParticipation(alreadyParticipant, selectedChallenge));
                 } else if (!isExpired) {
@@ -583,7 +603,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 }
             }
         }
-    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation]);
+    }, [selectedChallenge, effectiveUser, myParticipation, joinSelectedChallenge, normalizeParticipation, joinMutation.isPending, setMyParticipation, participants, loadingParticipants]);
 
     // Reset challenge state on unmount (when closing ChallengeModal)
     useEffect(() => {
@@ -925,6 +945,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         openChallengesCount: openChallenges.length,
         dailyMarathonChallenge,
         initialChallengeId,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenge, initialChallengeId]);
 
     return (

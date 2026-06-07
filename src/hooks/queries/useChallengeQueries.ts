@@ -5,6 +5,23 @@ import { getRandomWord, obfuscateWord } from "../../lib/game-logic";
 import { type Challenge } from "../useChallenge";
 import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 
+/**
+ * Supabase select strings for reusable queries.
+ */
+export const CHALLENGE_PARTICIPANTS_SELECT = `
+    id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+    profiles(username, avatar_url),
+    guest_profiles(username, avatar_url),
+    marathon_progress:challenge_participants_marathon(
+        id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+    )
+`;
+
+export const CHALLENGE_DETAILS_SELECT = `
+    *,
+    creator:profiles!creator_id(username, avatar_url)
+`;
+
 export const mapParticipant = (p: any) => {
    if (!p) return p;
    return {
@@ -32,6 +49,7 @@ export const mapParticipation = (participation: any) => {
 
 /**
  * Hook to fetch all challenges a user is participating in.
+ * Only fetches the user's own participation and challenge metadata.
  */
 export const useMyChallenges = (userId: string | undefined) => {
    // Retrieve recent challenges from localStorage
@@ -74,18 +92,7 @@ export const useMyChallenges = (userId: string | undefined) => {
                         marathon_progress:challenge_participants_marathon(
                             id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
                         ),
-                        challenge:challenges(
-                            *,
-                            creator:profiles!creator_id(username, avatar_url),
-                            participants:challenge_participants(
-                                id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                                profiles(username, avatar_url),
-                                guest_profiles(username, avatar_url),
-                                marathon_progress:challenge_participants_marathon(
-                                    id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                                )
-                            )
-                        )
+                        challenge:challenges(${CHALLENGE_DETAILS_SELECT})
                     `,
                )
                .or(`user_id.eq.${userId},guest_id.eq.${userId}`);
@@ -96,27 +103,14 @@ export const useMyChallenges = (userId: string | undefined) => {
             // 2. Fetch all challenges I created
             const { data: cData, error: cError } = await supabase
                .from("challenges")
-               .select(
-                  `
-                        *,
-                         creator:profiles!creator_id(username, avatar_url),
-                         participants:challenge_participants(
-                             id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                             profiles(username, avatar_url),
-                             guest_profiles(username, avatar_url),
-                             marathon_progress:challenge_participants_marathon(
-                                 id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                             )
-                         )
-                    `,
-               )
+               .select(CHALLENGE_DETAILS_SELECT)
                .eq("creator_id", userId);
 
             if (cError) throw cError;
             createdChallenges = cData || [];
          }
 
-         // 3. Merge them. If I'm both creator and participant, Query 1 has the full record.
+         // 3. Merge them.
          const finalResults = participations.map(mapParticipation);
          const participatedIds = new Set(
             finalResults.map((p) => p.challenge_id),
@@ -144,20 +138,7 @@ export const useMyChallenges = (userId: string | undefined) => {
          if (missingIds.length > 0) {
             const { data: recentChallenges, error: rError } = await supabase
                .from("challenges")
-               .select(
-                  `
-                        *,
-                        creator:profiles!creator_id(username, avatar_url),
-                        participants:challenge_participants(
-                            id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                            profiles(username, avatar_url),
-                            guest_profiles(username, avatar_url),
-                            marathon_progress:challenge_participants_marathon(
-                                id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                            )
-                        )
-                    `,
-               )
+               .select(CHALLENGE_DETAILS_SELECT)
                .in("id", missingIds);
 
             if (!rError && recentChallenges) {
@@ -231,7 +212,28 @@ export const useAvailableProfiles = (currentUserId: string | undefined) => {
 };
 
 /**
- * Hook to fetch a specific challenge by ID.
+ * Hook to fetch participants for a specific challenge.
+ */
+export const useChallengeParticipants = (challengeId: string | null) => {
+   return useQuery({
+      queryKey: ["challenge-participants", challengeId],
+      queryFn: async () => {
+         if (!challengeId) return [];
+         const { data, error } = await supabase
+            .from("challenge_participants")
+            .select(CHALLENGE_PARTICIPANTS_SELECT)
+            .eq("challenge_id", challengeId)
+            .order("score", { ascending: false });
+
+         if (error) throw error;
+         return (data || []).map(mapParticipant);
+      },
+      enabled: !!challengeId,
+   });
+};
+
+/**
+ * Hook to fetch a specific challenge by ID (Metadata only).
  */
 export const useChallengeData = (challengeId: string | null) => {
    return useQuery({
@@ -240,20 +242,7 @@ export const useChallengeData = (challengeId: string | null) => {
          if (!challengeId) return null;
          const { data, error } = await supabase
             .from("challenges")
-            .select(
-               `
-                     *,
-                     creator:profiles!creator_id(username, avatar_url),
-                     participants:challenge_participants(
-                         id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                         profiles(username, avatar_url),
-                         guest_profiles(username, avatar_url),
-                         marathon_progress:challenge_participants_marathon(
-                             id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                         )
-                     )
-                 `,
-            )
+            .select(CHALLENGE_DETAILS_SELECT)
             .eq("id", challengeId)
             .maybeSingle();
 
@@ -288,7 +277,7 @@ export const useChallengeData = (challengeId: string | null) => {
 };
 
 /**
- * Hook to fetch all active public challenges for discovery.
+ * Hook to fetch all active public challenges for discovery (Metadata only).
  */
 export const useDiscoverChallenges = () => {
    return useQuery({
@@ -296,20 +285,7 @@ export const useDiscoverChallenges = () => {
       queryFn: async () => {
          const { data, error } = await supabase
             .from("challenges")
-            .select(
-               `
-                    *,
-                     creator:profiles!creator_id(username, avatar_url),
-                     participants:challenge_participants(
-                         id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
-                         profiles(username, avatar_url),
-                         guest_profiles(username, avatar_url),
-                         marathon_progress:challenge_participants_marathon(
-                             id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
-                         )
-                     )
-                `,
-            )
+            .select(CHALLENGE_DETAILS_SELECT)
             .or(`is_public.eq.true,is_bot_marathon.eq.true`)
             .gt("expires_at", new Date().toISOString())
             .order("created_at", { ascending: false });
@@ -319,6 +295,35 @@ export const useDiscoverChallenges = () => {
       },
    });
 };
+
+/**
+ * Hook to fetch participants for multiple challenges in one go.
+ * Ideal for populating the challenge list with facepiles/leaderboards in parallel.
+ */
+export const useBulkChallengeParticipants = (challengeIds: string[]) => {
+   return useQuery({
+      queryKey: ["bulk-challenge-participants", challengeIds.join(",")],
+      queryFn: async () => {
+         if (challengeIds.length === 0) return {};
+         const { data, error } = await supabase
+            .from("challenge_participants")
+            .select(CHALLENGE_PARTICIPANTS_SELECT)
+            .in("challenge_id", challengeIds);
+
+         if (error) throw error;
+
+         // Group participants by challenge_id
+         return (data || []).reduce((acc: any, p: any) => {
+            const challengeId = p.challenge_id;
+            if (!acc[challengeId]) acc[challengeId] = [];
+            acc[challengeId].push(mapParticipant(p));
+            return acc;
+         }, {});
+      },
+      enabled: challengeIds.length > 0,
+   });
+};
+
 
 /**
  * Helper to count yellow + green matches between a starter word and a target word.
