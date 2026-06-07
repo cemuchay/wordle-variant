@@ -508,6 +508,7 @@ export const useChat = (userId: string) => {
 
       return () => {
          supabase.removeChannel(channel);
+         if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
       };
    }, [userId, activeRoomId]);
 

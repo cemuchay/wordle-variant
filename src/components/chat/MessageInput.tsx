@@ -179,6 +179,15 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         }
     }, [input]);
 
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, []);
+
     const renderHighlightedText = (text: string) => {
         if (!text) return "";
         let highlighted = text

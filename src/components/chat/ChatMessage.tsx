@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useMemo, useState, useRef } from 'react';
+import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
@@ -329,6 +329,12 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     // Long press logic for mobile reaction toggling
     const longPressTimeoutRef = useRef<any>(null);
     const hasDraggedRef = useRef<boolean>(false);
+
+    useEffect(() => {
+        return () => {
+            if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+        };
+    }, []);
 
     const handleTouchStart = () => {
         hasDraggedRef.current = false;
