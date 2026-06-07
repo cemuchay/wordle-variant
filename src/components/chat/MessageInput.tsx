@@ -20,6 +20,52 @@ interface MessageInputProps {
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 
+const saveSelection = (element: HTMLElement) => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    const preSelectionRange = range.cloneRange();
+    preSelectionRange.selectNodeContents(element);
+    preSelectionRange.setEnd(range.startContainer, range.startOffset);
+    return preSelectionRange.toString().length;
+};
+
+const restoreSelection = (element: HTMLElement, offset: number) => {
+    let charIndex = 0;
+    const range = document.createRange();
+    range.setStart(element, 0);
+    range.collapse(true);
+    const nodeStack: Node[] = [element];
+    let node: Node | undefined;
+    let foundStart = false;
+    let stop = false;
+
+    while (!stop && (node = nodeStack.pop())) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const textNode = node as Text;
+            const nextCharIndex = charIndex + textNode.length;
+            if (!foundStart && offset >= charIndex && offset <= nextCharIndex) {
+                range.setStart(textNode, offset - charIndex);
+                range.collapse(true);
+                foundStart = true;
+                stop = true;
+            }
+            charIndex = nextCharIndex;
+        } else {
+            let i = node.childNodes.length;
+            while (i--) {
+                nodeStack.push(node.childNodes[i]);
+            }
+        }
+    }
+
+    const sel = window.getSelection();
+    if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+};
+
 const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, onCancelReply, users, isGameAnalysis, dailyGuesses }: MessageInputProps) => {
     const { profile } = useApp();
     const [input, setInput] = useState("");
@@ -32,54 +78,69 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     const audioChunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<number | null>(null);
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const backdropRef = useRef<HTMLDivElement>(null);
+    const nextCursorPositionRef = useRef<number | null>(null);
 
-    const handleScroll = () => {
-        if (textareaRef.current && backdropRef.current) {
-            backdropRef.current.scrollTop = textareaRef.current.scrollTop;
-            backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
-        }
-    };
+    const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+        const rawText = e.currentTarget.textContent || "";
+        setInput(rawText);
+        onTyping(rawText.length > 0);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const val = e.target.value;
-        const cursorPos = e.target.selectionStart;
-        setInput(val);
-        onTyping(val.length > 0);
+        const cursorPos = saveSelection(e.currentTarget);
+        if (cursorPos !== null) {
+            const textBeforeCursor = rawText.substring(0, cursorPos);
+            const lastAtPos = textBeforeCursor.lastIndexOf("@");
 
-        const textBeforeCursor = val.substring(0, cursorPos);
-        const lastAtPos = textBeforeCursor.lastIndexOf("@");
-
-        if (lastAtPos !== -1) {
-            const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
-            if (!textAfterAt.includes("\n")) {
-                setMentionState({
-                    isVisible: true,
-                    filter: textAfterAt,
-                    cursorPosition: cursorPos
-                });
+            if (lastAtPos !== -1) {
+                const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
+                if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
+                    setMentionState({
+                        isVisible: true,
+                        filter: textAfterAt,
+                        cursorPosition: cursorPos
+                    });
+                } else {
+                    setMentionState(null);
+                }
             } else {
                 setMentionState(null);
             }
-        } else {
-            setMentionState(null);
         }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter') {
+            if (!e.shiftKey && window.innerWidth > 768) {
+                e.preventDefault();
+                handleSend();
+            } else {
+                e.preventDefault();
+                document.execCommand('insertText', false, '\n');
+            }
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
     };
 
     const handleUserSelect = (username: string) => {
         if (!mentionState) return;
-        const textBeforeAt = input.substring(0, input.lastIndexOf("@", mentionState.cursorPosition - 1));
+        const lastAt = input.lastIndexOf("@", mentionState.cursorPosition - 1);
+        const textBeforeAt = input.substring(0, lastAt);
         const textAfterCursor = input.substring(mentionState.cursorPosition);
         const newInput = textBeforeAt + "@" + username + " " + textAfterCursor;
+        
         setInput(newInput);
         setMentionState(null);
+        nextCursorPositionRef.current = (textBeforeAt + "@" + username + " ").length;
+        
         setTimeout(() => {
             if (textareaRef.current) {
                 textareaRef.current.focus();
-                const newPos = (textBeforeAt + "@" + username + " ").length;
-                textareaRef.current.setSelectionRange(newPos, newPos);
             }
         }, 0);
     };
@@ -97,10 +158,12 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
         onSend(input, replyingTo?.id, mentions);
         setInput("");
+        if (textareaRef.current) {
+            textareaRef.current.innerHTML = "";
+        }
         onTyping(false);
         onCancelReply();
         setMentionState(null);
-        if (textareaRef.current) textareaRef.current.style.height = '44px';
     };
 
     // Voice note recording helpers
@@ -149,7 +212,6 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
     const cancelRecording = () => {
         if (!mediaRecorderRef.current) return;
-        // override onstop callback to prevent sending the chunk
         mediaRecorderRef.current.onstop = () => {
             audioChunksRef.current = [];
             const stream = mediaRecorderRef.current?.stream;
@@ -171,14 +233,6 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = '44px';
-            const newHeight = Math.min(textareaRef.current.scrollHeight, 150);
-            textareaRef.current.style.height = `${newHeight}px`;
-        }
-    }, [input]);
-
     const renderHighlightedText = (text: string) => {
         if (!text) return "";
         let highlighted = text
@@ -199,12 +253,44 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             highlighted = highlighted.replace(regex, (match) => {
                 const endsWithSpace = match.endsWith(' ');
                 const cleanMatch = endsWithSpace ? match.slice(0, -1) : match;
-                return `<span style="background-color: ${color}20; color: ${color}; outline: 1px solid ${color}40; border-radius: 4px; padding: 0px 0px;">${cleanMatch}</span>${endsWithSpace ? ' ' : ''}`;
+                return `<span style="background-color: ${color}20; color: ${color}; outline: 1px solid ${color}40; border-radius: 6px; padding: 1px 2px; font-weight: 800;">${cleanMatch}</span>${endsWithSpace ? ' ' : ''}`;
             });
         });
 
-        return highlighted + (text.endsWith('\n') ? '\n ' : '');
+        return highlighted + (text.endsWith('\n') ? '<br/>' : '');
     };
+
+    // Auto-grow and innerHTML synchronization logic
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el || isRecording) return;
+
+        const targetHtml = renderHighlightedText(input);
+
+        // Only update innerHTML if it's semantically different or if we have a forced cursor update
+        if (el.innerHTML !== targetHtml || nextCursorPositionRef.current !== null) {
+            let cursorOffset = nextCursorPositionRef.current;
+            if (cursorOffset === null) {
+                cursorOffset = document.activeElement === el ? saveSelection(el) : null;
+            }
+
+            el.innerHTML = targetHtml;
+            
+            if (cursorOffset !== null) {
+                restoreSelection(el, cursorOffset);
+            }
+            nextCursorPositionRef.current = null;
+        }
+    }, [input, users, isRecording]);
+
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, []);
 
     const hasDailyScore = useMemo(() => {
         if (!dailyGuesses || !profile?.id) return false;
@@ -212,16 +298,24 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     }, [dailyGuesses, profile]);
 
     return (
-        <div className="px-3 pb-4 pt-2 bg-[#0b141a] relative">
+        <div className="px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0))] pt-2 bg-[#0b141a] border-t border-white/5 relative">
+            <style>{`
+                [contenteditable]:empty::before {
+                    content: attr(data-placeholder);
+                    color: rgba(255, 255, 255, 0.4);
+                    pointer-events: none;
+                    display: block;
+                }
+            `}</style>
             {/* Quick Actions for Game Analysis */}
             {isGameAnalysis && hasDailyScore && profile?.id && (
                 <div className="mx-2 mb-2.5 flex justify-start">
                     <button
                         type="button"
                         onClick={() => onSend(`[guess:${profile.id}]`)}
-                        className="px-3 py-1.5 bg-correct/10 hover:bg-correct/20 border border-correct/30 rounded-full text-[10px] font-black uppercase text-correct tracking-wider cursor-pointer flex items-center gap-1.5 transition-all"
+                        className="px-4 py-2 bg-correct/10 hover:bg-correct/20 border border-correct/20 rounded-2xl text-[10px] font-black uppercase text-correct tracking-widest cursor-pointer flex items-center gap-2 transition-all shadow-lg active:scale-95"
                     >
-                        📊 Share My Guess Board
+                        <span className="text-sm">📊</span> Share Guess Board
                     </button>
                 </div>
             )}
@@ -229,17 +323,24 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             <AnimatePresence>
                 {replyingTo && (
                     <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="mx-2 mb-2 bg-[#1d282f] p-3 rounded-t-2xl border-l-4 border-correct flex justify-between items-start shadow-lg"
+                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                        className="mx-2 mb-3 bg-[#1d282f] p-4 rounded-t-[24px] border-l-[6px] border-correct flex justify-between items-start shadow-2xl backdrop-blur-md"
                     >
-                        <div className="overflow-hidden">
-                            <p className="text-[11px] font-bold text-correct mb-0.5 font-sans">Replying to {replyingTo.profiles?.username}</p>
-                            <p className="text-[12px] text-white/60 truncate italic font-sans">{replyingTo.content}</p>
+                        <div className="overflow-hidden pr-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-correct" />
+                                <p className="text-[11px] font-black text-correct uppercase tracking-widest">Replying to {replyingTo.profiles?.username}</p>
+                            </div>
+                            <p className="text-[13px] text-white/70 line-clamp-2 font-medium leading-relaxed">{replyingTo.content}</p>
                         </div>
-                        <button type="button" onClick={onCancelReply} className="text-white/60 hover:text-white p-1 cursor-pointer">
-                            <X size={16} />
+                        <button 
+                            type="button" 
+                            onClick={onCancelReply} 
+                            className="bg-white/5 hover:bg-white/10 text-white/60 hover:text-white p-1.5 rounded-full cursor-pointer transition-colors"
+                        >
+                            <X size={14} />
                         </button>
                     </motion.div>
                 )}
@@ -254,16 +355,16 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                     currentInput={input}
                 />
 
-                <div className="flex items-end gap-2 px-2">
+                <div className="flex items-end gap-2.5 px-1.5">
                     {/* Image Attachment Trigger */}
                     {!isRecording && onSendImage && (
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="bg-[#2a3942] hover:bg-white/10 text-white/60 hover:text-white h-[44px] w-[44px] rounded-full flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer border border-white/5"
+                            className="bg-[#2a3942] hover:bg-[#37474f] text-white/70 hover:text-white h-[48px] w-[48px] rounded-full flex items-center justify-center transition-all shadow-xl shrink-0 cursor-pointer border border-white/10 active:scale-90"
                             title="Share Image"
                         >
-                            <ImageIcon size={20} />
+                            <ImageIcon size={22} strokeWidth={2.5} />
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -280,42 +381,43 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                         </button>
                     )}
                     {isRecording ? (
-                        <div className="flex-1 flex items-center justify-between bg-[#2a3942] rounded-[24px] px-4 py-[10px] min-h-[44px] text-white">
-                            <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                                <span className="text-xs font-black uppercase tracking-wider text-red-400">Recording</span>
-                                <span className="text-sm font-mono">{formatDuration(recordingTime)}</span>
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="flex-1 flex items-center justify-between bg-[#2a3942] rounded-[28px] px-5 py-2.5 min-h-[48px] text-white border border-red-500/20 shadow-2xl shadow-red-500/10"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="relative">
+                                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                                    <div className="absolute inset-0 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Live Recording</span>
+                                <span className="text-sm font-black tabular-nums text-white/90">{formatDuration(recordingTime)}</span>
                             </div>
                             <button
                                 type="button"
                                 onClick={cancelRecording}
-                                className="text-white/60 hover:text-red-400 p-1 transition-colors cursor-pointer"
+                                className="bg-white/5 hover:bg-red-500/20 text-white/60 hover:text-red-400 p-2 rounded-full transition-all cursor-pointer active:scale-90"
                                 title="Discard voice note"
                             >
                                 <Trash2 size={18} />
                             </button>
-                        </div>
+                        </motion.div>
                     ) : (
-                        <div className="flex-1 relative bg-[#2a3942] rounded-[24px] shadow-sm min-h-[44px] overflow-hidden">
+                        <div className="flex-1 relative bg-[#2a3942] rounded-[28px] shadow-2xl min-h-[48px] overflow-hidden border border-white/10 focus-within:border-correct/40 transition-colors group flex flex-col justify-center">
                             <div
-                                ref={backdropRef}
-                                aria-hidden="true"
-                                className="absolute inset-0 px-4 py-[10px] text-[15px] leading-6 font-sans tracking-normal text-left whitespace-pre-wrap wrap-break-word pointer-events-none text-white border-none overflow-y-auto scrollbar-hide"
-                                style={{ fontVariantLigatures: 'none' }}
-                                dangerouslySetInnerHTML={{ __html: renderHighlightedText(input) }}
-                            />
-
-                            <textarea
                                 ref={textareaRef}
-                                value={input}
-                                onChange={handleInputChange}
-                                onScroll={handleScroll}
-                                placeholder="Message (use @ to mention players)..."
-                                className="w-full relative bg-transparent border-none px-4 py-[10px] text-[15px] leading-6 font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none max-h-[150px] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent placeholder-white/50 caret-white z-10"
-                                rows={1}
+                                contentEditable={true}
+                                onInput={handleInput}
+                                onKeyDown={handleKeyDown}
+                                onPaste={handlePaste}
+                                data-placeholder="Message..."
+                                className="w-full bg-transparent border-none px-5 py-[12px] text-[15px] leading-[22px] font-medium font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent caret-correct block whitespace-pre-wrap break-words"
                                 style={{
-                                    WebkitTextFillColor: 'transparent',
-                                    fontVariantLigatures: 'none'
+                                    fontVariantLigatures: 'none',
+                                    minHeight: '48px',
+                                    maxHeight: '180px',
+                                    overflowY: 'auto'
                                 }}
                             />
                         </div>
@@ -326,30 +428,33 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                             <button
                                 type="button"
                                 onClick={stopRecording}
-                                className="bg-red-500 text-white h-[44px] w-[44px] rounded-full flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer animate-pulse"
+                                className="bg-red-500 text-white h-[48px] w-[48px] rounded-full flex items-center justify-center transition-all shadow-xl shadow-red-500/20 shrink-0 cursor-pointer active:scale-90 relative"
                                 title="Stop and send"
                             >
-                                <SendIcon size={20} className="ml-0.5" />
+                                <SendIcon size={22} className="ml-1" />
+                                <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20" />
                             </button>
                         ) : (
                             <button
                                 type="button"
                                 onClick={startRecording}
-                                className="bg-correct text-black h-[44px] w-[44px] rounded-full flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer hover:scale-105"
+                                className="bg-correct text-black h-[48px] w-[48px] rounded-full flex items-center justify-center transition-all shadow-xl shadow-correct/20 shrink-0 cursor-pointer hover:scale-105 active:scale-90 border border-black/5"
                                 title="Record voice message"
                             >
-                                <Mic size={20} />
+                                <Mic size={22} strokeWidth={2.5} />
                             </button>
                         )
                     ) : (
                         <motion.button
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
                             whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            whileTap={{ scale: 0.9 }}
                             type="button"
                             onClick={handleSend}
-                            className="bg-correct text-black h-[44px] w-[44px] rounded-full flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer"
+                            className="bg-correct text-black h-[48px] w-[48px] rounded-full flex items-center justify-center transition-all shadow-xl shadow-correct/20 shrink-0 cursor-pointer border border-black/5"
                         >
-                            <SendIcon size={20} className="ml-1" />
+                            <SendIcon size={22} className="ml-1" strokeWidth={2.5} />
                         </motion.button>
                     )}
                 </div>

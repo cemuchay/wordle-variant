@@ -14,6 +14,8 @@ class TechHouseSynth {
     private recorderDest: MediaStreamAudioDestinationNode | null = null;
     private mainGain: GainNode | null = null;
 
+    private resumeHandler: (() => void) | null = null;
+
     start(recorderDestNode?: MediaStreamAudioDestinationNode) {
         if (this.isPlaying) return;
         // @ts-expect-error undefined
@@ -47,21 +49,29 @@ class TechHouseSynth {
 
         // Autoplay resume workaround on any click
         if (this.ctx.state === 'suspended') {
-            const resume = () => {
+            this.resumeHandler = () => {
                 if (this.ctx && this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
-                window.removeEventListener('click', resume);
-                window.removeEventListener('touchstart', resume);
+                if (this.resumeHandler) {
+                    window.removeEventListener('click', this.resumeHandler);
+                    window.removeEventListener('touchstart', this.resumeHandler);
+                    this.resumeHandler = null;
+                }
             };
-            window.addEventListener('click', resume);
-            window.addEventListener('touchstart', resume);
+            window.addEventListener('click', this.resumeHandler);
+            window.addEventListener('touchstart', this.resumeHandler);
         }
     }
 
     stop() {
         this.isPlaying = false;
         if (this.timerId) clearTimeout(this.timerId);
+        if (this.resumeHandler) {
+            window.removeEventListener('click', this.resumeHandler);
+            window.removeEventListener('touchstart', this.resumeHandler);
+            this.resumeHandler = null;
+        }
         if (this.ctx) {
             this.ctx.close();
             this.ctx = null;

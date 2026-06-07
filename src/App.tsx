@@ -459,48 +459,6 @@ export default function App() {
                   setIsChallengeOpen={setIsChallengeOpen}
                   isAuthenticated={user ? true : false}
                 />
-
-                <ModalsManager
-                  modals={{
-                    isSettingsOpen,
-                    isInfoOpen: false,
-                    isStatsOpen: false,
-                    isChallengeOpen: false,
-                    isNotificationsOpen: showNotifications,
-                    isAuthOpen,
-                    isGameOverOpen: state.isGameOverModalOpen,
-                  }}
-                  actions={{
-                    setSettingsOpen: setIsSettingsOpen,
-                    setInfoOpen: setIsInfoOpen,
-                    setStatsOpen: setIsStatsOpen,
-                    setChallengeOpen: (open) => {
-                      setIsChallengeOpen(open);
-                      if (!open) {
-                        setSelectedChallengeId(null);
-                      }
-                    },
-                    setNotificationsOpen: setIsNotificationsOpen,
-                    setAuthOpen: setIsAuthOpen,
-                    setGameOverOpen: actions.setGameOverModalOpen,
-                  }}
-                  gameContext={{
-                    user: user as AppUser,
-                    date: date as string,
-                    guesses: state.guesses,
-                    config,
-                    usedHint: state.usedHint,
-                    gameMessage: state.gameMessage,
-                    stats,
-                    isGameOver: state.isGameOver,
-                    isGameOverOpen: state.isGameOverModalOpen,
-                  }}
-                  statsActiveTab={statsActiveTab}
-                  onChallengeCreated={handleChallengeCreated}
-                  viewedProfileId={viewedProfileId}
-                  setViewedProfileId={setViewedProfileId}
-                  initialChallengeId={selectedChallengeId}
-                />
               </main>
             )}
 
@@ -557,6 +515,48 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <ModalsManager
+        modals={{
+          isSettingsOpen,
+          isInfoOpen: false,
+          isStatsOpen: false,
+          isChallengeOpen: false,
+          isNotificationsOpen: showNotifications,
+          isAuthOpen,
+          isGameOverOpen: state.isGameOverModalOpen,
+        }}
+        actions={{
+          setSettingsOpen: setIsSettingsOpen,
+          setInfoOpen: setIsInfoOpen,
+          setStatsOpen: setIsStatsOpen,
+          setChallengeOpen: (open) => {
+            setIsChallengeOpen(open);
+            if (!open) {
+              setSelectedChallengeId(null);
+            }
+          },
+          setNotificationsOpen: setIsNotificationsOpen,
+          setAuthOpen: setIsAuthOpen,
+          setGameOverOpen: actions.setGameOverModalOpen,
+        }}
+        gameContext={{
+          user: user as AppUser,
+          date: date as string,
+          guesses: state.guesses,
+          config,
+          usedHint: state.usedHint,
+          gameMessage: state.gameMessage,
+          stats,
+          isGameOver: state.isGameOver,
+          isGameOverOpen: state.isGameOverModalOpen,
+        }}
+        statsActiveTab={statsActiveTab}
+        onChallengeCreated={handleChallengeCreated}
+        viewedProfileId={viewedProfileId}
+        setViewedProfileId={setViewedProfileId}
+        initialChallengeId={selectedChallengeId}
+      />
 
       {!isPlayingChallenge && (
         <AppNavigation

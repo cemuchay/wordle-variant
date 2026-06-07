@@ -31,8 +31,14 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
   const isChallenge = gameplayType === 'challenge' || compact;
 
   const dynamicClass = isChallenge
-    ? `${isWide ? 'px-1 text-[8px] sm:text-[9px] min-w-[44px] sm:min-w-[52px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-xs`
-    : `${isWide ? 'px-2.5 text-[10px] sm:text-xs min-w-[55px] sm:min-w-[65px]' : 'flex-1 min-w-[28px] sm:min-w-[32px]'} h-13 sm:h-12 text-sm sm:text-base`;
+    ? `${isWide
+      ? 'px-1 text-[8px] sm:text-[9px] min-w-[34px] max-[340px]:min-w-[30px] sm:min-w-[52px]'
+      : 'flex-1 min-w-[28px] max-[340px]:min-w-[22px] sm:min-w-[32px]'
+    } h-13 max-[340px]:h-10 sm:h-12 text-xs max-[340px]:text-[10px]`
+    : `${isWide
+      ? 'px-2.5 max-[340px]:px-1 text-[10px] sm:text-xs min-w-[55px] max-[340px]:min-w-[42px] sm:min-w-[65px]'
+      : 'flex-1 min-w-[28px] max-[340px]:min-w-[22px] sm:min-w-[32px]'
+    } h-13 max-[340px]:h-10 sm:h-12 text-sm max-[340px]:text-xs sm:text-base`;
 
   return (
     <button
