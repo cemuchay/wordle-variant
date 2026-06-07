@@ -119,6 +119,10 @@ export const useGameEngine = (date: string) => {
                         status: gamePayload.status,
                      },
                   });
+                  // Cleanup channel after a short delay to ensure broadcast is sent
+                  setTimeout(() => {
+                     supabase.removeChannel(syncChannel);
+                  }, 1000);
                }
             });
 

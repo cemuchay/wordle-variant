@@ -155,7 +155,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     event: 'call_accepted',
                     payload: { channelId: currentCall.channelId }
                 });
-                setTimeout(() => targetChannel.unsubscribe(), 1000);
+                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
@@ -177,7 +177,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     event: 'call_rejected',
                     payload: { channelId: currentCall.channelId }
                 });
-                setTimeout(() => targetChannel.unsubscribe(), 1000);
+                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
@@ -197,7 +197,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         event: 'hang_up',
                         payload: { channelId: currentCall.channelId }
                     });
-                    setTimeout(() => targetChannel.unsubscribe(), 1000);
+                    setTimeout(() => supabase.removeChannel(targetChannel), 1000);
                 }
             });
         }
@@ -237,7 +237,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         callerAvatar: profile?.avatar_url || ''
                     }
                 });
-                setTimeout(() => targetChannel.unsubscribe(), 1000);
+                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
@@ -254,7 +254,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                             event: 'hang_up',
                             payload: { channelId }
                         });
-                        setTimeout(() => hangupChannel.unsubscribe(), 1000);
+                        setTimeout(() => supabase.removeChannel(hangupChannel), 1000);
                     }
                 });
                 setActiveCall(null);
@@ -298,7 +298,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                         challengeId: currentCall.channelId
                                     }
                                 });
-                                setTimeout(() => groupChannel.unsubscribe(), 1000);
+                                setTimeout(() => supabase.removeChannel(groupChannel), 1000);
                             }
                         });
                     }
@@ -325,7 +325,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                 event: 'call_busy',
                                 payload: { channelId: payload.channelId }
                             });
-                            setTimeout(() => busyChannel.unsubscribe(), 1000);
+                            setTimeout(() => supabase.removeChannel(busyChannel), 1000);
                         }
                     });
                     return;
@@ -374,7 +374,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         signalingChannelRef.current = channel;
 
         return () => {
-            channel.unsubscribe();
+            supabase.removeChannel(channel);
             signalingChannelRef.current = null;
         };
     }, [user?.id, triggerToast, setActiveCall]);
@@ -402,7 +402,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .subscribe();
 
         return () => {
-            channel.unsubscribe();
+            supabase.removeChannel(channel);
         };
     }, [user?.id, myParticipations, triggerToast]);
 
@@ -528,9 +528,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .subscribe();
 
         return () => {
-            channel.unsubscribe();
             supabase.removeChannel(channel);
-            receiptsChannel.unsubscribe();
             supabase.removeChannel(receiptsChannel);
         };
     }, [user?.id]);

@@ -362,7 +362,7 @@ export const useChat = (userId: string) => {
          .subscribe();
 
       return () => {
-         groupChannel.unsubscribe();
+         supabase.removeChannel(groupChannel);
       };
    }, [userId, fetchGroups]);
 
@@ -507,7 +507,6 @@ export const useChat = (userId: string) => {
       channelRef.current = channel;
 
       return () => {
-         channel.unsubscribe();
          supabase.removeChannel(channel);
       };
    }, [userId, activeRoomId]);
