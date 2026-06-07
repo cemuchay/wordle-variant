@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useConfirmation } from '../hooks/useConfirmation';
 
 class TechHouseSynth {
     public ctx: AudioContext | null = null;
@@ -290,6 +291,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     isEasterEgg = false,
     gameDate
 }) => {
+    const { ask } = useConfirmation();
     const [loading, setLoading] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isPlayingMusic, setIsPlayingMusic] = useState(true);
@@ -1133,15 +1135,27 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 });
             } catch (err) {
                 console.log('Video share failed, falling back to download:', err);
-                downloadGeneratedVideo();
+                await downloadGeneratedVideo();
             }
         } else {
-            downloadGeneratedVideo();
+            await downloadGeneratedVideo();
         }
     };
 
-    const downloadGeneratedVideo = () => {
+    const downloadGeneratedVideo = async () => {
         if (!generatedVideoFile) return;
+
+        if (!isPlayingMusic) {
+            const confirmed = await ask({
+                title: 'No Audio Detected',
+                message: 'This video has no sound, do you still want to download it without sound?',
+                confirmLabel: 'Download Anyway',
+                cancelLabel: 'Cancel',
+                type: 'info'
+            });
+            if (!confirmed) return;
+        }
+
         const url = URL.createObjectURL(generatedVideoFile);
         const a = document.createElement('a');
         a.href = url;
