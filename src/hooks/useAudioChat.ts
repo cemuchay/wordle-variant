@@ -421,7 +421,7 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
 
         channelRef.current = channel;
         return () => {
-            channel.unsubscribe();
+            supabase.removeChannel(channel);
             stopAudio();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

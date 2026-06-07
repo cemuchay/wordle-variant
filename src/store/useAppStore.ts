@@ -123,7 +123,7 @@ export const useAppStore = create<AppState>((set) => ({
    })(),
 
    // Actions
-   triggerToast: (message, duration) =>
+   triggerToast: (message, duration = 3000) =>
       set({ toast: { show: true, message, duration } }),
    setToast: (toast) => set({ toast }),
    setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),

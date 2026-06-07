@@ -11,7 +11,6 @@ import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { Toast } from "./components/Toast";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { useApp } from "./context/AppContext";
@@ -48,8 +47,6 @@ export default function App() {
   const { user } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const {
-    toast,
-    setToast,
     triggerToast,
     date,
     isLoadingDate,
@@ -360,12 +357,7 @@ export default function App() {
       <AudioConnectionLog />
       <GlobalAudioPlayer />
       <NotificationsManager />
-      <Toast
-        isVisible={toast.show}
-        message={toast.message}
-        duration={toast.duration}
-        onClose={() => setToast({ ...toast, show: false })}
-      />
+      {/* Toast component has been migrated to DynamicIslandStatus */}
       {user && showDisconnectedUI && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-3 bg-amber-950/90 backdrop-blur-md border border-amber-500/30 px-4 py-2.5 rounded-2xl shadow-xl">

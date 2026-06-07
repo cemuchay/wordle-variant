@@ -91,7 +91,6 @@ export const useChallengeChat = (challengeId: string | undefined, effectiveUser:
         channelRef.current = channel;
 
         return () => {
-            channel.unsubscribe();
             supabase.removeChannel(channel);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };

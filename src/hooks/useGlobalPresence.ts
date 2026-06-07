@@ -95,7 +95,7 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
 
         return () => {
             clearInterval(heartbeat);
-            channel.unsubscribe();
+            supabase.removeChannel(channel);
             channelRef.current = null;
             updateLastSeen();
         };
