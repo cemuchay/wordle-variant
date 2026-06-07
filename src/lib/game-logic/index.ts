@@ -60,6 +60,7 @@ const SALT = "GFARMS_BETA_V2";
 const GUEST_SALT = "GFARMS_GUEST_V1";
 const TRANSITION_DATE = "2026-05-03";
 const LENGTH_TRANSITION_DATE = "2026-05-11";
+const REMOVAL_3L_TRANSITION_DATE = "2026-06-08";
 
 /**
  * Legacy hashing algorithm used before May 3rd, 2026.
@@ -91,6 +92,7 @@ const newHash = (str: string) =>
  * 1. Pre-May 3: Legacy hash, legacy word selection.
  * 2. Pre-May 11: New hash, legacy length selection (4-6 chars).
  * 3. Post-May 11: New hash, expanded length selection (3-7 chars) with weighted buckets.
+ * 4. Post-June 8: 3-letter words removed, weight reallocated to 7-letter words.
  *
  * @param dateStr - ISO date string (YYYY-MM-DD).
  * @param isAuthenticated - Whether the user is logged in (affects the salt).
@@ -105,6 +107,7 @@ function getWordAtDate(
 ): string {
    const isNew = dateStr >= TRANSITION_DATE;
    const isNewLength = dateStr >= LENGTH_TRANSITION_DATE;
+   const isPost3lRemoval = dateStr >= REMOVAL_3L_TRANSITION_DATE;
    const activeSalt = isAuthenticated ? SALT : GUEST_SALT;
    const seedBase =
       dateStr + activeSalt + (attempt > 0 ? `_retry_${attempt}` : "");
@@ -117,16 +120,27 @@ function getWordAtDate(
    if (isNewLength) {
       const r = random();
       // Weighted buckets for word length variety
-      length =
-         r < 0.05
-            ? 3 // 5% chance
-            : r < 0.1
-              ? 7 // 5% chance
-              : r < 0.25
-                ? 4 // 15% chance
-                : r < 0.65
-                  ? 5 // 35% chance
-                  : 6; // 30% chance
+      if (isPost3lRemoval) {
+         length =
+            r < 0.1
+               ? 7 // 10% chance (reallocated from 3l)
+               : r < 0.25
+                 ? 4 // 15% chance
+                 : r < 0.65
+                   ? 5 // 40% chance
+                   : 6; // 35% chance
+      } else {
+         length =
+            r < 0.05
+               ? 3 // 5% chance
+               : r < 0.1
+                 ? 7 // 5% chance
+                 : r < 0.25
+                   ? 4 // 15% chance
+                   : r < 0.65
+                     ? 5 // 40% chance
+                     : 6; // 35% chance
+      }
    } else {
       length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
    }
