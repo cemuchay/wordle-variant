@@ -1,9 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useConfirmation } from '../hooks/useConfirmation';
+
+const getWeekNumber = (d: Date): number => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return weekNo;
+};
 
 class TechHouseSynth {
     public ctx: AudioContext | null = null;
@@ -14,11 +22,13 @@ class TechHouseSynth {
     private bpm = 124;
     private recorderDest: MediaStreamAudioDestinationNode | null = null;
     private mainGain: GainNode | null = null;
+    private trackIndex = 0;
 
     private resumeHandler: (() => void) | null = null;
 
-    start(recorderDestNode?: MediaStreamAudioDestinationNode) {
+    start(trackIndex = 0, recorderDestNode?: MediaStreamAudioDestinationNode) {
         if (this.isPlaying) return;
+        this.trackIndex = trackIndex % 5;
         // @ts-expect-error undefined
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AudioContextClass();
@@ -81,9 +91,9 @@ class TechHouseSynth {
         this.mainGain = null;
     }
 
-    resumeContext() {
+    resumeContext(trackIndex = 0) {
         if (!this.isPlaying) {
-            this.start();
+            this.start(trackIndex);
         } else if (this.ctx && this.ctx.state === 'suspended') {
             this.ctx.resume().catch(e => console.log("Failed to resume context:", e));
         }
@@ -132,23 +142,32 @@ class TechHouseSynth {
             this.playHiHat(time);
         }
 
-        // 3. Bassline
-        const bassPattern = [
-            36, 0, 36, 0,
-            39, 0, 39, 39,
-            41, 0, 41, 0,
-            43, 41, 39, 36
+        // 3. Bassline & 4. Chord Pad
+        const bassPatterns = [
+            [36, 0, 36, 0, 39, 0, 39, 39, 41, 0, 41, 0, 43, 41, 39, 36],
+            [36, 36, 0, 36, 34, 34, 0, 34, 32, 32, 0, 32, 31, 31, 34, 34],
+            [36, 0, 0, 36, 0, 0, 36, 0, 36, 0, 0, 36, 0, 0, 39, 41],
+            [36, 36, 36, 36, 39, 39, 39, 39, 41, 41, 41, 41, 43, 43, 43, 43],
+            [36, 0, 36, 36, 36, 0, 36, 36, 34, 0, 34, 34, 34, 0, 34, 34]
         ];
+
+        const padPatterns = [
+            [48, 48 + 3, 48 + 7, 48 + 10], // Cm7
+            [48, 48 + 4, 48 + 7, 48 + 11], // CMaj7
+            [48, 48 + 3, 48 + 7, 48 + 8],  // Cm(addb6)
+            [48, 48 + 5, 48 + 7, 48 + 12], // Csus4
+            [48, 48 + 2, 48 + 7, 48 + 9]   // Cadd9
+        ];
+
+        const bassPattern = bassPatterns[this.trackIndex];
         const midiNote = bassPattern[beat];
         if (midiNote > 0) {
             const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
             this.playBass(freq, time);
         }
 
-        // 4. Chord Pad
         if (beat === 0) {
-            const root = 48; // C3
-            const notes = [root, root + 3, root + 7, root + 10]; // Cm7
+            const notes = padPatterns[this.trackIndex];
             notes.forEach(n => {
                 const freq = 440 * Math.pow(2, (n - 69) / 12);
                 this.playPad(freq, time, 3.8);
@@ -313,6 +332,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const [generatedVideoFile, setGeneratedVideoFile] = useState<File | null>(null);
     const [showVideoOverlay, setShowVideoOverlay] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const weeklyTrackIndex = useMemo(() => getWeekNumber(new Date()) % 5, []);
     const [avatarLoaded, setAvatarLoaded] = useState(false);
     const avatarImageRef = useRef<HTMLImageElement | null>(null);
 
@@ -427,7 +447,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         }
 
         if (isMusicPlaying) {
-            synthRef.current.start();
+            synthRef.current.start(weeklyTrackIndex);
         } else {
             synthRef.current.stop();
         }
@@ -446,7 +466,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 recordingIntervalRef.current = null;
             }
         };
-    }, [isOpen, isMusicPlaying]);
+    }, [isOpen, isMusicPlaying, weeklyTrackIndex]);
 
     // 3. Preload User Avatar Image for Canvas (preventing taint and CORS issues)
     useEffect(() => {
@@ -1187,12 +1207,12 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
         <div
             onClick={() => {
                 if (synthRef.current && isMusicPlayingRef.current) {
-                    synthRef.current.resumeContext();
+                    synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
             onTouchStart={() => {
                 if (synthRef.current && isMusicPlayingRef.current) {
-                    synthRef.current.resumeContext();
+                    synthRef.current.resumeContext(weeklyTrackIndex);
                 }
             }}
             className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-99999 text-white overflow-hidden select-none"
