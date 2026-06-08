@@ -372,6 +372,12 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
             return;
         }
 
+        // Defensively remove any existing channel first to prevent double subscriptions
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+        }
+
         const channelIdStr = `audio_chat_${activeCall.channelId}`;
         const channel = supabase.channel(channelIdStr);
 
@@ -422,6 +428,7 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
         channelRef.current = channel;
         return () => {
             supabase.removeChannel(channel);
+            channelRef.current = null;
             stopAudio();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

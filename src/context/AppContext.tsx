@@ -130,6 +130,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Refs for signaling
     const signalingChannelRef = useRef<any>(null);
+    const oneShotChannelsRef = useRef<Set<any>>(new Set());
+
+    const trackOneShotChannel = useCallback((channel: any, timeoutMs = 1000) => {
+        oneShotChannelsRef.current.add(channel);
+        setTimeout(() => {
+            if (oneShotChannelsRef.current.has(channel)) {
+                supabase.removeChannel(channel);
+                oneShotChannelsRef.current.delete(channel);
+            }
+        }, timeoutMs);
+    }, []);
+
+    // Clean up any lingering one-shot channels on unmount
+    useEffect(() => {
+        return () => {
+            oneShotChannelsRef.current.forEach(ch => supabase.removeChannel(ch));
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            oneShotChannelsRef.current.clear();
+        };
+    }, []);
 
     // 3. Server-Side State (TanStack Query)
     const { data: serverDateResponse, isLoading: isLoadingDate } = useAuthoritativeDate();
@@ -148,6 +168,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (!currentCall || currentCall.role !== 'receiver' || !user?.id) return;
 
         const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser?.id}`);
+        trackOneShotChannel(targetChannel);
         targetChannel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 targetChannel.send({
@@ -155,7 +176,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     event: 'call_accepted',
                     payload: { channelId: currentCall.channelId }
                 });
-                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
@@ -163,13 +183,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             ...currentCall,
             status: 'connecting'
         });
-    }, [user?.id, setActiveCall]);
+    }, [user?.id, setActiveCall, trackOneShotChannel]);
 
     const rejectCall = useCallback(() => {
         const currentCall = useAppStore.getState().activeCall;
         if (!currentCall || currentCall.role !== 'receiver' || !user?.id) return;
 
         const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser?.id}`);
+        trackOneShotChannel(targetChannel);
         targetChannel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 targetChannel.send({
@@ -177,12 +198,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     event: 'call_rejected',
                     payload: { channelId: currentCall.channelId }
                 });
-                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
         setActiveCall(null);
-    }, [user?.id, setActiveCall]);
+    }, [user?.id, setActiveCall, trackOneShotChannel]);
 
     const hangUpCall = useCallback(() => {
         const currentCall = useAppStore.getState().activeCall;
@@ -190,6 +210,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         if (currentCall.type === 'private' && currentCall.targetUser) {
             const targetChannel = supabase.channel(`user_signals_${currentCall.targetUser.id}`);
+            trackOneShotChannel(targetChannel);
             targetChannel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     targetChannel.send({
@@ -197,13 +218,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         event: 'hang_up',
                         payload: { channelId: currentCall.channelId }
                     });
-                    setTimeout(() => supabase.removeChannel(targetChannel), 1000);
                 }
             });
         }
 
         setActiveCall(null);
-    }, [user?.id, setActiveCall]);
+    }, [user?.id, setActiveCall, trackOneShotChannel]);
 
     const initiatePrivateCall = useCallback((targetUser: { id: string; username: string; avatar_url: string }) => {
         if (!user?.id) return;
@@ -225,6 +245,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setActiveCall(callState);
 
         const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
+        trackOneShotChannel(targetChannel);
         targetChannel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 targetChannel.send({
@@ -237,7 +258,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         callerAvatar: profile?.avatar_url || ''
                     }
                 });
-                setTimeout(() => supabase.removeChannel(targetChannel), 1000);
             }
         });
 
@@ -247,6 +267,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (currentCall && currentCall.channelId === channelId && currentCall.status === 'calling') {
                 triggerToast('No answer.', 4000);
                 const hangupChannel = supabase.channel(`user_signals_${targetUser.id}`);
+                trackOneShotChannel(hangupChannel);
                 hangupChannel.subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         hangupChannel.send({
@@ -254,7 +275,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                             event: 'hang_up',
                             payload: { channelId }
                         });
-                        setTimeout(() => supabase.removeChannel(hangupChannel), 1000);
                     }
                 });
                 setActiveCall(null);
@@ -262,7 +282,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }, 25000);
 
         return () => clearTimeout(timeoutId);
-    }, [user, profile, triggerToast, setActiveCall]);
+    }, [user, profile, triggerToast, setActiveCall, trackOneShotChannel]);
 
     // 5. Audio logic integration
     const audioChat = useAudioChat({
@@ -286,6 +306,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     const activeInRoom = onlineUsers.filter(u => u.activeVoiceRoomId === currentCall.channelId);
                     if (activeInRoom.length <= 1) {
                         const groupChannel = supabase.channel('group_call_signals');
+                        trackOneShotChannel(groupChannel);
                         groupChannel.subscribe((status) => {
                             if (status === 'SUBSCRIBED') {
                                 groupChannel.send({
@@ -298,7 +319,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                         challengeId: currentCall.channelId
                                     }
                                 });
-                                setTimeout(() => supabase.removeChannel(groupChannel), 1000);
                             }
                         });
                     }
@@ -318,6 +338,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 if (currentCall && currentCall.status !== 'idle') {
                     // Send call_busy to caller
                     const busyChannel = supabase.channel(`user_signals_${payload.callerId}`);
+                    trackOneShotChannel(busyChannel);
                     busyChannel.subscribe((status) => {
                         if (status === 'SUBSCRIBED') {
                             busyChannel.send({
@@ -325,7 +346,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                 event: 'call_busy',
                                 payload: { channelId: payload.channelId }
                             });
-                            setTimeout(() => supabase.removeChannel(busyChannel), 1000);
                         }
                     });
                     return;

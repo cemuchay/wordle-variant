@@ -104,10 +104,17 @@ export const useGameEngine = (date: string) => {
                }),
             );
 
-            // Broadcast score update to other active players on every sync
+                        // Broadcast score update to other active players on every sync
             const syncChannel = supabase.channel(
                "global_scores_leaderboard_sync",
             );
+            let channelRemoved = false;
+            const removeSyncChannel = () => {
+               if (!channelRemoved) {
+                  channelRemoved = true;
+                  supabase.removeChannel(syncChannel);
+               }
+            };
             syncChannel.subscribe((status) => {
                if (status === "SUBSCRIBED") {
                   syncChannel.send({
@@ -120,11 +127,11 @@ export const useGameEngine = (date: string) => {
                      },
                   });
                   // Cleanup channel after a short delay to ensure broadcast is sent
-                  setTimeout(() => {
-                     supabase.removeChannel(syncChannel);
-                  }, 1000);
+                  setTimeout(removeSyncChannel, 1000);
                }
             });
+            // Also clean up if status is not SUBSCRIBED (error/closed/timeout)
+            setTimeout(removeSyncChannel, 5000);
 
             // Invalidate Redis server cache on completion (Hybrid Optimization)
             if (isGameOver) {

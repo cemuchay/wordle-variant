@@ -255,19 +255,21 @@ export const useChat = (userId: string) => {
 
    // Fetch guesses of users for today (for mention/tag autocomplete)
    useEffect(() => {
-      if (!userId || !date) return;
-      const fetchGuesses = async () => {
-         const { data } = await supabase
-            .from("scores")
-            .select(
-               "user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score",
-            )
-            .eq("game_date", date);
-         if (data) {
-            setDailyGuesses(data);
-         }
-      };
-      fetchGuesses();
+     if (!userId || !date) return;
+     let cancelled = false;
+     const fetchGuesses = async () => {
+       const { data } = await supabase
+         .from("scores")
+         .select(
+           "user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score",
+         )
+         .eq("game_date", date);
+       if (!cancelled && data) {
+         setDailyGuesses(data);
+       }
+     };
+     fetchGuesses();
+     return () => { cancelled = true; };
    }, [userId, date]);
 
    // Fetch groups & invites on load
@@ -975,13 +977,15 @@ export const useChat = (userId: string) => {
 
    // Get all profiles for user selector
    useEffect(() => {
-      const fetchUsers = async () => {
-         const { data } = await supabase
-            .from("profiles")
-            .select("username, avatar_url, id");
-         if (data) setUsers(data.filter((u) => u.id !== userId));
-      };
-      fetchUsers();
+     let cancelled = false;
+     const fetchUsers = async () => {
+       const { data } = await supabase
+         .from("profiles")
+         .select("username, avatar_url, id");
+       if (!cancelled && data) setUsers(data.filter((u) => u.id !== userId));
+     };
+     fetchUsers();
+     return () => { cancelled = true; };
    }, [userId]);
 
    return {

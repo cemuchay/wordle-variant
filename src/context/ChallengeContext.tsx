@@ -227,6 +227,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         : null;
 
     const channelRef = useRef<any>(null);
+    const participantsCleanupRef = useRef<(() => void) | null>(null);
     const initialProcessed = useRef(false);
 
     // 3. Computed State (Merged with participants)
@@ -373,8 +374,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         });
     }, [myChallenges, openChallengeItems, listColumn, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
 
-    // 4. Action Wrappers
+        // 4. Action Wrappers
     const cleanupSubscription = useCallback(() => {
+        // Call the participants cleanup function if it exists
+        if (participantsCleanupRef.current) {
+            participantsCleanupRef.current();
+            participantsCleanupRef.current = null;
+        }
         if (channelRef.current) {
             supabase.removeChannel(channelRef.current);
             channelRef.current = null;
@@ -528,7 +534,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     setMyParticipation(null);
                 }
 
-                channelRef.current = subscribeToParticipants(challenge.id);
+                // subscribeToParticipants now returns a cleanup function
+                const cleanup = subscribeToParticipants(challenge.id);
+                participantsCleanupRef.current = cleanup;
+                // Keep channelRef for backward compatibility (used elsewhere)
+                const existingChannels = supabase.getChannels().filter(
+                    (c) => (c as any).topic === `realtime:challenge_participants_${challenge.id}` ||
+                            (c as any).topic === `realtime:challenge_participants_marathon_${challenge.id}`
+                );
+                channelRef.current = existingChannels[0] || null;
             } else {
                 triggerToast("Invalid challenge link or code.", 4000);
             }

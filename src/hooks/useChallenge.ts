@@ -212,10 +212,16 @@ export const useChallenge = (_user: AppUser | null) => {
             }, fetchAndSet)
             .subscribe();
 
-        // Initial fetch
+                // Initial fetch
         fetchAndSet();
 
-        return channel;
+        // Return a cleanup function instead of the raw channel
+        return () => {
+            supabase.removeChannel(channel);
+            if (activeChallengeIdRef.current === challengeId) {
+                activeChallengeIdRef.current = null;
+            }
+        };
     }, [normalizeParticipation]);
 
     const retryFetchParticipants = useCallback(() => {
