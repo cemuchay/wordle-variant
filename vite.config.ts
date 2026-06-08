@@ -13,12 +13,12 @@ export default defineConfig({
          strategies: "injectManifest",
          srcDir: "src",
          filename: "null.ts",
-         registerType: 'prompt',
+         registerType: "prompt",
          workbox: {
             cleanupOutdatedCaches: true,
             skipWaiting: true,
             clientsClaim: true,
-            globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+            globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
          },
          includeAssets: [
             "favicon.ico",
@@ -48,25 +48,36 @@ export default defineConfig({
             ],
          },
          devOptions: {
-            enabled: true,
+            enabled: false, // Turn off in dev unless actively debugging PWA
          },
       }),
    ],
    build: {
+      cssCodeSplit: true,
+      sourcemap: false,
       rollupOptions: {
          output: {
+            codeSplitting: true,
             manualChunks(id) {
-               if (id.includes('node_modules')) {
-                  if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
-                  if (id.includes('@supabase')) return 'vendor-supabase';
-                  if (id.includes('framer-motion') || id.includes('lucide-react')) return 'vendor-ui';
-                  if (id.includes('agora-rtc-sdk-ng')) return 'vendor-agora';
-                  return 'vendor-libs';
+               if (id.includes("src/data")) {
+                  return "data-layer";
                }
-               return null;
+               if (id.includes("node_modules")) {
+                  if (id.includes("react") || id.includes("scheduler") || id.includes("react-dom"))
+                     return "vendor-react-core";
+                  if (id.includes("@supabase")) return "vendor-supabase";
+                  if (id.includes("@tanstack/react-query")) return "vendor-query";
+                  if (id.includes("framer-motion")) return "vendor-framer";
+                  if (id.includes("lucide-react")) return "vendor-icons";
+                  if (id.includes("agora-rtc-sdk-ng")) return "vendor-agora";
+                  return "vendor-utils";
+               }
+               if (id.includes("src/lib/game-logic")) {
+                  return "game-logic";
+               }
             },
          },
       },
-      chunkSizeWarningLimit: 1500,
+      chunkSizeWarningLimit: 600, // Lower limit to encourage better splitting
    },
 });

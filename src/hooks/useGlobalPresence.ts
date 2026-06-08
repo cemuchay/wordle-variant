@@ -36,6 +36,7 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
     }, [userId]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchProfiles();
 
         if (!userId) {
@@ -99,14 +100,12 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             channelRef.current = null;
             updateLastSeen();
         };
-    }, [userId, fetchProfiles, updateLastSeen, currentVoiceRoomId]);
+    }, [userId, fetchProfiles, updateLastSeen]); // Removed currentVoiceRoomId - handled by the separate tracking effect below
 
-    // Update tracking when voice room changes
+        // Update tracking when voice room changes
     useEffect(() => {
         if (channelRef.current && userId && channelRef.current.state === 'joined') {
-            const { data: profile } = allProfiles.find(p => p.id === userId) 
-                ? { data: allProfiles.find(p => p.id === userId) } 
-                : { data: null };
+            const profile = allProfiles.find(p => p.id === userId);
             
             if (profile) {
                 channelRef.current.track({
