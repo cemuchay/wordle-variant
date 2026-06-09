@@ -30,6 +30,7 @@ export interface ChatGroup {
    created_at: string;
    is_core: boolean;
    dm_partner?: { id: string; username: string; avatar_url: string };
+   dm_key?: string | null;
 }
 
 // --- Encryption Helpers for DMs (Client-Side E2EE) ---
@@ -932,27 +933,18 @@ export const useChat = (userId: string) => {
    // Start DM room
    const startDM = async (partnerId: string): Promise<string | null> => {
       if (partnerId === userId) return null;
+      const dmKey = [userId, partnerId].sort().join(":");
 
-      // 1. Check if DM room already exists between these 2 users
-      const { data: matches } = await supabase
-         .from("chat_group_members")
-         .select("group_id, chat_groups!inner(type)")
-         .eq("user_id", userId)
-         .eq("chat_groups.type", "dm");
+      // 1. Check if DM room already exists using the dm_key
+      const { data: existingGroup } = await supabase
+         .from("chat_groups")
+         .select("id")
+         .eq("dm_key", dmKey)
+         .maybeSingle();
 
-      if (matches && matches.length > 0) {
-         const groupIds = matches.map((m: any) => m.group_id);
-         const { data: partnerMatch } = await supabase
-            .from("chat_group_members")
-            .select("group_id")
-            .in("group_id", groupIds)
-            .eq("user_id", partnerId)
-            .maybeSingle();
-
-         if (partnerMatch) {
-            setActiveRoomId(partnerMatch.group_id);
-            return partnerMatch.group_id;
-         }
+      if (existingGroup) {
+         setActiveRoomId(existingGroup.id);
+         return existingGroup.id;
       }
 
       // 2. Otherwise create a new DM group
@@ -965,6 +957,7 @@ export const useChat = (userId: string) => {
       if (groupErr) return null;
 
       // Add memberships
+      // Note: The SQL trigger will automatically populate the dm_key on the 2nd membership insert
       await supabase.from("chat_group_members").insert([
          { group_id: newGroup.id, user_id: userId, status: "joined" },
          { group_id: newGroup.id, user_id: partnerId, status: "joined" },
