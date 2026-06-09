@@ -773,69 +773,28 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <ChatHeader
                                 typingUsers={typingUsers}
                                 currentUserName={nameOfUser}
+                                activeRoom={activeRoom}
+                                showSearchIcon={!showConversationSearch}
+                                onToggleSearch={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
+                                onChallenge={(activeRoom?.type === "dm" || activeRoom?.type === "custom") ? () => {
+                                    if (onClose) onClose();
+                                    setIsChallengeOpen(true);
+                                } : undefined}
+                                onDeleteGroup={(activeRoom?.type === "custom" && activeRoom?.created_by === user.id) ? async () => {
+                                    const confirmed = await ask({
+                                        title: "Delete Group",
+                                        message: `Are you sure you want to delete "${activeRoom.name}"? This action cannot be undone.`,
+                                        confirmLabel: "Delete Group",
+                                        cancelLabel: "Cancel",
+                                        type: "danger"
+                                    });
+                                    if (confirmed) {
+                                        await deleteGroup(activeRoom.id);
+                                        setShowSidebar(true);
+                                    }
+                                } : undefined}
                             />
                         </div>
-
-                        {/* Top Group actions toolbar */}
-                        {activeRoom && (
-                            <div className="px-4 sm:px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
-                                <span className="text-[8px] sm:text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
-                                    <Zap size={10} /> Active: {activeRoom.name}
-                                    {activeRoom.type === "dm" && <span className="text-white/40">(E2EE Encrypted)</span>}
-                                    {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>
-                                    }
-                                    <>
-                                        {!showConversationSearch && (
-                                            <button
-                                                onClick={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
-                                                className="ms-4 p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
-                                                title="Search in conversation"
-                                            >
-                                                <Search size={14} />
-                                            </button>
-
-                                        )}
-                                    </>
-                                </span>
-                                <div className="flex gap-2">
-                                    {/* Create Challenge from chats button */}
-                                    {(activeRoom.type === "dm" || activeRoom.type === "custom") && (
-                                        <button
-                                            onClick={() => {
-                                                if (onClose) onClose();
-                                                setIsChallengeOpen(true);
-                                            }}
-                                            className="ms-2 px-1.5 sm:px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[7px] sm:text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
-                                            title="Create Challenge"
-                                        >
-                                            🏆 Challenge
-                                        </button>
-                                    )}
-                                    {/* Delete group action */}
-                                    {activeRoom.type === "custom" && activeRoom.created_by === user.id && (
-                                        <button
-                                            onClick={async () => {
-                                                const confirmed = await ask({
-                                                    title: "Delete Group",
-                                                    message: `Are you sure you want to delete "${activeRoom.name}"? This action cannot be undone.`,
-                                                    confirmLabel: "Delete Group",
-                                                    cancelLabel: "Cancel",
-                                                    type: "danger"
-                                                });
-                                                if (confirmed) {
-                                                    await deleteGroup(activeRoom.id);
-                                                    setShowSidebar(true);
-                                                }
-                                            }}
-                                            className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-all cursor-pointer border border-transparent hover:border-red-500/20"
-                                            title="Delete Group"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
                         {/* Game Analysis lock validation */}
                         {activeRoom && activeRoom.type === "game_analysis" && !hasPlayedToday ? (
