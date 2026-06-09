@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { NotificationToast } from './NotificationToast';
+import { useNotifications } from '../../hooks/useNotifications';
 
 /**
  * Headless component to manage notification lifecycle:
@@ -10,6 +10,9 @@ export const NotificationsManager = () => {
     const { profile, } = useApp();
     const hasReminded = useRef(false);
 
+    // Ensure real-time subscription is active
+    useNotifications(profile?.id, { enableRealtime: true });
+
     // Reset reminder state if user logs out
     useEffect(() => {
         if (!profile?.id) {
@@ -17,5 +20,5 @@ export const NotificationsManager = () => {
         }
     }, [profile?.id]);
 
-    return <NotificationToast />;
+    return null;
 };

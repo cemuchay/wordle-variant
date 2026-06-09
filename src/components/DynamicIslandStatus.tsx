@@ -13,6 +13,7 @@ export const DynamicIslandStatus = () => {
         activeCall,
         setIsChallengeOpen,
         setIsChatOpen,
+        setIsNotificationsOpen,
         triggerToast,
         toast,
         setToast,
@@ -40,6 +41,19 @@ export const DynamicIslandStatus = () => {
             triggerToast(audioChat.error, 5000);
         }
     }, [audioChat.error, triggerToast]);
+
+    // Listen for new notifications to flash in the Dynamic Island
+    useEffect(() => {
+        const handleNewNotification = (e: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail && detail.message) {
+                // Briefly flash in Dynamic Island using triggerToast
+                triggerToast(detail.message, 5000);
+            }
+        };
+        window.addEventListener('new-notification', handleNewNotification);
+        return () => window.removeEventListener('new-notification', handleNewNotification);
+    }, [triggerToast]);
 
     // Toast logic: auto-hide after duration
     useEffect(() => {
@@ -178,7 +192,14 @@ export const DynamicIslandStatus = () => {
                     scale: { duration: 0.15 },
                     y: { type: 'spring', stiffness: 380, damping: 35 }
                 }}
-                onClick={() => setIsExpanded(!isExpanded)}
+                onClick={() => {
+                    if (toast.show) {
+                        setIsNotificationsOpen(true);
+                        setToast({ ...toast, show: false });
+                    } else {
+                        setIsExpanded(!isExpanded);
+                    }
+                }}
                 className={`
                     pointer-events-auto cursor-pointer overflow-hidden
                     bg-black/20 backdrop-blur-md border border-white/10
