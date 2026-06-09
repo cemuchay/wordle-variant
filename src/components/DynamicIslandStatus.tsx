@@ -7,8 +7,11 @@ import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
 import formatLastSeen from '../utils/formatLastSeen';
 
+import { useAppStore } from '../store/useAppStore';
+
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
+    const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
     const {
         activeCall,
         setIsChallengeOpen,
@@ -535,7 +538,8 @@ export const DynamicIslandStatus = () => {
                                                 {p.id !== user?.id && (
                                                     <button
                                                         onClick={() => {
-                                                            window.dispatchEvent(new CustomEvent('start-direct-message', { detail: { userId: p.id } }));
+                                                            setPendingDMUserId(p.id);
+                                                            setIsChatOpen(true);
                                                             setIsExpanded(false);
                                                         }}
                                                         className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"

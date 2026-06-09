@@ -50,8 +50,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const readReceipts = useAppStore((state) => state.readReceipts);
 
     const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
+    const pendingDMUserId = useAppStore(s => s.pendingDMUserId);
+    const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
 
     const [showSidebar, setShowSidebar] = useState(true);
+    const [isStartingDM, setIsStartingDM] = useState(false);
 
     // Sync conversation state to store so App.tsx can hide navigation
     useEffect(() => {
@@ -142,18 +145,22 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     }, [firstUnreadId]);
 
-    // Handle incoming start-direct-message request
+    // Handle pending DM from Store
     useEffect(() => {
-        const handleStartDM = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            if (detail?.userId) {
-                startDM(detail.userId);
-                setShowSidebar(false);
+        const initDM = async () => {
+            if (pendingDMUserId) {
+                setIsStartingDM(true);
+                try {
+                    await startDM(pendingDMUserId);
+                    setShowSidebar(false);
+                } finally {
+                    setIsStartingDM(false);
+                    setPendingDMUserId(null);
+                }
             }
         };
-        window.addEventListener("start-direct-message", handleStartDM);
-        return () => window.removeEventListener("start-direct-message", handleStartDM);
-    }, [startDM]);
+        initDM();
+    }, [pendingDMUserId, startDM, setPendingDMUserId]);
 
     const handleScroll = () => {
         if (showUnreadLine) {
@@ -415,6 +422,24 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative"
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
         >
+            {/* DM Loading Overlay */}
+            <AnimatePresence>
+                {isStartingDM && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
+                    >
+                        <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,255,0,0.2)]" />
+                        <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-black uppercase tracking-[0.2em] text-white">Opening Chat</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Securing Connection...</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Background WhatsApp pattern */}
             <div
                 className="absolute inset-0 opacity-[0.05] pointer-events-none"
@@ -623,12 +648,17 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                             <button
                                                                 key={u.id}
                                                                 onClick={async () => {
-                                                                    const id = await startDM(u.id);
-                                                                    setIsCreatingDM(false);
-                                                                    setDmSearchQuery("");
-                                                                    if (id) {
-                                                                        setActiveRoomId(id);
-                                                                        setShowSidebar(false);
+                                                                    setIsStartingDM(true);
+                                                                    try {
+                                                                        const id = await startDM(u.id);
+                                                                        setIsCreatingDM(false);
+                                                                        setDmSearchQuery("");
+                                                                        if (id) {
+                                                                            setActiveRoomId(id);
+                                                                            setShowSidebar(false);
+                                                                        }
+                                                                    } finally {
+                                                                        setIsStartingDM(false);
                                                                     }
                                                                 }}
                                                                 className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
