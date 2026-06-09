@@ -17,7 +17,7 @@ import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setIsChallengeOpen } = useApp();
+    const { setIsChallengeOpen, allProfiles } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -944,6 +944,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         }}
                                                         onMarkAsRead={(id) => markAsRead(id)}
                                                         users={users}
+                                                        allProfiles={allProfiles}
                                                         onReact={(emoji) => reactToMessage(msg.id, emoji)}
                                                         currentUserId={user.id}
                                                         onEdit={(newContent) => editMessage(msg.id, newContent)}

@@ -15,6 +15,7 @@ interface ChatMessageProps {
     onScrollToMessage?: (messageId: string) => void;
     onMarkAsRead: (id: string) => void;
     users: { username: string; avatar_url: string; id: string }[];
+    allProfiles?: { id: string; username: string; avatar_url: string }[];
     onReact: (emoji: string | null) => void;
     currentUserId: string;
     onEdit: (newContent: string) => Promise<void>;
@@ -112,7 +113,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onMarkAsRead, users, allProfiles, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
 
@@ -120,20 +121,25 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
+    const [showReactionDetails, setShowReactionDetails] = useState(false);
     const [zoomOpen, setZoomOpen] = useState(false);
     const reactionsRef = useRef<HTMLDivElement>(null);
+    const detailsRef = useRef<HTMLDivElement>(null);
 
-    // Outside click to close reactions menu
+    // Outside click to close menus
     useEffect(() => {
-        if (!showReactionsMenu) return;
+        if (!showReactionsMenu && !showReactionDetails) return;
         const handleClickOutside = (e: MouseEvent) => {
-            if (reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
+            if (showReactionsMenu && reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
                 setShowReactionsMenu(false);
+            }
+            if (showReactionDetails && detailsRef.current && !detailsRef.current.contains(e.target as Node)) {
+                setShowReactionDetails(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showReactionsMenu]);
+    }, [showReactionsMenu, showReactionDetails]);
 
     // Transform x position to reply icon properties (swipe to right)
     const replyIconOpacity = useTransform(x, [0, 50], [0, 1]);
@@ -644,13 +650,55 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
 
                     {/* Reactions Count Display */}
                     {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
-                        <div className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30`}>
+                        <div 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowReactionDetails(!showReactionDetails);
+                            }}
+                            className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30 cursor-pointer hover:bg-[#2a3942] transition-colors`}
+                        >
                             {Array.from(new Set(Object.values(msg.reactions))).slice(0, 3).map((emoji, idx) => (
                                 <span key={idx} className="text-[10px]">{emoji as string}</span>
                             ))}
                             <span className="text-[9px] text-white font-black ml-0.5">
                                 {Object.keys(msg.reactions).length}
                             </span>
+
+                            {/* Reactions Details Popover */}
+                            <AnimatePresence>
+                                {showReactionDetails && (
+                                    <motion.div
+                                        ref={detailsRef}
+                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-[#1f2c34] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex flex-col gap-1.5">
+                                            {Object.entries(msg.reactions).map(([uid, emoji]) => {
+                                                const profile = (allProfiles || users).find(p => p.id === uid);
+                                                return (
+                                                    <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <ProtectedAvatar 
+                                                                userId={uid} 
+                                                                src={profile?.avatar_url} 
+                                                                username={profile?.username || 'Unknown'} 
+                                                                className="w-4 h-4 rounded-full shrink-0" 
+                                                            />
+                                                            <span className="text-[10px] font-black text-white truncate">
+                                                                {uid === currentUserId ? 'You' : (profile?.username || 'Someone')}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[12px] shrink-0">{emoji as string}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     )}
                 </div>
