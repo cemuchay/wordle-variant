@@ -48,9 +48,12 @@ interface ChallengeParticipation {
     };
 }
 
+import { useAppStore } from '../store/useAppStore';
+
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onClose }) => {
     const { user: currentUser } = useAuth();
-    const { onlineUsers, initiatePrivateCall, activeCall, triggerToast, date } = useApp();
+    const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
+    const { onlineUsers, initiatePrivateCall, activeCall, triggerToast, date, setIsChatOpen } = useApp();
     const [isWrappedOpen, setIsWrappedOpen] = useState(false);
     const [avatarClicks, setAvatarClicks] = useState(0);
 
@@ -372,7 +375,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     <div className="flex items-center gap-2 mr-6 shrink-0">
                                         <button
                                             onClick={() => {
-                                                window.dispatchEvent(new CustomEvent("start-direct-message", { detail: { userId: profile.id } }));
+                                                setPendingDMUserId(profile.id);
+                                                setIsChatOpen(true);
                                                 onClose();
                                             }}
                                             className="flex items-center justify-center p-2.5 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full shadow-lg hover:scale-105 transition-all"

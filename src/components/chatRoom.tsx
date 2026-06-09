@@ -17,7 +17,7 @@ import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setIsChallengeOpen } = useApp();
+    const { setIsChallengeOpen, allProfiles } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -50,8 +50,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const readReceipts = useAppStore((state) => state.readReceipts);
 
     const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
+    const pendingDMUserId = useAppStore(s => s.pendingDMUserId);
+    const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
 
     const [showSidebar, setShowSidebar] = useState(true);
+    const [isStartingDM, setIsStartingDM] = useState(false);
 
     // Sync conversation state to store so App.tsx can hide navigation
     useEffect(() => {
@@ -142,18 +145,22 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         }
     }, [firstUnreadId]);
 
-    // Handle incoming start-direct-message request
+    // Handle pending DM from Store
     useEffect(() => {
-        const handleStartDM = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            if (detail?.userId) {
-                startDM(detail.userId);
-                setShowSidebar(false);
+        const initDM = async () => {
+            if (pendingDMUserId) {
+                setIsStartingDM(true);
+                try {
+                    await startDM(pendingDMUserId);
+                    setShowSidebar(false);
+                } finally {
+                    setIsStartingDM(false);
+                    setPendingDMUserId(null);
+                }
             }
         };
-        window.addEventListener("start-direct-message", handleStartDM);
-        return () => window.removeEventListener("start-direct-message", handleStartDM);
-    }, [startDM]);
+        initDM();
+    }, [pendingDMUserId, startDM, setPendingDMUserId]);
 
     const handleScroll = () => {
         if (showUnreadLine) {
@@ -415,6 +422,24 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative"
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
         >
+            {/* DM Loading Overlay */}
+            <AnimatePresence>
+                {isStartingDM && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
+                    >
+                        <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,255,0,0.2)]" />
+                        <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-black uppercase tracking-[0.2em] text-white">Opening Chat</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Securing Connection...</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Background WhatsApp pattern */}
             <div
                 className="absolute inset-0 opacity-[0.05] pointer-events-none"
@@ -623,12 +648,17 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                             <button
                                                                 key={u.id}
                                                                 onClick={async () => {
-                                                                    const id = await startDM(u.id);
-                                                                    setIsCreatingDM(false);
-                                                                    setDmSearchQuery("");
-                                                                    if (id) {
-                                                                        setActiveRoomId(id);
-                                                                        setShowSidebar(false);
+                                                                    setIsStartingDM(true);
+                                                                    try {
+                                                                        const id = await startDM(u.id);
+                                                                        setIsCreatingDM(false);
+                                                                        setDmSearchQuery("");
+                                                                        if (id) {
+                                                                            setActiveRoomId(id);
+                                                                            setShowSidebar(false);
+                                                                        }
+                                                                    } finally {
+                                                                        setIsStartingDM(false);
                                                                     }
                                                                 }}
                                                                 className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
@@ -749,7 +779,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         {/* Top Group actions toolbar */}
                         {activeRoom && (
                             <div className="px-4 sm:px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
-                                <span className="text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
+                                <span className="text-[8px] sm:text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
                                     <Zap size={10} /> Active: {activeRoom.name}
                                     {activeRoom.type === "dm" && <span className="text-white/40">(E2EE Encrypted)</span>}
                                     {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>
@@ -775,7 +805,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 if (onClose) onClose();
                                                 setIsChallengeOpen(true);
                                             }}
-                                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
+                                            className="ms-2 px-1.5 sm:px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[7px] sm:text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
                                             title="Create Challenge"
                                         >
                                             🏆 Challenge
@@ -895,9 +925,26 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         isMe={isMe}
                                                         replyMsg={replyMsg}
                                                         onScrollToMessage={scrollToMessage}
-                                                        onReply={(m) => setReplyingTo(m)}
+                                                        onReply={(m) => {
+                                                            setReplyingTo(m);
+                                                            // Immediate focus for mobile swipe compatibility
+                                                            const input = document.querySelector('[contenteditable="true"]') as HTMLElement;
+                                                            if (input) {
+                                                                input.focus();
+                                                                // Move cursor to end
+                                                                const range = document.createRange();
+                                                                range.selectNodeContents(input);
+                                                                range.collapse(false);
+                                                                const sel = window.getSelection();
+                                                                if (sel) {
+                                                                    sel.removeAllRanges();
+                                                                    sel.addRange(range);
+                                                                }
+                                                            }
+                                                        }}
                                                         onMarkAsRead={(id) => markAsRead(id)}
                                                         users={users}
+                                                        allProfiles={allProfiles}
                                                         onReact={(emoji) => reactToMessage(msg.id, emoji)}
                                                         currentUserId={user.id}
                                                         onEdit={(newContent) => editMessage(msg.id, newContent)}
