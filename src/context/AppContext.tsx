@@ -33,6 +33,7 @@ interface AppContextType {
     setIsNotificationsOpen: (val: boolean) => void;
     isChatOpen: boolean;
     setIsChatOpen: (val: boolean) => void;
+    isChatConversationOpen: boolean;
 
     // Call Signaling Helpers
     initiatePrivateCall: (targetUser: { id: string; username: string; avatar_url: string }) => void;
@@ -101,6 +102,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const isNotificationsOpen = useAppStore(s => s.isNotificationsOpen);
     const setIsNotificationsOpen = useAppStore(s => s.setNotificationsOpen);
     const isChatOpen = useAppStore(s => s.isChatOpen);
+    const isChatConversationOpen = useAppStore(s => s.isChatConversationOpen);
     const setIsChatOpen = useAppStore(s => s.setChatOpen);
     const setIsLoadingDate = useAppStore(s => s.setIsLoadingDate);
     const myParticipations = useAppStore(s => s.myParticipations);
@@ -592,6 +594,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isNotificationsOpen,
         setIsNotificationsOpen,
         isChatOpen,
+        isChatConversationOpen,
         setIsChatOpen,
         onlineUsers,
         allProfiles,
@@ -609,7 +612,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsLoadingDate, stats, setStats, activeCall,
         setActiveCall, isChallengeOpen, setIsChallengeOpen,
         isNotificationsOpen, setIsNotificationsOpen,
-        isChatOpen, setIsChatOpen, onlineUsers, allProfiles,
+        isChatOpen,
+                isChatConversationOpen,
+                setIsChatOpen,
+                onlineUsers,
+                allProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
         acceptCall, rejectCall, hangUpCall, realtimeStatus
     ]);

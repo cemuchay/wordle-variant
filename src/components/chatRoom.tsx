@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
-import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap, Search } from "lucide-react";
+import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,7 +49,15 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const globalMessages = useAppStore((state) => state.globalMessages);
     const readReceipts = useAppStore((state) => state.readReceipts);
 
+    const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
+
     const [showSidebar, setShowSidebar] = useState(true);
+
+    // Sync conversation state to store so App.tsx can hide navigation
+    useEffect(() => {
+        setChatConversationOpen(!showSidebar);
+    }, [showSidebar, setChatConversationOpen]);
+
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [isCreatingDM, setIsCreatingDM] = useState(false);
     const [dmSearchQuery, setDmSearchQuery] = useState("");
@@ -61,6 +69,64 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Conversation search state
+    const [showConversationSearch, setShowConversationSearch] = useState(false);
+    const [conversationSearchQuery, setConversationSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<{ index: number; id: string; preview: string }[]>([]);
+    const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Scroll to bottom button visibility
+    const [showScrollDown, setShowScrollDown] = useState(false);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Scroll to a specific message by ID
+    const scrollToMessage = useCallback((messageId: string) => {
+        const el = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-correct', 'rounded-2xl');
+            setTimeout(() => {
+                el.classList.remove('ring-2', 'ring-correct', 'rounded-2xl');
+            }, 2000);
+        }
+    }, []);
+
+    // Search messages in current conversation
+    useEffect(() => {
+        if (!conversationSearchQuery.trim()) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setSearchResults([]);
+            return;
+        }
+        const q = conversationSearchQuery.toLowerCase();
+        const results = messages
+            .map((msg: any, index: number) => ({
+                index,
+                id: msg.id,
+                preview: (msg.content || '').slice(0, 60)
+            }))
+            .filter(r => r.preview.toLowerCase().includes(q));
+        setSearchResults(results);
+        setCurrentSearchIndex(0);
+        if (results.length > 0) {
+            scrollToMessage(results[0].id);
+        }
+    }, [conversationSearchQuery, messages, scrollToMessage]);
+
+    const navigateSearch = useCallback((direction: 'next' | 'prev') => {
+        if (searchResults.length === 0) return;
+        const newIndex = direction === 'next'
+            ? (currentSearchIndex + 1) % searchResults.length
+            : (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+        setCurrentSearchIndex(newIndex);
+        scrollToMessage(searchResults[newIndex].id);
+    }, [searchResults, currentSearchIndex, scrollToMessage]);
+
     const { signInWithGoogle } = useAuth();
 
 
@@ -92,6 +158,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const handleScroll = () => {
         if (showUnreadLine) {
             setShowUnreadLine(false);
+        }
+        // Show scroll-down button when scrolled up more than 300px from bottom
+        if (scrollNode) {
+            const isAtBottom = scrollNode.scrollHeight - scrollNode.scrollTop <= scrollNode.clientHeight + 250;
+            setShowScrollDown(!isAtBottom);
         }
     };
 
@@ -454,7 +525,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                         const isActive = activeRoomId === room.id;
                                         const unreadCount = unreadCounts[room.id] || 0;
 
-                                        let icon = null;
+                                        let icon;
                                         if (room.is_core) {
                                             icon = (
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0">
@@ -562,11 +633,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 }}
                                                                 className="p-3 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-left flex items-center gap-3 cursor-pointer transition-all"
                                                             >
-                                                                <ProtectedAvatar 
+                                                                <ProtectedAvatar
                                                                     userId={u.id}
-                                                                    src={u.avatar_url} 
-                                                                    username={u.username} 
-                                                                    className="w-8 h-8 rounded-full border border-white/10" 
+                                                                    src={u.avatar_url}
+                                                                    username={u.username}
+                                                                    className="w-8 h-8 rounded-full border border-white/10"
                                                                 />
                                                                 <span className="text-sm font-bold text-white">{u.username}</span>
                                                             </button>
@@ -619,11 +690,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                                 onClick={() => toggleSelectUser(u.id)}
                                                                 className={`p-2.5 border rounded-xl text-left flex items-center gap-2 truncate cursor-pointer transition-all ${isSelected ? 'bg-correct border-correct text-black' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`}
                                                             >
-                                                                <ProtectedAvatar 
+                                                                <ProtectedAvatar
                                                                     userId={u.id}
-                                                                    src={u.avatar_url} 
-                                                                    username={u.username} 
-                                                                    className="w-5 h-5 rounded-full border border-white/10" 
+                                                                    src={u.avatar_url}
+                                                                    username={u.username}
+                                                                    className="w-5 h-5 rounded-full border border-white/10"
                                                                 />
                                                                 <span className="text-[10.5px] font-bold truncate">{u.username}</span>
                                                             </button>
@@ -677,11 +748,24 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
                         {/* Top Group actions toolbar */}
                         {activeRoom && (
-                            <div className="px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
+                            <div className="px-4 sm:px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
                                 <span className="text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
                                     <Zap size={10} /> Active: {activeRoom.name}
                                     {activeRoom.type === "dm" && <span className="text-white/40">(E2EE Encrypted)</span>}
-                                    {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>}
+                                    {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>
+                                    }
+                                    <>
+                                        {!showConversationSearch && (
+                                            <button
+                                                onClick={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
+                                                className="ms-4 p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
+                                                title="Search in conversation"
+                                            >
+                                                <Search size={14} />
+                                            </button>
+
+                                        )}
+                                    </>
                                 </span>
                                 <div className="flex gap-2">
                                     {/* Create Challenge from chats button */}
@@ -736,6 +820,49 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             </div>
                         ) : (
                             <>
+                                {/* Conversation Search Icon Button */}
+                                {showConversationSearch && (
+                                    <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-black/40 border-b border-white/5">
+                                        <button
+                                            onClick={() => { setShowConversationSearch(false); setConversationSearchQuery(''); }}
+                                            className="text-white/40 hover:text-white transition-colors cursor-pointer"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                        <input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            value={conversationSearchQuery}
+                                            onChange={(e) => setConversationSearchQuery(e.target.value)}
+                                            placeholder="Search messages..."
+                                            className="flex-1 bg-transparent text-xs text-white placeholder-white/30 outline-none"
+                                            autoFocus
+                                        />
+                                        {searchResults.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] text-white/40 font-mono">
+                                                    {currentSearchIndex + 1}/{searchResults.length}
+                                                </span>
+                                                <button
+                                                    onClick={() => navigateSearch('prev')}
+                                                    className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                                >
+                                                    <ChevronUp size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => navigateSearch('next')}
+                                                    className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                                                >
+                                                    <ChevronDown size={12} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {searchResults.length === 0 && conversationSearchQuery.trim() && (
+                                            <span className="text-[9px] text-white/30 font-mono">No results</span>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Message Area */}
                                 <div
                                     ref={setScrollNode}
@@ -767,6 +894,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         msg={msg}
                                                         isMe={isMe}
                                                         replyMsg={replyMsg}
+                                                        onScrollToMessage={scrollToMessage}
                                                         onReply={(m) => setReplyingTo(m)}
                                                         onMarkAsRead={(id) => markAsRead(id)}
                                                         users={users}
@@ -794,6 +922,22 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     </AnimatePresence>
                                     <div ref={messagesEndRef} />
                                 </div>
+
+                                {/* Scroll to bottom button */}
+                                <AnimatePresence>
+                                    {showScrollDown && (
+                                        <motion.button
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 10 }}
+                                            onClick={scrollToBottom}
+                                            className="absolute top-100 right-4 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#1f2c34] border border-white/15 flex items-center justify-center text-white/70 hover:text-white hover:bg-[#2a3942] shadow-2xl transition-all cursor-pointer"
+                                            title="Scroll to bottom"
+                                        >
+                                            <ChevronDown size={18} />
+                                        </motion.button>
+                                    )}
+                                </AnimatePresence>
 
                                 {/* Input Area */}
                                 <div className="z-10">

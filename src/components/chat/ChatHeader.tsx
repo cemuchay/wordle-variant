@@ -15,9 +15,9 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
     const otherTypingUsers = typingUsers.filter(name => name !== currentUserName);
 
     return (
-        <div className="p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md">
+        <div className=" p-3 sm:p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md">
             <div className="flex items-center gap-4">
-                <div className="relative ms-8">
+                <div className="relative ms-10 sm:ms-8">
                     <div className="w-8 h-8 rounded-2xl bg-linear-to-tr from-correct to-emerald-400 flex items-center justify-center text-black shadow-lg shadow-correct/20">
                         <span className="font-black text-sm">#</span>
                     </div>
@@ -28,7 +28,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                     />
                 </div>
                 <div>
-                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Variant ChatRoom (24h)</h4>
+                    <h4 className="text-[8px] sm:text-sm font-black uppercase tracking-widest text-white">Chat (24h)</h4>
                     <div className="h-4 flex items-center">
                         <AnimatePresence mode="wait">
                             {otherTypingUsers.length > 0 ? (
@@ -37,7 +37,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                                     initial={{ opacity: 0, y: 5 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -5 }}
-                                    className="text-[10px] text-correct font-bold uppercase flex items-center gap-1"
+                                    className="text-[7px] sm:text-[10px] text-correct font-bold uppercase flex items-center gap-1"
                                 >
                                     <span className="flex gap-0.5">
                                         <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1 h-1 bg-correct rounded-full" />

@@ -54,9 +54,10 @@ export default function App() {
     isChallengeOpen,
     setIsChallengeOpen,
     isChatOpen,
-    setIsChatOpen,
-    isNotificationsOpen,
-    setIsNotificationsOpen,
+          isChatConversationOpen,
+          setIsChatOpen,
+          isNotificationsOpen,
+          setIsNotificationsOpen,
     setChallengeUnreadCount,
     challengeUnreadCount,
     realtimeStatus,
@@ -558,7 +559,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && (
+      {!isPlayingChallenge && !isChatConversationOpen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}

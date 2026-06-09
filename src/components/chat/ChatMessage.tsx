@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useMemo, useState, useRef, useEffect } from 'react';
+import { memo, useMemo, useState, useRef, useEffect, } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
@@ -12,6 +12,7 @@ interface ChatMessageProps {
     isMe: boolean;
     replyMsg?: Message;
     onReply: (msg: Message) => void;
+    onScrollToMessage?: (messageId: string) => void;
     onMarkAsRead: (id: string) => void;
     users: { username: string; avatar_url: string; id: string }[];
     onReact: (emoji: string | null) => void;
@@ -55,7 +56,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
     };
 
     const formatTime = (time: number) => {
-        if (isNaN(time)) return "0:00";
+        if (isNaN(time)) return "00:00";
         const mins = Math.floor(time / 60);
         const secs = Math.floor(time % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -111,7 +112,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
+const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onMarkAsRead, users, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
 
@@ -120,6 +121,19 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
     const [zoomOpen, setZoomOpen] = useState(false);
+    const reactionsRef = useRef<HTMLDivElement>(null);
+
+    // Outside click to close reactions menu
+    useEffect(() => {
+        if (!showReactionsMenu) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
+                setShowReactionsMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showReactionsMenu]);
 
     // Transform x position to reply icon properties (swipe to right)
     const replyIconOpacity = useTransform(x, [0, 50], [0, 1]);
@@ -366,7 +380,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
     };
 
     return (
-        <div className="relative group overflow-visible">
+        <div className="relative group overflow-visible" data-message-id={msg.id}>
             {/* Swipe Reply Indicator */}
             {(!msg.is_deleted && !isEditing) && (
                 <motion.div
@@ -395,9 +409,12 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-4 cursor-grab active:cursor-grabbing touch-pan-y relative`}
                 onMouseEnter={() => !isMe && !msg.is_read && onMarkAsRead(msg.id)}
             >
-                {/* Reply Preview */}
+                {/* Reply Preview - click to scroll to original message */}
                 {replyMsg && !msg.is_deleted && (
-                    <div className={`text-[10px] mb-1.5 flex items-center gap-2 text-white/60 bg-white/5 px-3 py-1.5 rounded-t-xl border-l-2 border-correct/40 max-w-[80%] ${isMe ? 'flex-row-reverse' : ''}`}>
+                    <div
+                        onClick={() => onScrollToMessage?.(replyMsg.id)}
+                        className={`text-[10px] mb-1.5 flex items-center gap-2 text-white/60 bg-white/5 px-3 py-1.5 rounded-t-xl border-l-2 border-correct/40 max-w-[80%] hover:bg-white/10 cursor-pointer transition-colors ${isMe ? 'flex-row-reverse' : ''}`}
+                    >
                         <Reply size={10} className="text-correct shrink-0" />
                         <span className="opacity-60 truncate">
                              {replyMsg.profiles?.username}: {replyMsg.content}
@@ -457,6 +474,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     <AnimatePresence>
                         {showReactionsMenu && (
                             <motion.div
+                                ref={reactionsRef}
                                 initial={{ scale: 0.8, opacity: 0, y: 10 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.8, opacity: 0, y: 10 }}
@@ -488,7 +506,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
                     onTouchCancel={handleTouchEnd}
-                    className={`relative max-w-[85%] p-3 px-4 shadow-lg transition-all ${isMe
+                    className={`relative max-w-[85%] p-1 pb-3 px-1 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
                     ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
                     : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
                     }`}
@@ -599,7 +617,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                         )}
                     </div>
 
-                    <div className={`text-[10px] mt-1 flex font-mono font-bold items-center gap-1.5 justify-end text-white/60 text-left`}>
+                    <div className={`text-[9px] mt-1 flex font-mono font-bold items-center gap-1.5 justify-end text-white/60 text-left`}>
                         {msg.is_edited && !msg.is_deleted && (
                             <span className="text-[8px] font-black uppercase tracking-wider text-white/40 italic">(edited)</span>
                         )}
