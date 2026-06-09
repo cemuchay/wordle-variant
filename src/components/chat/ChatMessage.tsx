@@ -55,7 +55,7 @@ const AudioPlayer = ({ url }: { url: string }) => {
     };
 
     const formatTime = (time: number) => {
-        if (isNaN(time)) return "0:00";
+        if (isNaN(time)) return "00:00";
         const mins = Math.floor(time / 60);
         const secs = Math.floor(time % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -488,7 +488,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onMarkAsRead, users, o
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
                     onTouchCancel={handleTouchEnd}
-                    className={`relative max-w-[85%] p-3 px-4 shadow-lg transition-all ${isMe
+                    className={`relative max-w-[85%] p-2 px-2 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
                     ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
                     : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
                     }`}

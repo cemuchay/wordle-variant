@@ -6,6 +6,7 @@ import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
 import GuessPreviewModal from './GuessPreviewModal';
+import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
 import { LeaderboardSkeleton } from './common/Skeletons';
@@ -268,6 +269,8 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         debounceTimer = setTimeout(() => {
           console.log('[StatsModal] Local update received. Refreshing...', isBackground);
           fetchLeaderboard(true, isBackground);
+
+          
         }, 1500);
       }
     };
@@ -763,10 +766,11 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
           )}
         </div>
 
-        <img
-          src={entry.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.username)}`}
+                <ProtectedAvatar
+          userId={entry.user_id}
+          src={entry.avatar_url}
+          username={entry.username}
           className={`w-7 h-7 rounded-full border ${isFirst ? 'border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]' : 'border-gray-700'}`}
-          alt={entry.username}
         />
 
         <div className="flex flex-col">

@@ -49,7 +49,15 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const globalMessages = useAppStore((state) => state.globalMessages);
     const readReceipts = useAppStore((state) => state.readReceipts);
 
+    const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
+
     const [showSidebar, setShowSidebar] = useState(true);
+
+    // Sync conversation state to store so App.tsx can hide navigation
+    useEffect(() => {
+        setChatConversationOpen(!showSidebar);
+    }, [showSidebar, setChatConversationOpen]);
+
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [isCreatingDM, setIsCreatingDM] = useState(false);
     const [dmSearchQuery, setDmSearchQuery] = useState("");

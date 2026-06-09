@@ -45,7 +45,8 @@ interface AppState {
    isChallengeOpen: boolean;
    isNotificationsOpen: boolean;
    isChatOpen: boolean;
-   isLoadingDate: boolean;
+       isChatConversationOpen: boolean;
+       isLoadingDate: boolean;
 
    // Auth-related Local State
    preferences: UserPreferences;
@@ -73,7 +74,8 @@ interface AppState {
    setChallengeOpen: (val: boolean) => void;
    setNotificationsOpen: (val: boolean) => void;
    setChatOpen: (val: boolean) => void;
-   setUnreadCount: (val: number) => void;
+       setChatConversationOpen: (val: boolean) => void;
+       setUnreadCount: (val: number) => void;
    setChallengeUnreadCount: (val: number) => void;
    setActiveCall: (call: VoiceCallState | null) => void;
    setPreferences: (prefs: UserPreferences) => void;
@@ -101,7 +103,8 @@ export const useAppStore = create<AppState>((set) => ({
    ),
    isNotificationsOpen: false,
    isChatOpen: false,
-   isLoadingDate: true,
+       isChatConversationOpen: false,
+       isLoadingDate: true,
    preferences: defaultPreferences,
    stats: INITIAL_STATS,
    myParticipations: [],
@@ -129,6 +132,7 @@ export const useAppStore = create<AppState>((set) => ({
    setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),
    setNotificationsOpen: (isNotificationsOpen) => set({ isNotificationsOpen }),
    setChatOpen: (isChatOpen) => set({ isChatOpen }),
+    setChatConversationOpen: (isChatConversationOpen) => set({ isChatConversationOpen }),
    setUnreadCount: (unreadCount) => set({ unreadCount }),
    setChallengeUnreadCount: (challengeUnreadCount) =>
       set({ challengeUnreadCount }),
