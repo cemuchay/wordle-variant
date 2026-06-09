@@ -779,7 +779,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         {/* Top Group actions toolbar */}
                         {activeRoom && (
                             <div className="px-4 sm:px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
-                                <span className="text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
+                                <span className="text-[8px] sm:text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
                                     <Zap size={10} /> Active: {activeRoom.name}
                                     {activeRoom.type === "dm" && <span className="text-white/40">(E2EE Encrypted)</span>}
                                     {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>
@@ -805,7 +805,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                 if (onClose) onClose();
                                                 setIsChallengeOpen(true);
                                             }}
-                                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
+                                            className="ms-2 px-1.5 sm:px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[7px] sm:text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
                                             title="Create Challenge"
                                         >
                                             🏆 Challenge
@@ -925,7 +925,23 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         isMe={isMe}
                                                         replyMsg={replyMsg}
                                                         onScrollToMessage={scrollToMessage}
-                                                        onReply={(m) => setReplyingTo(m)}
+                                                        onReply={(m) => {
+                                                            setReplyingTo(m);
+                                                            // Immediate focus for mobile swipe compatibility
+                                                            const input = document.querySelector('[contenteditable="true"]') as HTMLElement;
+                                                            if (input) {
+                                                                input.focus();
+                                                                // Move cursor to end
+                                                                const range = document.createRange();
+                                                                range.selectNodeContents(input);
+                                                                range.collapse(false);
+                                                                const sel = window.getSelection();
+                                                                if (sel) {
+                                                                    sel.removeAllRanges();
+                                                                    sel.addRange(range);
+                                                                }
+                                                            }
+                                                        }}
                                                         onMarkAsRead={(id) => markAsRead(id)}
                                                         users={users}
                                                         onReact={(emoji) => reactToMessage(msg.id, emoji)}

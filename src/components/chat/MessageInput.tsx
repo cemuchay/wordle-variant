@@ -283,6 +283,43 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         }
     }, [input, users, isRecording]);
 
+    // Focus input when replyingTo changes
+    useEffect(() => {
+        if (replyingTo && textareaRef.current) {
+            const el = textareaRef.current;
+            const triggerFocus = () => {
+                // Some mobile browsers require a click or a more direct interaction
+                // to open the keyboard on contentEditable elements
+                if (document.activeElement !== el) {
+                    el.click();
+                    el.focus();
+                }
+                
+                // Move cursor to end
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                const sel = window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            };
+
+            // First attempt immediately
+            triggerFocus();
+            
+            // Additional attempts to handle potential race conditions or browser delays
+            const timer1 = setTimeout(triggerFocus, 50);
+            const timer2 = setTimeout(triggerFocus, 150);
+            
+            return () => {
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+            };
+        }
+    }, [replyingTo]);
+
     useEffect(() => {
         return () => {
             if (timerRef.current) {
