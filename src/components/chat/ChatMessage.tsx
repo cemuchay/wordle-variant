@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useMemo, useState, useRef, useEffect, } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
-import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2 } from "lucide-react";
+import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 import { ProtectedAvatar } from "./ProtectedAvatar";
@@ -113,7 +113,10 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
+import { useAppStore } from '../../store/useAppStore';
+
 const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onMarkAsRead, users, allProfiles, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
+    const triggerToast = useAppStore(s => s.triggerToast);
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
     const x = useMotionValue(0);
 
@@ -145,6 +148,36 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
     const replyIconOpacity = useTransform(x, [0, 50], [0, 1]);
     const replyIconScale = useTransform(x, [0, 50], [0.5, 1.1]);
     const replyIconTranslateX = useTransform(x, [0, 50], [-20, 12]);
+
+    const copyToClipboard = async (text: string) => {
+        try {
+            // Modern Clipboard API
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                } catch (copyErr) {
+                    console.error('execCommand copy failed:', copyErr);
+                }
+                textArea.remove();
+            }
+            triggerToast("Message copied to clipboard", 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            triggerToast("Failed to copy message", 2000);
+        }
+    };
 
     const senderColor = useMemo(() => {
         const userIndex = users.findIndex(u => u.username === msg.profiles?.username);
@@ -386,7 +419,20 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
     };
 
     return (
-        <div className="relative group overflow-visible" data-message-id={msg.id}>
+        <div className={`relative group ${showReactionsMenu ? 'z-50' : 'z-auto'} overflow-visible`} data-message-id={msg.id}>
+            {/* Subtler Overlay when reactions menu is open */}
+            <AnimatePresence>
+                {showReactionsMenu && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowReactionsMenu(false)}
+                        className="fixed inset-0 bg-black/20 z-40"
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Swipe Reply Indicator */}
             {(!msg.is_deleted && !isEditing) && (
                 <motion.div
@@ -484,24 +530,38 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                 initial={{ scale: 0.8, opacity: 0, y: 10 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.8, opacity: 0, y: 10 }}
-                                className={`absolute ${isMe ? 'right-0' : 'left-0'} top-[-40px] flex items-center gap-1.5 bg-[#1f2c34] border border-white/15 rounded-full px-2 py-1.5 shadow-2xl z-50`}
+                                className={`absolute ${isMe ? 'right-0' : 'left-0'} top-[-54px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50`}
                             >
-                                {EMOJIS.map((emoji) => {
-                                    const hasReacted = msg.reactions?.[currentUserId] === emoji;
-                                    return (
-                                        <button
-                                            key={emoji}
-                                            type="button"
-                                            onClick={() => {
-                                                onReact(hasReacted ? null : emoji);
-                                                setShowReactionsMenu(false);
-                                            }}
-                                            className={`text-[15px] hover:scale-135 transition-transform duration-100 cursor-pointer ${hasReacted ? 'bg-white/10 rounded-full px-0.5' : ''}`}
-                                        >
-                                            {emoji}
-                                        </button>
-                                    );
-                                })}
+                                <div className="flex items-center gap-1 pr-2 border-r border-white/10">
+                                    {EMOJIS.map((emoji) => {
+                                        const hasReacted = msg.reactions?.[currentUserId] === emoji;
+                                        return (
+                                            <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => {
+                                                    onReact(hasReacted ? null : emoji);
+                                                    setShowReactionsMenu(false);
+                                                }}
+                                                className={`text-[18px] w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform duration-100 cursor-pointer rounded-full ${hasReacted ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                                            >
+                                                {emoji}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        copyToClipboard(msg.content);
+                                        setShowReactionsMenu(false);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer group/copy"
+                                    title="Copy Message"
+                                >
+                                    <Copy size={14} className="group-hover/copy:scale-110 transition-transform" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider">Copy</span>
+                                </button>
                             </motion.div>
                         )}
                     </AnimatePresence>
