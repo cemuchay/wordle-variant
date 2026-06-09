@@ -37,7 +37,7 @@ const ChatHeader = ({ typingUsers, currentUserName, onClose }: ChatHeaderProps) 
                                     initial={{ opacity: 0, y: 5 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -5 }}
-                                    className="text-[10px] text-correct font-bold uppercase flex items-center gap-1"
+                                    className="text-[7px] sm:text-[10px] text-correct font-bold uppercase flex items-center gap-1"
                                 >
                                     <span className="flex gap-0.5">
                                         <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1 h-1 bg-correct rounded-full" />
