@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
-import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { MessageSquare, Lock, ChevronLeft, Plus, Users, User,  ShieldAlert, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -351,7 +351,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         const prefix = sender ? `${sender}: ` : "";
         const truncated = text.length > 25 ? text.slice(0, 25) + "..." : text;
         return (
-            <span className="text-[12px] text-white/80 truncate max-w-[200px] mt-0.5 block">
+            <span className="text-[12px] text-white/80 truncate max-w-50 mt-0.5 block">
                 {prefix}{truncated}
             </span>
         );
@@ -402,14 +402,14 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                     </div>
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter text-white mb-4">Chat restricted</h3>
-                <p className="text-white/80 text-sm mb-10 max-w-[280px] leading-relaxed">
+                <p className="text-white/80 text-sm mb-10 max-w-70 leading-relaxed">
                     Join the community to discuss strategies and share your daily wins.
                 </p>
                 <motion.button
                     whileHover={{ scale: 1.02, backgroundColor: "#00ff00" }}
                     whileTap={{ scale: 0.98 }}
                     onClick={signInWithGoogle}
-                    className="w-full bg-white text-black py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-colors"
+                    className="w-full bg-white text-black py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-colors"
                 >
                     Login with Google
                 </motion.button>
@@ -429,7 +429,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
+                        className="absolute inset-0 z-100 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
                     >
                         <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,255,0,0.2)]" />
                         <div className="flex flex-col items-center gap-1">
@@ -803,7 +803,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     <ShieldAlert size={28} />
                                 </div>
                                 <h4 className="text-base font-black uppercase text-white tracking-tight mb-2">Analysis Room Locked</h4>
-                                <p className="text-white/60 text-xs leading-relaxed max-w-[260px]">
+                                <p className="text-white/60 text-xs leading-relaxed max-w-65">
                                     Complete today's daily puzzle first to unlock this discussion and view daily stats and player guess breakdowns!
                                 </p>
                             </div>
