@@ -233,6 +233,9 @@ export const useChallengeGameEngine = ({
          saveToLocal(payload);
 
          const dbPayload = { ...payload };
+         delete dbPayload.needsSync;
+         delete dbPayload.timestamp;
+
          if (dbPayload.guesses && targetWord) {
             const key = targetWord + (challenge.salt || "");
             dbPayload.guesses = encryptGuesses(dbPayload.guesses, key);
