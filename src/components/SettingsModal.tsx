@@ -16,6 +16,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const { signOut } = useAuth();
     const { ask } = useConfirmation();
     const [loading, setLoading] = useState(false);
+    const [sendingLogs, setSendingLogs] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [receiveEmails, setReceiveEmails] = useState(true);
@@ -58,6 +59,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     }
                 }
             };
+            
             fetchAuthData();
             fetchEmailPreferences();
         }
@@ -205,14 +207,20 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             <div className="flex-1 pr-4">
                                 <p className="text-sm font-bold text-gray-100">Session Logs</p>
                                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                                    Download diagnostic logs to help us debug issues.
+                                    Send diagnostic logs to admin to help us debug issues.
                                 </p>
                             </div>
                             <button
-                                onClick={() => logger.downloadLogs()}
-                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all"
+                                onClick={async () => {
+                                    setSendingLogs(true);
+                                    await logger.sendLogsToAdmin();
+                                    setSendingLogs(false);
+                                    triggerToast('Logs Sent to Admin');
+                                }}
+                                disabled={sendingLogs}
+                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
                             >
-                                DOWNLOAD
+                                {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
                             </button>
                         </div>
                     </section>
