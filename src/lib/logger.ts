@@ -69,7 +69,7 @@ class Logger {
         level: entry.level,
         message: entry.message,
         context: {
-          ...entry.context,
+          ...this.safeJsonClone(entry.context),
           browser: navigator.userAgent,
           url: window.location.href,
           timestamp: entry.timestamp,
@@ -85,6 +85,25 @@ class Logger {
       console.warn('[Logger] Error in streamLog:', e);
     } finally {
       this.isStreaming = false;
+    }
+  }
+
+  private safeJsonClone(obj: any): any {
+    if (!obj) return obj;
+    const cache = new WeakSet();
+    try {
+      return JSON.parse(
+        JSON.stringify(obj, (key, value) => {
+          if (typeof value === 'object' && value !== null) {
+            if (cache.has(value)) return undefined; // Prune circular reference
+            cache.add(value);
+          }
+          if (key === 'logs' && Array.isArray(value)) return '[NESTED_LOGS]'; // Avoid recursive log structures
+          return value;
+        })
+      );
+    } catch (e) {
+      return { error: 'Cloning failed', message: String(e) };
     }
   }
 
@@ -117,6 +136,67 @@ class Logger {
 
   public getLogs(): LogEntry[] {
     return [...this.buffer];
+  }
+
+  public async sendLogsToAdmin() {
+    const storage: Record<string, any> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const value = localStorage.getItem(key) || '';
+        try {
+          // Attempt to parse JSON for better formatting in the diagnostic report
+          storage[key] = JSON.parse(value);
+        } catch {
+          storage[key] = value;
+        }
+      }
+    }
+
+    // Use safeJsonClone to avoid circular references when snapshoting the buffer
+    const logsCopy = this.safeJsonClone(this.buffer);
+
+    const data = {
+      logs: logsCopy,
+      device: {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        screen: `${window.screen.width}x${window.screen.height}`,
+      },
+      localStorage: storage
+    };
+
+    // We use fatal level to trigger the admin email alert pattern
+    const entry: LogEntry = { 
+      level: 'fatal', 
+      message: 'MANUAL SESSION LOG REQUEST', 
+      context: data, 
+      timestamp: new Date().toISOString() 
+    };
+    
+    // Add to buffer AFTER copying the buffer to avoid self-reference
+    this.addToBuffer(entry);
+    
+    // Stream to database
+    await this.streamLog(entry);
+
+    // Also directly invoke the edge function to ensure email delivery
+    try {
+      const userId = await this.getUserId();
+      await supabase.functions.invoke('send-error-email', {
+        body: { 
+          record: { 
+            ...entry, 
+            session_id: this.sessionId, 
+            user_id: userId,
+            created_at: entry.timestamp 
+          } 
+        }
+      });
+    } catch (e) {
+      console.warn('[Logger] Direct email invocation failed:', e);
+    }
   }
 
   public downloadLogs() {

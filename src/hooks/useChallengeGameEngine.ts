@@ -25,6 +25,7 @@ import {
 } from "../reducers/challengeReducer";
 import { useChallengeStore } from "../store/useChallengeStore";
 import { useConfirmation } from "../context/ConfirmationContext";
+import { logger } from "../lib/logger";
 import {
    parseMarathonGames,
    getMarathonTimer,
@@ -152,7 +153,7 @@ export const useChallengeGameEngine = ({
             setBotDailyWords(wordsMap);
          }
       } catch (err: any) {
-         console.error("Failed to fetch bot daily words:", err);
+         logger.error("Failed to fetch bot daily words", { error: err });
          triggerToast("Failed to fetch today's words.", 4000);
       }
    }, [challenge.is_bot_marathon, challenge.target_word, triggerToast]);
@@ -205,16 +206,18 @@ export const useChallengeGameEngine = ({
          try {
             const existing = safeLocalStorage.getItem(storageKey);
             const existingParsed = existing ? JSON.parse(existing) : {};
+            const finalPayload = {
+               ...existingParsed,
+               ...payload,
+               timestamp: Date.now(),
+            };
             safeLocalStorage.setItem(
                storageKey,
-               JSON.stringify({
-                  ...existingParsed,
-                  ...payload,
-                  timestamp: Date.now(),
-               }),
+               JSON.stringify(finalPayload),
             );
+            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, { payload: finalPayload });
          } catch (e) {
-            console.error("Local save failed", e);
+            logger.error("Local save failed", { key: storageKey, error: e });
          }
       },
       [storageKey],
@@ -252,11 +255,9 @@ export const useChallengeGameEngine = ({
                   const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                   localStorage.removeItem(legacyKey);
                }
-               console.log(
-                  "[Engine] Local mirror cleaned up after successful completion sync.",
-               );
+               logger.info(`[challenge-prog] Local mirror cleaned up: ${storageKey}`);
             } catch (e) {
-               console.error("Local cleanup failed", e);
+               logger.error("Local cleanup failed", { key: storageKey, error: e });
             }
          }
 
@@ -495,10 +496,7 @@ export const useChallengeGameEngine = ({
                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                saved = safeLocalStorage.getItem(legacyKey);
                if (saved) {
-                  console.log(
-                     "[Engine] Found legacy storage key, migrating/recovering from:",
-                     legacyKey,
-                  );
+                  logger.info(`[challenge-prog] Found legacy storage key: ${legacyKey}`);
                }
             }
             if (saved) {
@@ -507,10 +505,12 @@ export const useChallengeGameEngine = ({
                const hasNewHint = parsed.hints_used && !localUsedHint;
 
                if (hasMoreGuesses || hasNewHint) {
-                  console.log(
-                     "[Engine] Recovering advanced progress or hint from localStorage",
-                     { hasMoreGuesses, hasNewHint },
-                  );
+                  logger.info(`[challenge-prog] Recovering progress from localStorage: ${storageKey}`, {
+                     hasMoreGuesses,
+                     hasNewHint,
+                     localCount: parsed.guesses?.length,
+                     serverCount: incoming.length
+                  });
                   if (
                      parsed.guesses &&
                      parsed.guesses.length >= incoming.length
@@ -522,7 +522,7 @@ export const useChallengeGameEngine = ({
                }
             }
          } catch (e) {
-            console.error("Local recovery failed", e);
+            logger.error("Local recovery failed", { key: storageKey, error: e });
          }
 
          let isStarterEnforced = false;
@@ -853,7 +853,7 @@ export const useChallengeGameEngine = ({
             attempt++;
          }
       } catch (e) {
-         console.error("[Engine] Error during guess submission sync:", e);
+         logger.error("[Engine] Error during guess submission sync", { error: e });
          success = false;
       }
 
@@ -965,7 +965,7 @@ export const useChallengeGameEngine = ({
             setIsSaving(false);
             if (!success) triggerToast("Failed to save hint usage.", 3000);
          } catch (e) {
-            console.error("[Engine] Error in handleHint sync:", e);
+            logger.error("[Engine] Error in handleHint sync", { error: e });
             setIsSaving(false);
             triggerToast("Failed to save hint usage.", 3000);
          }
