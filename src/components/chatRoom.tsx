@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
-import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, Trash2, ShieldAlert, Zap, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { MessageSquare, Lock, ChevronLeft, Plus, Users, User,  ShieldAlert, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -351,7 +351,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         const prefix = sender ? `${sender}: ` : "";
         const truncated = text.length > 25 ? text.slice(0, 25) + "..." : text;
         return (
-            <span className="text-[12px] text-white/80 truncate max-w-[200px] mt-0.5 block">
+            <span className="text-[12px] text-white/80 truncate max-w-50 mt-0.5 block">
                 {prefix}{truncated}
             </span>
         );
@@ -402,14 +402,14 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                     </div>
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter text-white mb-4">Chat restricted</h3>
-                <p className="text-white/80 text-sm mb-10 max-w-[280px] leading-relaxed">
+                <p className="text-white/80 text-sm mb-10 max-w-70 leading-relaxed">
                     Join the community to discuss strategies and share your daily wins.
                 </p>
                 <motion.button
                     whileHover={{ scale: 1.02, backgroundColor: "#00ff00" }}
                     whileTap={{ scale: 0.98 }}
                     onClick={signInWithGoogle}
-                    className="w-full bg-white text-black py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-colors"
+                    className="w-full bg-white text-black py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-colors"
                 >
                     Login with Google
                 </motion.button>
@@ -429,7 +429,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
+                        className="absolute inset-0 z-100 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4"
                     >
                         <div className="w-12 h-12 border-4 border-correct border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,255,0,0.2)]" />
                         <div className="flex flex-col items-center gap-1">
@@ -773,69 +773,28 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                             <ChatHeader
                                 typingUsers={typingUsers}
                                 currentUserName={nameOfUser}
+                                activeRoom={activeRoom}
+                                showSearchIcon={!showConversationSearch}
+                                onToggleSearch={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
+                                onChallenge={(activeRoom?.type === "dm" || activeRoom?.type === "custom") ? () => {
+                                    if (onClose) onClose();
+                                    setIsChallengeOpen(true);
+                                } : undefined}
+                                onDeleteGroup={(activeRoom?.type === "custom" && activeRoom?.created_by === user.id) ? async () => {
+                                    const confirmed = await ask({
+                                        title: "Delete Group",
+                                        message: `Are you sure you want to delete "${activeRoom.name}"? This action cannot be undone.`,
+                                        confirmLabel: "Delete Group",
+                                        cancelLabel: "Cancel",
+                                        type: "danger"
+                                    });
+                                    if (confirmed) {
+                                        await deleteGroup(activeRoom.id);
+                                        setShowSidebar(true);
+                                    }
+                                } : undefined}
                             />
                         </div>
-
-                        {/* Top Group actions toolbar */}
-                        {activeRoom && (
-                            <div className="px-4 sm:px-6 py-2.5 bg-black/40 border-b border-white/5 flex justify-between items-center shrink-0">
-                                <span className="text-[8px] sm:text-[9.5px] font-black uppercase tracking-wider text-correct flex items-center gap-1.5">
-                                    <Zap size={10} /> Active: {activeRoom.name}
-                                    {activeRoom.type === "dm" && <span className="text-white/40">(E2EE Encrypted)</span>}
-                                    {activeRoom.is_core && activeRoom.type !== "bugs_features" && <span className="text-amber-400 font-bold">(Auto-Purges Daily)</span>
-                                    }
-                                    <>
-                                        {!showConversationSearch && (
-                                            <button
-                                                onClick={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
-                                                className="ms-4 p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer"
-                                                title="Search in conversation"
-                                            >
-                                                <Search size={14} />
-                                            </button>
-
-                                        )}
-                                    </>
-                                </span>
-                                <div className="flex gap-2">
-                                    {/* Create Challenge from chats button */}
-                                    {(activeRoom.type === "dm" || activeRoom.type === "custom") && (
-                                        <button
-                                            onClick={() => {
-                                                if (onClose) onClose();
-                                                setIsChallengeOpen(true);
-                                            }}
-                                            className="ms-2 px-1.5 sm:px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[7px] sm:text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
-                                            title="Create Challenge"
-                                        >
-                                            🏆 Challenge
-                                        </button>
-                                    )}
-                                    {/* Delete group action */}
-                                    {activeRoom.type === "custom" && activeRoom.created_by === user.id && (
-                                        <button
-                                            onClick={async () => {
-                                                const confirmed = await ask({
-                                                    title: "Delete Group",
-                                                    message: `Are you sure you want to delete "${activeRoom.name}"? This action cannot be undone.`,
-                                                    confirmLabel: "Delete Group",
-                                                    cancelLabel: "Cancel",
-                                                    type: "danger"
-                                                });
-                                                if (confirmed) {
-                                                    await deleteGroup(activeRoom.id);
-                                                    setShowSidebar(true);
-                                                }
-                                            }}
-                                            className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-all cursor-pointer border border-transparent hover:border-red-500/20"
-                                            title="Delete Group"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
                         {/* Game Analysis lock validation */}
                         {activeRoom && activeRoom.type === "game_analysis" && !hasPlayedToday ? (
@@ -844,7 +803,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     <ShieldAlert size={28} />
                                 </div>
                                 <h4 className="text-base font-black uppercase text-white tracking-tight mb-2">Analysis Room Locked</h4>
-                                <p className="text-white/60 text-xs leading-relaxed max-w-[260px]">
+                                <p className="text-white/60 text-xs leading-relaxed max-w-65">
                                     Complete today's daily puzzle first to unlock this discussion and view daily stats and player guess breakdowns!
                                 </p>
                             </div>

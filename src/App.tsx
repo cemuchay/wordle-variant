@@ -390,7 +390,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && (
+      {!isPlayingChallenge && !isChatConversationOpen && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
