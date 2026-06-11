@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { AudioChatControls } from "../challenge/AudioChatControls";
 import { useApp } from "../../context/AppContext";
-import { X, Search, Trash2, Zap } from "lucide-react";
+import { X, Search, Trash2, Zap, } from "lucide-react";
 import type { ChatGroup } from "../../hooks/useChat";
 
 interface ChatHeaderProps {
@@ -25,28 +25,22 @@ const ChatHeader = ({
     onChallenge,
     onDeleteGroup
 }: ChatHeaderProps) => {
-    const { profile } = useApp();
+    const { profile, } = useApp();
+
     // Filter out the current user from typing indicators
     const otherTypingUsers = typingUsers.filter(name => name !== currentUserName);
 
     return (
-        <div className=" p-3 sm:p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md">
+        <div className={` p-3 sm:p-5 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center backdrop-blur-md`}>
             <div className="flex items-center gap-4">
                 <div className="relative ms-10 sm:ms-8">
-                    <div className="w-8 h-8 rounded-2xl bg-linear-to-tr from-correct to-emerald-400 flex items-center justify-center text-black shadow-lg shadow-correct/20">
-                        <span className="font-black text-sm">#</span>
-                    </div>
-                    <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-correct border-2 border-gray-950 rounded-full"
-                    />
+
                 </div>
                 <div>
-                    <h4 className="text-[8px] sm:text-sm font-black uppercase tracking-widest text-white flex items-center gap-1.5">
+                    <h4 className="text-[10px] sm:text-sm font-black uppercase tracking-widest text-white flex items-center gap-1.5">
                         {activeRoom ? (
                             <>
-                                <Zap size={10} className="text-correct" />
+                                <Zap size={12} className="text-correct" />
                                 {activeRoom.name}
                             </>
                         ) : "Chat (24h)"}
@@ -74,12 +68,12 @@ const ChatHeader = ({
                                     initial={{ opacity: 0, y: 5 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -5 }}
-                                    className="text-[7px] sm:text-[9px] text-white/60 font-bold uppercase tracking-widest flex items-center gap-1.5"
+                                    className="text-[8px] sm:text-[10px] text-white/60 font-bold uppercase tracking-widest flex items-center gap-1.5"
                                 >
                                     {activeRoom?.is_core && activeRoom.type !== "bugs_features" ? (
                                         <span className="text-amber-400 font-bold">(24h)</span>
                                     ) : activeRoom?.type === "dm" ? (
-                                        <span className="text-white/40">(E2EE Encrypted)</span>
+                                        null
                                     ) : (
                                         "Live Now"
                                     )}
@@ -104,10 +98,10 @@ const ChatHeader = ({
                 {onChallenge && (
                     <button
                         onClick={onChallenge}
-                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[7px] sm:text-[9px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
+                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[10px] sm:text-[11px] font-black uppercase text-white cursor-pointer flex items-center gap-1 shadow-lg shadow-indigo-600/10 transition-all border border-indigo-400/20"
                         title="Create Challenge"
                     >
-                        🏆 Challenge
+                        🏆
                     </button>
                 )}
 

@@ -148,20 +148,8 @@ const AuthenticatedChallengeContent = memo(
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
-    const [hasMascot, setHasMascot] = useState(false);
 
-    useEffect(() => {
-      const handleMascot = (e: Event) => {
-        const detail = (e as CustomEvent)?.detail;
-        setHasMascot(!!detail);
-      };
-      window.addEventListener('mascot-changed', handleMascot);
-      return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
+    const { isDynamicIslandVisible } = useApp();
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -888,7 +876,7 @@ export const ChallengeModal = ({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
           className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
-            ? "h-[100svh] max-h-[100svh] rounded-none border-none"
+            ? "h-svh max-h-svh rounded-none border-none"
             : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
             }`}
         >
