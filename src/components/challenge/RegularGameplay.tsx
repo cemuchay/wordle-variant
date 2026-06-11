@@ -1,16 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb, RefreshCw, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { ANIMATION_DURATION } from '../../constants/ui';
+import { useApp } from '../../context/AppContext';
+import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
+import { getHandicapStarter } from '../../utils/marathon';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
-import { useChallengeContext } from '../../context/ChallengeContext';
 import { NetworkLog } from './ChallengeUIElements';
-import { getHandicapStarter } from '../../utils/marathon';
-import { useApp } from '../../context/AppContext';
-import { useAuth } from '../../hooks/useAuth';
-import { ANIMATION_DURATION } from '../../constants/ui';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -26,21 +25,7 @@ export const RegularGameplay = memo(function RegularGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onBack
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
-    const { user } = useAuth();
-    const { onlineUsers, activeCall, activeVoiceRooms } = useApp();
-    const [hasMascot, setHasMascot] = useState(false);
-
-    useEffect(() => {
-        const handleMascot = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            setHasMascot(!!detail);
-        };
-        window.addEventListener('mascot-changed', handleMascot);
-        return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
+    const { isDynamicIslandVisible } = useApp();
 
     const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
         challenge,

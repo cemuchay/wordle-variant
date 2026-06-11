@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -45,22 +45,8 @@ export const AppHeader = ({
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
-    const { activeCall, onlineUsers, activeVoiceRooms, triggerToast } = useApp();
+    const { triggerToast, isDynamicIslandVisible } = useApp();
     const [isShaking, setIsShaking] = useState(false);
-    const [hasMascot, setHasMascot] = useState(false);
-
-    useEffect(() => {
-        const handleMascot = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            setHasMascot(!!detail);
-        };
-        window.addEventListener('mascot-changed', handleMascot);
-        return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    let isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
-    isDynamicIslandVisible = true
 
     const handleLockedHintClick = () => {
         setIsShaking(true);

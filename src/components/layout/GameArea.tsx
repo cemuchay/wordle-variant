@@ -69,13 +69,13 @@ export const GameArea = ({
             const days = Math.floor(difference / (1000 * 60 * 60 * 24));
             const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+            // const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
             const parts = [];
             if (days > 0) parts.push(`${days}d`);
             if (hours > 0 || days > 0) parts.push(`${hours}h`);
             if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
-            parts.push(`${seconds}s`);
+            // parts.push(`${seconds}s`);
 
             setTimeLeft(parts.join(' '));
         };
@@ -147,14 +147,14 @@ export const GameArea = ({
                                     <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
                                         Active Marathon
                                     </span>
-                                    <span className="text-[10px] text-gray-400 font-medium">
+                                    <span className="text-[11px] text-gray-400 font-medium">
                                         Daily Challenge • {timeLeft && <span className="text-indigo-400 font-black tabular-nums">{timeLeft} left</span>}
                                     </span>
                                 </div>
                                 <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
                                     Bot Marathon Event
                                 </h3>
-                                <p className="text-xs text-gray-400 mt-0.5">
+                                <p className="text-[10px] text-gray-400 mt-0.5">
                                     Test your skills across multiple word lengths!
                                 </p>
                             </div>

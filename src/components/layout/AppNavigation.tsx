@@ -72,7 +72,7 @@ export const AppNavigation = ({
                                     ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.8)] '
                                     : 'bg-correct text-black shadow-[0_0_10px_rgba(46,204,113,0.5)]'
                                     }`}>
-                                    {item.id === "chat" ? '*' : item.badge}
+                                    {item.id === "chat" ? item.badge : item.badge}
                                 </span>
                             )}
 

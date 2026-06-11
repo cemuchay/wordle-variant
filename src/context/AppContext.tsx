@@ -47,6 +47,7 @@ interface AppContextType {
     audioChat: AudioChatState;
     activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
     realtimeStatus: 'connected' | 'disconnected';
+    isDynamicIslandVisible: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -604,7 +605,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         acceptCall,
         rejectCall,
         hangUpCall,
-        realtimeStatus
+        realtimeStatus,
+        isDynamicIslandVisible: true
     }), [
         profile, preferences, isProfileLoading, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
