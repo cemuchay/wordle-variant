@@ -151,12 +151,12 @@ const AuthenticatedChallengeContent = memo(
     const [hasMascot, setHasMascot] = useState(false);
 
     useEffect(() => {
-        const handleMascot = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            setHasMascot(!!detail);
-        };
-        window.addEventListener('mascot-changed', handleMascot);
-        return () => window.removeEventListener('mascot-changed', handleMascot);
+      const handleMascot = (e: Event) => {
+        const detail = (e as CustomEvent)?.detail;
+        setHasMascot(!!detail);
+      };
+      window.addEventListener('mascot-changed', handleMascot);
+      return () => window.removeEventListener('mascot-changed', handleMascot);
     }, []);
 
     const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
@@ -259,7 +259,7 @@ const AuthenticatedChallengeContent = memo(
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying ? "p-3 sm:p-4" : "p-4 sm:p-6"} ${isDynamicIslandVisible ? 'pt-10 sm:pt-12' : ''}`}
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-4 sm:p-6"}`}
         >
           <div className="flex items-center gap-2 sm:gap-3">
             {!isPlaying && selectedChallenge && (
@@ -271,7 +271,7 @@ const AuthenticatedChallengeContent = memo(
                 <ArrowLeft size={18} />
               </button>
             )}
-            <div className="bg-correct/20 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
+            <div className="bg-correct/20 p-0.5 sm:p-1 rounded-lg sm:rounded-xl">
               <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
@@ -373,7 +373,7 @@ const AuthenticatedChallengeContent = memo(
                   ) : (
                     <div className="space-y-6">
                       {/* Segmented Switcher for Columns */}
-                      <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
+                      <div className="flex bg-white/5 p-0.5 sm:p-1 rounded-xl border border-white/10 gap-1 shrink-0">
                         {(["active", "played", "expired", "open"] as const).map((tab) => {
                           const count = tab === "active" ? activeCount : tab === "played" ? playedCount : tab === "expired" ? expiredCount : openChallengesCount;
                           const label = tab === "open" ? `Open (${count})` : `${tab} (${count})`;
@@ -381,7 +381,7 @@ const AuthenticatedChallengeContent = memo(
                             <button
                               key={tab}
                               onClick={() => setListColumn(tab)}
-                              className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${listColumn === tab
+                              className={`flex-1 py-0.5 sm:py-2 text-center text-[9px] sm:text-[10px]  font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${listColumn === tab
                                 ? "bg-correct text-black font-extrabold shadow-md"
                                 : "text-white hover:text-white hover:bg-white/5"
                                 }`}
@@ -404,29 +404,29 @@ const AuthenticatedChallengeContent = memo(
                               animationDuration: '2s'
                             }}
                           >
-                            <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
+                            <div className="absolute top-0 right-0 h-16 sm:w-36 sm:h-20 bg-yellow-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
                             <div className="flex items-center justify-between w-full">
-                              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/25 text-yellow-400 border border-yellow-500/40">
+                              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-yellow-500/25 text-yellow-400 border border-yellow-500/40">
                                 <Sparkles size={11} className="animate-spin" style={{ animationDuration: '4s' }} />
                                 Daily Event Challenge
                               </span>
-                              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-wider font-mono">
+                              <span className="ms-2 sm:ms-0 text-[8px] font-black text-indigo-300 uppercase tracking-wider font-mono">
                                 Hosted by @Variant Bot
                               </span>
                             </div>
 
                             <div>
-                              <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                              <h3 className="text-base font-black text-white uppercase tracking-tight">
                                 Today's Daily Marathon Challenge 🏃‍♂️💨
                               </h3>
 
                             </div>
 
-                            <div className="flex items-center justify-between w-full border-t border-white/10 pt-2.5 mt-1">
-                              <span className="text-[10px] font-bold text-white/70 uppercase">
+                            <div className="flex items-center justify-between w-full border-t border-white/10 pt-0.5 sm:pt-1.5 mt-1">
+                              <span className="text-[8px] font-bold text-white/70 uppercase">
                                 Click to join and start playing
                               </span>
-                              <span className="text-[10px] font-black uppercase tracking-wider text-correct flex items-center gap-1">
+                              <span className="text-[8px] font-black uppercase tracking-wider text-correct flex items-center gap-1">
                                 Play Now &rarr;
                               </span>
                             </div>
