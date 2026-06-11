@@ -1,6 +1,7 @@
 import React, { memo, useState, useEffect } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
+import returnAnimationTime from '../utils/returnAnimationTime';
 
 interface CellProps {
   letter: string;
@@ -170,7 +171,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     if (guesses.length > revealedRowsCount) {
       const timer = setTimeout(() => {
         setRevealedRowsCount(guesses.length);
-      }, wordLength * ANIMATION_DURATION.TILE_REVEAL + 400);
+      }, returnAnimationTime(wordLength));
       return () => clearTimeout(timer);
     } else if (guesses.length < revealedRowsCount) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -205,52 +206,65 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     }
   }
 
-  let mascotFace = "(•‿•)";
-  let mascotLabel = "Looking good!";
-  let animationClass = "";
-
-  if (isWon) {
-    mascotFace = "(★‿★)";
-    mascotLabel = "Splendid job! 🎉";
-    animationClass = "animate-bounce text-correct";
-  } else if (isLost) {
-    mascotFace = "(✖╭╮✖)";
-    mascotLabel = "Aww, maybe next time! 😢";
-    animationClass = "text-red-400";
-  } else if (isOneAttemptLeft) {
-    mascotFace = "(⊙_⊙;)";
-    mascotLabel = "Yikes! Only 1 guess left! 😰";
-    animationClass = "animate-pulse text-amber-400";
-  } else if (hasRepeatedLetters) {
-    mascotFace = "(🤨)";
-    mascotLabel = "Hmm... interesting choice. 🧐";
-    animationClass = "animate-shake text-yellow-400";
-  } else if (attemptsCount > 0) {
-    const defaultMascots = [
-      { face: "(•_•)", label: "Thinking..." },
-      { face: "(o_O)", label: "Let's see..." },
-      { face: "(^_-)", label: "Keep going! 😉" }
-    ];
-    const idx = (attemptsCount - 1) % defaultMascots.length;
-    mascotFace = defaultMascots[idx].face;
-    mascotLabel = defaultMascots[idx].label;
-    animationClass = "text-white/80";
-  } else {
-    animationClass = "text-white/60";
-  }
+  const [mascotData, setMascotData] = useState<{ face: string; label: string; animationClass: string } | null>(null);
 
   useEffect(() => {
-    // Notify Dynamic Island about the mascot state update
-    window.dispatchEvent(new CustomEvent('mascot-changed', {
-      detail: { mascotFace, mascotLabel, animationClass }
-    }));
+    let face = "(•‿•)";
+    let label = "Looking good!";
+    let animClass = "";
+    let delay = 0;
+
+    if (isWon) {
+      face = "(★‿★)";
+      label = "Splendid job! 🎉";
+      animClass = "animate-bounce text-correct";
+      // Delay the victory greeting until the tiles finish revealing
+      delay = isCurrentRevealing ? returnAnimationTime(wordLength) * 1.25 : 0;
+    } else if (isLost) {
+      face = "(✖╭╮✖)";
+      label = "Aww, maybe next time! 😢";
+      animClass = "text-red-400";
+    } else if (isOneAttemptLeft) {
+      face = "(⊙_⊙;)";
+      label = "Yikes! Only 1 guess left! 😰";
+      animClass = "animate-pulse text-amber-400";
+    } else if (hasRepeatedLetters) {
+      face = "(🤨)";
+      label = "Hmm... interesting choice. 🧐";
+      animClass = "animate-shake text-yellow-400";
+    } else if (attemptsCount > 0) {
+      const defaultMascots = [
+        { face: "(•_•)", label: "Thinking..." },
+        { face: "(o_O)", label: "Let's see..." },
+        { face: "(^_-)", label: "Keep going! 😉" }
+      ];
+      const idx = (attemptsCount - 1) % defaultMascots.length;
+      face = defaultMascots[idx].face;
+      label = defaultMascots[idx].label;
+      animClass = "text-white/80";
+    } else {
+      animClass = "text-white/60";
+    }
+
+    const timer = setTimeout(() => {
+      setMascotData({ face, label, animationClass: animClass });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [isWon, isLost, isOneAttemptLeft, hasRepeatedLetters, attemptsCount, isCurrentRevealing, wordLength]);
+
+  useEffect(() => {
+    if (mascotData) {
+      window.dispatchEvent(new CustomEvent('mascot-changed', {
+        detail: { mascotFace: mascotData.face, mascotLabel: mascotData.label, animationClass: mascotData.animationClass }
+      }));
+    }
     return () => {
-      // Clear mascot when Grid is unmounted (e.g. user leaves play tab)
       window.dispatchEvent(new CustomEvent('mascot-changed', {
         detail: null
       }));
     };
-  }, [mascotFace, mascotLabel, animationClass]);
+  }, [mascotData]);
 
   return (
     <div className="relative mx-auto w-fit select-none shrink-0">
