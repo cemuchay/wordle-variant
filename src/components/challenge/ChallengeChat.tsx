@@ -461,23 +461,32 @@ export const ChallengeChat = memo(function ChallengeChat({
       {/* Input Form */}
       <form
         onSubmit={handleSend}
-        className="flex gap-2 border-t border-white/5 pt-3 shrink-0"
+        className="flex items-end gap-2 border-t border-white/5 pt-3 shrink-0"
       >
-        <input
-          type="text"
+        <textarea
           maxLength={300}
           placeholder="Type a message..."
           value={inputText}
           onChange={(e) => {
             setInputText(e.target.value);
             setTyping(true);
+            // Auto-grow height
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
           }}
-          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/60 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+              e.preventDefault();
+              handleSend(e);
+            }
+          }}
+          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/60 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium resize-none max-h-[120px] scrollbar-hide"
+          rows={1}
         />
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="bg-correct hover:brightness-110 disabled:opacity-30 disabled:hover:brightness-100 text-black px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          className="bg-correct hover:brightness-110 disabled:opacity-30 disabled:hover:brightness-100 text-black h-[38px] w-[38px] rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer shrink-0"
         >
           <Send size={12} strokeWidth={2.5} />
         </button>

@@ -28,6 +28,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         messages,
         sendMessage,
         sendImageMessage,
+        sendVoiceMessage,
         reactToMessage,
         editMessage,
         deleteMessage,
@@ -949,7 +950,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 <div className="z-10">
                                     <MessageInput
                                         onSend={sendMessage}
-                                        onSendVoice={null as any} // Simplify voice out for now
+                                        onSendVoice={sendVoiceMessage}
                                         onSendImage={sendImageMessage}
                                         onTyping={handleTyping}
                                         replyingTo={replyingTo}

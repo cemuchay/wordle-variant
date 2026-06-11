@@ -160,6 +160,7 @@ export const useChallengeGameEngine = ({
 
    useEffect(() => {
       if (challenge.is_bot_marathon && challenge.target_word === "MARATHON") {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          fetchBotDailyWords();
       }
    }, [challenge.is_bot_marathon, challenge.target_word, fetchBotDailyWords]);
@@ -212,11 +213,10 @@ export const useChallengeGameEngine = ({
                needsSync,
                timestamp: Date.now(),
             };
-            safeLocalStorage.setItem(
-               storageKey,
-               JSON.stringify(finalPayload),
-            );
-            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, { payload: finalPayload });
+            safeLocalStorage.setItem(storageKey, JSON.stringify(finalPayload));
+            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, {
+               payload: finalPayload,
+            });
          } catch (e) {
             logger.error("Local save failed", { key: storageKey, error: e });
          }
@@ -256,7 +256,10 @@ export const useChallengeGameEngine = ({
                   const parsed = JSON.parse(saved);
                   if (parsed.needsSync) {
                      delete parsed.needsSync;
-                     safeLocalStorage.setItem(storageKey, JSON.stringify(parsed));
+                     safeLocalStorage.setItem(
+                        storageKey,
+                        JSON.stringify(parsed),
+                     );
                   }
                }
             } catch (e) {
@@ -278,9 +281,14 @@ export const useChallengeGameEngine = ({
                   const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                   safeLocalStorage.removeItem(legacyKey);
                }
-               logger.info(`[challenge-prog] Local mirror cleaned up: ${storageKey}`);
+               logger.info(
+                  `[challenge-prog] Local mirror cleaned up: ${storageKey}`,
+               );
             } catch (e) {
-               logger.error("Local cleanup failed", { key: storageKey, error: e });
+               logger.error("Local cleanup failed", {
+                  key: storageKey,
+                  error: e,
+               });
             }
          }
 
@@ -389,7 +397,7 @@ export const useChallengeGameEngine = ({
          return decryptGuesses(progress.guesses, key);
       }
 
-      let g = participation.guesses;
+      const g = participation.guesses;
       return decryptGuesses(g, key);
    }, [
       participation,
@@ -521,26 +529,40 @@ export const useChallengeGameEngine = ({
                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                saved = safeLocalStorage.getItem(legacyKey);
                if (saved) {
-                  logger.info(`[challenge-prog] Found legacy storage key: ${legacyKey}`);
+                  logger.info(
+                     `[challenge-prog] Found legacy storage key: ${legacyKey}`,
+                  );
                }
             }
             if (saved) {
                const parsed = JSON.parse(saved);
                const localStatus = parsed.status || "playing";
 
-               const hasMoreGuesses = (parsed.guesses?.length || 0) > incoming.length;
+               const hasMoreGuesses =
+                  (parsed.guesses?.length || 0) > incoming.length;
                const hasNewHint = parsed.hints_used && !localUsedHint;
-               const hasAdvancedStatus = (localStatus === 'completed' || localStatus === 'timed_out') && serverStatus === 'playing';
+               const hasAdvancedStatus =
+                  (localStatus === "completed" ||
+                     localStatus === "timed_out") &&
+                  serverStatus === "playing";
 
-               if (hasMoreGuesses || hasNewHint || hasAdvancedStatus || parsed.needsSync) {
-                  logger.info(`[challenge-prog] Recovering advanced progress from localStorage: ${storageKey}`, {
-                     hasMoreGuesses,
-                     hasNewHint,
-                     hasAdvancedStatus,
-                     needsSync: parsed.needsSync,
-                     localCount: parsed.guesses?.length,
-                     serverCount: incoming.length
-                  });
+               if (
+                  hasMoreGuesses ||
+                  hasNewHint ||
+                  hasAdvancedStatus ||
+                  parsed.needsSync
+               ) {
+                  logger.info(
+                     `[challenge-prog] Recovering advanced progress from localStorage: ${storageKey}`,
+                     {
+                        hasMoreGuesses,
+                        hasNewHint,
+                        hasAdvancedStatus,
+                        needsSync: parsed.needsSync,
+                        localCount: parsed.guesses?.length,
+                        serverCount: incoming.length,
+                     },
+                  );
                   if (
                      parsed.guesses &&
                      parsed.guesses.length >= incoming.length
@@ -555,7 +577,10 @@ export const useChallengeGameEngine = ({
                }
             }
          } catch (e) {
-            logger.error("Local recovery failed", { key: storageKey, error: e });
+            logger.error("Local recovery failed", {
+               key: storageKey,
+               error: e,
+            });
          }
 
          let isStarterEnforced = false;
@@ -595,8 +620,15 @@ export const useChallengeGameEngine = ({
          // Side Effects (Timer Start / Timeout Sync / Background Sync-Back)
          try {
             // Handle Background Sync-Back of recovered local state
-            if (needsBackgroundSync && recoveredPayload && !isFinishedStatus && !startTimerRef.current) {
-               console.log("[Engine] Triggering background sync for advanced local state...");
+            if (
+               needsBackgroundSync &&
+               recoveredPayload &&
+               !isFinishedStatus &&
+               !startTimerRef.current
+            ) {
+               console.log(
+                  "[Engine] Triggering background sync for advanced local state...",
+               );
                wrappedSubmitResult(
                   recoveredPayload,
                   isMarathon ? wordLength : undefined,
@@ -896,7 +928,9 @@ export const useChallengeGameEngine = ({
             attempt++;
          }
       } catch (e) {
-         logger.error("[Engine] Error during guess submission sync", { error: e });
+         logger.error("[Engine] Error during guess submission sync", {
+            error: e,
+         });
          success = false;
       }
 
