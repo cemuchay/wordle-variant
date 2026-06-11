@@ -59,7 +59,8 @@ export const AppHeader = ({
     }, []);
 
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
+    let isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
+    isDynamicIslandVisible = true
 
     const handleLockedHintClick = () => {
         setIsShaking(true);
