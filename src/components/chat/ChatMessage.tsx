@@ -649,7 +649,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                         ) : msg.voice_url ? (
                             <AudioPlayer url={msg.voice_url} />
                         ) : msg.image_url ? (
-                            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url)}>
+                            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url as string)}>
                                 <img
                                     src={msg.image_url}
                                     className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
