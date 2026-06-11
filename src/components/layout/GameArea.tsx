@@ -66,13 +66,15 @@ export const GameArea = ({
                 return;
             }
 
-            const hours = Math.floor(difference / (1000 * 60 * 60));
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
             const parts = [];
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+            if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
             parts.push(`${seconds}s`);
 
             setTimeLeft(parts.join(' '));
@@ -112,9 +114,10 @@ export const GameArea = ({
             if (wasGameOverOnMount.current) {
                 setHideKeyboard(true);
             } else {
+                const hideDelay = wordLength * 400 + 400; // Match TILE_REVEAL + padding
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
-                }, 2200);
+                }, hideDelay);
                 return () => clearTimeout(timer);
             }
         } else {
@@ -122,7 +125,7 @@ export const GameArea = ({
             setHideKeyboard(false);
             wasGameOverOnMount.current = false;
         }
-    }, [isGameOver]);
+    }, [isGameOver, wordLength]);
 
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
@@ -225,7 +228,7 @@ export const GameArea = ({
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-4 shrink-0 px-2">
+                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-8 shrink-0 px-2">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}

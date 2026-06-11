@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../../hooks/useChat";
 import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
+import { useAppStore } from "../../store/useAppStore";
 
 interface MessageInputProps {
     onSend: (content: string, replyToId?: string, mentions?: string[]) => void;
@@ -18,54 +19,6 @@ interface MessageInputProps {
     dailyGuesses?: any[];
 }
 
-const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
-
-const saveSelection = (element: HTMLElement) => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-    const range = sel.getRangeAt(0);
-    const preSelectionRange = range.cloneRange();
-    preSelectionRange.selectNodeContents(element);
-    preSelectionRange.setEnd(range.startContainer, range.startOffset);
-    return preSelectionRange.toString().length;
-};
-
-const restoreSelection = (element: HTMLElement, offset: number) => {
-    let charIndex = 0;
-    const range = document.createRange();
-    range.setStart(element, 0);
-    range.collapse(true);
-    const nodeStack: Node[] = [element];
-    let node: Node | undefined;
-    let foundStart = false;
-    let stop = false;
-
-    while (!stop && (node = nodeStack.pop())) {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const textNode = node as Text;
-            const nextCharIndex = charIndex + textNode.length;
-            if (!foundStart && offset >= charIndex && offset <= nextCharIndex) {
-                range.setStart(textNode, offset - charIndex);
-                range.collapse(true);
-                foundStart = true;
-                stop = true;
-            }
-            charIndex = nextCharIndex;
-        } else {
-            let i = node.childNodes.length;
-            while (i--) {
-                nodeStack.push(node.childNodes[i]);
-            }
-        }
-    }
-
-    const sel = window.getSelection();
-    if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(range);
-    }
-};
-
 const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, onCancelReply, users, isGameAnalysis, dailyGuesses }: MessageInputProps) => {
     const { profile } = useApp();
     const [input, setInput] = useState("");
@@ -78,69 +31,66 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     const audioChunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<number | null>(null);
 
-    const textareaRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const nextCursorPositionRef = useRef<number | null>(null);
 
-    const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-        const rawText = e.currentTarget.textContent || "";
-        setInput(rawText);
-        onTyping(rawText.length > 0);
+    const adjustHeight = () => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    };
 
-        const cursorPos = saveSelection(e.currentTarget);
-        if (cursorPos !== null) {
-            const textBeforeCursor = rawText.substring(0, cursorPos);
-            const lastAtPos = textBeforeCursor.lastIndexOf("@");
+    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setInput(value);
+        onTyping(value.length > 0);
+        adjustHeight();
 
-            if (lastAtPos !== -1) {
-                const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
-                if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
-                    setMentionState({
-                        isVisible: true,
-                        filter: textAfterAt,
-                        cursorPosition: cursorPos
-                    });
-                } else {
-                    setMentionState(null);
-                }
+        const cursorPos = e.target.selectionStart;
+        const textBeforeCursor = value.substring(0, cursorPos);
+        const lastAtPos = textBeforeCursor.lastIndexOf("@");
+
+        if (lastAtPos !== -1) {
+            const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
+            if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
+                setMentionState({
+                    isVisible: true,
+                    filter: textAfterAt,
+                    cursorPosition: cursorPos
+                });
             } else {
                 setMentionState(null);
             }
+        } else {
+            setMentionState(null);
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Enter') {
-            if (!e.shiftKey && window.innerWidth > 768) {
-                e.preventDefault();
-                handleSend();
-            } else {
-                e.preventDefault();
-                document.execCommand('insertText', false, '\n');
-            }
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+            e.preventDefault();
+            handleSend();
         }
-    };
-
-    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
     };
 
     const handleUserSelect = (username: string) => {
-        if (!mentionState) return;
+        if (!mentionState || !textareaRef.current) return;
         const lastAt = input.lastIndexOf("@", mentionState.cursorPosition - 1);
         const textBeforeAt = input.substring(0, lastAt);
         const textAfterCursor = input.substring(mentionState.cursorPosition);
         const newInput = textBeforeAt + "@" + username + " " + textAfterCursor;
-        
+
         setInput(newInput);
         setMentionState(null);
-        nextCursorPositionRef.current = (textBeforeAt + "@" + username + " ").length;
-        
+
+        const newCursorPos = (textBeforeAt + "@" + username + " ").length;
+
         setTimeout(() => {
             if (textareaRef.current) {
                 textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                adjustHeight();
             }
         }, 0);
     };
@@ -158,19 +108,35 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
         onSend(input, replyingTo?.id, mentions);
         setInput("");
-        if (textareaRef.current) {
-            textareaRef.current.innerHTML = "";
-        }
         onTyping(false);
         onCancelReply();
         setMentionState(null);
+
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+        }
     };
 
     // Voice note recording helpers
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
+            // 1. Explicitly check for supported MIME types (iOS fallback)
+            const mimeType = [
+                'audio/webm;codecs=opus',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+                'audio/wav'
+            ].find(type => MediaRecorder.isTypeSupported(type)) || '';
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
 
@@ -181,14 +147,22 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             };
 
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/ogg; codecs=opus' });
-                if (audioChunksRef.current.length > 0) {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+                // 2. Validate blob size (prevent silent/empty notes)
+                // If it's less than 1000 bytes, it's likely empty or failed
+                if (audioBlob.size < 500) {
+                    console.warn("Captured audio is too small, likely failed:", audioBlob.size);
+                    useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", 4000);
+                } else {
                     onSendVoice(audioBlob);
                 }
+
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            mediaRecorder.start();
+            // 3. Use a smaller timeslice for dataavailable to ensure data is captured on mobile
+            mediaRecorder.start(200);
             setIsRecording(true);
             setRecordingTime(0);
             timerRef.current = window.setInterval(() => {
@@ -196,7 +170,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             }, 1000);
         } catch (err) {
             console.error("Error accessing microphone:", err);
-            alert("Could not access microphone.");
+            useAppStore.getState().triggerToast("Could not access microphone. Ensure you have granted permission.", 4000);
         }
     };
 
@@ -233,90 +207,10 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const renderHighlightedText = (text: string) => {
-        if (!text) return "";
-        let highlighted = text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-
-        const sortedUsers = [...users].sort((a, b) => b.username.length - a.username.length);
-
-        sortedUsers.forEach((user) => {
-            const userIndex = users.findIndex(u => u.username === user.username);
-            const color = MENTION_COLORS[userIndex % MENTION_COLORS.length];
-            const escapedName = user.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`@${escapedName}(\\s|$)`, 'g');
-
-            highlighted = highlighted.replace(regex, (match) => {
-                const endsWithSpace = match.endsWith(' ');
-                const cleanMatch = endsWithSpace ? match.slice(0, -1) : match;
-                return `<span style="background-color: ${color}20; color: ${color}; outline: 1px solid ${color}40; border-radius: 6px; padding: 1px 2px; font-weight: 800;">${cleanMatch}</span>${endsWithSpace ? ' ' : ''}`;
-            });
-        });
-
-        return highlighted + (text.endsWith('\n') ? '<br/>' : '');
-    };
-
-    // Auto-grow and innerHTML synchronization logic
-    useEffect(() => {
-        const el = textareaRef.current;
-        if (!el || isRecording) return;
-
-        const targetHtml = renderHighlightedText(input);
-
-        // Only update innerHTML if it's semantically different or if we have a forced cursor update
-        if (el.innerHTML !== targetHtml || nextCursorPositionRef.current !== null) {
-            let cursorOffset = nextCursorPositionRef.current;
-            if (cursorOffset === null) {
-                cursorOffset = document.activeElement === el ? saveSelection(el) : null;
-            }
-
-            el.innerHTML = targetHtml;
-            
-            if (cursorOffset !== null) {
-                restoreSelection(el, cursorOffset);
-            }
-            nextCursorPositionRef.current = null;
-        }
-    }, [input, users, isRecording]);
-
     // Focus input when replyingTo changes
     useEffect(() => {
         if (replyingTo && textareaRef.current) {
-            const el = textareaRef.current;
-            const triggerFocus = () => {
-                // Some mobile browsers require a click or a more direct interaction
-                // to open the keyboard on contentEditable elements
-                if (document.activeElement !== el) {
-                    el.click();
-                    el.focus();
-                }
-                
-                // Move cursor to end
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                range.collapse(false);
-                const sel = window.getSelection();
-                if (sel) {
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-            };
-
-            // First attempt immediately
-            triggerFocus();
-            
-            // Additional attempts to handle potential race conditions or browser delays
-            const timer1 = setTimeout(triggerFocus, 50);
-            const timer2 = setTimeout(triggerFocus, 150);
-            
-            return () => {
-                clearTimeout(timer1);
-                clearTimeout(timer2);
-            };
+            textareaRef.current.focus();
         }
     }, [replyingTo]);
 
@@ -336,14 +230,6 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
     return (
         <div className="px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0))] pt-2 bg-[#0b141a] border-t border-white/5 relative">
-            <style>{`
-                [contenteditable]:empty::before {
-                    content: attr(data-placeholder);
-                    color: rgba(255, 255, 255, 0.4);
-                    pointer-events: none;
-                    display: block;
-                }
-            `}</style>
             {/* Quick Actions for Game Analysis */}
             {isGameAnalysis && hasDailyScore && profile?.id && (
                 <div className="mx-2 mb-2.5 flex justify-start">
@@ -372,9 +258,9 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                             </div>
                             <p className="text-[13px] text-white/70 line-clamp-2 font-medium leading-relaxed">{replyingTo.content}</p>
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={onCancelReply} 
+                        <button
+                            type="button"
+                            onClick={onCancelReply}
                             className="bg-white/5 hover:bg-white/10 text-white/60 hover:text-white p-1.5 rounded-full cursor-pointer transition-colors"
                         >
                             <X size={14} />
@@ -418,7 +304,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                         </button>
                     )}
                     {isRecording ? (
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             className="flex-1 flex items-center justify-between bg-[#2a3942] rounded-[28px] px-5 py-2.5 min-h-[48px] text-white border border-red-500/20 shadow-2xl shadow-red-500/10"
@@ -442,20 +328,14 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                         </motion.div>
                     ) : (
                         <div className="flex-1 relative bg-[#2a3942] rounded-[28px] shadow-2xl min-h-[48px] overflow-hidden border border-white/10 focus-within:border-correct/40 transition-colors group flex flex-col justify-center">
-                            <div
+                            <textarea
                                 ref={textareaRef}
-                                contentEditable={true}
-                                onInput={handleInput}
+                                value={input}
+                                onChange={handleInput}
                                 onKeyDown={handleKeyDown}
-                                onPaste={handlePaste}
-                                data-placeholder="Message..."
-                                className="w-full bg-transparent border-none px-5 py-[12px] text-[15px] leading-[22px] font-medium font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent caret-correct block whitespace-pre-wrap break-words"
-                                style={{
-                                    fontVariantLigatures: 'none',
-                                    minHeight: '48px',
-                                    maxHeight: '180px',
-                                    overflowY: 'auto'
-                                }}
+                                placeholder="Message..."
+                                className="w-full bg-transparent border-none px-5 py-[12px] text-[15px] leading-[22px] font-medium font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent caret-correct block whitespace-pre-wrap wrap-break-word min-h-[48px] max-h-[180px]"
+                                rows={1}
                             />
                         </div>
                     )}

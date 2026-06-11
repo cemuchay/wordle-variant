@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Eye, Loader2, X } from "lucide-react";
+import { Eye, Loader2, X, Search } from "lucide-react";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { MAX_ATTEMPTS } from "../constants/game";
 import { Z_INDEX } from "../constants/ui";
@@ -60,6 +60,8 @@ const GuessPreviewModal: React.FC<{
       initialMarathonGameIndex ?? 0,
     );
     const [showTargetWord, setShowTargetWord] = useState(false);
+    const [sortMode, setSortMode] = useState<"number" | "length">("number");
+    const marathonGamesRef = useRef<HTMLDivElement>(null);
 
     const marathonGames = useMemo(() => {
       if (!isMarathon) return [];
@@ -399,46 +401,21 @@ const GuessPreviewModal: React.FC<{
             <X size={20} />
           </button>
 
-          <p className="text-sm uppercase tracking-tighter mb-2 text-center text-gray-100 font-bold">
-            {username}'s Guesses
-          </p>
+          <div className="flex items-center justify-center gap-2 mb-2 relative">
+            <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold">
+              {username}'s Guesses
+            </p>
+            {isMarathon && (
+              <button
+                onClick={() => marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
+                title="Scroll to game list"
+              >
+                <Search size={14} />
+              </button>
+            )}
+          </div>
 
-          {isMarathon && (
-            <div className="flex justify-center flex-wrap gap-1 mb-4 border-b border-white/5 py-4 ">
-              {marathonGames.map((game, idx) => {
-                const prog = entry.marathon_progress?.find(
-                  (p: any) => p.game_index === idx,
-                );
-                const targetPlayed = !!prog;
-
-                const myProg = myParticipation?.marathon_progress?.find(
-                  (p: any) => p.game_index === idx,
-                );
-                const viewerFinished =
-                  myProg?.status === "completed" ||
-                  myProg?.status === "timed_out";
-                const isMe =
-                  profile?.id === (entry.user_id || entry.profiles?.id);
-
-                const canSelect =
-                  isMe || (targetPlayed && viewerFinished) || isCreator;
-
-                return (
-                  <button
-                    key={idx}
-                    disabled={false}
-                    onClick={() => {
-                      setMarathonGameIndex(idx);
-                      setShowTargetWord(false);
-                    }}
-                    className={`px-2.5 h-8 rounded-lg text-[10px] font-black transition-all ${marathonGameIndex === idx ? "bg-correct text-black scale-110 shadow-lg shadow-correct/20" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
-                  >
-                    #{idx + 1} ({game.wordLength}L)
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {loading ? (
             <div className="flex justify-center py-12">
@@ -541,6 +518,8 @@ const GuessPreviewModal: React.FC<{
                   </button>
                 )}
               </div>
+
+
 
               {/* Roast Message */}
               {gameData?.game_message && (
@@ -690,6 +669,120 @@ const GuessPreviewModal: React.FC<{
                   );
                 })}
               </div>
+
+
+              {isMarathon && (
+                <div ref={marathonGamesRef} className="mb-4 border-b border-white/5 py-4 w-full scroll-mt-20">
+                  <div className="flex justify-between items-center mb-3 px-1">
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                      Marathon Games
+                    </span>
+                    <div className="flex bg-white/5 rounded-lg p-0.5">
+                      <button
+                        onClick={() => setSortMode("number")}
+                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${sortMode === "number" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                      >
+                        # Order
+                      </button>
+                      <button
+                        onClick={() => setSortMode("length")}
+                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${sortMode === "length" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                      >
+                        By Length
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {sortMode === "number" ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5 w-full">
+                      {marathonGames.map((game, idx) => {
+                        const prog = entry.marathon_progress?.find(
+                          (p: any) => p.game_index === idx,
+                        );
+                        const targetPlayed = !!prog;
+
+                        const myProg = myParticipation?.marathon_progress?.find(
+                          (p: any) => p.game_index === idx,
+                        );
+                        const viewerFinished =
+                          myProg?.status === "completed" ||
+                          myProg?.status === "timed_out";
+                        const isMe =
+                          profile?.id === (entry.user_id || entry.profiles?.id);
+
+                        const canSelect =
+                          isMe || (targetPlayed && viewerFinished) || isCreator;
+
+                        return (
+                          <button
+                            key={idx}
+                            disabled={false}
+                            onClick={() => {
+                              setMarathonGameIndex(idx);
+                              setShowTargetWord(false);
+                            }}
+                            className={`w-full px-1.5 py-2 h-auto min-h-[32px] rounded-lg text-[10px] font-black transition-all flex items-center justify-center text-center ${marathonGameIndex === idx ? "bg-correct text-black scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
+                          >
+                            #{idx + 1} ({game.wordLength}L)
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 w-full">
+                      {Object.entries(
+                        marathonGames.reduce((acc, game, idx) => {
+                          const len = game.wordLength;
+                          if (!acc[len]) acc[len] = [];
+                          acc[len].push({ ...game, originalIndex: idx });
+                          return acc;
+                        }, {} as Record<number, any[]>)
+                      )
+                        .sort(([lenA], [lenB]) => Number(lenA) - Number(lenB))
+                        .map(([len, games]) => (
+                          <div key={len} className="bg-white/5 rounded-xl p-2.5 border border-white/5">
+                            <h4 className="text-[9px] font-black uppercase text-gray-400 mb-2 px-1 tracking-widest">{len} Letters</h4>
+                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+                              {games.map((game: any) => {
+                                const idx = game.originalIndex;
+                                const prog = entry.marathon_progress?.find(
+                                  (p: any) => p.game_index === idx,
+                                );
+                                const targetPlayed = !!prog;
+
+                                const myProg = myParticipation?.marathon_progress?.find(
+                                  (p: any) => p.game_index === idx,
+                                );
+                                const viewerFinished =
+                                  myProg?.status === "completed" ||
+                                  myProg?.status === "timed_out";
+                                const isMe =
+                                  profile?.id === (entry.user_id || entry.profiles?.id);
+
+                                const canSelect =
+                                  isMe || (targetPlayed && viewerFinished) || isCreator;
+
+                                return (
+                                  <button
+                                    key={idx}
+                                    disabled={false}
+                                    onClick={() => {
+                                      setMarathonGameIndex(idx);
+                                      setShowTargetWord(false);
+                                    }}
+                                    className={`w-full px-1.5 py-2 h-auto min-h-[32px] rounded-lg text-[10px] font-black transition-all flex items-center justify-center text-center ${marathonGameIndex === idx ? "bg-correct text-black scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
+                                  >
+                                    #{idx + 1}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={onClose}

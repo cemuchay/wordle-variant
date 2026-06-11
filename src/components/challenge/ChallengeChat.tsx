@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, memo, useMemo, useCallback } from "react";
-import { Send, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Send, MessageSquare, Pencil, Trash2, Play, Pause } from "lucide-react";
 import { type ChallengeMessage } from "../../hooks/useChallengeChat";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useConfirmation } from "../../hooks/useConfirmation";
+import { useAppStore } from "../../store/useAppStore";
 
 interface ChallengeChatProps {
+// ... rest remains same but I need to make sure I don't break imports
   messages: ChallengeMessage[];
   sendMessage: (content: string) => Promise<void>;
   editMessage: (id: string, newContent: string) => Promise<void>;
@@ -28,6 +30,54 @@ interface ChallengeChatMessageProps {
 
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 
+const ChallengeAudioPlayer = ({ url }: { url: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-black/20 rounded-xl p-2 pr-4 border border-white/5 min-w-[160px]">
+      <audio
+        ref={audioRef}
+        src={url}
+        onEnded={() => setIsPlaying(false)}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="w-8 h-8 rounded-full bg-correct flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-transform"
+      >
+        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+      </button>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] font-black uppercase text-correct tracking-widest">Voice Note</span>
+        <div className="flex gap-1">
+          {[...Array(12)].map((_, i) => (
+            <div
+              key={i}
+              className={`w-0.5 h-3 rounded-full ${isPlaying ? 'bg-correct animate-pulse' : 'bg-white/20'}`}
+              style={{
+                height: `${2 + Math.random() * 10}px`,
+                animationDelay: `${i * 0.1}s`
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ChallengeChatMessage = memo(function ChallengeChatMessage({
   msg,
   isMe,
@@ -39,6 +89,7 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
 }: ChallengeChatMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
+  const setPreviewImage = useAppStore(s => s.setPreviewImage);
 
   const isWithinTimeLimit = useMemo(() => {
     const elapsed = Date.now() - new Date(msg.created_at).getTime();
@@ -160,6 +211,16 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
                   Save
                 </button>
               </div>
+            </div>
+          ) : msg.voice_url ? (
+            <ChallengeAudioPlayer url={msg.voice_url} />
+          ) : msg.image_url ? (
+            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url!)}>
+              <img
+                src={msg.image_url}
+                className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
+                alt="shared file"
+              />
             </div>
           ) : (
             formatMessageContent(msg.content, isMe, usernames)
@@ -461,23 +522,32 @@ export const ChallengeChat = memo(function ChallengeChat({
       {/* Input Form */}
       <form
         onSubmit={handleSend}
-        className="flex gap-2 border-t border-white/5 pt-3 shrink-0"
+        className="flex items-end gap-2 border-t border-white/5 pt-3 shrink-0"
       >
-        <input
-          type="text"
+        <textarea
           maxLength={300}
           placeholder="Type a message..."
           value={inputText}
           onChange={(e) => {
             setInputText(e.target.value);
             setTyping(true);
+            // Auto-grow height
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
           }}
-          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/60 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+              e.preventDefault();
+              handleSend(e);
+            }
+          }}
+          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/60 focus:border-correct outline-none focus:ring-1 focus:ring-correct/20 transition-all font-medium resize-none max-h-[120px] scrollbar-hide"
+          rows={1}
         />
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="bg-correct hover:brightness-110 disabled:opacity-30 disabled:hover:brightness-100 text-black px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          className="bg-correct hover:brightness-110 disabled:opacity-30 disabled:hover:brightness-100 text-black h-[38px] w-[38px] rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer shrink-0"
         >
           <Send size={12} strokeWidth={2.5} />
         </button>

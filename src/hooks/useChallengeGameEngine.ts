@@ -82,6 +82,7 @@ export const useChallengeGameEngine = ({
          return challenge.max_time;
       const activeLength = activeGame ? activeGame.wordLength : 5;
       return getMarathonTimer(challenge, gameIndex, activeLength);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       challenge.mode,
       challenge.max_time,
@@ -160,6 +161,7 @@ export const useChallengeGameEngine = ({
 
    useEffect(() => {
       if (challenge.is_bot_marathon && challenge.target_word === "MARATHON") {
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          fetchBotDailyWords();
       }
    }, [challenge.is_bot_marathon, challenge.target_word, fetchBotDailyWords]);
@@ -202,20 +204,20 @@ export const useChallengeGameEngine = ({
    }, []);
 
    const saveToLocal = useCallback(
-      (payload: any) => {
+      (payload: any, needsSync = false) => {
          try {
             const existing = safeLocalStorage.getItem(storageKey);
             const existingParsed = existing ? JSON.parse(existing) : {};
             const finalPayload = {
                ...existingParsed,
                ...payload,
+               needsSync,
                timestamp: Date.now(),
             };
-            safeLocalStorage.setItem(
-               storageKey,
-               JSON.stringify(finalPayload),
-            );
-            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, { payload: finalPayload });
+            safeLocalStorage.setItem(storageKey, JSON.stringify(finalPayload));
+            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, {
+               payload: finalPayload,
+            });
          } catch (e) {
             logger.error("Local save failed", { key: storageKey, error: e });
          }
@@ -232,6 +234,9 @@ export const useChallengeGameEngine = ({
          saveToLocal(payload);
 
          const dbPayload = { ...payload };
+         delete dbPayload.needsSync;
+         delete dbPayload.timestamp;
+
          if (dbPayload.guesses && targetWord) {
             const key = targetWord + (challenge.salt || "");
             dbPayload.guesses = encryptGuesses(dbPayload.guesses, key);
@@ -241,6 +246,28 @@ export const useChallengeGameEngine = ({
          const duration = Date.now() - start;
          addLog(`Sync End: ${success ? "Success" : "Failed"}`, duration);
 
+         // Update needsSync flag based on success
+         if (!success) {
+            saveToLocal(payload, true);
+         } else {
+            // Clear needsSync flag on success
+            try {
+               const saved = safeLocalStorage.getItem(storageKey);
+               if (saved) {
+                  const parsed = JSON.parse(saved);
+                  if (parsed.needsSync) {
+                     delete parsed.needsSync;
+                     safeLocalStorage.setItem(
+                        storageKey,
+                        JSON.stringify(parsed),
+                     );
+                  }
+               }
+            } catch (e) {
+               logger.error("Failed to clear needsSync flag", { error: e });
+            }
+         }
+
          // --- LOCAL STORAGE CLEANUP ---
          // If sync succeeded, and it was a final state (completed/timed_out),
          // we can remove the local mirror as the cloud is now authoritative.
@@ -249,15 +276,20 @@ export const useChallengeGameEngine = ({
             (payload.status === "completed" || payload.status === "timed_out")
          ) {
             try {
-               localStorage.removeItem(storageKey);
+               safeLocalStorage.removeItem(storageKey);
                // Also clean up fallback legacy key if it exists
                if (isMarathon && activeGame) {
                   const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
-                  localStorage.removeItem(legacyKey);
+                  safeLocalStorage.removeItem(legacyKey);
                }
-               logger.info(`[challenge-prog] Local mirror cleaned up: ${storageKey}`);
+               logger.info(
+                  `[challenge-prog] Local mirror cleaned up: ${storageKey}`,
+               );
             } catch (e) {
-               logger.error("Local cleanup failed", { key: storageKey, error: e });
+               logger.error("Local cleanup failed", {
+                  key: storageKey,
+                  error: e,
+               });
             }
          }
 
@@ -366,7 +398,7 @@ export const useChallengeGameEngine = ({
          return decryptGuesses(progress.guesses, key);
       }
 
-      let g = participation.guesses;
+      const g = participation.guesses;
       return decryptGuesses(g, key);
    }, [
       participation,
@@ -489,6 +521,8 @@ export const useChallengeGameEngine = ({
             ? progress?.hints_used || false
             : participation?.hints_used || false;
          let localHintRecord = serverHintRecord;
+         let needsBackgroundSync = false;
+         let recoveredPayload = null;
 
          try {
             let saved = safeLocalStorage.getItem(storageKey);
@@ -496,21 +530,40 @@ export const useChallengeGameEngine = ({
                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                saved = safeLocalStorage.getItem(legacyKey);
                if (saved) {
-                  logger.info(`[challenge-prog] Found legacy storage key: ${legacyKey}`);
+                  logger.info(
+                     `[challenge-prog] Found legacy storage key: ${legacyKey}`,
+                  );
                }
             }
             if (saved) {
                const parsed = JSON.parse(saved);
-               const hasMoreGuesses = parsed.guesses?.length > incoming.length;
-               const hasNewHint = parsed.hints_used && !localUsedHint;
+               const localStatus = parsed.status || "playing";
 
-               if (hasMoreGuesses || hasNewHint) {
-                  logger.info(`[challenge-prog] Recovering progress from localStorage: ${storageKey}`, {
-                     hasMoreGuesses,
-                     hasNewHint,
-                     localCount: parsed.guesses?.length,
-                     serverCount: incoming.length
-                  });
+               const hasMoreGuesses =
+                  (parsed.guesses?.length || 0) > incoming.length;
+               const hasNewHint = parsed.hints_used && !localUsedHint;
+               const hasAdvancedStatus =
+                  (localStatus === "completed" ||
+                     localStatus === "timed_out") &&
+                  serverStatus === "playing";
+
+               if (
+                  hasMoreGuesses ||
+                  hasNewHint ||
+                  hasAdvancedStatus ||
+                  parsed.needsSync
+               ) {
+                  logger.info(
+                     `[challenge-prog] Recovering advanced progress from localStorage: ${storageKey}`,
+                     {
+                        hasMoreGuesses,
+                        hasNewHint,
+                        hasAdvancedStatus,
+                        needsSync: parsed.needsSync,
+                        localCount: parsed.guesses?.length,
+                        serverCount: incoming.length,
+                     },
+                  );
                   if (
                      parsed.guesses &&
                      parsed.guesses.length >= incoming.length
@@ -519,10 +572,16 @@ export const useChallengeGameEngine = ({
                   }
                   localUsedHint = parsed.hints_used || localUsedHint;
                   localHintRecord = parsed.hint_record || localHintRecord;
+
+                  needsBackgroundSync = true;
+                  recoveredPayload = parsed;
                }
             }
          } catch (e) {
-            logger.error("Local recovery failed", { key: storageKey, error: e });
+            logger.error("Local recovery failed", {
+               key: storageKey,
+               error: e,
+            });
          }
 
          let isStarterEnforced = false;
@@ -559,8 +618,25 @@ export const useChallengeGameEngine = ({
 
          setIsSaving(false);
 
-         // Side Effects (Timer Start / Timeout Sync)
+         // Side Effects (Timer Start / Timeout Sync / Background Sync-Back)
          try {
+            // Handle Background Sync-Back of recovered local state
+            if (
+               needsBackgroundSync &&
+               recoveredPayload &&
+               !isFinishedStatus &&
+               !startTimerRef.current
+            ) {
+               console.log(
+                  "[Engine] Triggering background sync for advanced local state...",
+               );
+               wrappedSubmitResult(
+                  recoveredPayload,
+                  isMarathon ? wordLength : undefined,
+                  isMarathon ? gameIndex! : undefined,
+               );
+            }
+
             // Handle Enforced Starter Word Sync
             if (isStarterEnforced && !startTimerRef.current) {
                console.log(
@@ -615,6 +691,7 @@ export const useChallengeGameEngine = ({
       };
 
       initialize();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       currentKey,
       isMarathon,
@@ -853,7 +930,9 @@ export const useChallengeGameEngine = ({
             attempt++;
          }
       } catch (e) {
-         logger.error("[Engine] Error during guess submission sync", { error: e });
+         logger.error("[Engine] Error during guess submission sync", {
+            error: e,
+         });
          success = false;
       }
 
@@ -874,6 +953,12 @@ export const useChallengeGameEngine = ({
       }
 
       if (won || lost) {
+         // Calculate dynamic delay based on tile reveal animation
+         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
+         const transitionDelay = isMarathon
+            ? wordLength * 400 + 1000
+            : wordLength * 400 + 1000;
+
          setTimeout(() => {
             triggerToast(
                won ? "Completed! 🎉" : `The word was ${targetWord}`,
@@ -884,7 +969,7 @@ export const useChallengeGameEngine = ({
             } else {
                onFinish();
             }
-         }, 2000);
+         }, transitionDelay);
       }
    }, [
       isGameOver,
@@ -970,6 +1055,7 @@ export const useChallengeGameEngine = ({
             triggerToast("Failed to save hint usage.", 3000);
          }
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       isGameOver,
       isSaving,

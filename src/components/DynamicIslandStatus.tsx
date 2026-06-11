@@ -33,11 +33,24 @@ export const DynamicIslandStatus = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [mascot, setMascot] = useState<{ mascotFace: string; mascotLabel: string; animationClass: string } | null>(null);
     const [showOnlineNotification, setShowOnlineNotification] = useState(false);
-    const toastTimerRef = useRef<any>(null);
+    const toastTimerRef = useRef<number>(null);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
     const [lastOnlineCount, setLastOnlineCount] = useState(otherOnlineUsers.length);
+
+    // Default persistent state
+    const [localTime, setLocalTime] = useState("");
+
+    useEffect(() => {
+        const updateTime = () => {
+            const now = new Date();
+            setLocalTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        };
+        updateTime();
+        const timer = setInterval(updateTime, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         if (audioChat.error) {
@@ -69,7 +82,7 @@ export const DynamicIslandStatus = () => {
                 if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
             };
         }
-    }, [toast.show, toast.message, toast.duration, setToast]);
+    }, [setToast, toast]);
 
     // Force expand on incoming call so user immediately sees Accept/Reject buttons
     useEffect(() => {
@@ -108,6 +121,7 @@ export const DynamicIslandStatus = () => {
     // Trigger brief online notification when user count increases
     useEffect(() => {
         if (otherOnlineUsers.length > lastOnlineCount) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowOnlineNotification(true);
             const timer = setTimeout(() => {
                 setShowOnlineNotification(false);
@@ -119,9 +133,6 @@ export const DynamicIslandStatus = () => {
 
     // Get the first active voice room to show in the island
     const currentVoiceSession = activeVoiceRooms[0];
-
-    // Show island if: expanded OR online users > 0 OR active call OR someone is in a voice room I'm part of OR mascot is playing OR toast is active
-    if (!isExpanded && otherOnlineUsers.length === 0 && !activeCall && !currentVoiceSession && !mascot && !toast.show) return null;
 
     const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
@@ -164,10 +175,13 @@ export const DynamicIslandStatus = () => {
         }
         if (currentVoiceSession) return '180px';
         if (mascot && (!showOnlineNotification || otherOnlineUsers.length === 0)) {
-            return '170px';
+            return '180px';
         }
-        if (otherOnlineUsers.length === 1) return '150px';
-        return '135px';
+        if (otherOnlineUsers.length === 1) return '160px';
+        if (otherOnlineUsers.length > 1) return '145px';
+
+        // Persistent default state (Smiley + Time)
+        return '150px';
     };
 
     return (
@@ -333,7 +347,12 @@ export const DynamicIslandStatus = () => {
                                     <span className="text-[9px] font-mono font-black text-correct shrink-0 tracking-wide select-none">{mascot.mascotFace}</span>
                                     <span className="text-[8px] uppercase font-black tracking-widest text-white/80 truncate max-w-[115px] select-none">{mascot.mascotLabel}</span>
                                 </div>
-                            ) : null}
+                            ) : (
+                                <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center opacity-50">
+                                    <span className="text-[9px] font-mono font-black text-correct shrink-0 tracking-wide select-none">(•‿•)</span>
+                                    <span className="text-[10px] font-black tracking-widest text-white/80 tabular-nums select-none">{localTime}</span>
+                                </div>
+                            )}
                         </AnimatePresence>
                     </motion.div>
                 ) : (
