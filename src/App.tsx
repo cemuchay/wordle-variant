@@ -153,6 +153,39 @@ export default function App() {
     }
   }, [user, date]);
 
+  // Mascot Greeting on app open
+  useEffect(() => {
+    if (!date || isLoadingDate || !isHydrated) return;
+
+    const now = new Date();
+    const hour = now.getHours();
+    let greeting = "Hello!";
+    let face = "(•‿•)";
+
+    if (hour >= 5 && hour < 12) {
+      greeting = "Good morning! ☀️";
+    } else if (hour >= 12 && hour < 17) {
+      greeting = "Good afternoon! 🌤️";
+    } else if (hour >= 17 && hour < 21) {
+      greeting = "Good evening! 🌙";
+    } else {
+      greeting = "Good night! ✨";
+      face = "(★‿★)";
+    }
+
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('mascot-changed', {
+        detail: { 
+          mascotFace: face, 
+          mascotLabel: greeting, 
+          animationClass: "animate-in slide-in-from-top-2 duration-500" 
+        }
+      }));
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [date, isLoadingDate, isHydrated]);
+
   // Listen to custom event to open stats modal at a specific tab
   useEffect(() => {
     const handleOpenStats = (e: Event) => {

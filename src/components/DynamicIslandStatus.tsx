@@ -33,7 +33,7 @@ export const DynamicIslandStatus = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [mascot, setMascot] = useState<{ mascotFace: string; mascotLabel: string; animationClass: string } | null>(null);
     const [showOnlineNotification, setShowOnlineNotification] = useState(false);
-    const toastTimerRef = useRef<any>(null);
+    const toastTimerRef = useRef<number>(null);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
@@ -69,7 +69,7 @@ export const DynamicIslandStatus = () => {
                 if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
             };
         }
-    }, [toast.show, toast.message, toast.duration, setToast]);
+    }, [setToast, toast]);
 
     // Force expand on incoming call so user immediately sees Accept/Reject buttons
     useEffect(() => {
@@ -108,6 +108,7 @@ export const DynamicIslandStatus = () => {
     // Trigger brief online notification when user count increases
     useEffect(() => {
         if (otherOnlineUsers.length > lastOnlineCount) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowOnlineNotification(true);
             const timer = setTimeout(() => {
                 setShowOnlineNotification(false);
@@ -164,10 +165,10 @@ export const DynamicIslandStatus = () => {
         }
         if (currentVoiceSession) return '180px';
         if (mascot && (!showOnlineNotification || otherOnlineUsers.length === 0)) {
-            return '170px';
+            return '180px';
         }
-        if (otherOnlineUsers.length === 1) return '150px';
-        return '135px';
+        if (otherOnlineUsers.length === 1) return '160px';
+        return '145px';
     };
 
     return (
