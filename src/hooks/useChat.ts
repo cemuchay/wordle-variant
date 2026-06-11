@@ -34,7 +34,7 @@ export interface ChatGroup {
 }
 
 // --- Encryption Helpers for DMs (Client-Side E2EE) ---
-// Using RC4 for simple E2EE obfuscation. 
+// Using RC4 for simple E2EE obfuscation.
 // NOTE: For true high-security applications, AES-GCM via WebCrypto is preferred.
 const rc4EncryptDecrypt = (key: string, data: Uint8Array): Uint8Array => {
    const s: number[] = [];
@@ -76,7 +76,7 @@ export const encryptDM = (text: string, key: string): string => {
       const encoder = new TextEncoder();
       const data = encoder.encode(text);
       const encryptedData = rc4EncryptDecrypt(key, data);
-      
+
       // Convert to hex for storage
       let hex = "";
       for (let i = 0; i < encryptedData.length; i++) {
@@ -101,7 +101,7 @@ export const decryptDM = (ciphertext: string, key: string): string => {
       for (let i = 0; i < hex.length; i += 2) {
          encryptedData[i / 2] = parseInt(hex.slice(i, i + 2), 16);
       }
-      
+
       const decryptedData = rc4EncryptDecrypt(key, encryptedData);
       const decoder = new TextDecoder();
       return decoder.decode(decryptedData);
@@ -256,21 +256,23 @@ export const useChat = (userId: string) => {
 
    // Fetch guesses of users for today (for mention/tag autocomplete)
    useEffect(() => {
-     if (!userId || !date) return;
-     let cancelled = false;
-     const fetchGuesses = async () => {
-       const { data } = await supabase
-         .from("scores")
-         .select(
-           "user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score",
-         )
-         .eq("game_date", date);
-       if (!cancelled && data) {
-         setDailyGuesses(data);
-       }
-     };
-     fetchGuesses();
-     return () => { cancelled = true; };
+      if (!userId || !date) return;
+      let cancelled = false;
+      const fetchGuesses = async () => {
+         const { data } = await supabase
+            .from("scores")
+            .select(
+               "user_id, guesses, status, profiles(username), hint_record, hints_used, skill_score",
+            )
+            .eq("game_date", date);
+         if (!cancelled && data) {
+            setDailyGuesses(data);
+         }
+      };
+      fetchGuesses();
+      return () => {
+         cancelled = true;
+      };
    }, [userId, date]);
 
    // Fetch groups & invites on load
@@ -538,7 +540,8 @@ export const useChat = (userId: string) => {
 
       return () => {
          supabase.removeChannel(channel);
-         if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+         if (typingTimeoutRef.current)
+            window.clearTimeout(typingTimeoutRef.current);
       };
    }, [userId, activeRoomId]);
 
@@ -704,6 +707,76 @@ export const useChat = (userId: string) => {
             .updateGlobalMessage({ id: messageId, status: "failed" });
          addFailedMessageId(messageId);
          useAppStore.getState().triggerToast("Resend failed.", 4000);
+      }
+   };
+
+   // Upload & send voice note
+   const sendVoiceMessage = async (blob: Blob) => {
+      const tempId = crypto.randomUUID();
+      const tempUrl = URL.createObjectURL(blob); // Temporary local URL for optimistic UI
+
+      const optimisticMessage: Message = {
+         id: tempId,
+         content: "[Voice Message]",
+         user_id: userId,
+         created_at: new Date().toISOString(),
+         voice_url: tempUrl,
+         group_id: activeRoomId,
+         status: "sending",
+         is_read: false,
+         profiles: globalMessages.find((m) => m.user_id === userId)
+            ?.profiles || { username: "Me", avatar_url: "", id: userId },
+      };
+
+      useAppStore.getState().addGlobalMessage(optimisticMessage);
+
+      try {
+         const fileName = `${userId}/${Date.now()}.ogg`;
+
+         // 1. Upload to storage
+         const { error: uploadErr } = await supabase.storage
+            .from("chat-voices")
+            .upload(fileName, blob, {
+               contentType: "audio/ogg; codecs=opus",
+               cacheControl: "3600",
+            });
+
+         if (uploadErr) throw uploadErr;
+
+         const {
+            data: { publicUrl },
+         } = supabase.storage.from("chat-voices").getPublicUrl(fileName);
+
+         // 2. Persist to database
+         const messagePayload = {
+            id: tempId,
+            content: "[Voice Message]",
+            user_id: userId,
+            is_read: false,
+            voice_url: publicUrl,
+            group_id: activeRoomId,
+         };
+
+         const success = await sendWithRetry(tempId, messagePayload);
+
+         if (success) {
+            useAppStore.getState().updateGlobalMessage({ 
+               id: tempId, 
+               status: "sent", 
+               voice_url: publicUrl // Replace blob URL with public URL
+            });
+         } else {
+            throw new Error("Failed to persist voice message");
+         }
+      } catch (err) {
+         console.error("Failed to upload/send voice message:", err);
+         useAppStore
+            .getState()
+            .updateGlobalMessage({ id: tempId, status: "failed" });
+         addFailedMessageId(tempId);
+         useAppStore
+            .getState()
+            .triggerToast("Failed to send voice note.", 4000);
       }
    };
 
@@ -970,15 +1043,17 @@ export const useChat = (userId: string) => {
 
    // Get all profiles for user selector
    useEffect(() => {
-     let cancelled = false;
-     const fetchUsers = async () => {
-       const { data } = await supabase
-         .from("profiles")
-         .select("username, avatar_url, id");
-       if (!cancelled && data) setUsers(data.filter((u) => u.id !== userId));
-     };
-     fetchUsers();
-     return () => { cancelled = true; };
+      let cancelled = false;
+      const fetchUsers = async () => {
+         const { data } = await supabase
+            .from("profiles")
+            .select("username, avatar_url, id");
+         if (!cancelled && data) setUsers(data.filter((u) => u.id !== userId));
+      };
+      fetchUsers();
+      return () => {
+         cancelled = true;
+      };
    }, [userId]);
 
    return {
@@ -992,6 +1067,7 @@ export const useChat = (userId: string) => {
       resendMessage,
       failedMessageIds,
       sendImageMessage,
+      sendVoiceMessage,
       reactToMessage,
       editMessage,
       deleteMessage,

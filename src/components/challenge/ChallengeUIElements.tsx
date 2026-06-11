@@ -89,7 +89,8 @@ export const ExpirationTimer = memo(function ExpirationTimer({
     textClass = "text-yellow-500";
   }
 
-  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+  const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
   return (
@@ -100,7 +101,12 @@ export const ExpirationTimer = memo(function ExpirationTimer({
         <span
           className={`w-1.5 h-1.5 rounded-full ${colorClass} animate-pulse`}
         />
-        {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`} left
+        {days > 0
+          ? `${days}d ${hours}h`
+          : hours > 0
+            ? `${hours}h ${minutes}m`
+            : `${minutes}m`}{" "}
+        left
       </span>
       <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
         <motion.div

@@ -66,13 +66,15 @@ export const GameArea = ({
                 return;
             }
 
-            const hours = Math.floor(difference / (1000 * 60 * 60));
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
             const parts = [];
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+            if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
             parts.push(`${seconds}s`);
 
             setTimeLeft(parts.join(' '));
