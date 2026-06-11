@@ -587,7 +587,10 @@ export const useChat = (userId: string) => {
             return result;
          } catch (err) {
             if (i === retries - 1) throw err;
-            console.warn(`Operation failed, retrying (${i + 1}/${retries})...`, err);
+            console.warn(
+               `Operation failed, retrying (${i + 1}/${retries})...`,
+               err,
+            );
             await new Promise((resolve) =>
                setTimeout(resolve, delay * Math.pow(2, i)),
             );
@@ -688,6 +691,17 @@ export const useChat = (userId: string) => {
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
+      // Prevent sending local blob URLs to the database
+      if (
+         msg.voice_url?.startsWith("blob:") ||
+         msg.image_url?.startsWith("blob:")
+      ) {
+         useAppStore
+            .getState()
+            .triggerToast("Cannot resend media. Please upload again.", 4000);
+         return;
+      }
+
       useAppStore
          .getState()
          .updateGlobalMessage({ id: messageId, status: "sending" });
@@ -752,7 +766,7 @@ export const useChat = (userId: string) => {
          // 1. Upload to storage with retry
          await retryOperation(async () => {
             const { error: uploadErr } = await supabase.storage
-               .from("chat-voices")
+               .from("voice-notes")
                .upload(fileName, blob, {
                   contentType: "audio/ogg; codecs=opus",
                   cacheControl: "3600",
@@ -762,7 +776,7 @@ export const useChat = (userId: string) => {
 
          const {
             data: { publicUrl },
-         } = supabase.storage.from("chat-voices").getPublicUrl(fileName);
+         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
 
          // 2. Persist to database with retry
          const messagePayload = {
@@ -777,13 +791,15 @@ export const useChat = (userId: string) => {
          const success = await sendWithRetry(tempId, messagePayload);
 
          if (success) {
-            useAppStore.getState().updateGlobalMessage({ 
-               id: tempId, 
-               status: "sent", 
-               voice_url: publicUrl 
+            useAppStore.getState().updateGlobalMessage({
+               id: tempId,
+               status: "sent",
+               voice_url: publicUrl,
             });
          } else {
-            throw new Error("Failed to persist voice message record after retries");
+            throw new Error(
+               "Failed to persist voice message record after retries",
+            );
          }
       } catch (err) {
          console.error("Failed to upload/send voice message:", err);
