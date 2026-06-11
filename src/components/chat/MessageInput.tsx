@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../../hooks/useChat";
 import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
+import { useAppStore } from "../../store/useAppStore";
 
 interface MessageInputProps {
     onSend: (content: string, replyToId?: string, mentions?: string[]) => void;
@@ -79,12 +80,12 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         const textBeforeAt = input.substring(0, lastAt);
         const textAfterCursor = input.substring(mentionState.cursorPosition);
         const newInput = textBeforeAt + "@" + username + " " + textAfterCursor;
-        
+
         setInput(newInput);
         setMentionState(null);
-        
+
         const newCursorPos = (textBeforeAt + "@" + username + " ").length;
-        
+
         setTimeout(() => {
             if (textareaRef.current) {
                 textareaRef.current.focus();
@@ -110,7 +111,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         onTyping(false);
         onCancelReply();
         setMentionState(null);
-        
+
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
@@ -119,8 +120,23 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     // Voice note recording helpers
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
+            // 1. Explicitly check for supported MIME types (iOS fallback)
+            const mimeType = [
+                'audio/webm;codecs=opus',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+                'audio/wav'
+            ].find(type => MediaRecorder.isTypeSupported(type)) || '';
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
 
@@ -131,14 +147,22 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             };
 
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/ogg; codecs=opus' });
-                if (audioChunksRef.current.length > 0) {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+                // 2. Validate blob size (prevent silent/empty notes)
+                // If it's less than 1000 bytes, it's likely empty or failed
+                if (audioBlob.size < 500) {
+                    console.warn("Captured audio is too small, likely failed:", audioBlob.size);
+                    useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", 4000);
+                } else {
                     onSendVoice(audioBlob);
                 }
+
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            mediaRecorder.start();
+            // 3. Use a smaller timeslice for dataavailable to ensure data is captured on mobile
+            mediaRecorder.start(200);
             setIsRecording(true);
             setRecordingTime(0);
             timerRef.current = window.setInterval(() => {
@@ -146,7 +170,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             }, 1000);
         } catch (err) {
             console.error("Error accessing microphone:", err);
-            alert("Could not access microphone.");
+            useAppStore.getState().triggerToast("Could not access microphone. Ensure you have granted permission.", 4000);
         }
     };
 
@@ -234,9 +258,9 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                             </div>
                             <p className="text-[13px] text-white/70 line-clamp-2 font-medium leading-relaxed">{replyingTo.content}</p>
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={onCancelReply} 
+                        <button
+                            type="button"
+                            onClick={onCancelReply}
                             className="bg-white/5 hover:bg-white/10 text-white/60 hover:text-white p-1.5 rounded-full cursor-pointer transition-colors"
                         >
                             <X size={14} />
@@ -280,7 +304,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                         </button>
                     )}
                     {isRecording ? (
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             className="flex-1 flex items-center justify-between bg-[#2a3942] rounded-[28px] px-5 py-2.5 min-h-[48px] text-white border border-red-500/20 shadow-2xl shadow-red-500/10"

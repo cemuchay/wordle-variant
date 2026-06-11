@@ -9,6 +9,7 @@ import { AppHeader } from "./components/layout/AppHeader";
 import { AppNavigation } from "./components/layout/AppNavigation";
 import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
+import { ImageModal } from "./components/common/ImageModal";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { UnsubscribePage } from "./components/UnsubscribePage";
@@ -614,6 +615,8 @@ export default function App() {
           User Data Deletion
         </a>
       </div>
+
+      <ImageModal />
     </div>
   );
 }

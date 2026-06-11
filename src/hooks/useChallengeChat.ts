@@ -14,7 +14,8 @@ export interface ChallengeMessage {
    is_deleted?: boolean;
    reactions?: Record<string, string>;
    voice_url?: string | null;
-}
+   image_url?: string | null;
+   }
 
 export const useChallengeChat = (
    challengeId: string | undefined,
@@ -159,6 +160,25 @@ export const useChallengeChat = (
       [effectiveUser],
    );
 
+   const retryOperation = async (
+      operation: () => Promise<any>,
+      retries = 3,
+      delay = 1000,
+   ): Promise<any> => {
+      for (let i = 0; i < retries; i++) {
+         try {
+            const result = await operation();
+            return result;
+         } catch (err) {
+            if (i === retries - 1) throw err;
+            console.warn(`Operation failed, retrying (${i + 1}/${retries})...`, err);
+            await new Promise((resolve) =>
+               setTimeout(resolve, delay * Math.pow(2, i)),
+            );
+         }
+      }
+   };
+
    const sendMessage = useCallback(
       async (content: string, voiceUrl?: string) => {
          if (!content.trim() && !voiceUrl) return;
@@ -192,12 +212,14 @@ export const useChallengeChat = (
          setMessages((prev) => [...prev, optimisticMsg]);
 
          try {
-            const { error } = await supabase
-               .from("challenge_messages")
-               .insert([msgData]);
-            if (error) throw error;
+            await retryOperation(async () => {
+                const { error } = await supabase
+                   .from("challenge_messages")
+                   .insert([msgData]);
+                if (error) throw error;
+            });
          } catch (err) {
-            console.error("Failed to send challenge message:", err);
+            console.error("Failed to send challenge message after retries:", err);
             // Remove optimistic message on error
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
          }
@@ -208,7 +230,7 @@ export const useChallengeChat = (
    const sendVoiceMessage = useCallback(
       async (blob: Blob) => {
          if (!challengeId || !effectiveUser) return;
-         
+
          const tempId = crypto.randomUUID();
          const tempUrl = URL.createObjectURL(blob);
          const username = effectiveUser.username || effectiveUser.user_metadata?.full_name || 'Player';
@@ -224,21 +246,23 @@ export const useChallengeChat = (
             sender_id: isGuest ? null : effectiveUser.id,
             guest_sender_id: isGuest ? effectiveUser.id : null
          };
-         
+
          setMessages(prev => [...prev, optimisticMsg]);
 
          try {
             const userId = effectiveUser.id;
             const fileName = `${userId}/${Date.now()}.ogg`;
 
-            const { error: uploadErr } = await supabase.storage
-               .from('chat-voices')
-               .upload(fileName, blob, {
-                  contentType: 'audio/ogg; codecs=opus',
-                  cacheControl: '3600',
-               });
-
-            if (uploadErr) throw uploadErr;
+            // 1. Upload to storage with retry
+            await retryOperation(async () => {
+                const { error: uploadErr } = await supabase.storage
+                   .from('chat-voices')
+                   .upload(fileName, blob, {
+                      contentType: 'audio/ogg; codecs=opus',
+                      cacheControl: '3600',
+                   });
+                if (uploadErr) throw uploadErr;
+            });
 
             const { data: { publicUrl } } = supabase.storage.from('chat-voices').getPublicUrl(fileName);
 
@@ -258,13 +282,16 @@ export const useChallengeChat = (
                 msgData.guest_sender_id = null;
             }
 
-            const { error } = await supabase.from('challenge_messages').insert([msgData]);
-            if (error) throw error;
+            // 2. Persist to database with retry
+            await retryOperation(async () => {
+                const { error } = await supabase.from('challenge_messages').insert([msgData]);
+                if (error) throw error;
+            });
 
             // Update with public URL
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, voice_url: publicUrl } : m));
          } catch (err) {
-            console.error('Failed to upload/send challenge voice message:', err);
+            console.error('Failed to upload/send challenge voice message after retries:', err);
             setMessages(prev => prev.filter(m => m.id !== tempId));
          }
       },
