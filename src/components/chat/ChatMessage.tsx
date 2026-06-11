@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useMemo, useState, useRef, useEffect, } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
-import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy, X } from "lucide-react";
+import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy, } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 import { ProtectedAvatar } from "./ProtectedAvatar";
@@ -125,7 +125,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
     const [showReactionDetails, setShowReactionDetails] = useState(false);
-    const [zoomOpen, setZoomOpen] = useState(false);
+    const setPreviewImage = useAppStore(s => s.setPreviewImage);
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
 
@@ -201,15 +201,15 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
         if (guessMatch && dailyGuesses) {
             const guessIdentifier = guessMatch[1];
             // Find by user_id OR profiles.username (case-insensitive)
-            const guessData = dailyGuesses.find(dg => 
-                dg.user_id === guessIdentifier || 
+            const guessData = dailyGuesses.find(dg =>
+                dg.user_id === guessIdentifier ||
                 dg.profiles?.username?.toLowerCase() === guessIdentifier.toLowerCase()
             );
             if (guessData) {
                 const username = guessData.profiles?.username || "Player";
                 const won = guessData.status === "won";
                 const attempts = won ? guessData.guesses.length : "X";
-                
+
                 // Security check: only show letters/points if it's our own board, OR we have played today's game
                 const isOwner = guessData.user_id === currentUserId;
                 const viewerGuess = dailyGuesses.find(dg => dg.user_id === currentUserId);
@@ -469,7 +469,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                     >
                         <Reply size={10} className="text-correct shrink-0" />
                         <span className="opacity-60 truncate">
-                             {replyMsg.profiles?.username}: {replyMsg.content}
+                            {replyMsg.profiles?.username}: {replyMsg.content}
                         </span>
                     </div>
                 )}
@@ -573,9 +573,9 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                     onTouchMove={handleTouchMove}
                     onTouchCancel={handleTouchEnd}
                     className={`relative max-w-[85%] p-1 pb-3 px-1 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
-                    ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
-                    : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
-                    }`}
+                        ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
+                        : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
+                        }`}
                 >
 
                     {/* Sender profile header inside the bubble container */}
@@ -649,51 +649,13 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                         ) : msg.voice_url ? (
                             <AudioPlayer url={msg.voice_url} />
                         ) : msg.image_url ? (
-                            <>
-                                <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setZoomOpen(true)}>
-                                    <img
-                                        src={msg.image_url}
-                                        className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                                        alt="shared file"
-                                    />
-                                </div>
-                                <AnimatePresence>
-                                    {zoomOpen && (
-                                        <motion.div
-                                            key="zoom-modal"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 backdrop-blur-md"
-                                        >
-                                            <button
-                                                type="button"
-                                                onClick={() => setZoomOpen(false)}
-                                                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-[10000] cursor-pointer"
-                                            >
-                                                <X size={24} />
-                                            </button>
-                                            <motion.div
-                                                initial={{ scale: 0.9, opacity: 0 }}
-                                                animate={{ scale: 1, opacity: 1 }}
-                                                exit={{ scale: 0.9, opacity: 0 }}
-                                                className="relative max-w-full max-h-full flex items-center justify-center"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <img
-                                                    src={msg.image_url}
-                                                    className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl border border-white/10"
-                                                    alt="zoomed shared file"
-                                                />
-                                            </motion.div>
-                                            <div 
-                                                className="absolute inset-0 z-[-1] cursor-zoom-out" 
-                                                onClick={() => setZoomOpen(false)} 
-                                            />
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </>
+                            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url as string)}>
+                                <img
+                                    src={msg.image_url}
+                                    className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
+                                    alt="shared file"
+                                />
+                            </div>
                         ) : (
                             renderedContent
                         )}
@@ -726,7 +688,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
 
                     {/* Reactions Count Display */}
                     {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
-                        <div 
+                        <div
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setShowReactionDetails(!showReactionDetails);
@@ -757,11 +719,11 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                                 return (
                                                     <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
                                                         <div className="flex items-center gap-2 min-w-0">
-                                                            <ProtectedAvatar 
-                                                                userId={uid} 
-                                                                src={profile?.avatar_url} 
-                                                                username={profile?.username || 'Unknown'} 
-                                                                className="w-4 h-4 rounded-full shrink-0" 
+                                                            <ProtectedAvatar
+                                                                userId={uid}
+                                                                src={profile?.avatar_url}
+                                                                username={profile?.username || 'Unknown'}
+                                                                className="w-4 h-4 rounded-full shrink-0"
                                                             />
                                                             <span className="text-[10px] font-black text-white truncate">
                                                                 {uid === currentUserId ? 'You' : (profile?.username || 'Someone')}

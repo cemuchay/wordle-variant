@@ -64,6 +64,7 @@ interface AppState {
    pendingReadReceipts: Record<string, string>;
    joinedGroupIds: string[];
    pendingDMUserId: string | null;
+   previewImage: string | null;
 
    // Actions
    triggerToast: (message: string, duration?: number) => void;
@@ -95,6 +96,7 @@ interface AppState {
    removePendingReadReceipt: (groupId: string) => void;
    setJoinedGroupIds: (ids: string[]) => void;
    setPendingDMUserId: (id: string | null) => void;
+   setPreviewImage: (url: string | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -127,6 +129,7 @@ export const useAppStore = create<AppState>((set) => ({
       }
    })(),
    pendingDMUserId: null,
+   previewImage: null,
 
    // Actions
    triggerToast: (message, duration = 3000) =>
@@ -197,4 +200,5 @@ export const useAppStore = create<AppState>((set) => ({
    }),
    setJoinedGroupIds: (joinedGroupIds) => set({ joinedGroupIds }),
    setPendingDMUserId: (pendingDMUserId) => set({ pendingDMUserId }),
+   setPreviewImage: (previewImage) => set({ previewImage }),
 }));

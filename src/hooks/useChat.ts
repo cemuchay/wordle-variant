@@ -576,31 +576,47 @@ export const useChat = (userId: string) => {
       }, 2000);
    }, []);
 
+   const retryOperation = async (
+      operation: () => Promise<any>,
+      retries = 3,
+      delay = 1000,
+   ): Promise<any> => {
+      for (let i = 0; i < retries; i++) {
+         try {
+            const result = await operation();
+            return result;
+         } catch (err) {
+            if (i === retries - 1) throw err;
+            console.warn(`Operation failed, retrying (${i + 1}/${retries})...`, err);
+            await new Promise((resolve) =>
+               setTimeout(resolve, delay * Math.pow(2, i)),
+            );
+         }
+      }
+   };
+
    const sendWithRetry = async (
       messageId: string,
       messagePayload: any,
       retries = 3,
       delay = 1000,
    ): Promise<boolean> => {
-      for (let i = 0; i < retries; i++) {
-         try {
-            const { error } = await supabase
-               .from("messages")
-               .insert([messagePayload]);
-            if (!error) return true;
-            throw error;
-         } catch (err) {
-            console.warn(
-               `Retry ${i + 1}/${retries} failed for message ${messageId}:`,
-               err,
-            );
-            if (i === retries - 1) return false;
-            await new Promise((resolve) =>
-               setTimeout(resolve, delay * Math.pow(2, i)),
-            );
-         }
+      try {
+         await retryOperation(
+            async () => {
+               const { error } = await supabase
+                  .from("messages")
+                  .insert([messagePayload]);
+               if (error) throw error;
+            },
+            retries,
+            delay,
+         );
+         return true;
+      } catch (err) {
+         console.error(`Max retries reached for message ${messageId}:`, err);
+         return false;
       }
-      return false;
    };
 
    // Send Message
@@ -733,21 +749,22 @@ export const useChat = (userId: string) => {
       try {
          const fileName = `${userId}/${Date.now()}.ogg`;
 
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-voices")
-            .upload(fileName, blob, {
-               contentType: "audio/ogg; codecs=opus",
-               cacheControl: "3600",
-            });
-
-         if (uploadErr) throw uploadErr;
+         // 1. Upload to storage with retry
+         await retryOperation(async () => {
+            const { error: uploadErr } = await supabase.storage
+               .from("chat-voices")
+               .upload(fileName, blob, {
+                  contentType: "audio/ogg; codecs=opus",
+                  cacheControl: "3600",
+               });
+            if (uploadErr) throw uploadErr;
+         });
 
          const {
             data: { publicUrl },
          } = supabase.storage.from("chat-voices").getPublicUrl(fileName);
 
-         // 2. Persist to database
+         // 2. Persist to database with retry
          const messagePayload = {
             id: tempId,
             content: "[Voice Message]",
@@ -763,10 +780,10 @@ export const useChat = (userId: string) => {
             useAppStore.getState().updateGlobalMessage({ 
                id: tempId, 
                status: "sent", 
-               voice_url: publicUrl // Replace blob URL with public URL
+               voice_url: publicUrl 
             });
          } else {
-            throw new Error("Failed to persist voice message");
+            throw new Error("Failed to persist voice message record after retries");
          }
       } catch (err) {
          console.error("Failed to upload/send voice message:", err);
