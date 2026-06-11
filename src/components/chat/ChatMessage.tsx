@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo, useMemo, useState, useRef, useEffect, } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
-import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy } from "lucide-react";
+import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy, X } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 import { ProtectedAvatar } from "./ProtectedAvatar";
@@ -660,19 +660,35 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                 <AnimatePresence>
                                     {zoomOpen && (
                                         <motion.div
+                                            key="zoom-modal"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            onClick={() => setZoomOpen(false)}
-                                            className="fixed inset-0 bg-black/90 z-200 flex items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
+                                            className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 backdrop-blur-md"
                                         >
-                                            <motion.img
-                                                initial={{ scale: 0.9 }}
-                                                animate={{ scale: 1 }}
-                                                exit={{ scale: 0.9 }}
-                                                src={msg.image_url}
-                                                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
-                                                alt="zoomed shared file"
+                                            <button
+                                                type="button"
+                                                onClick={() => setZoomOpen(false)}
+                                                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-[10000] cursor-pointer"
+                                            >
+                                                <X size={24} />
+                                            </button>
+                                            <motion.div
+                                                initial={{ scale: 0.9, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                exit={{ scale: 0.9, opacity: 0 }}
+                                                className="relative max-w-full max-h-full flex items-center justify-center"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <img
+                                                    src={msg.image_url}
+                                                    className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl border border-white/10"
+                                                    alt="zoomed shared file"
+                                                />
+                                            </motion.div>
+                                            <div 
+                                                className="absolute inset-0 z-[-1] cursor-zoom-out" 
+                                                onClick={() => setZoomOpen(false)} 
                                             />
                                         </motion.div>
                                     )}
