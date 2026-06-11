@@ -403,42 +403,6 @@ const GuessPreviewModal: React.FC<{
             {username}'s Guesses
           </p>
 
-          {isMarathon && (
-            <div className="flex justify-center flex-wrap gap-1 mb-4 border-b border-white/5 py-4 ">
-              {marathonGames.map((game, idx) => {
-                const prog = entry.marathon_progress?.find(
-                  (p: any) => p.game_index === idx,
-                );
-                const targetPlayed = !!prog;
-
-                const myProg = myParticipation?.marathon_progress?.find(
-                  (p: any) => p.game_index === idx,
-                );
-                const viewerFinished =
-                  myProg?.status === "completed" ||
-                  myProg?.status === "timed_out";
-                const isMe =
-                  profile?.id === (entry.user_id || entry.profiles?.id);
-
-                const canSelect =
-                  isMe || (targetPlayed && viewerFinished) || isCreator;
-
-                return (
-                  <button
-                    key={idx}
-                    disabled={false}
-                    onClick={() => {
-                      setMarathonGameIndex(idx);
-                      setShowTargetWord(false);
-                    }}
-                    className={`px-2.5 h-8 rounded-lg text-[10px] font-black transition-all ${marathonGameIndex === idx ? "bg-correct text-black scale-110 shadow-lg shadow-correct/20" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
-                  >
-                    #{idx + 1} ({game.wordLength}L)
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {loading ? (
             <div className="flex justify-center py-12">
@@ -541,6 +505,8 @@ const GuessPreviewModal: React.FC<{
                   </button>
                 )}
               </div>
+
+
 
               {/* Roast Message */}
               {gameData?.game_message && (
@@ -690,6 +656,44 @@ const GuessPreviewModal: React.FC<{
                   );
                 })}
               </div>
+
+
+              {isMarathon && (
+                <div className="flex justify-center flex-wrap gap-1 mb-4 border-b border-white/5 py-4 ">
+                  {marathonGames.map((game, idx) => {
+                    const prog = entry.marathon_progress?.find(
+                      (p: any) => p.game_index === idx,
+                    );
+                    const targetPlayed = !!prog;
+
+                    const myProg = myParticipation?.marathon_progress?.find(
+                      (p: any) => p.game_index === idx,
+                    );
+                    const viewerFinished =
+                      myProg?.status === "completed" ||
+                      myProg?.status === "timed_out";
+                    const isMe =
+                      profile?.id === (entry.user_id || entry.profiles?.id);
+
+                    const canSelect =
+                      isMe || (targetPlayed && viewerFinished) || isCreator;
+
+                    return (
+                      <button
+                        key={idx}
+                        disabled={false}
+                        onClick={() => {
+                          setMarathonGameIndex(idx);
+                          setShowTargetWord(false);
+                        }}
+                        className={`px-2.5 h-8 rounded-lg text-[10px] font-black transition-all ${marathonGameIndex === idx ? "bg-correct text-black scale-110 shadow-lg shadow-correct/20" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
+                      >
+                        #{idx + 1} ({game.wordLength}L)
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               <button
                 onClick={onClose}
