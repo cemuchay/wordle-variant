@@ -82,6 +82,7 @@ export const useChallengeGameEngine = ({
          return challenge.max_time;
       const activeLength = activeGame ? activeGame.wordLength : 5;
       return getMarathonTimer(challenge, gameIndex, activeLength);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       challenge.mode,
       challenge.max_time,
@@ -690,6 +691,7 @@ export const useChallengeGameEngine = ({
       };
 
       initialize();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       currentKey,
       isMarathon,
@@ -951,6 +953,12 @@ export const useChallengeGameEngine = ({
       }
 
       if (won || lost) {
+         // Calculate dynamic delay based on tile reveal animation
+         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
+         const transitionDelay = isMarathon
+            ? wordLength * 400 + 1000
+            : wordLength * 400 + 1000;
+
          setTimeout(() => {
             triggerToast(
                won ? "Completed! 🎉" : `The word was ${targetWord}`,
@@ -961,7 +969,7 @@ export const useChallengeGameEngine = ({
             } else {
                onFinish();
             }
-         }, 2000);
+         }, transitionDelay);
       }
    }, [
       isGameOver,
@@ -1047,6 +1055,7 @@ export const useChallengeGameEngine = ({
             triggerToast("Failed to save hint usage.", 3000);
          }
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       isGameOver,
       isSaving,

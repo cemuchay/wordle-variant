@@ -74,16 +74,17 @@ export const RegularGameplay = memo(function RegularGameplay({
             if (wasGameOverOnMount.current) {
                 setHideKeyboard(true);
             } else {
+                const hideDelay = wordLength * 400 + 400; // Match TILE_REVEAL + padding
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
-                }, 2200);
+                }, hideDelay);
                 return () => clearTimeout(timer);
             }
         } else {
             setHideKeyboard(false);
             wasGameOverOnMount.current = false;
         }
-    }, [isGameOver]);
+    }, [isGameOver, wordLength]);
 
     // Physical Keyboard Support
     useKeyboard(actions, isGameOver || isSaving);

@@ -573,8 +573,9 @@ export const useGameEngine = (date: string) => {
             );
          }
 
-         // Calculate delay: wordLength * 300ms + 600ms (last tile flip) + padding
-         const revealDelay = (config.length - 1) * 300 + 600 + 600;
+         // Calculate delay: wordLength * 400ms + buffer to ensure all tiles flip
+         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
+         const revealDelay = config.length * 400 + 1000;
 
          setTimeout(() => {
             dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });

@@ -114,9 +114,10 @@ export const GameArea = ({
             if (wasGameOverOnMount.current) {
                 setHideKeyboard(true);
             } else {
+                const hideDelay = wordLength * 400 + 400; // Match TILE_REVEAL + padding
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
-                }, 2200);
+                }, hideDelay);
                 return () => clearTimeout(timer);
             }
         } else {
@@ -124,7 +125,7 @@ export const GameArea = ({
             setHideKeyboard(false);
             wasGameOverOnMount.current = false;
         }
-    }, [isGameOver]);
+    }, [isGameOver, wordLength]);
 
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">

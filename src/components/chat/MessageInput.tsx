@@ -334,7 +334,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
                                 onChange={handleInput}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Message..."
-                                className="w-full bg-transparent border-none px-5 py-[12px] text-[15px] leading-[22px] font-medium font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent caret-correct block whitespace-pre-wrap break-words min-h-[48px] max-h-[180px]"
+                                className="w-full bg-transparent border-none px-5 py-[12px] text-[15px] leading-[22px] font-medium font-sans tracking-normal text-left text-white focus:ring-0 outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent caret-correct block whitespace-pre-wrap wrap-break-word min-h-[48px] max-h-[180px]"
                                 rows={1}
                             />
                         </div>
