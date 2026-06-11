@@ -228,7 +228,7 @@ export const GameArea = ({
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-4 shrink-0 px-2">
+                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-8 shrink-0 px-2">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}

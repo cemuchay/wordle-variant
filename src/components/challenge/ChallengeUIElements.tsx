@@ -206,17 +206,16 @@ export const ChallengeItem = memo(function ChallengeItem({
   return (
     <button
       onClick={handleSelect}
-      className={`w-full text-left bg-linear-to-br from-white/5 to-transparent border ${
-        isExpired
-          ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
-          : isSelfChallenge
-            ? "border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:border-indigo-500/50"
-            : isLeader
-              ? "border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)] hover:border-correct/50"
-              : mode === "LIVE"
-                ? "border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/35"
-                : "border-blue-500/20 hover:border-blue-500/35"
-      } p-5 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
+      className={`w-full text-left bg-linear-to-br from-white/5 to-transparent border ${isExpired
+        ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
+        : isSelfChallenge
+          ? "border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:border-indigo-500/50"
+          : isLeader
+            ? "border-correct/30 shadow-[0_0_15px_rgba(46,204,113,0.1)] hover:border-correct/50"
+            : mode === "LIVE"
+              ? "border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:border-red-500/35"
+              : "border-blue-500/20 hover:border-blue-500/35"
+        } p-2 sm:p-4 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
     >
       {/* Ambient Background Glows */}
       {!isExpired && isSelfChallenge && (
@@ -236,16 +235,15 @@ export const ChallengeItem = memo(function ChallengeItem({
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-wrap items-center gap-2">
           {/* Index Number Badge */}
-          <span className="text-[10px] font-black text-white/80 bg-white/10 px-2 py-0.5 rounded-lg font-mono">
+          <span className="text-[10px] font-black text-white bg-white/10 px-2 py-0.5 rounded-lg font-mono">
             #{index + 1}
           </span>
           {/* Mode Pill */}
           <span
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-              mode === "LIVE"
-                ? "bg-linear-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30"
-                : "bg-linear-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30"
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${mode === "LIVE"
+              ? "bg-linear-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30"
+              : "bg-linear-to-r from-blue-500/20 to-cyan-500/20 text-cyan-400 border border-blue-500/30"
+              }`}
           >
             {mode === "LIVE" ? (
               <>
@@ -263,11 +261,10 @@ export const ChallengeItem = memo(function ChallengeItem({
 
           {/* Word Size / Mode Pill */}
           <span
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-              isMarathon
-                ? "bg-linear-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30"
-                : "bg-linear-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30"
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${isMarathon
+              ? "bg-linear-to-r from-yellow-500/20 to-amber-500/20 text-yellow-400 border border-yellow-500/30"
+              : "bg-linear-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-indigo-500/30"
+              }`}
           >
             {isMarathon ? (
               <>
@@ -355,13 +352,12 @@ export const ChallengeItem = memo(function ChallengeItem({
 
           <div className="flex items-baseline justify-between">
             <span
-              className={`text-[9px] sm:text-[12px] font-black uppercase font-mono ${
-                status === "completed" || status === "host"
-                  ? "text-correct"
-                  : status === "playing"
-                    ? "text-yellow-500"
-                    : "text-white/80"
-              }`}
+              className={`text-[9px] sm:text-[12px] font-black uppercase font-mono ${status === "completed" || status === "host"
+                ? "text-correct"
+                : status === "playing"
+                  ? "text-yellow-500"
+                  : "text-white/80"
+                }`}
             >
               {status === "host" ? "Host (Spectating)" : status}
             </span>

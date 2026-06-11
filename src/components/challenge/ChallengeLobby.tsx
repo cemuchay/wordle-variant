@@ -311,29 +311,33 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white/5 p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+      <div className="bg-white/5 p-2 sm:p-4 rounded-2xl border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
 
         <div className="flex items-center justify-between mb-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span
-              className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-widest leading-none text-center ${selectedChallenge.mode === "LIVE" ? "bg-red-500/20 text-red-500" : "bg-blue-500/20 text-blue-500"}`}
+              className={`inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center ${selectedChallenge.mode === "LIVE" ? "bg-red-500/20 text-red-500" : "bg-blue-500/20 text-blue-500"}`}
             >
-              {selectedChallenge.mode} Mode
+              <span className="hidden sm:inline">{selectedChallenge.mode} Mode</span>
+              <span className="sm:hidden">{selectedChallenge.mode === "LIVE" ? "⚡ Live" : "⏳ Async"}</span>
             </span>
             {isMarathon && (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-yellow-500/20 text-yellow-500">
-                Marathon
+              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-yellow-500/20 text-yellow-500">
+                <span className="hidden sm:inline">Marathon</span>
+                <span className="sm:hidden">🏃 Mar.</span>
               </span>
             )}
             {selectedChallenge.is_public && (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-correct/20 text-correct">
-                Public
+              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-correct/20 text-correct">
+                <span className="hidden sm:inline">Public</span>
+                <span className="sm:hidden">🌍 Pub</span>
               </span>
             )}
             {selectedChallenge.is_bot_marathon && (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                Daily Event
+              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                <span className="hidden sm:inline">Daily Event</span>
+                <span className="sm:hidden">🤖 Daily</span>
               </span>
             )}
           </div>
@@ -352,18 +356,31 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </button>
           </div>
         </div>
-        <h3 className="text-2xl font-black mb-1">
+        <h3 className="text-xl font-black mb-1">
           {isMarathon
             ? `The Marathon (${marathonGamesList.length} Games)`
             : `${selectedChallenge.word_length} Letter Word`}
         </h3>
-        <p className="text-white text-sm mb-4">
-          {isMarathon
-            ? `Solve sequence (${marathonGamesList.map((g) => g.wordLength).join("-")}). ${selectedChallenge.mode === "LIVE" ? `You have ${selectedChallenge.max_time} minutes per word!` : "Take your time, async play."}`
-            : selectedChallenge.mode === "LIVE"
+        {isMarathon && (
+          <>
+            <p className="text-white text-sm mb-2">
+              Solve sequence : {" "}
+              <span className="text-green-500 text-[0.5rem] sm:text-[0.8rem]">
+                ({marathonGamesList.map((g: { wordLength: number }) => g.wordLength).join("-")}).
+              </span>
+              <span> {selectedChallenge.mode === "LIVE" ? `You have ${selectedChallenge.max_time} minutes per word!` : "Take your time, async play."}</span>
+            </p>
+
+
+          </>
+        )
+        }
+        {!isMarathon && (
+          <p className="text-white text-sm mb-2">
+            {selectedChallenge.mode === "LIVE"
               ? `Fastest wins! You have ${selectedChallenge.max_time} minutes.`
               : "Play anytime within the lifespan. Highest skill score wins!"}
-        </p>
+          </p>)}
 
         {selectedChallenge.max_time && selectedChallenge.mode === "LIVE" && (
           <div className="inline-flex items-center gap-2 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
@@ -379,13 +396,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1">
         <button
           onClick={() => setLobbyTab('lobby')}
-          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+          className={`flex-1 py-1.5 sm:py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
         >
           Lobby
         </button>
         <button
           onClick={() => setLobbyTab('chat')}
-          className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+          className={`flex-1 py-1.5 sm:py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${lobbyTab === 'chat' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
         >
           <span>Chat Room</span>
           {unreadChatCount > 0 && (
@@ -411,13 +428,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       ) : (
         <>
           {/* Challenge Configuration Details */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-2">
             <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <h4 className="text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+              <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5">
                 <SlidersHorizontal size={12} className="text-correct" />
-                Challenge Configuration
+                Challenge Config.
               </h4>
-              <span className="text-[8px] font-bold text-white/70 uppercase">
+              <span className="text-[7px] sm:text-[8px] font-bold text-white/70 uppercase">
                 Hosted by{" "}
                 {selectedChallenge.is_bot_marathon
                   ? "Variant Bot"
@@ -428,7 +445,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
             </div>
 
-            <div className="pt-6 flex flex-col gap-3">
+            <div className="pt-1 sm:pt-2 flex flex-col gap-3">
               {isExpired ? (
                 <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-center space-y-1">
                   <p className="text-xs font-black uppercase text-red-500 flex items-center justify-center gap-1.5">
@@ -622,9 +639,17 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     }
                   />
                   <span className="text-xs font-bold text-white">
-                    {selectedChallenge.mode === "LIVE"
-                      ? "Live Race"
-                      : "Anytime (Async)"}
+                    {selectedChallenge.mode === "LIVE" ? (
+                      <>
+                        <span className="hidden sm:inline">Live Race</span>
+                        <span className="sm:hidden">Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hidden sm:inline">Anytime (Async)</span>
+                        <span className="sm:hidden">A/M</span>
+                      </>
+                    )}
                   </span>
                 </div>
                 {selectedChallenge.mode === "LIVE" && (
@@ -643,10 +668,15 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </p>
                 <div className="flex items-center gap-1.5">
                   <Sparkles size={12} className="text-yellow-500" />
-                  <span className="text-xs font-bold text-white">
-                    {isMarathon
-                      ? `Marathon (${marathonGamesList.length} Games)`
-                      : `${selectedChallenge.word_length || "Random"} Letters`}
+                  <span className="text-xs font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                    {isMarathon ? (
+                      <>
+                        <span className="hidden sm:inline">Marathon ({marathonGamesList.length} Games)</span>
+                        <span className="sm:hidden">M-({marathonGamesList.length})</span>
+                      </>
+                    ) : (
+                      `${selectedChallenge.word_length || "Random"} Letters`
+                    )}
                   </span>
                 </div>
                 <p className="text-[9px] text-white">
