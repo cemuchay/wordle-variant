@@ -424,6 +424,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           effectiveUser={effectiveUser}
           loading={chatLoading}
           participants={participants}
+          reactToMessage={reactToMessage}
         />
       ) : (
         <>

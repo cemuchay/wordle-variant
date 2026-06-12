@@ -14,6 +14,7 @@ interface ChallengeChatProps {
   reactToMessage: (id: string, emoji: string | null) => Promise<void>;
   typingUsers: string[];
   setTyping: (isTyping: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   effectiveUser: any;
   loading?: boolean;
   participants: ChallengeParticipant[];
@@ -35,59 +36,59 @@ interface ChallengeChatMessageProps {
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-const ReactionPicker = React.forwardRef<HTMLDivElement, { 
-    onReact: (emoji: string | null) => void; 
-    currentReaction?: string; 
-    isMe: boolean;
+const ReactionPicker = React.forwardRef<HTMLDivElement, {
+  onReact: (emoji: string | null) => void;
+  currentReaction?: string;
+  isMe: boolean;
 }>(({ onReact, currentReaction, isMe }, ref) => (
-    <motion.div
-        ref={ref}
-        initial={{ scale: 0.8, opacity: 0, y: 10 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.8, opacity: 0, y: 10 }}
-        className={`absolute ${isMe ? 'right-0' : 'left-0'} top-[-54px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50`}
-    >
-        <div className="flex items-center gap-1 pr-2 border-r border-white/10">
-            {EMOJIS.map((emoji) => (
-                <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => onReact(currentReaction === emoji ? null : emoji)}
-                    className={`text-[18px] w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform duration-100 cursor-pointer rounded-full ${currentReaction === emoji ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                >
-                    {emoji}
-                </button>
-            ))}
-        </div>
-        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/40">
-          React
-        </div>
-    </motion.div>
+  <motion.div
+    ref={ref}
+    initial={{ scale: 0.8, opacity: 0, y: 10 }}
+    animate={{ scale: 1, opacity: 1, y: 0 }}
+    exit={{ scale: 0.8, opacity: 0, y: 10 }}
+    className={`absolute ${isMe ? 'right-0' : 'left-0'} top-[-54px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50`}
+  >
+    <div className="flex items-center gap-1 pr-2 border-r border-white/10">
+      {EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => onReact(currentReaction === emoji ? null : emoji)}
+          className={`text-[18px] w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform duration-100 cursor-pointer rounded-full ${currentReaction === emoji ? 'bg-white/10' : 'hover:bg-white/5'}`}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/40">
+      React
+    </div>
+  </motion.div>
 ));
 
-const ReactionBadge = React.forwardRef<HTMLDivElement, { 
-    reactions: Record<string, string>; 
-    onShowDetails: () => void; 
-    isMe: boolean;
+const ReactionBadge = React.forwardRef<HTMLDivElement, {
+  reactions: Record<string, string>;
+  onShowDetails: () => void;
+  isMe: boolean;
 }>(({ reactions, onShowDetails, isMe }, ref) => {
-    const emojis = Array.from(new Set(Object.values(reactions))).slice(0, 3);
-    const count = Object.keys(reactions).length;
+  const emojis = Array.from(new Set(Object.values(reactions))).slice(0, 3);
+  const count = Object.keys(reactions).length;
 
-    return (
-        <div
-            ref={ref}
-            onClick={(e) => {
-                e.stopPropagation();
-                onShowDetails();
-            }}
-            className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30 cursor-pointer hover:bg-[#2a3942] transition-colors`}
-        >
-            {emojis.map((emoji, idx) => (
-                <span key={idx} className="text-[10px]">{emoji}</span>
-            ))}
-            <span className="text-[9px] text-white font-black ml-0.5">{count}</span>
-        </div>
-    );
+  return (
+    <div
+      ref={ref}
+      onClick={(e) => {
+        e.stopPropagation();
+        onShowDetails();
+      }}
+      className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30 cursor-pointer hover:bg-[#2a3942] transition-colors`}
+    >
+      {emojis.map((emoji, idx) => (
+        <span key={idx} className="text-[10px]">{emoji}</span>
+      ))}
+      <span className="text-[9px] text-white font-black ml-0.5">{count}</span>
+    </div>
+  );
 });
 const ChallengeAudioPlayer = ({ url }: { url: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -126,6 +127,7 @@ const ChallengeAudioPlayer = ({ url }: { url: string }) => {
               key={i}
               className={`w-0.5 h-3 rounded-full ${isPlaying ? 'bg-correct animate-pulse' : 'bg-white/20'}`}
               style={{
+                // eslint-disable-next-line react-hooks/purity
                 height: `${2 + Math.random() * 10}px`,
                 animationDelay: `${i * 0.1}s`
               }}
@@ -161,18 +163,19 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
   useEffect(() => {
     if (!showReactionsMenu && !showReactionDetails) return;
     const handleClickOutside = (e: MouseEvent) => {
-        if (showReactionsMenu && reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
-            setShowReactionsMenu(false);
-        }
-        if (showReactionDetails && detailsRef.current && !detailsRef.current.contains(e.target as Node)) {
-            setShowReactionDetails(false);
-        }
+      if (showReactionsMenu && reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
+        setShowReactionsMenu(false);
+      }
+      if (showReactionDetails && detailsRef.current && !detailsRef.current.contains(e.target as Node)) {
+        setShowReactionDetails(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showReactionsMenu, showReactionDetails]);
 
   const isWithinTimeLimit = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
     const elapsed = Date.now() - new Date(msg.created_at).getTime();
     return elapsed < 5 * 60 * 1000;
   }, [msg.created_at]);
@@ -237,25 +240,25 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
         )}
 
         <AnimatePresence>
-            {showReactionsMenu && (
-                <ReactionPicker
-                    ref={reactionsRef}
-                    isMe={isMe}
-                    onReact={(emoji) => {
-                        onReact(emoji);
-                        setShowReactionsMenu(false);
-                    }}
-                    currentReaction={msg.reactions?.[currentUserId]}
-                />
-            )}
+          {showReactionsMenu && (
+            <ReactionPicker
+              ref={reactionsRef}
+              isMe={isMe}
+              onReact={(emoji) => {
+                onReact(emoji);
+                setShowReactionsMenu(false);
+              }}
+              currentReaction={msg.reactions?.[currentUserId]}
+            />
+          )}
         </AnimatePresence>
 
       </div>
 
       <div
         className={`relative p-3 px-4 shadow-lg transition-all text-left ${isMe
-            ? "bg-[#005c4b] text-white rounded-2xl rounded-tr-none"
-            : "bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]"
+          ? "bg-[#005c4b] text-white rounded-2xl rounded-tr-none"
+          : "bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]"
           }`}
       >
         {/* Sender profile header inside the bubble container */}
@@ -359,53 +362,53 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
 
         {/* Reactions Count Display */}
         {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
-            <>
-                <ReactionBadge
-                    ref={detailsRef}
-                    reactions={msg.reactions}
-                    isMe={isMe}
-                    onShowDetails={() => setShowReactionDetails(!showReactionDetails)}
-                />
+          <>
+            <ReactionBadge
+              ref={detailsRef}
+              reactions={msg.reactions}
+              isMe={isMe}
+              onShowDetails={() => setShowReactionDetails(!showReactionDetails)}
+            />
 
-                {/* Reactions Details Popover */}
-                <AnimatePresence>
-                    {showReactionDetails && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-[#1f2c34] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex flex-col gap-1.5">
-                                {Object.entries(msg.reactions).map(([uid, emoji]) => {
-                                    const participant = participants?.find(p => p.user_id === uid || p.guest_id === uid);
-                                    const username = participant?.profiles?.username || participant?.guest_profiles?.username || 'Someone';
-                                    const avatar = participant?.profiles?.avatar_url || '';
+            {/* Reactions Details Popover */}
+            <AnimatePresence>
+              {showReactionDetails && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-[#1f2c34] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    {Object.entries(msg.reactions).map(([uid, emoji]) => {
+                      const participant = participants?.find(p => p.user_id === uid || p.guest_id === uid);
+                      const username = participant?.profiles?.username || participant?.guest_profiles?.username || 'Someone';
+                      const avatar = participant?.profiles?.avatar_url || '';
 
-                                    return (
-                                        <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                              {avatar ? (
-                                                <img src={avatar} className="w-4 h-4 rounded-full shrink-0" alt="avatar" />
-                                              ) : (
-                                                <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[7px] font-black uppercase text-white shrink-0">
-                                                  {username.substring(0, 2)}
-                                                </div>
-                                              )}
-                                              <span className="text-[10px] font-black text-white truncate">
-                                                  {uid === currentUserId ? 'You' : username}
-                                              </span>
-                                            </div>
-                                            <span className="text-[12px] shrink-0">{emoji as string}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </>
+                      return (
+                        <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {avatar ? (
+                              <img src={avatar} className="w-4 h-4 rounded-full shrink-0" alt="avatar" />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[7px] font-black uppercase text-white shrink-0">
+                                {username.substring(0, 2)}
+                              </div>
+                            )}
+                            <span className="text-[10px] font-black text-white truncate">
+                              {uid === currentUserId ? 'You' : username}
+                            </span>
+                          </div>
+                          <span className="text-[12px] shrink-0">{emoji as string}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
         )}
 
       </div>
@@ -432,7 +435,7 @@ const formatMessageContent = (
         return;
       }
 
-      const escapedMention = mention.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const escapedMention = mention.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
       const subParts = part.split(
         new RegExp(`(${escapedMention}(?:\\s|$))`, "g"),
       );
@@ -446,8 +449,8 @@ const formatMessageContent = (
             <span
               key={`mention-${username}-${pIdx}-${sIdx}`}
               className={`px-1.5 py-0.5 rounded font-black whitespace-nowrap inline-block ${isMe
-                  ? "bg-black/15 text-black border border-black/10"
-                  : "bg-correct/20 text-correct border border-correct/10"
+                ? "bg-black/15 text-black border border-black/10"
+                : "bg-correct/20 text-correct border border-correct/10"
                 }`}
             >
               {cleanMention}
@@ -477,8 +480,8 @@ const formatMessageContent = (
           <span
             key={`fallback-${pIdx}-${sIdx}`}
             className={`px-1.5 py-0.5 rounded font-black whitespace-nowrap inline-block ${isMe
-                ? "bg-black/15 text-black border border-black/10"
-                : "bg-correct/20 text-correct border border-correct/10"
+              ? "bg-black/15 text-black border border-black/10"
+              : "bg-correct/20 text-correct border border-correct/10"
               }`}
           >
             {subPart}

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { memo, useMemo, useState, useRef, useEffect, forwardRef } from 'react';
+import { memo, useMemo, useState, useRef, useEffect, forwardRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy, } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
@@ -39,7 +39,7 @@ const ReactionPicker = forwardRef<HTMLDivElement, {
         ref={ref}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
-        className={`absolute ${isMe ? 'right-4' : 'left-4'} top-[-44px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] animate-in fade-in zoom-in-95 duration-100`}
+        className={`absolute ${isMe ? 'right-4' : 'left-4'} top-[-44px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-100 animate-in fade-in zoom-in-95 duration-100`}
     >
         <div className="flex items-center gap-1 pr-2 border-r border-white/10">
             {EMOJIS.map((emoji) => (
