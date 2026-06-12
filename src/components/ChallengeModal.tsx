@@ -708,6 +708,35 @@ const AuthenticatedChallengeContent = memo(
                   </ul>
                 </section>
 
+                <section className="space-y-2">
+                  <h4 className="text-sm font-black uppercase text-white tracking-wide">
+                    🌀 Shape Shifter Mode
+                  </h4>
+                  <p className="text-xs leading-relaxed text-white">
+                    An adversarial mode where the secret target word changes dynamically in the background with each guess.
+                  </p>
+                  <ul className="list-disc pl-4 space-y-2 text-xs text-white">
+                    <li>
+                      <strong className="text-purple-400">
+                        Adversarial Shifting:
+                      </strong>{" "}
+                      The target word shifts, but all your previously guessed correct (green), misplaced (yellow), and absent (gray) letter feedback is strictly respected.
+                    </li>
+                    <li>
+                      <strong className="text-purple-400">
+                        10 Attempts:
+                      </strong>{" "}
+                      Because the algorithm shifts the word to avoid matching, the game limit is extended to <strong className="text-white">10 tries</strong> to help you "box it in".
+                    </li>
+                    <li>
+                      <strong className="text-purple-400">
+                        Word Timeline:
+                      </strong>{" "}
+                      Complete transparency. Once the game ends, you can inspect the full sequence of words the algorithm shifted through.
+                    </li>
+                  </ul>
+                </section>
+
                 <section className="space-y-3">
                   <h4 className="text-sm font-black uppercase text-white tracking-wide">
                     🛠️ Advanced Rules
