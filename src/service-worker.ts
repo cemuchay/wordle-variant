@@ -23,6 +23,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+   //@ts-ignore
    event.waitUntil(
       caches.keys().then((cacheNames) => {
          return Promise.all(

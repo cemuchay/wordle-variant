@@ -365,7 +365,10 @@ export const useChat = (userId: string) => {
             JSON.stringify(activeGroups),
          );
       } catch (error) {
-         logger.error(error);
+         logger.error(
+            `an error occured while attempting tp restore chatgroups`,
+            error,
+         );
       }
    }, [userId]);
 
