@@ -67,6 +67,17 @@ export default function App() {
   // Core Game Engine
   const { state, actions, config, isHydrated } = useGameEngine(date as string);
 
+  // Stabilize UI state to wait for reveal animations
+  const [stableGuessesCount, setStableGuessesCount] = useState(state.guesses.length);
+  const [stableIsHintDisabled, setStableIsHintDisabled] = useState(state.isHintDisabled);
+
+  useEffect(() => {
+    if (!state.isRevealing) {
+      setStableGuessesCount(state.guesses.length);
+      setStableIsHintDisabled(state.isHintDisabled);
+    }
+  }, [state.guesses.length, state.isRevealing, state.isHintDisabled]);
+
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
   const { data: discoverChallenges } = useDiscoverChallenges();
@@ -435,11 +446,12 @@ export default function App() {
             onShare={() => actions.setGameOverModalOpen(true)}
             onRetrySync={actions.retrySync}
             isGameOver={state.isGameOver}
+            isRevealing={state.isRevealing}
             usedHint={state.usedHint}
-            canShowHint={state.guesses.length >= 2}
+            canShowHint={stableGuessesCount >= 2}
             isHintLocked={
-              (state.guesses.length >= config.maxAttempts - 1 ||
-                state.isHintDisabled) &&
+              (stableGuessesCount >= config.maxAttempts - 1 ||
+                stableIsHintDisabled) &&
               !state.usedHint
             }
             syncStatus={state.syncStatus}

@@ -11,6 +11,7 @@ interface CellProps {
   isShake?: boolean;
   isPop?: boolean;
   isHinted?: boolean;
+  isWinner?: boolean;
   isSaving?: boolean;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
@@ -90,7 +91,7 @@ const useIsResponsive = () => {
   return state;
 };
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, compact, gameplayType, wordLength }: CellProps) => {
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
   const { isDesktop, isSmall } = useIsResponsive(); // Detect responsive state
 
@@ -123,6 +124,8 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     if (status === 'correct') animationClass = 'animate-reveal-correct';
     else if (status === 'present') animationClass = 'animate-reveal-present';
     else if (status === 'absent') animationClass = 'animate-reveal-absent';
+  } else if (isWinner) {
+    animationClass = 'animate-bounce-up-down';
   } else if (isShake) {
     animationClass = 'animate-shake';
   } else if (isPop) {
@@ -212,14 +215,14 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     let face = "(•‿•)";
     let label = "Looking good!";
     let animClass = "";
-    let delay = 0;
+    
+    // Always wait for the reveal animation if it's currently happening
+    const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
 
     if (isWon) {
       face = "(★‿★)";
       label = "Splendid job! 🎉";
       animClass = "animate-bounce text-correct";
-      // Delay the victory greeting until the tiles finish revealing
-      delay = isCurrentRevealing ? returnAnimationTime(wordLength) * 1.25 : 0;
     } else if (isLost) {
       face = "(✖╭╮✖)";
       label = "Aww, maybe next time! 😢";
@@ -278,6 +281,8 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
         {/* Past Guesses */}
         {guesses.map((guess, i) => {
           const isRevealing = i === revealingRowIndex;
+          const isWinningRow = isWon && i === guesses.length - 1 && !isCurrentRevealing;
+          
           return guess.map((res, j) => (
             <Cell
               key={`past-${i}-${j}`}
@@ -285,6 +290,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
               status={res.status}
               isRevealing={isRevealing}
               revealIndex={j}
+              isWinner={isWinningRow}
               compact={compact}
               gameplayType={gameplayType}
               wordLength={wordLength}

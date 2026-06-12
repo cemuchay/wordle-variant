@@ -17,6 +17,7 @@ interface AppHeaderProps {
     onShare: () => void;
     onRetrySync: () => void;
     isGameOver: boolean;
+    isRevealing?: boolean;
     usedHint: boolean;
     canShowHint: boolean;
     isHintLocked?: boolean;
@@ -35,6 +36,7 @@ export const AppHeader = ({
     onShare,
     onRetrySync,
     isGameOver,
+    isRevealing,
     usedHint,
     canShowHint,
     isHintLocked,
@@ -93,7 +95,7 @@ export const AppHeader = ({
                     {!hideGameplayActions && (
                         <>
                             <div className="flex items-center gap-0.5">
-                                {canShowHint && !isGameOver && (
+                                {canShowHint && (!isGameOver || isRevealing) && (
                                     <button
                                         onClick={isHintLocked && !usedHint ? handleLockedHintClick : onHint}
                                         disabled={usedHint}

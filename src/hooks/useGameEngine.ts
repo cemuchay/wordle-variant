@@ -25,6 +25,7 @@ import { generateRoast } from "../utils/roastEngine";
 import { gameReducer, initialState } from "../reducers/gameReducer";
 import { useWordleStats } from "./useStats";
 import { useConfirmation } from "../context/ConfirmationContext";
+import returnAnimationTime from "../utils/returnAnimationTime";
 
 import { logger } from "../lib/logger";
 import { TOAST_DURATION } from "../constants/ui";
@@ -551,6 +552,9 @@ export const useGameEngine = (date: string) => {
       // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
       await new Promise((r) => setTimeout(r, 300));
 
+      // Calculate delay: use returnAnimationTime + extra buffer for safety
+      const revealDelay = returnAnimationTime(config.length) + 600;
+
       // 2. Update UI (flips row)
       dispatch({
          type: "SUBMIT_GUESS",
@@ -573,11 +577,8 @@ export const useGameEngine = (date: string) => {
             );
          }
 
-         // Calculate delay: wordLength * 400ms + buffer to ensure all tiles flip
-         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
-         const revealDelay = config.length * 400 + 1000;
-
          setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
             dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
 
             if (won) {
@@ -586,6 +587,11 @@ export const useGameEngine = (date: string) => {
                   TOAST_DURATION.LONG + 1000,
                );
             }
+         }, revealDelay);
+      } else {
+         // Even if not game over, we should stop revealing state after animation
+         setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
          }, revealDelay);
       }
    }, [

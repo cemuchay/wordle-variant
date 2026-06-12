@@ -32,6 +32,7 @@ import {
    getHandicapStarter,
 } from "../utils/marathon";
 import { supabase } from "../lib/supabaseClient";
+import returnAnimationTime from "../utils/returnAnimationTime";
 
 interface UseChallengeGameEngineProps {
    challenge: any;
@@ -954,12 +955,10 @@ export const useChallengeGameEngine = ({
 
       if (won || lost) {
          // Calculate dynamic delay based on tile reveal animation
-         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
-         const transitionDelay = isMarathon
-            ? wordLength * 400 + 1000
-            : wordLength * 400 + 1000;
+         const transitionDelay = returnAnimationTime(wordLength) + 600;
 
          setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
             triggerToast(
                won ? "Completed! 🎉" : `The word was ${targetWord}`,
                5000,
@@ -969,6 +968,11 @@ export const useChallengeGameEngine = ({
             } else {
                onFinish();
             }
+         }, transitionDelay);
+      } else {
+         const transitionDelay = returnAnimationTime(wordLength) + 600;
+         setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
          }, transitionDelay);
       }
    }, [
