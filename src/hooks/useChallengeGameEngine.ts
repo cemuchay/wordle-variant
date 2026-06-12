@@ -216,9 +216,6 @@ export const useChallengeGameEngine = ({
                timestamp: Date.now(),
             };
             safeLocalStorage.setItem(storageKey, JSON.stringify(finalPayload));
-            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, {
-               payload: finalPayload,
-            });
          } catch (e) {
             logger.error("Local save failed", { key: storageKey, error: e });
          }
@@ -283,9 +280,6 @@ export const useChallengeGameEngine = ({
                   const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                   safeLocalStorage.removeItem(legacyKey);
                }
-               logger.info(
-                  `[challenge-prog] Local mirror cleaned up: ${storageKey}`,
-               );
             } catch (e) {
                logger.error("Local cleanup failed", {
                   key: storageKey,
@@ -530,11 +524,6 @@ export const useChallengeGameEngine = ({
             if (!saved && isMarathon && activeGame) {
                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                saved = safeLocalStorage.getItem(legacyKey);
-               if (saved) {
-                  logger.info(
-                     `[challenge-prog] Found legacy storage key: ${legacyKey}`,
-                  );
-               }
             }
             if (saved) {
                const parsed = JSON.parse(saved);
@@ -554,17 +543,6 @@ export const useChallengeGameEngine = ({
                   hasAdvancedStatus ||
                   parsed.needsSync
                ) {
-                  logger.info(
-                     `[challenge-prog] Recovering advanced progress from localStorage: ${storageKey}`,
-                     {
-                        hasMoreGuesses,
-                        hasNewHint,
-                        hasAdvancedStatus,
-                        needsSync: parsed.needsSync,
-                        localCount: parsed.guesses?.length,
-                        serverCount: incoming.length,
-                     },
-                  );
                   if (
                      parsed.guesses &&
                      parsed.guesses.length >= incoming.length
@@ -628,9 +606,6 @@ export const useChallengeGameEngine = ({
                !isFinishedStatus &&
                !startTimerRef.current
             ) {
-               console.log(
-                  "[Engine] Triggering background sync for advanced local state...",
-               );
                wrappedSubmitResult(
                   recoveredPayload,
                   isMarathon ? wordLength : undefined,
@@ -640,9 +615,6 @@ export const useChallengeGameEngine = ({
 
             // Handle Enforced Starter Word Sync
             if (isStarterEnforced && !startTimerRef.current) {
-               console.log(
-                  "[Engine] Syncing enforced starter word to server...",
-               );
                startTimerRef.current = true;
                await wrappedSubmitResult(
                   {
@@ -658,7 +630,6 @@ export const useChallengeGameEngine = ({
 
             // Handle Offline Timeout Sync
             if (hasTimedOutOffline && !startTimerRef.current) {
-               console.log("[Engine] Offline timeout detected, syncing...");
                startTimerRef.current = true;
                await handleTimeExpired();
             }
@@ -674,7 +645,6 @@ export const useChallengeGameEngine = ({
                   ? progress?.started_at
                   : participation?.started_at;
                if (!startTime) {
-                  console.log("[Engine] Starting LIVE timer...");
                   startTimerRef.current = true;
                   await wrappedSubmitResult(
                      {
@@ -741,9 +711,6 @@ export const useChallengeGameEngine = ({
          }
 
          if (hasChanged) {
-            console.log(
-               `[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`,
-            );
             setTimeout(
                () =>
                   addLog(

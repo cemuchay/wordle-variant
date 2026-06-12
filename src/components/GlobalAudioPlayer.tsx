@@ -11,12 +11,10 @@ export const GlobalAudioPlayer = () => {
         if (audio && remoteStream && activeCall) {
             // Only update srcObject if it has actually changed to avoid flickering
             if (audio.srcObject !== remoteStream) {
-                console.log('GlobalAudio: Attaching remote stream', remoteStream.id);
-                addLog(`Global playback: Attaching remote stream (${remoteStream.getAudioTracks().length} tracks)`, 'info');
                 audio.srcObject = remoteStream;
             }
-            
-            audio.muted = false; 
+
+            audio.muted = false;
             audio.volume = isSpeakerOn ? 1.0 : 0.0;
 
             const playAudio = () => {
@@ -50,11 +48,11 @@ export const GlobalAudioPlayer = () => {
     }, [remoteStream, isSpeakerOn, activeCall, addLog]);
 
     return (
-        <audio 
-            ref={audioRef} 
-            autoPlay 
-            playsInline 
-            style={{ display: 'none' }} 
+        <audio
+            ref={audioRef}
+            autoPlay
+            playsInline
+            style={{ display: 'none' }}
         />
     );
 };

@@ -47,6 +47,7 @@ const fadeVariants = {
 export default function App() {
   const { user } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
+  const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
   const {
     triggerToast,
     date,
@@ -435,7 +436,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isChatConversationOpen && (
+      {!isPlayingChallenge && !isChatConversationOpen && !selectedChallenge && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}

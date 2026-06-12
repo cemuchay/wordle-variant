@@ -208,9 +208,9 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
          return result;
       }
       return obfuscated;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
    } catch (e) {
       // If atob fails, it's definitely not obfuscated Base64.
-      console.log("Deobfuscation failed:", e);
       return obfuscated;
    }
 };
@@ -254,6 +254,7 @@ export const decryptGuesses = (encryptedStr: any, key: string) => {
          return typeof encryptedStr === "string"
             ? JSON.parse(encryptedStr)
             : encryptedStr;
+         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
          return encryptedStr;
       }
@@ -1221,7 +1222,6 @@ export const calculateSkillIndex = ({
 export const syncGameState = async (
    userId: string,
    date: string | null,
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any,
 ) => {
    if (!date) return;
@@ -1272,7 +1272,6 @@ export const syncGameState = async (
 export const syncWithRetry = async (
    userId: string,
    date: string | null,
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any,
    retries = 3,
 ): Promise<{ success: boolean; score: number }> => {

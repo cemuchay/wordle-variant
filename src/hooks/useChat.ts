@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { useAppStore } from "../store/useAppStore";
+import { logger } from "../lib/logger";
 
 export interface Message {
    id: string;
@@ -364,7 +365,7 @@ export const useChat = (userId: string) => {
             JSON.stringify(activeGroups),
          );
       } catch (error) {
-         console.log(error);
+         logger.error(error);
       }
    }, [userId]);
 
@@ -468,6 +469,7 @@ export const useChat = (userId: string) => {
                removePendingReadReceipt(activeRoomId);
             }
          });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [userId, activeRoomId, activeMessages, readReceipts]);
 
    // Flush pending read receipts on load or network restore
@@ -497,6 +499,7 @@ export const useChat = (userId: string) => {
 
       window.addEventListener("online", flushReceipts);
       return () => window.removeEventListener("online", flushReceipts);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [userId, pendingReadReceipts]);
 
    // Presence & typing updates
@@ -850,7 +853,7 @@ export const useChat = (userId: string) => {
    // Reaction
    const reactToMessage = async (messageId: string, emoji: string | null) => {
       if (!userId) return;
-      
+
       // Optimistic UI: update global store immediately
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
@@ -870,7 +873,7 @@ export const useChat = (userId: string) => {
       const { error } = await supabase.rpc("toggle_message_reaction", {
          p_message_id: messageId,
          p_user_id: userId,
-         p_emoji: emoji
+         p_emoji: emoji,
       });
 
       if (error) {
