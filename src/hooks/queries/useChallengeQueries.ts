@@ -9,11 +9,11 @@ import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
  * Supabase select strings for reusable queries.
  */
 export const CHALLENGE_PARTICIPANTS_SELECT = `
-    id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+    id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words,
     profiles(username, avatar_url),
     guest_profiles(username, avatar_url),
     marathon_progress:challenge_participants_marathon(
-        id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+        id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words
     )
 `;
 
@@ -86,11 +86,11 @@ export const useMyChallenges = (userId: string | undefined) => {
                .from("challenge_participants")
                .select(
                   `
-                        id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
+                        id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words,
                         guest_profiles(username, avatar_url),
                         profiles(username, avatar_url),
                         marathon_progress:challenge_participants_marathon(
-                            id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
+                            id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words
                         ),
                         challenge:challenges(${CHALLENGE_DETAILS_SELECT})
                     `,
@@ -384,6 +384,8 @@ export const useChallengeMutations = () => {
          disableHints = false,
          isBotMarathon = false,
          is_bot_marathon,
+         isShapeshifter = false,
+         is_shapeshifter,
       }: any) => {
          const salt = Math.random().toString(36).substring(2, 15);
          let actualLength = length;
@@ -492,8 +494,8 @@ export const useChallengeMutations = () => {
                let limit = 0;
                while (limit < 200) {
                   if (
-                     starter !== target &&
-                     getMatchCount(starter, target) <= maxAllowed
+                      starter !== target &&
+                      getMatchCount(starter, target) <= maxAllowed
                   ) {
                      break;
                   }
@@ -530,6 +532,7 @@ export const useChallengeMutations = () => {
                   marathon_timers: marathonTimers,
                   marathon_force_order: marathonForceOrder,
                   is_bot_marathon: resolvedIsBotMarathon,
+                  is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
                },
             ])
             .select()

@@ -29,6 +29,7 @@ export interface Challenge {
     disable_hints?: boolean;
     marathon_timers?: Record<number, number> | null;
     marathon_force_order?: boolean;
+    is_shapeshifter?: boolean;
 }
 
 export interface MarathonProgress {
@@ -45,6 +46,7 @@ export interface MarathonProgress {
     time_taken: number | null;
     started_at: string;
     completed_at: string | null;
+    target_words?: string[] | null;
 }
 
 export interface ChallengeParticipant {
@@ -64,6 +66,7 @@ export interface ChallengeParticipant {
     profiles?: { username: string, avatar_url: string };
     guest_profiles?: { username: string, avatar_url: string };
     marathon_progress?: MarathonProgress[];
+    target_words?: string[] | null;
 }
 
 /**

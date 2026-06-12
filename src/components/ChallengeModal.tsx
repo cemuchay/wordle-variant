@@ -766,6 +766,7 @@ const AuthenticatedChallengeContent = memo(
               hints_used: previewParticipant.hints_used,
               hint_record: previewParticipant.hint_record,
               time_taken: previewParticipant.time_taken,
+              target_words: previewParticipant.target_words || undefined,
             }}
             targetWord={selectedChallenge?.target_word}
             salt={selectedChallenge?.salt}
@@ -774,6 +775,7 @@ const AuthenticatedChallengeContent = memo(
               selectedChallenge?.creator_id === user?.id &&
               !!selectedChallenge?.is_custom_word
             }
+            isShapeshifter={selectedChallenge?.is_shapeshifter}
           />
         )}
       </div>

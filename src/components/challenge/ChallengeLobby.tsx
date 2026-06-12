@@ -340,6 +340,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <span className="sm:hidden">🤖 Daily</span>
               </span>
             )}
+            {selectedChallenge.is_shapeshifter && (
+              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-purple-500/20 text-purple-400 border border-purple-500/30 animate-pulse">
+                <span className="hidden sm:inline">Shape Shifter</span>
+                <span className="sm:hidden">🌀 Shift</span>
+              </span>
+            )}
           </div>
           <div className="flex gap-4">
             <button
@@ -681,9 +687,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   </span>
                 </div>
                 <p className="text-[9px] text-white">
-                  {selectedChallenge.is_custom_word
-                    ? "Host Custom Word"
-                    : "System Generated"}
+                  {selectedChallenge.is_shapeshifter
+                    ? "Shape Shifter"
+                    : selectedChallenge.is_custom_word
+                      ? "Host Custom Word"
+                      : "System Generated"}
                 </p>
               </div>
 
