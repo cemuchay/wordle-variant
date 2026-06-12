@@ -1,5 +1,5 @@
+import { Check, Share2 } from 'lucide-react';
 import React, { useState } from 'react';
-import { Share2, Check } from 'lucide-react';
 
 interface Props {
   text: string;
@@ -13,11 +13,10 @@ export const ShareButton: React.FC<Props> = ({ text }) => {
       try {
         await navigator.share({ text });
         return;
-      } catch (err) {
-        console.log("Share cancelled", err);
-      }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) { /* empty */ }
     }
-    
+
     // Fallback to Clipboard
     await navigator.clipboard.writeText(text);
     setCopied(true);

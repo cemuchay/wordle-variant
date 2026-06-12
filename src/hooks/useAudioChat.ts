@@ -94,7 +94,6 @@ export const useAudioChat = ({ activeCall, userId, enabled, onConnectionFailure,
     const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
         if (!isMounted.current) return;
         setLogs(prev => [...prev.slice(-19), { message, type, timestamp: Date.now() }]);
-        console.log(`[AudioChat] [${type.toUpperCase()}] ${message}`);
     }, []);
 
     const clearLogs = useCallback(() => setLogs([]), []);

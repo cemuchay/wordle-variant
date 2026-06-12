@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { logger } from '../lib/logger';
 
 const getWeekNumber = (d: Date): number => {
     const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -42,7 +43,7 @@ class TechHouseSynth {
                 // @ts-expect-error undefined
                 navigator.audioSession.type = 'playback';
             } catch (e) {
-                console.log("Failed to set audio session type:", e);
+                logger.error("Failed to set audio session type:", e);
             }
         }
 
@@ -95,7 +96,7 @@ class TechHouseSynth {
         if (!this.isPlaying) {
             this.start(trackIndex);
         } else if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume().catch(e => console.log("Failed to resume context:", e));
+            this.ctx.resume().catch(e => logger.error("Failed to resume context:", e));
         }
     }
 
@@ -111,7 +112,7 @@ class TechHouseSynth {
             try {
                 this.mainGain.disconnect(this.recorderDest);
             } catch (e) {
-                console.log("Error disconnecting recorder:", e);
+                logger.error("Error disconnecting recorder:", e);
             }
         }
         this.recorderDest = null;
@@ -488,7 +489,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             setAvatarLoaded(true);
         };
         img.onerror = () => {
-            console.log("CORS/Image loading error for avatar. Fallback text will be rendered.");
+            logger.error("CORS/Image loading error for avatar. Fallback text will be rendered.");
             avatarImageRef.current = null;
             setAvatarLoaded(false);
         };
@@ -969,7 +970,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                         text: `Check out my Variant Wrapped slide!`,
                     });
                 } catch (err) {
-                    console.log('Share failed, falling back to download:', err);
+                    logger.error('Share failed, falling back to download:', err);
                     triggerDownload(blob);
                 }
             } else {
@@ -1039,7 +1040,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 audioStream = dest.stream;
             }
         } catch (e) {
-            console.log("Audio capture error:", e);
+            logger.error("Audio capture error:", e);
         }
 
         // Combine video and audio tracks
@@ -1073,7 +1074,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 }
             } catch (e) {
                 // Ignore unsupported error
-                console.log("Unsupported mime type", e);
+                logger.error("Unsupported mime type", e);
             }
         }
 
@@ -1091,7 +1092,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                 videoBitsPerSecond: targetBitrate
             });
         } catch (e) {
-            console.log("Error with bitrate", e);
+            logger.error("Error with bitrate", e);
             try {
                 // Fall back to just the mimeType if the bitrate parameter fails
                 mediaRecorder = new MediaRecorder(combinedStream, {
@@ -1100,7 +1101,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             } catch (err) {
                 // Hard fallback to default
                 mediaRecorder = new MediaRecorder(combinedStream);
-                console.log("Hard fallback to default", err);
+                logger.error("Hard fallback to default", err);
             }
         }
 
@@ -1182,7 +1183,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                     text: 'Check out my Variant Weekly Performance Wrapped video!',
                 });
             } catch (err) {
-                console.log('Video share failed, falling back to download:', err);
+                logger.error('Video share failed, falling back to download:', err);
                 await downloadGeneratedVideo();
             }
         } else {

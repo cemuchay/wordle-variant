@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Define the service worker scope for proper type hinting
 
@@ -22,17 +23,16 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-   //@ts-expect-error
+   //@ts-ignore
    event.waitUntil(
       caches.keys().then((cacheNames) => {
          return Promise.all(
             cacheNames.map((cacheName) => {
                // Delete old caches that don't match the current Workbox version
                return caches.delete(cacheName);
-            })
+            }),
          );
-      })
+      }),
    );
 });
 
@@ -50,7 +50,6 @@ sw.addEventListener("push", (event: PushEvent) => {
       data = event.data?.json() ?? {};
    } catch (e) {
       // Fallback for non-JSON or empty payloads
-      console.log(e);
       data = { body: event.data?.text() };
    }
 
@@ -85,6 +84,6 @@ sw.addEventListener("notificationclick", (event: NotificationEvent) => {
             if (sw.clients.openWindow) {
                return sw.clients.openWindow(urlToOpen);
             }
-         })
+         }),
    );
 });

@@ -47,7 +47,7 @@ try {
     } else {
       // First time migrating: Gather data
       const migrationData: Record<string, string> = {};
-      
+
       // Get today's date in Lagos timezone to migrate current game state
       const todayStr = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Africa/Lagos",
@@ -62,7 +62,7 @@ try {
           const isAuthToken = key.startsWith('sb-') && key.endsWith('-auth-token');
           const isStats = key === 'wordle-statistics';
           const isTodayGame = key === `wordle-${todayStr}`;
-          
+
           let isUnsyncedGame = false;
           if (key.startsWith('wordle-') && !isTodayGame) {
             try {
@@ -132,8 +132,7 @@ try {
           Object.keys(decodedData).forEach((key) => {
             safeLocalStorage.setItem(key, decodedData[key]);
           });
-          console.log('[Migration] Successfully imported LocalStorage data and session.');
-          
+
           // Clean URL hash so it doesn't trigger again on subsequent reloads
           window.history.replaceState(null, "", window.location.pathname + window.location.search);
         }
@@ -150,43 +149,42 @@ try {
   console.error('[Boot/Migration] Fatal exception caught in redirect block:', err);
 }
 
-  // ==========================================
-  // Mount the React Application (only on the new domain)
-  // ==========================================
-  logger.info('Application starting...');
+// ==========================================
+// Mount the React Application (only on the new domain)
+// ==========================================
 
-  const queryClient = new QueryClient({
-    queryCache: new QueryCache({
-      onError: (error) => {
-        logger.error('Query Error:', error);
-      },
-    }),
-    mutationCache: new MutationCache({
-      onError: (error) => {
-        logger.error('Mutation Error:', error);
-      },
-    }),
-    defaultOptions: {
-      queries: {
-        retry: 1,
-        refetchOnWindowFocus: false,
-      },
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      logger.error('Query Error:', error);
     },
-  });
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      logger.error('Mutation Error:', error);
+    },
+  }),
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <GlobalErrorBoundary>
-          <AppProvider>
-            <ConfirmationProvider>
-              <App />
-            </ConfirmationProvider>
-          </AppProvider>
-          <Analytics />
-        </GlobalErrorBoundary>
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-      </QueryClientProvider>
-    </StrictMode>
-  );
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <GlobalErrorBoundary>
+        <AppProvider>
+          <ConfirmationProvider>
+            <App />
+          </ConfirmationProvider>
+        </AppProvider>
+        <Analytics />
+      </GlobalErrorBoundary>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
+  </StrictMode>
+);
 

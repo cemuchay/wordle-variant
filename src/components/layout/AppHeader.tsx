@@ -26,7 +26,7 @@ interface AppHeaderProps {
     hideGameplayActions?: boolean;
 }
 
-const ICON_SIZE = 16;
+const ICON_SIZE = 17;
 
 export const AppHeader = ({
     onOpenSettings,

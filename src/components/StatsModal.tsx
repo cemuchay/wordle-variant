@@ -92,7 +92,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       if (error) throw error;
 
       if (currentFetchId !== fetchIdRef.current) {
-        console.log('[StatsModal] Stale fetch response ignored.');
         return;
       }
 
@@ -173,8 +172,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       const isGameOverUpdate = status === 'won' || status === 'lost';
       const currentTF = timeframeRef.current;
 
-      console.log(`[StatsModal Realtime] Score update received: status=${status}, currentTF=${currentTF}`);
-
       // 1. Evict sessionStorage cache keys
       if (status === 'playing') {
         safeSessionStorage.removeItem(`wordle_global_leaderboard_today_${currentDate}`);
@@ -196,7 +193,6 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       if (shouldRefresh) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          console.log(`[StatsModal Realtime] Performing background refresh for timeframe: ${currentTF}`);
           fetchLeaderboard(true, true);
         }, 1500);
       }
@@ -267,10 +263,9 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
       if (shouldRefresh) {
         debounceTimer = setTimeout(() => {
-          console.log('[StatsModal] Local update received. Refreshing...', isBackground);
           fetchLeaderboard(true, isBackground);
 
-          
+
         }, 1500);
       }
     };
@@ -766,7 +761,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
           )}
         </div>
 
-                <ProtectedAvatar
+        <ProtectedAvatar
           userId={entry.user_id}
           src={entry.avatar_url}
           username={entry.username}

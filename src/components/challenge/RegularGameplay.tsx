@@ -27,7 +27,7 @@ export const RegularGameplay = memo(function RegularGameplay({
     const { setBackAction } = useChallengeContext();
     const { isDynamicIslandVisible } = useApp();
 
-    const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
+    const { state, actions, isSaving, syncFailed, retryCount, wordLength, maxAttempts, networkLogs } = useChallengeGameEngine({
         challenge,
         participation,
         triggerToast,
@@ -191,7 +191,7 @@ export const RegularGameplay = memo(function RegularGameplay({
             <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
                 <Grid
                     wordLength={wordLength}
-                    maxAttempts={6}
+                    maxAttempts={maxAttempts}
                     guesses={guesses}
                     currentGuess={currentGuess}
                     hintRecord={hintRecord}

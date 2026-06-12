@@ -25,7 +25,7 @@ export const AudioConnectionLog = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-4 left-4 w-72 max-h-60 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-2xl z-50 pointer-events-auto"
+            className="fixed bottom-4 left-4 w-72 max-h-60 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col shadow-2xl z-50 pointer-events-auto hidden"
         >
             <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 bg-white/5">
                 <div className="flex items-center gap-2">
@@ -69,9 +69,9 @@ export const AudioConnectionLog = () => {
                                 </div>
                                 <div className="flex flex-col flex-1 min-w-0">
                                     <span className={`text-[9px] leading-tight font-bold wrap-break-word ${log.type === 'success' ? 'text-emerald-400' :
-                                            log.type === 'error' ? 'text-red-400' :
-                                                log.type === 'warning' ? 'text-yellow-400' :
-                                                    'text-white/80'
+                                        log.type === 'error' ? 'text-red-400' :
+                                            log.type === 'warning' ? 'text-yellow-400' :
+                                                'text-white/80'
                                         }`}>
                                         {log.message}
                                     </span>

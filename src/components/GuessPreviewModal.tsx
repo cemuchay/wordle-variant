@@ -36,12 +36,14 @@ const GuessPreviewModal: React.FC<{
   initialMarathonGameIndex?: number;
   yesterday?: boolean;
   isCreator?: boolean;
+  isShapeshifter?: boolean;
   initialData?: {
     guesses: any[] | null;
     hints_used?: boolean;
     skill_score?: number;
     hint_record?: any | null;
     time_taken?: number | null;
+    target_words?: string[];
   };
 }> = ({
   entry,
@@ -53,6 +55,7 @@ const GuessPreviewModal: React.FC<{
   initialMarathonGameIndex,
   yesterday,
   isCreator,
+  isShapeshifter,
   initialData,
 }) => {
     const isMarathon = lengthOfWord === 1;
@@ -83,6 +86,7 @@ const GuessPreviewModal: React.FC<{
       hint_record: { letter: string; index: number; row?: number } | null;
       time_taken?: number | null;
       game_message?: string | null;
+      target_words?: string[];
     } | null>(() => {
       if (initialData && !isMarathon) {
         return {
@@ -92,6 +96,7 @@ const GuessPreviewModal: React.FC<{
           hint_record: initialData.hint_record || null,
           time_taken: initialData.time_taken,
           game_message: (initialData as any).game_message || (initialData as any).gameMessage || null,
+          target_words: initialData.target_words || entry.target_words || [],
         };
       }
       return null;
@@ -201,23 +206,29 @@ const GuessPreviewModal: React.FC<{
             if (prog && (isMe || myFinished || isCreator)) {
               let guessesToUse = prog.guesses;
               let hintRecordToUse = prog.hint_record;
+              let targetWordsToUse = prog.target_words;
 
               // If guesses are not loaded or are in encrypted string format
-              if (!Array.isArray(guessesToUse)) {
+              if (!Array.isArray(guessesToUse) || !targetWordsToUse) {
                 const { data, error } = await supabase
                   .from("challenge_participants_marathon")
-                  .select("guesses, hint_record")
+                  .select("guesses, hint_record, target_words")
                   .eq("participation_id", entry.id)
                   .eq("game_index", marathonGameIndex)
                   .maybeSingle();
 
                 if (!error && data) {
-                  guessesToUse = data.guesses;
-                  hintRecordToUse = data.hint_record;
+                  if (!Array.isArray(guessesToUse)) guessesToUse = data.guesses;
+                  if (!hintRecordToUse) hintRecordToUse = data.hint_record;
+                  targetWordsToUse = data.target_words;
                 }
               }
 
-              const decrypted = decryptGuesses(guessesToUse, key);
+              let activeKey = key;
+              if (isShapeshifter && Array.isArray(targetWordsToUse) && targetWordsToUse.length > 0) {
+                activeKey = targetWordsToUse[targetWordsToUse.length - 1] + (salt || "");
+              }
+              const decrypted = decryptGuesses(guessesToUse, activeKey);
 
               const resolvedData = {
                 guesses: decrypted || [],
@@ -226,6 +237,7 @@ const GuessPreviewModal: React.FC<{
                 hint_record: hintRecordToUse || null,
                 time_taken: prog.time_taken,
                 game_message: prog.game_message || null,
+                target_words: targetWordsToUse || [],
               };
 
               fetchedCacheRef.current[marathonGameIndex] = resolvedData;
@@ -246,21 +258,27 @@ const GuessPreviewModal: React.FC<{
             if (isMe || myFinished || isCreator) {
               let guessesToUse = entry.guesses;
               let hintRecordToUse = entry.hint_record;
+              let targetWordsToUse = entry.target_words;
 
-              if (!Array.isArray(guessesToUse)) {
+              if (!Array.isArray(guessesToUse) || !targetWordsToUse) {
                 const { data, error } = await supabase
                   .from("challenge_participants")
-                  .select("guesses, hint_record")
+                  .select("guesses, hint_record, target_words")
                   .eq("id", entry.id)
                   .single();
 
                 if (!error && data) {
-                  guessesToUse = data.guesses;
-                  hintRecordToUse = data.hint_record;
+                  if (!Array.isArray(guessesToUse)) guessesToUse = data.guesses;
+                  if (!hintRecordToUse) hintRecordToUse = data.hint_record;
+                  targetWordsToUse = data.target_words;
                 }
               }
 
-              const decrypted = decryptGuesses(guessesToUse, key);
+              let activeKey = key;
+              if (isShapeshifter && Array.isArray(targetWordsToUse) && targetWordsToUse.length > 0) {
+                activeKey = targetWordsToUse[targetWordsToUse.length - 1] + (salt || "");
+              }
+              const decrypted = decryptGuesses(guessesToUse, activeKey);
 
               setGameData({
                 guesses: decrypted || [],
@@ -269,6 +287,7 @@ const GuessPreviewModal: React.FC<{
                 hint_record: hintRecordToUse || null,
                 time_taken: entry.time_taken,
                 game_message: entry.game_message || null,
+                target_words: targetWordsToUse || [],
               });
             } else {
               setGameData(null);
@@ -485,24 +504,42 @@ const GuessPreviewModal: React.FC<{
                     </p>
                   </div>
                 ) : showTargetWord ? (
-                  <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                    <span className="text-[8px] uppercase font-black text-gray-500 mb-1">
-                      Target Word
-                    </span>
-                    <div className="flex gap-1">
-                      {targetWordToUse
-                        .toUpperCase()
-                        .split("")
-                        .map((letter, i) => (
-                          <div
-                            key={i}
-                            className={`flex items-center justify-center bg-correct/10 border border-correct/20 font-black text-correct ${getTileSizeClass(targetWordToUse.length)}`}
-                          >
-                            {letter}
+                  isShapeshifter && gameData?.target_words && gameData.target_words.length > 0 ? (
+                    <div className="flex flex-col items-center animate-in zoom-in duration-300 w-full">
+                      <span className="text-[9px] uppercase font-black text-gray-500 mb-2">
+                        Shape Shifter Shift History
+                      </span>
+                      <div className="flex flex-wrap gap-2 justify-center items-center max-w-sm p-3 bg-white/5 border border-white/10 rounded-2xl">
+                        {(gameData.target_words || []).map((w: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-1.5">
+                            {idx > 0 && <span className="text-correct font-black text-xs font-mono">&rarr;</span>}
+                            <span className={`px-2.5 py-1 text-xs font-black uppercase font-mono rounded-lg transition-all ${idx === (gameData.target_words || []).length - 1 ? 'bg-correct text-black shadow-md shadow-correct/25 scale-105' : 'bg-white/5 text-white/50 border border-white/5'}`}>
+                              {w}
+                            </span>
                           </div>
                         ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col items-center animate-in zoom-in duration-300">
+                      <span className="text-[8px] uppercase font-black text-gray-500 mb-1">
+                        Target Word
+                      </span>
+                      <div className="flex gap-1">
+                        {targetWordToUse
+                          .toUpperCase()
+                          .split("")
+                          .map((letter, i) => (
+                            <div
+                              key={i}
+                              className={`flex items-center justify-center bg-correct/10 border border-correct/20 font-black text-correct ${getTileSizeClass(targetWordToUse.length)}`}
+                            >
+                              {letter}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <button
                     onClick={() => setShowTargetWord(true)}

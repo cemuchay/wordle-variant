@@ -18,6 +18,7 @@ import {
    isHintDisabled,
    encryptGuesses,
    decryptGuesses,
+   getShapeShifterFeedbackAndWord,
 } from "../lib/game-logic";
 import {
    challengeGameReducer,
@@ -173,7 +174,12 @@ export const useChallengeGameEngine = ({
          : 5
       : challenge.word_length;
 
-   const targetWord = useMemo(() => {
+   const maxAttempts = challenge.is_shapeshifter ? 10 : 6;
+
+   const [targetWords, setTargetWords] = useState<string[]>([]);
+   const [activeTargetWord, setActiveTargetWord] = useState<string>("");
+
+   const initialTargetWord = useMemo(() => {
       if (challenge.is_bot_marathon && challenge.target_word === "MARATHON") {
          const botData = botDailyWords[wordLength];
          if (botData) {
@@ -197,6 +203,30 @@ export const useChallengeGameEngine = ({
       wordLength,
    ]);
 
+   const targetWord = challenge.is_shapeshifter ? (activeTargetWord || initialTargetWord) : initialTargetWord;
+
+   const getDecryptionKey = useCallback((participationRecord: any) => {
+      const salt = challenge.salt || "";
+      if (challenge.is_shapeshifter && participationRecord) {
+         let loadedTargetWords: string[] = [];
+         if (isMarathon) {
+            const progress = participationRecord.marathon_progress?.find(
+               (p: any) =>
+                  p.game_index === gameIndex ||
+                  (p.game_index === undefined &&
+                     p.word_length === activeGame?.wordLength),
+            );
+            loadedTargetWords = progress?.target_words || [];
+         } else {
+            loadedTargetWords = participationRecord.target_words || [];
+         }
+         if (loadedTargetWords.length > 0) {
+            return loadedTargetWords[loadedTargetWords.length - 1] + salt;
+         }
+      }
+      return initialTargetWord + salt;
+   }, [challenge.is_shapeshifter, challenge.salt, isMarathon, gameIndex, activeGame, initialTargetWord]);
+
    const addLog = useCallback((msg: string, duration?: number) => {
       setNetworkLogs((prev) => [
          ...prev,
@@ -216,9 +246,6 @@ export const useChallengeGameEngine = ({
                timestamp: Date.now(),
             };
             safeLocalStorage.setItem(storageKey, JSON.stringify(finalPayload));
-            logger.info(`[challenge-prog] Saved to local: ${storageKey}`, {
-               payload: finalPayload,
-            });
          } catch (e) {
             logger.error("Local save failed", { key: storageKey, error: e });
          }
@@ -238,8 +265,14 @@ export const useChallengeGameEngine = ({
          delete dbPayload.needsSync;
          delete dbPayload.timestamp;
 
-         if (dbPayload.guesses && targetWord) {
-            const key = targetWord + (challenge.salt || "");
+         const activeWord = challenge.is_shapeshifter
+            ? (payload.target_words && payload.target_words.length > 0
+               ? payload.target_words[payload.target_words.length - 1]
+               : targetWord)
+            : targetWord;
+
+         if (dbPayload.guesses && activeWord) {
+            const key = activeWord + (challenge.salt || "");
             dbPayload.guesses = encryptGuesses(dbPayload.guesses, key);
          }
 
@@ -283,9 +316,6 @@ export const useChallengeGameEngine = ({
                   const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                   safeLocalStorage.removeItem(legacyKey);
                }
-               logger.info(
-                  `[challenge-prog] Local mirror cleaned up: ${storageKey}`,
-               );
             } catch (e) {
                logger.error("Local cleanup failed", {
                   key: storageKey,
@@ -418,10 +448,47 @@ export const useChallengeGameEngine = ({
       const initialize = async () => {
          setIsSaving(true);
 
+         let loadedTargetWords: string[] = [];
+         if (participation) {
+            if (isMarathon) {
+               const progress = participation.marathon_progress?.find(
+                  (p: any) =>
+                     p.game_index === gameIndex ||
+                     (p.game_index === undefined &&
+                        p.word_length === activeGame?.wordLength),
+               );
+               loadedTargetWords = progress?.target_words || [];
+            } else {
+               loadedTargetWords = participation.target_words || [];
+            }
+         }
+
+         let localTargetWords = loadedTargetWords;
+         try {
+            const saved = safeLocalStorage.getItem(storageKey);
+            if (saved) {
+               const parsed = JSON.parse(saved);
+               if (parsed.target_words && parsed.target_words.length >= loadedTargetWords.length) {
+                  localTargetWords = parsed.target_words;
+               }
+            }
+         } catch (e) {
+            console.error("Local target words recovery failed", e);
+         }
+
+         if (challenge.is_shapeshifter) {
+            const resolvedWords = localTargetWords.length > 0 ? localTargetWords : [initialTargetWord];
+            setTargetWords(resolvedWords);
+            setActiveTargetWord(resolvedWords[resolvedWords.length - 1]);
+         } else {
+            setTargetWords([initialTargetWord]);
+            setActiveTargetWord(initialTargetWord);
+         }
+
+         const key = getDecryptionKey(participation);
+
          let incoming: any[] = [];
          let serverHintRecord: any = null;
-
-         const key = targetWord + (challenge.salt || "");
 
          if (participation) {
             if (isMarathon) {
@@ -530,11 +597,6 @@ export const useChallengeGameEngine = ({
             if (!saved && isMarathon && activeGame) {
                const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
                saved = safeLocalStorage.getItem(legacyKey);
-               if (saved) {
-                  logger.info(
-                     `[challenge-prog] Found legacy storage key: ${legacyKey}`,
-                  );
-               }
             }
             if (saved) {
                const parsed = JSON.parse(saved);
@@ -554,17 +616,6 @@ export const useChallengeGameEngine = ({
                   hasAdvancedStatus ||
                   parsed.needsSync
                ) {
-                  logger.info(
-                     `[challenge-prog] Recovering advanced progress from localStorage: ${storageKey}`,
-                     {
-                        hasMoreGuesses,
-                        hasNewHint,
-                        hasAdvancedStatus,
-                        needsSync: parsed.needsSync,
-                        localCount: parsed.guesses?.length,
-                        serverCount: incoming.length,
-                     },
-                  );
                   if (
                      parsed.guesses &&
                      parsed.guesses.length >= incoming.length
@@ -586,13 +637,14 @@ export const useChallengeGameEngine = ({
          }
 
          let isStarterEnforced = false;
-         if (localGuesses.length === 0 && targetWord) {
+         const currentWordForStarter = challenge.is_shapeshifter ? (localTargetWords.length > 0 ? localTargetWords[localTargetWords.length - 1] : initialTargetWord) : targetWord;
+         if (localGuesses.length === 0 && currentWordForStarter) {
             const starter = isMarathon
                ? getHandicapStarter(challenge, gameIndex!, wordLength)
                : challenge.handicap_starter;
             if (starter && challenge.handicap_enforced) {
                const upperStarter = starter.toUpperCase();
-               const result = checkGuess(upperStarter, targetWord);
+               const result = checkGuess(upperStarter, currentWordForStarter);
                localGuesses = [result];
                isStarterEnforced = true;
             }
@@ -611,7 +663,7 @@ export const useChallengeGameEngine = ({
                   localGuesses.some((g: any) =>
                      g.every((r: any) => r.status === "correct"),
                   ) ||
-                  localGuesses.length >= 6,
+                  localGuesses.length >= maxAttempts,
                status: serverStatus,
                timeLeft: initialTimeLeft,
             },
@@ -628,9 +680,6 @@ export const useChallengeGameEngine = ({
                !isFinishedStatus &&
                !startTimerRef.current
             ) {
-               console.log(
-                  "[Engine] Triggering background sync for advanced local state...",
-               );
                wrappedSubmitResult(
                   recoveredPayload,
                   isMarathon ? wordLength : undefined,
@@ -640,9 +689,6 @@ export const useChallengeGameEngine = ({
 
             // Handle Enforced Starter Word Sync
             if (isStarterEnforced && !startTimerRef.current) {
-               console.log(
-                  "[Engine] Syncing enforced starter word to server...",
-               );
                startTimerRef.current = true;
                await wrappedSubmitResult(
                   {
@@ -658,7 +704,6 @@ export const useChallengeGameEngine = ({
 
             // Handle Offline Timeout Sync
             if (hasTimedOutOffline && !startTimerRef.current) {
-               console.log("[Engine] Offline timeout detected, syncing...");
                startTimerRef.current = true;
                await handleTimeExpired();
             }
@@ -674,7 +719,6 @@ export const useChallengeGameEngine = ({
                   ? progress?.started_at
                   : participation?.started_at;
                if (!startTime) {
-                  console.log("[Engine] Starting LIVE timer...");
                   startTimerRef.current = true;
                   await wrappedSubmitResult(
                      {
@@ -741,9 +785,6 @@ export const useChallengeGameEngine = ({
          }
 
          if (hasChanged) {
-            console.log(
-               `[Engine] Syncing background update. Incoming: ${incoming.length}, Local: ${guesses.length}`,
-            );
             setTimeout(
                () =>
                   addLog(
@@ -759,7 +800,7 @@ export const useChallengeGameEngine = ({
                   isGameOver:
                      incoming.some((g: any) =>
                         g.every((r: any) => r.status === "correct"),
-                     ) || incoming.length >= 6,
+                     ) || incoming.length >= maxAttempts,
                },
             });
          }
@@ -828,11 +869,33 @@ export const useChallengeGameEngine = ({
          if (!confirmSubmit) return;
       }
 
-      const result = checkGuess(upperGuess, targetWord);
+      let result = checkGuess(upperGuess, targetWord);
+      let finalTargetWord = targetWord;
+      let updatedTargetWords = [...targetWords];
+
+      if (challenge.is_shapeshifter) {
+         const shiftResult = getShapeShifterFeedbackAndWord(
+            upperGuess,
+            targetWord,
+            guesses,
+            wordLength
+         );
+         result = shiftResult.feedback;
+         finalTargetWord = shiftResult.nextWord;
+
+         if (updatedTargetWords.length === 0) {
+            updatedTargetWords.push(initialTargetWord);
+         }
+         updatedTargetWords.push(finalTargetWord);
+
+         setTargetWords(updatedTargetWords);
+         setActiveTargetWord(finalTargetWord);
+      }
+
       const newGuesses = [...guesses, result];
       const newStatuses = getLetterStatuses(newGuesses);
-      const won = upperGuess === targetWord;
-      const lost = newGuesses.length === 6;
+      const won = upperGuess === finalTargetWord;
+      const lost = newGuesses.length === maxAttempts;
 
       // --- OPTIMISTIC UPDATE ---
       // Trigger reveal animation IMMEDIATELY
@@ -857,7 +920,7 @@ export const useChallengeGameEngine = ({
          if (won || lost) {
             const skillScore = calculateSkillIndex({
                attempts: newGuesses.length,
-               maxAttempts: 6,
+               maxAttempts: maxAttempts,
                usedHint: usedHint,
                guesses: newGuesses,
                gameDate: new Date().toISOString().split("T")[0],
@@ -871,6 +934,7 @@ export const useChallengeGameEngine = ({
                hints_used: usedHint,
                hint_record: hintRecord,
                time_taken: timeTaken,
+               ...(challenge.is_shapeshifter ? { target_words: updatedTargetWords } : {})
             };
          } else {
             resultPayload = {
@@ -879,13 +943,14 @@ export const useChallengeGameEngine = ({
                attempts: newGuesses.length,
                hints_used: usedHint,
                hint_record: hintRecord,
+               ...(challenge.is_shapeshifter ? { target_words: updatedTargetWords } : {})
             };
          }
       } else {
          if (won || lost) {
             const skillScore = calculateSkillIndex({
                attempts: newGuesses.length,
-               maxAttempts: 6,
+               maxAttempts: maxAttempts,
                usedHint: usedHint,
                guesses: newGuesses,
                gameDate: new Date().toISOString().split("T")[0],
@@ -899,6 +964,7 @@ export const useChallengeGameEngine = ({
                hints_used: usedHint,
                hint_record: hintRecord,
                time_taken: timeTaken,
+               ...(challenge.is_shapeshifter ? { target_words: updatedTargetWords } : {})
             };
          } else {
             resultPayload = {
@@ -908,6 +974,7 @@ export const useChallengeGameEngine = ({
                guesses: newGuesses,
                hints_used: usedHint,
                hint_record: hintRecord,
+               ...(challenge.is_shapeshifter ? { target_words: updatedTargetWords } : {})
             };
          }
       }
@@ -915,10 +982,10 @@ export const useChallengeGameEngine = ({
       // Retry logic: 3 attempts in background
       let success = false;
       let attempt = 0;
-      const maxAttempts = 3;
+      const maxSyncAttempts = 3;
 
       try {
-         while (attempt < maxAttempts && !success) {
+         while (attempt < maxSyncAttempts && !success) {
             if (attempt > 0) {
                setRetryCount(attempt);
                await new Promise((r) => setTimeout(r, 1500));
@@ -1116,8 +1183,10 @@ export const useChallengeGameEngine = ({
       syncFailed,
       retryCount,
       wordLength,
+      maxAttempts,
       targetWord,
       timeLeft,
       networkLogs,
+      targetWords,
    };
 };
