@@ -39,6 +39,17 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
 
+    // Stabilize UI state to wait for reveal animations
+    const [stableGuessesCount, setStableGuessesCount] = useState(guesses.length);
+    const [stableIsHintDisabled, setStableIsHintDisabled] = useState(state.isHintDisabled);
+
+    useEffect(() => {
+        if (!state.isRevealing) {
+            setStableGuessesCount(guesses.length);
+            setStableIsHintDisabled(state.isHintDisabled);
+        }
+    }, [guesses.length, state.isRevealing, state.isHintDisabled]);
+
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
@@ -91,7 +102,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         ? getHandicapStarter(challenge, gameIndex, wordLength)
         : challenge.handicap_starter;
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
-    const showHint = guesses.length >= 2 && !isGameOver && !challenge.disable_hints;
+    const showHint = stableGuessesCount >= 2 && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 
     const lastGuess = guesses[guesses.length - 1];
 
@@ -144,12 +155,12 @@ export const RegularGameplay = memo(function RegularGameplay({
                         {showHint && (
                             <button
                                 onClick={actions.handleHint}
-                                disabled={usedHint || guesses.length >= 5 || state.isHintDisabled}
-                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                                title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                                disabled={usedHint || stableGuessesCount >= 5 || stableIsHintDisabled}
+                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((stableGuessesCount >= 5 || stableIsHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : (stableGuessesCount >= 5 || stableIsHintDisabled) ? "Hint Unavailable" : "Get Hint"}
                             >
                                 <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                                {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
+                                {(stableGuessesCount >= 5 || stableIsHintDisabled) && !usedHint && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
                                     </div>

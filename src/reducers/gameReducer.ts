@@ -10,6 +10,7 @@ export interface GameState {
     gameMessage: string;
     isGameOver: boolean;
     isGameOverModalOpen: boolean;
+    isRevealing: boolean;
     isShake: boolean;
     syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
 }
@@ -18,6 +19,7 @@ export type GameAction =
     | { type: 'ADD_LETTER'; char: string; maxLength: number }
     | { type: 'DELETE_LETTER' }
     | { type: 'SUBMIT_GUESS'; result: GuessResult[]; isWon: boolean; isLost: boolean; message: string }
+    | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string; index: number; row?: number } }
     | { type: 'LOAD_STATE'; payload: Partial<GameState> }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
@@ -36,6 +38,7 @@ export const initialState: GameState = {
     gameMessage: '',
     isGameOver: false,
     isGameOverModalOpen: false,
+    isRevealing: false,
     isShake: false,
     syncStatus: 'idle',
 };
@@ -72,10 +75,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 currentGuess: '',
                 status: newStatus,
                 isGameOver: isFinished,
+                isRevealing: true,
                 isGameOverModalOpen: false, // Delay modal until animation finishes
                 gameMessage: action.message,
             };
         }
+
+        case 'STOP_REVEALING':
+            return {
+                ...state,
+                isRevealing: false,
+            };
 
         case 'SET_HINT':
             return {

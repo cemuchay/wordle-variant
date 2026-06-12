@@ -5,6 +5,7 @@ export interface ChallengeGameState {
     currentGuess: string;
     letterStatuses: Record<string, any>;
     isGameOver: boolean;
+    isRevealing: boolean;
     isShake: boolean;
     usedHint: boolean;
     hintRecord: { letter: string; index: number; row?: number } | null;
@@ -20,6 +21,7 @@ export type ChallengeGameAction =
     | { type: 'TYPE_CHAR'; char: string; wordLength: number }
     | { type: 'DELETE_CHAR' }
     | { type: 'SUBMIT_GUESS'; newGuesses: any[]; newStatuses: any; isWon: boolean; isLost: boolean }
+    | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string, index: number, row?: number } }
     | { type: 'TIME_UP' }
     | { type: 'SHAKE_GUESS' }
@@ -33,6 +35,7 @@ export const initialChallengeState: ChallengeGameState = {
     currentGuess: '',
     letterStatuses: {},
     isGameOver: false,
+    isRevealing: false,
     isShake: false,
     usedHint: false,
     hintRecord: null,
@@ -79,9 +82,16 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
                 letterStatuses: action.newStatuses,
                 currentGuess: '',
                 isGameOver: isFinished,
+                isRevealing: true,
                 status: action.isWon || action.isLost ? 'completed' : 'playing'
             };
         }
+
+        case 'STOP_REVEALING':
+            return {
+                ...state,
+                isRevealing: false,
+            };
 
         case 'SET_HINT':
             return {
