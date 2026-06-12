@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useMemo, useState, useRef, useEffect, } from 'react';
+import React, { memo, useMemo, useState, useRef, useEffect, forwardRef } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Play, Pause, Pencil, Trash2, Copy, } from "lucide-react";
 import type { Message } from "../../hooks/useChat";
 import type { JSX } from "react";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { calculateSkillIndex } from '../../lib/game-logic';
+import { useAppStore } from '../../store/useAppStore';
 
 interface ChatMessageProps {
     msg: Message;
@@ -27,6 +28,74 @@ interface ChatMessageProps {
 const MENTION_COLORS = ["#4ade80", "#60a5fa", "#f87171", "#fbbf24", "#c084fc", "#22d3ee", "#f472b6", "#fb923c"];
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+const ReactionPicker = forwardRef<HTMLDivElement, {
+    onReact: (emoji: string | null) => void;
+    currentReaction?: string;
+    onCopy: () => void;
+    isMe: boolean;
+}>(({ onReact, currentReaction, onCopy, isMe }, ref) => (
+    <div
+        ref={ref}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`absolute ${isMe ? 'right-4' : 'left-4'} top-[-44px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] animate-in fade-in zoom-in-95 duration-100`}
+    >
+        <div className="flex items-center gap-1 pr-2 border-r border-white/10">
+            {EMOJIS.map((emoji) => (
+                <button
+                    key={emoji}
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onReact(currentReaction === emoji ? null : emoji);
+                    }}
+                    className={`text-[18px] w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform duration-100 cursor-pointer rounded-full ${currentReaction === emoji ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                >
+                    {emoji}
+                </button>
+            ))}
+        </div>
+        <button
+            type="button"
+            onClick={(e) => {
+                e.stopPropagation();
+                onCopy();
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer group/copy"
+            title="Copy Message"
+        >
+            <Copy size={14} className="group-hover/copy:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-wider">Copy</span>
+        </button>
+    </div>
+));
+
+const ReactionBadge = forwardRef<HTMLDivElement, {
+    reactions: Record<string, string>;
+    onShowDetails: () => void;
+    isMe: boolean;
+}>(({ reactions, onShowDetails, isMe }, ref) => {
+    const emojis = Array.from(new Set(Object.values(reactions))).slice(0, 3);
+    const count = Object.keys(reactions).length;
+
+    return (
+        <div
+            ref={ref}
+            onClick={(e) => {
+                e.stopPropagation();
+                onShowDetails();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30 cursor-pointer hover:bg-[#2a3942] transition-colors`}
+        >
+            {emojis.map((emoji, idx) => (
+                <span key={idx} className="text-[10px]">{emoji}</span>
+            ))}
+            <span className="text-[9px] text-white font-black ml-0.5">{count}</span>
+        </div>
+    );
+});
 
 const AudioPlayer = ({ url }: { url: string }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -113,7 +182,6 @@ const AudioPlayer = ({ url }: { url: string }) => {
     );
 };
 
-import { useAppStore } from '../../store/useAppStore';
 
 const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onMarkAsRead, users, allProfiles, onReact, currentUserId, onEdit, onDelete, dailyGuesses, onResend }: ChatMessageProps) => {
     const triggerToast = useAppStore(s => s.triggerToast);
@@ -433,6 +501,25 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                 )}
             </AnimatePresence>
 
+            {/* Reactions Quick Picker popover - Moved OUTSIDE draggable area */}
+            <AnimatePresence>
+                {showReactionsMenu && (
+                    <ReactionPicker
+                        ref={reactionsRef}
+                        isMe={isMe}
+                        onReact={(emoji) => {
+                            onReact(emoji);
+                            setShowReactionsMenu(false);
+                        }}
+                        currentReaction={msg.reactions?.[currentUserId]}
+                        onCopy={() => {
+                            copyToClipboard(msg.content);
+                            setShowReactionsMenu(false);
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* Swipe Reply Indicator */}
             {(!msg.is_deleted && !isEditing) && (
                 <motion.div
@@ -455,7 +542,6 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                         onReply(msg);
                     }
                 }}
-                onMouseLeave={() => setShowReactionsMenu(false)}
                 initial={{ opacity: 0, x: isMe ? 20 : -20, y: 10 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-4 cursor-grab active:cursor-grabbing touch-pan-y relative`}
@@ -480,7 +566,11 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                         <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0.5 transition-all bg-black/25 rounded-md px-1 py-0.5 border border-white/5">
                             <button
                                 type="button"
-                                onClick={() => onReply(msg)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onReply(msg);
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
                                 title="Reply"
                             >
@@ -488,7 +578,11 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setShowReactionsMenu(!showReactionsMenu)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowReactionsMenu(!showReactionsMenu);
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer relative"
                                 title="React"
                             >
@@ -498,10 +592,12 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                 <>
                                     <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             setEditText(msg.content);
                                             setIsEditing(true);
                                         }}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                         className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
                                         title="Edit message"
                                     >
@@ -509,9 +605,11 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             onDelete()
                                         }}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                         className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
                                         title="Delete message"
                                     >
@@ -521,50 +619,6 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                             )}
                         </div>
                     )}
-
-                    {/* Reactions Quick Picker popover */}
-                    <AnimatePresence>
-                        {showReactionsMenu && (
-                            <motion.div
-                                ref={reactionsRef}
-                                initial={{ scale: 0.8, opacity: 0, y: 10 }}
-                                animate={{ scale: 1, opacity: 1, y: 0 }}
-                                exit={{ scale: 0.8, opacity: 0, y: 10 }}
-                                className={`absolute ${isMe ? 'right-0' : 'left-0'} top-[-54px] flex items-center gap-1 bg-[#1f2c34] border border-white/15 rounded-2xl px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50`}
-                            >
-                                <div className="flex items-center gap-1 pr-2 border-r border-white/10">
-                                    {EMOJIS.map((emoji) => {
-                                        const hasReacted = msg.reactions?.[currentUserId] === emoji;
-                                        return (
-                                            <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => {
-                                                    onReact(hasReacted ? null : emoji);
-                                                    setShowReactionsMenu(false);
-                                                }}
-                                                className={`text-[18px] w-9 h-9 flex items-center justify-center hover:scale-125 transition-transform duration-100 cursor-pointer rounded-full ${hasReacted ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        copyToClipboard(msg.content);
-                                        setShowReactionsMenu(false);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer group/copy"
-                                    title="Copy Message"
-                                >
-                                    <Copy size={14} className="group-hover/copy:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-black uppercase tracking-wider">Copy</span>
-                                </button>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
                 </div>
 
                 <div
@@ -688,19 +742,13 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
 
                     {/* Reactions Count Display */}
                     {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
-                        <div
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowReactionDetails(!showReactionDetails);
-                            }}
-                            className={`absolute bottom-[-10px] ${isMe ? 'left-3' : 'right-3'} flex items-center gap-0.5 bg-[#1f2c34] border border-white/10 rounded-full px-1.5 py-0.5 shadow-md z-30 cursor-pointer hover:bg-[#2a3942] transition-colors`}
-                        >
-                            {Array.from(new Set(Object.values(msg.reactions))).slice(0, 3).map((emoji, idx) => (
-                                <span key={idx} className="text-[10px]">{emoji as string}</span>
-                            ))}
-                            <span className="text-[9px] text-white font-black ml-0.5">
-                                {Object.keys(msg.reactions).length}
-                            </span>
+                        <>
+                            <ReactionBadge
+                                ref={detailsRef}
+                                reactions={msg.reactions}
+                                isMe={isMe}
+                                onShowDetails={() => setShowReactionDetails(!showReactionDetails)}
+                            />
 
                             {/* Reactions Details Popover */}
                             <AnimatePresence>
@@ -737,7 +785,7 @@ const ChatMessage = memo(({ msg, isMe, replyMsg, onReply, onScrollToMessage, onM
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                        </div>
+                        </>
                     )}
                 </div>
             </motion.div>
