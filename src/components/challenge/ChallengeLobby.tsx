@@ -183,7 +183,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     return effectiveUser.id === localStorage.getItem('wordle_anon_id');
   }, [effectiveUser]);
 
-  const { messages, sendMessage, editMessage, deleteMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(
+  const { messages, sendMessage, editMessage, deleteMessage, reactToMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(
     selectedChallenge?.id,
     effectiveUser,
     isGuest
@@ -424,6 +424,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           effectiveUser={effectiveUser}
           loading={chatLoading}
           participants={participants}
+          reactToMessage={reactToMessage}
         />
       ) : (
         <>

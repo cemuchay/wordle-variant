@@ -850,6 +850,8 @@ export const useChat = (userId: string) => {
    // Reaction
    const reactToMessage = async (messageId: string, emoji: string | null) => {
       if (!userId) return;
+      
+      // Optimistic UI: update global store immediately
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
@@ -864,13 +866,16 @@ export const useChat = (userId: string) => {
          .getState()
          .updateGlobalMessage({ id: messageId, reactions: currentReactions });
 
-      const { error } = await supabase
-         .from("messages")
-         .update({ reactions: currentReactions })
-         .eq("id", messageId);
+      // Resilience: Use RPC call for atomic DB update
+      const { error } = await supabase.rpc("toggle_message_reaction", {
+         p_message_id: messageId,
+         p_user_id: userId,
+         p_emoji: emoji
+      });
 
       if (error) {
-         console.error("Failed to react:", error);
+         console.error("Failed to react resiliently:", error);
+         // Optionally rollback optimistic UI if it's a persistent failure
       }
    };
 
