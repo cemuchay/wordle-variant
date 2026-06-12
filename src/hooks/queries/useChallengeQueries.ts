@@ -773,6 +773,8 @@ export const useChallengeMutations = () => {
             marathonForceOrder,
             lifespanHours,
             disableHints,
+            isShapeshifter,
+            is_shapeshifter,
          } = params;
 
          // 1. Double check in client logic if anyone has played
@@ -826,7 +828,7 @@ export const useChallengeMutations = () => {
                      } else if (
                         customWords &&
                         typeof customWords === "object"
-                     ) {
+                      ) {
                         rawWord = customWords[l];
                      }
                   }
@@ -959,6 +961,7 @@ export const useChallengeMutations = () => {
                   : existing.disable_hints,
             marathon_timers: marathonTimers,
             marathon_force_order: marathonForceOrder,
+            is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
          };
 
          if (lifespanHours) {

@@ -224,7 +224,11 @@ const GuessPreviewModal: React.FC<{
                 }
               }
 
-              const decrypted = decryptGuesses(guessesToUse, key);
+              let activeKey = key;
+              if (isShapeshifter && Array.isArray(targetWordsToUse) && targetWordsToUse.length > 0) {
+                activeKey = targetWordsToUse[targetWordsToUse.length - 1] + (salt || "");
+              }
+              const decrypted = decryptGuesses(guessesToUse, activeKey);
 
               const resolvedData = {
                 guesses: decrypted || [],
@@ -270,7 +274,11 @@ const GuessPreviewModal: React.FC<{
                 }
               }
 
-              const decrypted = decryptGuesses(guessesToUse, key);
+              let activeKey = key;
+              if (isShapeshifter && Array.isArray(targetWordsToUse) && targetWordsToUse.length > 0) {
+                activeKey = targetWordsToUse[targetWordsToUse.length - 1] + (salt || "");
+              }
+              const decrypted = decryptGuesses(guessesToUse, activeKey);
 
               setGameData({
                 guesses: decrypted || [],
