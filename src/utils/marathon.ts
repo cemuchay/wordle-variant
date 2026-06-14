@@ -15,6 +15,16 @@ export interface MarathonGame {
  */
 export function parseMarathonGames(targetWordField: string | any, salt?: string): MarathonGame[] {
     if (!targetWordField) return [];
+    
+    // Special case for Daily Bot Marathons
+    if (targetWordField === "MARATHON") {
+        return [3, 4, 5, 6, 7].map((l, idx) => ({
+            gameIndex: idx,
+            wordLength: l,
+            word: '' // Words are fetched async for bot marathons
+        }));
+    }
+
     try {
         const parsed = typeof targetWordField === 'string' ? JSON.parse(targetWordField) : targetWordField;
         if (Array.isArray(parsed)) {
@@ -67,12 +77,41 @@ export function getMarathonTimer(challenge: any, gameIndex: number, wordLength: 
     const timers = challenge.marathon_timers;
     if (!timers) return challenge.max_time || 5;
 
+    const defaultTime = challenge.max_time || 5;
+
     if (Array.isArray(timers)) {
-        return timers[gameIndex] !== undefined ? timers[gameIndex] : (challenge.max_time || 5);
+        if (timers.length === 0) return defaultTime;
+        // Modulo mapping: if sequence is longer than timers provided, wrap around
+        // e.g. 21 games with 7 timers -> games 8-14 use timers 0-6
+        return timers[gameIndex % timers.length] ?? defaultTime;
     } else if (typeof timers === 'object') {
-        return timers[String(wordLength)] ?? timers[wordLength] ?? (challenge.max_time || 5);
+        const keys = Object.keys(timers).filter(k => !isNaN(Number(k)));
+        if (keys.length > 0) {
+            const numericKeys = keys.map(Number).sort((a, b) => a - b);
+            // If keys are like 0, 1, 2... they are index-based.
+            const isIndexBased = numericKeys.some(k => k < 3);
+
+            if (isIndexBased) {
+                // Determine cycle length based on provided index keys
+                const cycleLength = Math.max(...numericKeys.filter(k => k < 30)) + 1;
+                const effectiveIdx = gameIndex % cycleLength;
+                
+                return timers[String(effectiveIdx)] ?? 
+                       timers[effectiveIdx] ?? 
+                       timers[String(wordLength)] ?? 
+                       timers[wordLength] ?? 
+                       defaultTime;
+            }
+        }
+
+        // Fallback to word length
+        return timers[String(wordLength)] ?? 
+               timers[wordLength] ?? 
+               timers[String(gameIndex)] ?? 
+               timers[gameIndex] ?? 
+               defaultTime;
     }
-    return challenge.max_time || 5;
+    return defaultTime;
 }
 
 /**
@@ -83,10 +122,34 @@ export function getHandicapStarter(challenge: any, gameIndex: number, wordLength
         return challenge?.handicap_starter || null;
     }
     const starters = challenge.handicap_starters;
+
     if (Array.isArray(starters)) {
-        return starters[gameIndex] || null;
+        if (starters.length === 0) return null;
+        // Modulo mapping for starters
+        return starters[gameIndex % starters.length] || null;
     } else if (typeof starters === 'object') {
-        return starters[String(wordLength)] ?? starters[wordLength] ?? null;
+        const keys = Object.keys(starters).filter(k => !isNaN(Number(k)));
+        if (keys.length > 0) {
+            const numericKeys = keys.map(Number).sort((a, b) => a - b);
+            const isIndexBased = numericKeys.some(k => k < 3);
+
+            if (isIndexBased) {
+                const cycleLength = Math.max(...numericKeys.filter(k => k < 30)) + 1;
+                const effectiveIdx = gameIndex % cycleLength;
+                
+                return starters[String(effectiveIdx)] ?? 
+                       starters[effectiveIdx] ?? 
+                       starters[String(wordLength)] ?? 
+                       starters[wordLength] ?? 
+                       null;
+            }
+        }
+
+        return starters[String(wordLength)] ?? 
+               starters[wordLength] ?? 
+               starters[String(gameIndex)] ?? 
+               starters[gameIndex] ?? 
+               null;
     }
     return null;
 }

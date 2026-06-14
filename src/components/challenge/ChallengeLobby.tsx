@@ -831,7 +831,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 selectedChallenge.marathon_timers && (
                   <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
                     <p className="text-[8px] font-black uppercase text-white/70">
-                      Marathon Per-Length Time Limits
+                      Marathon Game Time Limits
                     </p>
                     <div className="flex flex-wrap gap-1.5 justify-center pt-1 max-h-[120px] overflow-y-auto animate-in fade-in duration-200">
                       {marathonGamesList.map((game, idx) => {
