@@ -9,6 +9,7 @@ interface UseActionsProps {
    state: any;
    dispatch: React.Dispatch<any>;
    isGameOver: boolean;
+   isSaving: boolean;
    wordLength: number;
    targetWord: string;
    guesses: any[];
@@ -39,6 +40,7 @@ export const useActions = ({
    state,
    dispatch,
    isGameOver,
+   isSaving,
    wordLength,
    targetWord,
    guesses,
@@ -79,7 +81,7 @@ export const useActions = ({
    }, [isGameOver, dispatch]);
 
    const onEnter = useCallback(async () => {
-      if (isGameOver || state.currentGuess.length !== wordLength) return;
+      if (isGameOver || isSaving || state.currentGuess.length !== wordLength) return;
 
       const upperGuess = state.currentGuess.toUpperCase();
 

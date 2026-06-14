@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabaseClient';
 import type { AppUser } from '../types/game';
 import { safeSessionStorage } from '../utils/storage';
 
+import { fetchWithRetry } from '../utils/fetchWithRetry';
+
 export interface Challenge {
     profiles: any;
     id: string;
@@ -127,14 +129,8 @@ export const useChallenge = (_user: AppUser | null) => {
             setLoadingParticipants(true);
             setParticipantsError(null);
 
-            let attempts = 0;
-            const maxAttempts = 3;
-            let success = false;
-            let lastError: any = null;
-
-            while (attempts < maxAttempts && !success) {
-                try {
-                    attempts++;
+            try {
+                const result = await fetchWithRetry(async () => {
                     const { data: challengeData, error: cError } = await supabase
                         .from('challenges')
                         .select('mode, max_time')
@@ -158,42 +154,39 @@ export const useChallenge = (_user: AppUser | null) => {
 
                     if (pError) throw pError;
 
-                    if (parts && challengeData) {
-                        const mappedParts = parts.map((p: any) => ({
-                            ...p,
-                            profiles: p.profiles || p.guest_profiles || null
-                        }));
-                        const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
-                        
-                        // Compare structural difference to avoid redundant state updates and cache writes
-                        const currentStringified = JSON.stringify(participantsRef.current);
-                        const newStringified = JSON.stringify(normalized);
-                        
-                        if (currentStringified !== newStringified) {
-                            setParticipants(normalized as ChallengeParticipant[]);
-                            participantsRef.current = normalized;
-                            try {
-                                safeSessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
-                            } catch (e) {
-                                console.error('Failed to cache participants', e);
-                            }
-                        }
-                        success = true;
-                    } else {
+                    if (!parts || !challengeData) {
                         throw new Error("Challenge or participant data not found");
                     }
-                } catch (err: any) {
-                    console.warn(`[useChallenge] Fetch participants attempt ${attempts} failed:`, err);
-                    lastError = err;
-                    if (attempts < maxAttempts) {
-                        await new Promise(res => setTimeout(res, 1000));
+
+                    return { parts, challengeData };
+                }, 3, 1000, (attempt) => {
+                    console.warn(`[useChallenge] Fetch participants attempt ${attempt} failed.`);
+                });
+
+                const { parts, challengeData } = result;
+                const mappedParts = parts.map((p: any) => ({
+                    ...p,
+                    profiles: p.profiles || p.guest_profiles || null
+                }));
+                const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
+
+                const currentStringified = JSON.stringify(participantsRef.current);
+                const newStringified = JSON.stringify(normalized);
+
+                if (currentStringified !== newStringified) {
+                    setParticipants(normalized as ChallengeParticipant[]);
+                    participantsRef.current = normalized;
+                    try {
+                        safeSessionStorage.setItem(`wordle_challenge_participants_${challengeId}`, newStringified);
+                    } catch (e) {
+                        console.error('Failed to cache participants', e);
                     }
                 }
-            }
-
-            setLoadingParticipants(false);
-            if (!success) {
-                setParticipantsError(lastError?.message || "Failed to load participants after 3 attempts.");
+            } catch (err: any) {
+                console.error("[useChallenge] Final fetch failure:", err);
+                setParticipantsError(err?.message || "Failed to load participants after 3 attempts.");
+            } finally {
+                setLoadingParticipants(false);
             }
         };
 

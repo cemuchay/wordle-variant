@@ -382,7 +382,7 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenge && (
+                        {dailyMarathonChallenge && (["open", "played"]).includes(listColumn) && (
                           <MarathonBanner
                             challenge={dailyMarathonChallenge}
                             onClick={() => {

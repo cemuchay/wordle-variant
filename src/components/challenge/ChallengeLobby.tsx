@@ -581,14 +581,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </h4>
               </div>
               <div className="space-y-2">
-                {loadingParticipants && participants.length === 0 ? (
-                  <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
-                    <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
-                    <p className="text-xs font-black uppercase tracking-wider text-white">
-                      Fetching participants...
-                    </p>
-                  </div>
-                ) : participantsError ? (
+                {participantsError ? (
                   <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
                     <p className="text-xs font-black uppercase text-red-500">
                       Failed to load participants
@@ -605,7 +598,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   </div>
                 ) : participants.length === 0 ? (
                   <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
-                    No participants found
+                    {loadingParticipants ? "Syncing participants..." : "No participants found"}
                   </div>
                 ) : (
                   participants.map((p) => (

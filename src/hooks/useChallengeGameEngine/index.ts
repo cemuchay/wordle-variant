@@ -181,6 +181,7 @@ export const useChallengeGameEngine = ({
       state,
       dispatch,
       isGameOver,
+      isSaving,
       wordLength,
       targetWord,
       guesses,

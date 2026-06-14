@@ -189,8 +189,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const playDate = useMemo(() => getLagosDate(), [getLagosDate]);
 
     // 1. Server Data (TanStack Query)
-    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError } = useMyChallenges(effectiveUser?.id);
-    const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError } = useDiscoverChallenges();
+    const myChallengesQuery = useMyChallenges(effectiveUser?.id);
+    const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError, failureCount: myChallengesFailureCount } = myChallengesQuery;
+    
+    const discoverChallengesQuery = useDiscoverChallenges();
+    const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError, failureCount: discoverChallengesFailureCount } = discoverChallengesQuery;
 
     // Parallel fetch for all participants in the visible challenges list
     const challengeIds = useMemo(() => {
@@ -199,7 +202,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         return Array.from(new Set([...myIds, ...discoverIds]));
     }, [myChallengesData, discoverChallengesData]);
 
-    const { data: participantsMap, isFetching: isParticipantsBulkFetching } = useBulkChallengeParticipants(challengeIds);
+    const participantsBulkQuery = useBulkChallengeParticipants(challengeIds);
+    const { data: participantsMap, isFetching: isParticipantsBulkFetching, failureCount: participantsBulkFailureCount } = participantsBulkQuery;
 
     const { data: profilesData } = useAvailableProfiles(effectiveUser?.id);
     const {
@@ -216,11 +220,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const challengeApi = useChallenge(user);
     const { subscribeToParticipants, participants, loadingParticipants, participantsError, retryFetchParticipants } = challengeApi;
 
+    const isRetrying = myChallengesFailureCount > 0 || discoverChallengesFailureCount > 0 || participantsBulkFailureCount > 0;
+
     const isBackgroundFetching =
-        (isChallengesFetching && !isChallengesLoading) ||
+        ((isChallengesFetching && !isChallengesLoading) ||
         (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) ||
-        isParticipantsBulkFetching ||
-        loadingParticipants;
+        isParticipantsBulkFetching) && isRetrying;
 
     const error = (listColumn === 'open' ? discoverChallengesError : myChallengesError)
         ? ((listColumn === 'open' ? discoverChallengesError : myChallengesError) as any)?.message || "Failed to load challenges."

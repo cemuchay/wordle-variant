@@ -63,7 +63,10 @@ const GuessPreviewModal: React.FC<{
       initialMarathonGameIndex ?? 0,
     );
     const [showTargetWord, setShowTargetWord] = useState(false);
-    const [sortMode, setSortMode] = useState<"number" | "length">("number");
+    const [sortMode, setSortMode] = useState<"number" | "length">(() => {
+      const games = isMarathon ? parseMarathonGames(targetWord, salt) : [];
+      return games.length > 15 ? "length" : "number";
+    });
     const marathonGamesRef = useRef<HTMLDivElement>(null);
 
     const marathonGames = useMemo(() => {

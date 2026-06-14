@@ -83,7 +83,7 @@ export const RegularGameplay = memo(function RegularGameplay({
     }, [isGameOver, wordLength]);
 
     // Physical Keyboard Support
-    useKeyboard(actions, isGameOver || isSaving);
+    useKeyboard(actions, isGameOver);
 
     useEffect(() => {
         // Ensure window has focus to capture keyboard events when game starts
@@ -127,11 +127,11 @@ export const RegularGameplay = memo(function RegularGameplay({
 
             {/* Sync Status Overlay */}
             <div className={`absolute left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 ${isDynamicIslandVisible ? 'top-12' : 'top-2'}`}>
-                {isSaving && (
+                {isSaving && (retryCount > 0 || syncFailed) && (
                     <div className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
-                        <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
+                        <RefreshCw size={10} className="animate-spin text-red-500" />
                         <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
-                            {retryCount > 0 ? `Retrying ${retryCount}/3...` : 'Syncing...'}
+                            {syncFailed ? 'Retrying sync...' : `Retrying ${retryCount}/3...`}
                         </span>
                     </div>
                 )}
