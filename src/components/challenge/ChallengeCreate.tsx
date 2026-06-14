@@ -6,6 +6,8 @@ import { useConfirmation } from '../../hooks/useConfirmation';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
+import { useAppStore } from '../../store/useAppStore';
+
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
     tooltip: string;
@@ -318,6 +320,21 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         handleEdit, setInvitedIds, effectiveUser
     } = useChallengeContext();
     const { ask } = useConfirmation();
+
+    const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
+    const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
+
+    // Handle pre-selected user from Chat DM
+    useEffect(() => {
+        if (pendingChallengeUserId && !editingChallenge) {
+            const ids = pendingChallengeUserId.split(',').filter(Boolean);
+            if (ids.length > 0) {
+                setInvitedIds(ids);
+                // Clear the pending ID so it doesn't persist
+                setPendingChallengeUserId(null);
+            }
+        }
+    }, [pendingChallengeUserId, setInvitedIds, setPendingChallengeUserId, editingChallenge]);
 
     // Initialize edit fields
     useEffect(() => {

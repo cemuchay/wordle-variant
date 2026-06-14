@@ -53,6 +53,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
     const pendingDMUserId = useAppStore(s => s.pendingDMUserId);
     const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
+    const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
 
     const [showSidebar, setShowSidebar] = useState(true);
     const [isStartingDM, setIsStartingDM] = useState(false);
@@ -778,6 +779,16 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 showSearchIcon={!showConversationSearch}
                                 onToggleSearch={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                                 onChallenge={(activeRoom?.type === "dm" || activeRoom?.type === "custom") ? () => {
+                                    if (activeRoom.type === "dm" && activeRoom.dm_partner) {
+                                        setPendingChallengeUserId(activeRoom.dm_partner.id);
+                                    } else if (activeRoom.type === "custom" && activeRoom.members) {
+                                        // Select all members except current user
+                                        const otherMemberIds = activeRoom.members
+                                            .filter((m: any) => m.user_id !== user.id)
+                                            .map((m: any) => m.user_id)
+                                            .join(',');
+                                        setPendingChallengeUserId(otherMemberIds);
+                                    }
                                     if (onClose) onClose();
                                     setIsChallengeOpen(true);
                                 } : undefined}

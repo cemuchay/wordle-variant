@@ -12,21 +12,21 @@ import { ReactionBadge } from './ReactionBadge';
 import { AudioPlayer } from './AudioPlayer';
 import { MessageContent } from './MessageContent';
 
-const ChatMessage = memo(({ 
-    msg, 
-    isMe, 
-    replyMsg, 
-    onReply, 
-    onScrollToMessage, 
-    onMarkAsRead, 
-    users, 
-    allProfiles, 
-    onReact, 
-    currentUserId, 
-    onEdit, 
-    onDelete, 
-    dailyGuesses, 
-    onResend 
+const ChatMessage = memo(({
+    msg,
+    isMe,
+    replyMsg,
+    onReply,
+    onScrollToMessage,
+    onMarkAsRead,
+    users,
+    allProfiles,
+    onReact,
+    currentUserId,
+    onEdit,
+    onDelete,
+    dailyGuesses,
+    onResend
 }: ChatMessageProps) => {
     const triggerToast = useAppStore(s => s.triggerToast);
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
@@ -95,7 +95,6 @@ const ChatMessage = memo(({
     }, [users, msg.profiles?.username]);
 
     const isWithinTimeLimit = useMemo(() => {
-        // eslint-disable-next-line react-hooks/purity
         const elapsed = Date.now() - new Date(msg.created_at).getTime();
         return elapsed < 5 * 60 * 1000; // 5 minutes
     }, [msg.created_at]);
@@ -275,7 +274,7 @@ const ChatMessage = memo(({
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
                     onTouchCancel={handleTouchEnd}
-                    className={`relative max-w-[85%] p-1 pb-3 px-1 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
+                    className={`relative max-w-[85%] p-1.5 pb-2 sm:pb-3 px-2 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
                         ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
                         : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
                         }`}
@@ -356,7 +355,7 @@ const ChatMessage = memo(({
                                 />
                             </div>
                         ) : (
-                            <MessageContent 
+                            <MessageContent
                                 content={msg.content}
                                 isMe={isMe}
                                 users={users}

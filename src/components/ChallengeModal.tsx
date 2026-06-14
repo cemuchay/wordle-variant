@@ -22,6 +22,7 @@ import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
+import { useAppStore } from "../store/useAppStore";
 import { useApp } from "../context/AppContext";
 
 // Sub-components
@@ -150,6 +151,7 @@ const AuthenticatedChallengeContent = memo(
     const [isHelpOpen, setIsHelpOpen] = useState(false);
 
     const { isDynamicIslandVisible } = useApp();
+    const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -195,6 +197,14 @@ const AuthenticatedChallengeContent = memo(
         scrollContainerRef.current.scrollTop = 0;
       }
     }, [selectedChallenge?.id]);
+
+    // Handle pre-selected user from DM
+    useEffect(() => {
+      if (pendingChallengeUserId) {
+        setSelectedChallenge(null);
+        setIsCreatingChallenge(true);
+      }
+    }, [pendingChallengeUserId, setSelectedChallenge]);
 
     const activeCount = useMemo(() => {
       return myChallenges.filter((item: any) => {
