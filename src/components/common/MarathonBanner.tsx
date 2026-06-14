@@ -222,13 +222,18 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
 
     return (
         <div className={`relative w-full overflow-hidden ${className}`}>
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="popLayout" initial={false}>
                 <motion.div
                     key={sortedChallenges[currentIndex].id || sortedChallenges[currentIndex].challenge?.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, x: 100, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, x: -100, filter: 'blur(10px)' }}
+                    transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                        opacity: { duration: 0.2 }
+                    }}
                     className="w-full"
                 >
                     <BannerItem

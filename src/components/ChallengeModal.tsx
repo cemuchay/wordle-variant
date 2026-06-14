@@ -189,6 +189,7 @@ const AuthenticatedChallengeContent = memo(
       openChallengesCount,
       dailyMarathonChallenges,
       initialChallengeId,
+      activeGameLength,
     } = useChallengeContext();
 
     // Reset scroll position to top whenever active challenge changes
@@ -273,7 +274,7 @@ const AuthenticatedChallengeContent = memo(
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
-                  Challenges
+                  Challenges {activeGameLength ? `#${activeGameLength}L` : ""}
                 </h2>
                 {isBackgroundFetching && (
                   <Loader2 className="w-3.5 h-3.5 text-correct animate-spin" />

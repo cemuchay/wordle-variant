@@ -80,6 +80,7 @@ interface ChallengeContextType {
     unplayedCount: number;
     backAction: (() => void) | null;
     setBackAction: (fn: (() => void) | null) => void;
+    activeGameLength: number | null;
     effectiveUser: any;
     loadingParticipants: boolean;
     participantsError: string | null;
@@ -173,6 +174,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setPreviewMarathonGameIndex = useChallengeStore(s => s.setPreviewMarathonGameIndex);
     const backAction = useChallengeStore(s => s.backAction);
     const setBackAction = useChallengeStore(s => s.setBackAction);
+    const activeGameLength = useChallengeStore(s => s.activeGameLength);
 
     const [isEditingChallenge, setIsEditingChallenge] = useState(false);
 
@@ -966,6 +968,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         unplayedCount,
         backAction,
         setBackAction,
+        activeGameLength,
         registerAnonymousUser,
         effectiveUser,
         isEditingChallenge,
@@ -977,7 +980,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         dailyMarathonChallenges,
         initialChallengeId,
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenges, initialChallengeId]);
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, activeGameLength, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenges, initialChallengeId]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>

@@ -10,6 +10,7 @@ interface ChallengeState {
     previewMarathonLength: number | null;
     previewMarathonGameIndex: number | null;
     timeLeft: number | null;
+    activeGameLength: number | null;
     backAction: (() => void) | null;
 
     // Form State
@@ -37,6 +38,7 @@ interface ChallengeState {
     setPreviewMarathonLength: (l: number | null) => void;
     setPreviewMarathonGameIndex: (idx: number | null) => void;
     setTimeLeft: (t: number | null) => void;
+    setActiveGameLength: (l: number | null) => void;
     setBackAction: (fn: (() => void) | null) => void;
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
     setLength: (length: number) => void;
@@ -63,6 +65,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     previewMarathonLength: null,
     previewMarathonGameIndex: null,
     timeLeft: null,
+    activeGameLength: null,
     backAction: null,
     mode: 'ANYTIME',
     length: 5,
@@ -84,6 +87,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     setPreviewMarathonLength: (previewMarathonLength) => set({ previewMarathonLength }),
     setPreviewMarathonGameIndex: (previewMarathonGameIndex) => set({ previewMarathonGameIndex }),
     setTimeLeft: (timeLeft) => set({ timeLeft }),
+    setActiveGameLength: (activeGameLength) => set({ activeGameLength }),
     setBackAction: (fn) => set((state) => ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         backAction: typeof fn === 'function' ? (fn as any)(state.backAction) : fn
