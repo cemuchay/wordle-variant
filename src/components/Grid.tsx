@@ -167,7 +167,7 @@ interface GridProps {
   gameplayType?: 'regular' | 'challenge';
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, isSaving, compact, gameplayType }) => {
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType }) => {
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
@@ -331,7 +331,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
           {guesses.length < maxAttempts && revealingRowIndex === null && (
             <div ref={currentRowRef} className={`flex justify-center ${rowGapClass}`}>
               {Array.from({ length: wordLength }).map((_, i) => {
-                const isHinted = !isSaving && hintRecord?.index === i;
+                const isHinted = hintRecord?.index === i;
                 const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
                 return (
@@ -354,7 +354,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
           {Array.from({ length: empties }).map((_, i) => (
             <div key={`row-empty-${i}`} className={`flex justify-center ${rowGapClass}`}>
               {Array.from({ length: wordLength }).map((_, j) => {
-                const isHinted = !isSaving && hintRecord?.index === j;
+                const isHinted = hintRecord?.index === j;
                 return (
                   <Cell
                     key={`empty-${i}-${j}`}
