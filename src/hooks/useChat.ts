@@ -32,6 +32,7 @@ export interface ChatGroup {
    is_core: boolean;
    dm_partner?: { id: string; username: string; avatar_url: string };
    dm_key?: string | null;
+   members?: { user_id: string; username?: string; avatar_url?: string }[];
 }
 
 // --- Encryption Helpers for DMs (Client-Side E2EE) ---
@@ -323,6 +324,7 @@ export const useChat = (userId: string) => {
                // If type is DM, resolve the dm partner's profile
                let dmPartner = undefined;
                let groupName = cg.name;
+               let members = undefined;
 
                if (cg.type === "dm") {
                   const { data: partner } = await supabase
@@ -341,6 +343,20 @@ export const useChat = (userId: string) => {
                      };
                      groupName = p.username;
                   }
+               } else if (cg.type === "custom") {
+                  const { data: groupMembers } = await supabase
+                     .from("chat_group_members")
+                     .select("user_id, profiles(username, avatar_url)")
+                     .eq("group_id", cg.id)
+                     .eq("status", "joined");
+
+                  if (groupMembers) {
+                     members = groupMembers.map((gm: any) => ({
+                        user_id: gm.user_id,
+                        username: gm.profiles?.username,
+                        avatar_url: gm.profiles?.avatar_url,
+                     }));
+                  }
                }
 
                activeGroups.push({
@@ -351,6 +367,8 @@ export const useChat = (userId: string) => {
                   created_at: cg.created_at,
                   is_core: false,
                   dm_partner: dmPartner,
+                  dm_key: cg.dm_key,
+                  members: members,
                });
             }
          }

@@ -64,6 +64,7 @@ interface AppState {
    pendingReadReceipts: Record<string, string>;
    joinedGroupIds: string[];
    pendingDMUserId: string | null;
+   pendingChallengeUserId: string | null;
    previewImage: string | null;
 
    // Actions
@@ -96,6 +97,7 @@ interface AppState {
    removePendingReadReceipt: (groupId: string) => void;
    setJoinedGroupIds: (ids: string[]) => void;
    setPendingDMUserId: (id: string | null) => void;
+   setPendingChallengeUserId: (id: string | null) => void;
    setPreviewImage: (url: string | null) => void;
 }
 
@@ -129,6 +131,7 @@ export const useAppStore = create<AppState>((set) => ({
       }
    })(),
    pendingDMUserId: null,
+   pendingChallengeUserId: null,
    previewImage: null,
 
    // Actions
@@ -200,5 +203,6 @@ export const useAppStore = create<AppState>((set) => ({
    }),
    setJoinedGroupIds: (joinedGroupIds) => set({ joinedGroupIds }),
    setPendingDMUserId: (pendingDMUserId) => set({ pendingDMUserId }),
+   setPendingChallengeUserId: (pendingChallengeUserId) => set({ pendingChallengeUserId }),
    setPreviewImage: (previewImage) => set({ previewImage }),
 }));

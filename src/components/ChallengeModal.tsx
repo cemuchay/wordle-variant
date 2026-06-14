@@ -22,6 +22,7 @@ import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
+import { useAppStore } from "../store/useAppStore";
 import { useApp } from "../context/AppContext";
 
 // Sub-components
@@ -150,6 +151,7 @@ const AuthenticatedChallengeContent = memo(
     const [isHelpOpen, setIsHelpOpen] = useState(false);
 
     const { isDynamicIslandVisible } = useApp();
+    const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -185,7 +187,7 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
-      dailyMarathonChallenge,
+      dailyMarathonChallenges,
       initialChallengeId,
     } = useChallengeContext();
 
@@ -195,6 +197,14 @@ const AuthenticatedChallengeContent = memo(
         scrollContainerRef.current.scrollTop = 0;
       }
     }, [selectedChallenge?.id]);
+
+    // Handle pre-selected user from DM
+    useEffect(() => {
+      if (pendingChallengeUserId) {
+        setSelectedChallenge(null);
+        setIsCreatingChallenge(true);
+      }
+    }, [pendingChallengeUserId, setSelectedChallenge]);
 
     const activeCount = useMemo(() => {
       return myChallenges.filter((item: any) => {
@@ -222,13 +232,11 @@ const AuthenticatedChallengeContent = memo(
     }, [myChallenges]);
 
     const displayChallenges = useMemo(() => {
-      if (dailyMarathonChallenge) {
-        return filteredChallenges.filter(
-          (item: any) => (item.challenge_id || item.challenge?.id) !== (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)
-        );
-      }
-      return filteredChallenges;
-    }, [filteredChallenges, dailyMarathonChallenge]);
+      const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
+      return filteredChallenges.filter(
+        (item: any) => !marathonIds.includes(item.challenge_id || item.challenge?.id)
+      );
+    }, [filteredChallenges, dailyMarathonChallenges]);
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -382,11 +390,11 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenge && (["open", "played"]).includes(listColumn) && (
+                        {dailyMarathonChallenges.length > 0 && (["open", "played"]).includes(listColumn) && (
                           <MarathonBanner
-                            challenge={dailyMarathonChallenge}
-                            onClick={() => {
-                              handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
+                            challenges={dailyMarathonChallenges}
+                            onClick={(challenge) => {
+                              handleViewChallenge(initialChallengeId ? initialChallengeId : (challenge.challenge_id || challenge.challenge?.id))
                             }}
                           />
                         )}

@@ -83,9 +83,10 @@ export default function App() {
   const { data: myChallenges } = useMyChallenges(user?.id);
   const { data: discoverChallenges } = useDiscoverChallenges();
 
-  const activeDailyMarathon = useMemo(() => {
-    if (!discoverChallenges) return null;
-    return discoverChallenges.find((c: { is_bot_marathon: boolean; expires_at: string; id: string }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+  const activeDailyMarathons = useMemo(() => {
+    if (!discoverChallenges) return [];
+    const botMarathons = discoverChallenges.filter((c: any) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+    return botMarathons.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()).slice(0, 2);
   }, [discoverChallenges]);
 
   const isMonday = useMemo(() => {
@@ -490,7 +491,7 @@ export default function App() {
                   onChar={actions.onChar}
                   onDelete={actions.onDelete}
                   onEnter={actions.onEnter}
-                  activeDailyMarathon={activeDailyMarathon}
+                  activeDailyMarathons={activeDailyMarathons}
                   setSelectedChallengeId={setSelectedChallengeId}
                   setIsChallengeOpen={setIsChallengeOpen}
                   isAuthenticated={user ? true : false}

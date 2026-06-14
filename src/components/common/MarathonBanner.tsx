@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 
 interface MarathonBannerProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    challenge: any;
-    onClick: () => void;
+    challenges: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onClick: (challenge: any) => void;
     className?: string;
     showTimer?: boolean;
 }
@@ -76,10 +77,22 @@ const DAILY_CONFIG = [
     }
 ];
 
-export const MarathonBanner = ({ challenge, onClick, className, showTimer = true }: MarathonBannerProps) => {
+const URGENT_CONFIG = {
+    bg: 'from-red-600/30 via-rose-600/30 to-red-700/30',
+    border: 'border-red-500/40',
+    hoverBorder: 'hover:border-red-400/60',
+    accent: 'bg-red-600',
+    textAccent: 'text-red-400',
+    title: 'Ending Soon! 🔥',
+    description: 'Today\'s marathon is about to expire. Join the race before it\'s too late!'
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: any, onClick: (c: any) => void, showTimer: boolean, navigation?: React.ReactNode }) => {
     const [timeLeft, setTimeLeft] = useState<string>('');
+    const [isUrgent, setIsUrgent] = useState(false);
     const dayIndex = new Date().getDay();
-    const config = DAILY_CONFIG[dayIndex];
+    const config = isUrgent ? URGENT_CONFIG : DAILY_CONFIG[dayIndex];
 
     useEffect(() => {
         const expiresAtStr = challenge?.expires_at || challenge?.challenge?.expires_at;
@@ -92,8 +105,12 @@ export const MarathonBanner = ({ challenge, onClick, className, showTimer = true
 
             if (difference <= 0) {
                 setTimeLeft('Expired');
+                setIsUrgent(false);
                 return;
             }
+
+            const hoursLeft = difference / (1000 * 60 * 60);
+            setIsUrgent(hoursLeft < 18);
 
             const days = Math.floor(difference / (1000 * 60 * 60 * 24));
             const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -114,19 +131,15 @@ export const MarathonBanner = ({ challenge, onClick, className, showTimer = true
     }, [challenge]);
 
     return (
-        <motion.button
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onClick}
-            className={`w-full text-left bg-linear-to-r ${config.bg} border ${config.border} p-1.5 sm:p-2 px-2 sm:px-4 rounded-2xl ${config.hoverBorder} transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-xl backdrop-blur-md group cursor-pointer ${className}`}
+        <div
+            onClick={() => onClick(challenge)}
+            className={`w-full text-left bg-linear-to-r ${config.bg} border ${config.border} p-3 sm:p-4 rounded-2xl ${config.hoverBorder} transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-xl backdrop-blur-md group cursor-pointer`}
         >
             <div className={`absolute top-0 right-0 h-16 w-36 bg-white/5 blur-3xl -mr-12 -mt-12 pointer-events-none group-hover:bg-white/10 transition-colors duration-500`} />
 
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-2">
-                    <span className={`flex items-center gap-1.5 px-0.5 sm:px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${config.accent} text-white border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${config.accent} text-white border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
                         <Sparkles size={12} className="animate-pulse" />
                         Daily Marathon
                     </span>
@@ -140,9 +153,11 @@ export const MarathonBanner = ({ challenge, onClick, className, showTimer = true
                         </span>
                     )}
                 </div>
-                <span className="text-[10px] font-black text-white/30 uppercase tracking-wider font-mono">
-                    Host: Variant Bot
-                </span>
+                {navigation ? navigation : (
+                    <span className=" text-[8px] sm:text-[10px] font-black text-white/30 uppercase tracking-wider font-mono">
+                        Host: Variant Bot
+                    </span>
+                )}
             </div>
 
             <div className="relative z-10 flex flex-col">
@@ -158,8 +173,72 @@ export const MarathonBanner = ({ challenge, onClick, className, showTimer = true
                     </span>
                 </div>
             </div>
+        </div>
+    );
+};
 
+export const MarathonBanner = ({ challenges, onClick, className, showTimer = true }: MarathonBannerProps) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-        </motion.button>
+    const sortedChallenges = useMemo(() => {
+        return [...challenges].sort((a, b) => {
+            const dateA = new Date(a.expires_at || a.challenge?.expires_at).getTime();
+            const dateB = new Date(b.expires_at || b.challenge?.expires_at).getTime();
+            return dateA - dateB;
+        });
+    }, [challenges]);
+
+    if (sortedChallenges.length === 0) return null;
+
+    const navigationUI = sortedChallenges.length > 1 ? (
+        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+            <div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
+                <span className="text-[9px] font-black text-white/90">
+                    {currentIndex + 1}/{sortedChallenges.length}
+                </span>
+            </div>
+            <div className="flex gap-1">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentIndex(prev => (prev - 1 + sortedChallenges.length) % sortedChallenges.length);
+                    }}
+                    className="w-5 h-5 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                    &larr;
+                </button>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentIndex(prev => (prev + 1) % sortedChallenges.length);
+                    }}
+                    className="w-5 h-5 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                    &rarr;
+                </button>
+            </div>
+        </div>
+    ) : undefined;
+
+    return (
+        <div className={`relative w-full overflow-hidden ${className}`}>
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={sortedChallenges[currentIndex].id || sortedChallenges[currentIndex].challenge?.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full"
+                >
+                    <BannerItem
+                        challenge={sortedChallenges[currentIndex]}
+                        onClick={onClick}
+                        showTimer={showTimer}
+                        navigation={navigationUI}
+                    />
+                </motion.div>
+            </AnimatePresence>
+        </div>
     );
 };
