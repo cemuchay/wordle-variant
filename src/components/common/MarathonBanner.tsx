@@ -179,6 +179,7 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
 
 export const MarathonBanner = ({ challenges, onClick, className, showTimer = true }: MarathonBannerProps) => {
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [direction, setDirection] = useState(0);
 
     const sortedChallenges = useMemo(() => {
         return [...challenges].sort((a, b) => {
@@ -187,6 +188,11 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
             return dateA - dateB;
         });
     }, [challenges]);
+
+    const paginate = (newDirection: number) => {
+        setDirection(newDirection);
+        setCurrentIndex((prev) => (prev + newDirection + sortedChallenges.length) % sortedChallenges.length);
+    };
 
     if (sortedChallenges.length === 0) return null;
 
@@ -201,7 +207,7 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        setCurrentIndex(prev => (prev - 1 + sortedChallenges.length) % sortedChallenges.length);
+                        paginate(-1);
                     }}
                     className="w-5 h-5 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
                 >
@@ -210,7 +216,7 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        setCurrentIndex(prev => (prev + 1) % sortedChallenges.length);
+                        paginate(1);
                     }}
                     className="w-5 h-5 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
                 >
@@ -220,16 +226,51 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
         </div>
     ) : undefined;
 
+    const variants = {
+        enter: (direction: number) => ({
+            opacity: 0,
+            x: direction > 0 ? 100 : -100,
+            filter: 'blur(10px)'
+        }),
+        center: {
+            opacity: 1,
+            x: 0,
+            filter: 'blur(0px)'
+        },
+        exit: (direction: number) => ({
+            opacity: 0,
+            x: direction > 0 ? -100 : 100,
+            filter: 'blur(10px)'
+        })
+    };
+
     return (
         <div className={`relative w-full overflow-hidden ${className}`}>
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="popLayout" initial={false} custom={direction}>
                 <motion.div
                     key={sortedChallenges[currentIndex].id || sortedChallenges[currentIndex].challenge?.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="w-full"
+                    custom={direction}
+                    variants={variants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                        opacity: { duration: 0.2 }
+                    }}
+                    drag={sortedChallenges.length > 1 ? "x" : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.7}
+                    onDragEnd={(_, info) => {
+                        if (info.offset.x < -50) {
+                            paginate(1);
+                        } else if (info.offset.x > 50) {
+                            paginate(-1);
+                        }
+                    }}
+                    className="w-full touch-pan-y"
                 >
                     <BannerItem
                         challenge={sortedChallenges[currentIndex]}

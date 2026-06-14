@@ -117,9 +117,11 @@ const ParticipantItem = memo(function ParticipantItem({
           <p
             className={`text-[9px] font-black uppercase ${pIsFinished ? "text-white/60" : "text-yellow-500"}`}
           >
-            {isMarathon && p.status === "playing"
+            {isMarathon
               ? `${marathonCompletedCount}/${totalMarathonGames} Games`
-              : p.status}
+              : p.status === "timed_out"
+                ? "Time Expired"
+                : p.status}
           </p>
         </div>
       </div>
@@ -294,6 +296,17 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       selectedChallenge.salt,
     );
   }, [isMarathon, selectedChallenge.target_word, selectedChallenge.salt]);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const marathonCompletedCount = useMemo(() => {
+    if (!isMarathon || !myParticipation?.marathon_progress) return 0;
+    let count = 0;
+    for (let i = 0; i < myParticipation.marathon_progress.length; i++) {
+      const s = myParticipation.marathon_progress[i].status;
+      if (s === "completed" || s === "timed_out") count++;
+    }
+    return count;
+  }, [isMarathon, myParticipation?.marathon_progress]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const deobfuscatedTargetWord = useMemo(() => {
@@ -569,7 +582,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </button>
               ) : (
                 <div className="w-full bg-white/5 border border-white/10 text-correct py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
-                  Challenge Completed 🎉
+                  {isMarathon
+                    ? `${marathonCompletedCount}/${marathonGamesList.length} Games Completed ${marathonCompletedCount === marathonGamesList.length ? '🎉' : '⌛'}`
+                    : (myParticipation?.status === 'timed_out' ? 'Time Expired ⌛' : 'Challenge Completed 🎉')}
                 </div>
               )}
             </div>

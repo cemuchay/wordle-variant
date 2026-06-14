@@ -34,6 +34,8 @@ import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 import { safeLocalStorage } from "../../utils/storage";
 
+import { useChallengeStore } from "../../store/useChallengeStore";
+
 export const useChallengeGameEngine = ({
    challenge,
    participation,
@@ -44,6 +46,7 @@ export const useChallengeGameEngine = ({
    onLengthComplete,
 }: UseChallengeGameEngineProps) => {
    const { ask } = useConfirmation();
+   const setActiveGameLength = useChallengeStore(s => s.setActiveGameLength);
    const isMarathon = challenge.word_length === 1;
 
    const marathonGames = useMemo(() => {
@@ -583,7 +586,13 @@ export const useChallengeGameEngine = ({
       handleTimeExpired,
    ]);
 
-   // Sync guesses if they update in props while engine is mounted
+   // Sync current word length with store for header
+   useEffect(() => {
+      setActiveGameLength(wordLength);
+      return () => setActiveGameLength(null);
+   }, [wordLength, setActiveGameLength]);
+
+   // Sync currentKey with initializedRef for re-hydration logic
    useEffect(() => {
       if (
          isSaving ||
