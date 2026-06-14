@@ -15,6 +15,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { formatTime } from "./lib";
+import { parseMarathonGames } from "../../utils/marathon";
 
 export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
   return (
@@ -203,6 +204,21 @@ export const ChallengeItem = memo(function ChallengeItem({
 
   const isMarathon = word_length === 1;
 
+  const marathonCompletedCount = useMemo(() => {
+    if (!isMarathon || !item.marathon_progress) return 0;
+    let count = 0;
+    for (let i = 0; i < item.marathon_progress.length; i++) {
+      const s = item.marathon_progress[i].status;
+      if (s === "completed" || s === "timed_out") count++;
+    }
+    return count;
+  }, [isMarathon, item.marathon_progress]);
+
+  const totalMarathonGames = useMemo(() => {
+    if (!isMarathon) return 0;
+    return parseMarathonGames(challenge.target_word, challenge.salt).length;
+  }, [isMarathon, challenge.target_word, challenge.salt]);
+
   return (
     <button
       onClick={handleSelect}
@@ -359,7 +375,9 @@ export const ChallengeItem = memo(function ChallengeItem({
                   : "text-white/80"
                 }`}
             >
-              {status === "host" ? "Host (Spectating)" : status}
+              {status === "host" ? "Host (Spectating)" : 
+               isMarathon ? `${marathonCompletedCount}/${totalMarathonGames} Games` : 
+               (status === "timed_out" ? "Time Expired" : status)}
             </span>
             {status !== "host" && hasStarted && (
               <span className="text-[9px] sm:text-lg font-black text-white font-mono">
