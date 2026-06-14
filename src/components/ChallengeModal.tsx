@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   Plus,
   HelpCircle,
-  Sparkles,
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,6 +34,7 @@ import {
   ChallengeItem,
 } from "./challenge/ChallengeUIElements";
 import { WORD_LENGTHS } from "../constants/game";
+import { MarathonBanner } from "./common/MarathonBanner";
 
 interface ChallengeModalProps {
   isOpen: boolean;
@@ -383,42 +383,12 @@ const AuthenticatedChallengeContent = memo(
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
                         {dailyMarathonChallenge && (
-                          <motion.button
+                          <MarathonBanner
+                            challenge={dailyMarathonChallenge}
                             onClick={() => {
                               handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
                             }}
-                            className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-2 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
-                            style={{
-                              animationDuration: '2s'
-                            }}
-                          >
-                            <div className="absolute top-0 right-0 h-16 sm:w-36 sm:h-20 bg-yellow-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
-                            <div className="flex items-center justify-between w-full">
-                              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-yellow-500/25 text-yellow-400 border border-yellow-500/40">
-                                <Sparkles size={11} className="animate-spin" style={{ animationDuration: '4s' }} />
-                                Daily Event Challenge
-                              </span>
-                              <span className="ms-2 sm:ms-0 text-[8px] font-black text-indigo-300 uppercase tracking-wider font-mono">
-                                Hosted by @Variant Bot
-                              </span>
-                            </div>
-
-                            <div>
-                              <h3 className="text-base font-black text-white uppercase tracking-tight">
-                                Today's Daily Marathon Challenge 🏃‍♂️💨
-                              </h3>
-
-                            </div>
-
-                            <div className="flex items-center justify-between w-full border-t border-white/10 pt-0.5 sm:pt-1.5 mt-1">
-                              <span className="text-[8px] font-bold text-white/70 uppercase">
-                                Click to join and start playing
-                              </span>
-                              <span className="text-[8px] font-black uppercase tracking-wider text-correct flex items-center gap-1">
-                                Play Now &rarr;
-                              </span>
-                            </div>
-                          </motion.button>
+                          />
                         )}
 
                         <div className="flex items-center gap-2">

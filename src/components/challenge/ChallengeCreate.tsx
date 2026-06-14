@@ -642,7 +642,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (editingChallenge) {
             await handleEdit(editingChallenge.id, customParams);
         } else {
-            await handleCreate(customParams, !onSuccess);
+            await handleCreate(customParams, true);
         }
         
         if (onSuccess) {
