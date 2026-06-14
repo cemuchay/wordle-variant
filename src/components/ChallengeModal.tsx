@@ -16,7 +16,7 @@ import {
   ChallengeProvider,
   useChallengeContext,
 } from "../context/ChallengeContext";
-import GuessPreviewModal from "./GuessPreviewModal";
+import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
 import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";

@@ -5,7 +5,7 @@ import { MAX_ATTEMPTS } from '../constants/game';
 import { Z_INDEX } from '../constants/ui';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
-import GuessPreviewModal from './GuessPreviewModal';
+import GuessPreviewModal from './guess-preview';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
