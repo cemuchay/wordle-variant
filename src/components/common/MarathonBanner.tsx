@@ -145,23 +145,21 @@ export const MarathonBanner = ({ challenge, onClick, className, showTimer = true
                 </span>
             </div>
 
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col">
                 <h3 className="text-base font-black text-white uppercase tracking-tight group-hover:translate-x-1 transition-transform duration-300 flex items-center gap-2">
                     {config.title}
                 </h3>
-                <p className="text-[11px] text-white/50 mt-0.5 font-medium leading-relaxed max-w-[90%]">
-                    {config.description}
-                </p>
+                <div className="flex items-end justify-between gap-4">
+                    <p className="text-[11px] text-white/50 mt-0.5 font-medium leading-relaxed">
+                        {config.description}
+                    </p>
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${config.textAccent} flex items-center gap-1 group-hover:gap-2 transition-all shrink-0 mb-0.5`}>
+                        Play Now &rarr;
+                    </span>
+                </div>
             </div>
 
-            <div className="flex items-center justify-between w-full border-t border-white/10 pt-1 mt-1 relative z-10">
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-wide">
-                    Join the global event
-                </span>
-                <span className={`text-[10px] font-black uppercase tracking-wider ${config.textAccent} flex items-center gap-1 group-hover:gap-2 transition-all`}>
-                    Play Now &rarr;
-                </span>
-            </div>
+
         </motion.button>
     );
 };
