@@ -25,6 +25,7 @@ import { generateRoast } from "../utils/roastEngine";
 import { gameReducer, initialState } from "../reducers/gameReducer";
 import { useWordleStats } from "./useStats";
 import { useConfirmation } from "../context/ConfirmationContext";
+import returnAnimationTime from "../utils/returnAnimationTime";
 
 import { logger } from "../lib/logger";
 import { TOAST_DURATION } from "../constants/ui";
@@ -104,7 +105,7 @@ export const useGameEngine = (date: string) => {
                }),
             );
 
-                        // Broadcast score update to other active players on every sync
+            // Broadcast score update to other active players on every sync
             const syncChannel = supabase.channel(
                "global_scores_leaderboard_sync",
             );
@@ -254,9 +255,6 @@ export const useGameEngine = (date: string) => {
                // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY:
                // Only perform mismatch check once auth state is stable.
                if (payload.config && payload.config.word !== config.word) {
-                  console.log(
-                     "[Engine] Target word mismatch (Auth status changed), wiping today's progress.",
-                  );
                   safeLocalStorage.removeItem(`wordle-${date}`);
 
                   // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
@@ -298,9 +296,6 @@ export const useGameEngine = (date: string) => {
                         if (
                            cloudPayload.guesses.length > payload.guesses.length
                         ) {
-                           console.log(
-                              "[Engine] Cloud is ahead. Overwriting local state with cloud data.",
-                           );
                            dispatch({
                               type: "LOAD_STATE",
                               payload: cloudPayload,
@@ -323,9 +318,6 @@ export const useGameEngine = (date: string) => {
                         } else if (
                            payload.guesses.length > cloudPayload.guesses.length
                         ) {
-                           console.log(
-                              "[Engine] Local is ahead. Syncing local state to cloud.",
-                           );
                            dispatch({ type: "LOAD_STATE", payload });
                            performSync(payload);
                         } else {
@@ -334,9 +326,6 @@ export const useGameEngine = (date: string) => {
                         }
                      } else {
                         // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
-                        console.log(
-                           "[Engine] Guess conflict/tampering detected. Overwriting local state with cloud data.",
-                        );
                         dispatch({ type: "LOAD_STATE", payload: cloudPayload });
                         const localSalt = getLocalSalt(date, user.id);
                         const savedPayload = {
@@ -362,9 +351,6 @@ export const useGameEngine = (date: string) => {
                         payload.guesses &&
                         payload.guesses.length > 0
                      ) {
-                        console.log(
-                           "[Engine] Local state exists but no cloud score found. Syncing local state to cloud.",
-                        );
                         performSync(payload);
                      }
                   }
@@ -551,6 +537,9 @@ export const useGameEngine = (date: string) => {
       // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
       await new Promise((r) => setTimeout(r, 300));
 
+      // Calculate delay: use returnAnimationTime + extra buffer for safety
+      const revealDelay = returnAnimationTime(config.length) + 600;
+
       // 2. Update UI (flips row)
       dispatch({
          type: "SUBMIT_GUESS",
@@ -573,11 +562,8 @@ export const useGameEngine = (date: string) => {
             );
          }
 
-         // Calculate delay: wordLength * 400ms + buffer to ensure all tiles flip
-         // Same formula used in Grid.tsx (wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer)
-         const revealDelay = config.length * 400 + 1000;
-
          setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
             dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
 
             if (won) {
@@ -586,6 +572,11 @@ export const useGameEngine = (date: string) => {
                   TOAST_DURATION.LONG + 1000,
                );
             }
+         }, revealDelay);
+      } else {
+         // Even if not game over, we should stop revealing state after animation
+         setTimeout(() => {
+            dispatch({ type: "STOP_REVEALING" });
          }, revealDelay);
       }
    }, [

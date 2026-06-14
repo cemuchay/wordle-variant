@@ -1,16 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Lightbulb, RefreshCw, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { ANIMATION_DURATION } from '../../constants/ui';
+import { useApp } from '../../context/AppContext';
+import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
+import { getHandicapStarter } from '../../utils/marathon';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
-import { useChallengeContext } from '../../context/ChallengeContext';
 import { NetworkLog } from './ChallengeUIElements';
-import { getHandicapStarter } from '../../utils/marathon';
-import { useApp } from '../../context/AppContext';
-import { useAuth } from '../../hooks/useAuth';
-import { ANIMATION_DURATION } from '../../constants/ui';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -26,23 +25,9 @@ export const RegularGameplay = memo(function RegularGameplay({
     challenge, participation, triggerToast, submitChallengeResult, onFinish, gameIndex, onBack
 }: RegularGameplayProps) {
     const { setBackAction } = useChallengeContext();
-    const { user } = useAuth();
-    const { onlineUsers, activeCall, activeVoiceRooms } = useApp();
-    const [hasMascot, setHasMascot] = useState(false);
+    const { isDynamicIslandVisible } = useApp();
 
-    useEffect(() => {
-        const handleMascot = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            setHasMascot(!!detail);
-        };
-        window.addEventListener('mascot-changed', handleMascot);
-        return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
-
-    const { state, actions, isSaving, syncFailed, retryCount, wordLength, networkLogs } = useChallengeGameEngine({
+    const { state, actions, isSaving, syncFailed, retryCount, wordLength, maxAttempts, networkLogs } = useChallengeGameEngine({
         challenge,
         participation,
         triggerToast,
@@ -53,6 +38,17 @@ export const RegularGameplay = memo(function RegularGameplay({
     });
 
     const { guesses, currentGuess, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
+
+    // Stabilize UI state to wait for reveal animations
+    const [stableGuessesCount, setStableGuessesCount] = useState(guesses.length);
+    const [stableIsHintDisabled, setStableIsHintDisabled] = useState(state.isHintDisabled);
+
+    useEffect(() => {
+        if (!state.isRevealing) {
+            setStableGuessesCount(guesses.length);
+            setStableIsHintDisabled(state.isHintDisabled);
+        }
+    }, [guesses.length, state.isRevealing, state.isHintDisabled]);
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
@@ -87,7 +83,7 @@ export const RegularGameplay = memo(function RegularGameplay({
     }, [isGameOver, wordLength]);
 
     // Physical Keyboard Support
-    useKeyboard(actions, isGameOver || isSaving);
+    useKeyboard(actions, isGameOver);
 
     useEffect(() => {
         // Ensure window has focus to capture keyboard events when game starts
@@ -106,7 +102,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         ? getHandicapStarter(challenge, gameIndex, wordLength)
         : challenge.handicap_starter;
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
-    const showHint = guesses.length >= 2 && !isGameOver && !challenge.disable_hints;
+    const showHint = stableGuessesCount >= 2 && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 
     const lastGuess = guesses[guesses.length - 1];
 
@@ -131,11 +127,11 @@ export const RegularGameplay = memo(function RegularGameplay({
 
             {/* Sync Status Overlay */}
             <div className={`absolute left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 ${isDynamicIslandVisible ? 'top-12' : 'top-2'}`}>
-                {isSaving && (
+                {isSaving && (retryCount > 0 || syncFailed) && (
                     <div className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 animate-in fade-in zoom-in duration-300">
-                        <RefreshCw size={10} className={`animate-spin ${retryCount > 0 ? 'text-red-500' : 'text-correct'}`} />
+                        <RefreshCw size={10} className="animate-spin text-red-500" />
                         <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
-                            {retryCount > 0 ? `Retrying ${retryCount}/3...` : 'Syncing...'}
+                            {syncFailed ? 'Retrying sync...' : `Retrying ${retryCount}/3...`}
                         </span>
                     </div>
                 )}
@@ -159,12 +155,12 @@ export const RegularGameplay = memo(function RegularGameplay({
                         {showHint && (
                             <button
                                 onClick={actions.handleHint}
-                                disabled={usedHint || guesses.length >= 5 || state.isHintDisabled}
-                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((guesses.length >= 5 || state.isHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                                title={usedHint ? "Hint Used" : (guesses.length >= 5 || state.isHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                                disabled={usedHint || stableGuessesCount >= 5 || stableIsHintDisabled}
+                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((stableGuessesCount >= 5 || stableIsHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : (stableGuessesCount >= 5 || stableIsHintDisabled) ? "Hint Unavailable" : "Get Hint"}
                             >
                                 <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                                {(guesses.length >= 5 || state.isHintDisabled) && !usedHint && (
+                                {(stableGuessesCount >= 5 || stableIsHintDisabled) && !usedHint && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
                                     </div>
@@ -195,7 +191,7 @@ export const RegularGameplay = memo(function RegularGameplay({
             <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
                 <Grid
                     wordLength={wordLength}
-                    maxAttempts={6}
+                    maxAttempts={maxAttempts}
                     guesses={guesses}
                     currentGuess={currentGuess}
                     hintRecord={hintRecord}

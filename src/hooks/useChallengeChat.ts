@@ -388,12 +388,52 @@ export const useChallengeChat = (
       [messages],
    );
 
+   const reactToMessage = useCallback(
+      async (messageId: string, emoji: string | null) => {
+         const userId = effectiveUser?.id;
+         if (!userId) return;
+
+         const msg = messages.find((m) => m.id === messageId);
+         if (!msg) return;
+
+         // Optimistic Update
+         const currentReactions = { ...(msg.reactions || {}) };
+         if (emoji) {
+            currentReactions[userId] = emoji;
+         } else {
+            delete currentReactions[userId];
+         }
+
+         setMessages((prev) =>
+            prev.map((m) =>
+               m.id === messageId ? { ...m, reactions: currentReactions } : m,
+            ),
+         );
+
+         try {
+            const { error } = await supabase.rpc(
+               "toggle_challenge_message_reaction",
+               {
+                  p_message_id: messageId,
+                  p_user_id: userId,
+                  p_emoji: emoji,
+               },
+            );
+            if (error) throw error;
+         } catch (err) {
+            console.error("Failed to react to challenge message:", err);
+         }
+      },
+      [messages, effectiveUser],
+   );
+
    return {
       messages,
       sendMessage,
       sendVoiceMessage,
       editMessage,
       deleteMessage,
+      reactToMessage,
       loading,
       typingUsers,
       setTyping,

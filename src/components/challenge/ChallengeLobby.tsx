@@ -183,7 +183,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     return effectiveUser.id === localStorage.getItem('wordle_anon_id');
   }, [effectiveUser]);
 
-  const { messages, sendMessage, editMessage, deleteMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(
+  const { messages, sendMessage, editMessage, deleteMessage, reactToMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(
     selectedChallenge?.id,
     effectiveUser,
     isGuest
@@ -340,6 +340,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <span className="sm:hidden">🤖 Daily</span>
               </span>
             )}
+            {selectedChallenge.is_shapeshifter && (
+              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-purple-500/20 text-purple-400 border border-purple-500/30 animate-pulse">
+                <span className="hidden sm:inline">Shape Shifter</span>
+                <span className="sm:hidden">🌀 Shift</span>
+              </span>
+            )}
           </div>
           <div className="flex gap-4">
             <button
@@ -424,6 +430,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
           effectiveUser={effectiveUser}
           loading={chatLoading}
           participants={participants}
+          reactToMessage={reactToMessage}
         />
       ) : (
         <>
@@ -574,14 +581,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </h4>
               </div>
               <div className="space-y-2">
-                {loadingParticipants && participants.length === 0 ? (
-                  <div className="py-8 flex flex-col items-center justify-center space-y-3 bg-white/5 rounded-2xl border border-white/10">
-                    <div className="w-8 h-8 border-4 border-t-correct border-white/10 rounded-full animate-spin" />
-                    <p className="text-xs font-black uppercase tracking-wider text-white">
-                      Fetching participants...
-                    </p>
-                  </div>
-                ) : participantsError ? (
+                {participantsError ? (
                   <div className="p-5 bg-red-950/20 border border-red-500/30 rounded-2xl text-center space-y-3">
                     <p className="text-xs font-black uppercase text-red-500">
                       Failed to load participants
@@ -598,7 +598,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   </div>
                 ) : participants.length === 0 ? (
                   <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
-                    No participants found
+                    {loadingParticipants ? "Syncing participants..." : "No participants found"}
                   </div>
                 ) : (
                   participants.map((p) => (
@@ -680,9 +680,11 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                   </span>
                 </div>
                 <p className="text-[9px] text-white">
-                  {selectedChallenge.is_custom_word
-                    ? "Host Custom Word"
-                    : "System Generated"}
+                  {selectedChallenge.is_shapeshifter
+                    ? "Shape Shifter"
+                    : selectedChallenge.is_custom_word
+                      ? "Host Custom Word"
+                      : "System Generated"}
                 </p>
               </div>
 

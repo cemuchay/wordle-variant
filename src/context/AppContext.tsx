@@ -47,6 +47,7 @@ interface AppContextType {
     audioChat: AudioChatState;
     activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
     realtimeStatus: 'connected' | 'disconnected';
+    isDynamicIslandVisible: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -67,7 +68,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const channel = supabase
             .channel('connection_health_monitor')
             .subscribe((status) => {
-                console.log('[Realtime Health] Channel status:', status);
                 if (status === 'SUBSCRIBED') {
                     setRealtimeStatus('connected');
                 } else {
@@ -399,6 +399,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             supabase.removeChannel(channel);
             signalingChannelRef.current = null;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, triggerToast, setActiveCall]);
 
     // Subscriptions for group call alerts
@@ -492,7 +493,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 async (payload) => {
 
                     // 1. Extract the group ID
-                    //@ts-ignore
+                    //@ts-expect-error `supabase new does not have group_id defined`
                     const groupId = payload.new?.group_id || payload.old?.group_id;
 
                     // 2. Check if the user is a member of the group
@@ -504,7 +505,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                     if (payload.eventType === 'INSERT') {
                         const newMessage = payload.new as any;
-                        let profile = null;
+                        let profile;
 
                         const allMsgs = useAppStore.getState().globalMessages;
                         const existingMsg = allMsgs.find(m => m.user_id === newMessage.user_id && m.profiles);
@@ -604,7 +605,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         acceptCall,
         rejectCall,
         hangUpCall,
-        realtimeStatus
+        realtimeStatus,
+        isDynamicIslandVisible: true
     }), [
         profile, preferences, isProfileLoading, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
@@ -613,10 +615,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setActiveCall, isChallengeOpen, setIsChallengeOpen,
         isNotificationsOpen, setIsNotificationsOpen,
         isChatOpen,
-                isChatConversationOpen,
-                setIsChatOpen,
-                onlineUsers,
-                allProfiles,
+        isChatConversationOpen,
+        setIsChatOpen,
+        onlineUsers,
+        allProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
         acceptCall, rejectCall, hangUpCall, realtimeStatus
     ]);

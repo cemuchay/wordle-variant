@@ -8,7 +8,6 @@ import {
   SlidersHorizontal,
   Plus,
   HelpCircle,
-  Sparkles,
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,12 +16,13 @@ import {
   ChallengeProvider,
   useChallengeContext,
 } from "../context/ChallengeContext";
-import GuessPreviewModal from "./GuessPreviewModal";
+import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
 import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
+import { useAppStore } from "../store/useAppStore";
 import { useApp } from "../context/AppContext";
 
 // Sub-components
@@ -35,6 +35,7 @@ import {
   ChallengeItem,
 } from "./challenge/ChallengeUIElements";
 import { WORD_LENGTHS } from "../constants/game";
+import { MarathonBanner } from "./common/MarathonBanner";
 
 interface ChallengeModalProps {
   isOpen: boolean;
@@ -148,20 +149,9 @@ const AuthenticatedChallengeContent = memo(
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
-    const [hasMascot, setHasMascot] = useState(false);
 
-    useEffect(() => {
-      const handleMascot = (e: Event) => {
-        const detail = (e as CustomEvent)?.detail;
-        setHasMascot(!!detail);
-      };
-      window.addEventListener('mascot-changed', handleMascot);
-      return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const { activeCall, onlineUsers, activeVoiceRooms } = useApp();
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
+    const { isDynamicIslandVisible } = useApp();
+    const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -197,7 +187,7 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
-      dailyMarathonChallenge,
+      dailyMarathonChallenges,
       initialChallengeId,
     } = useChallengeContext();
 
@@ -207,6 +197,14 @@ const AuthenticatedChallengeContent = memo(
         scrollContainerRef.current.scrollTop = 0;
       }
     }, [selectedChallenge?.id]);
+
+    // Handle pre-selected user from DM
+    useEffect(() => {
+      if (pendingChallengeUserId) {
+        setSelectedChallenge(null);
+        setIsCreatingChallenge(true);
+      }
+    }, [pendingChallengeUserId, setSelectedChallenge]);
 
     const activeCount = useMemo(() => {
       return myChallenges.filter((item: any) => {
@@ -234,13 +232,11 @@ const AuthenticatedChallengeContent = memo(
     }, [myChallenges]);
 
     const displayChallenges = useMemo(() => {
-      if (dailyMarathonChallenge) {
-        return filteredChallenges.filter(
-          (item: any) => (item.challenge_id || item.challenge?.id) !== (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)
-        );
-      }
-      return filteredChallenges;
-    }, [filteredChallenges, dailyMarathonChallenge]);
+      const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
+      return filteredChallenges.filter(
+        (item: any) => !marathonIds.includes(item.challenge_id || item.challenge?.id)
+      );
+    }, [filteredChallenges, dailyMarathonChallenges]);
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -259,7 +255,7 @@ const AuthenticatedChallengeContent = memo(
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-2 sm:p-2"}`}
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-2 sm:p-2 mt-7 sm:mt-9"}`}
         >
           <div className="flex items-center gap-2 sm:gap-3">
             {!isPlaying && selectedChallenge && (
@@ -394,43 +390,13 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenge && (
-                          <motion.button
-                            onClick={() => {
-                              handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
+                        {dailyMarathonChallenges.length > 0 && (["open", "played"]).includes(listColumn) && (
+                          <MarathonBanner
+                            challenges={dailyMarathonChallenges}
+                            onClick={(challenge) => {
+                              handleViewChallenge(initialChallengeId ? initialChallengeId : (challenge.challenge_id || challenge.challenge?.id))
                             }}
-                            className="w-full text-left bg-linear-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/50 p-2 rounded-3xl hover:bg-linear-to-r hover:from-indigo-600/40 hover:to-purple-600/40 transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-[0_0_20px_rgba(99,102,241,0.25)] animate-pulse"
-                            style={{
-                              animationDuration: '2s'
-                            }}
-                          >
-                            <div className="absolute top-0 right-0 h-16 sm:w-36 sm:h-20 bg-yellow-500/10 blur-3xl -mr-12 -mt-12 pointer-events-none" />
-                            <div className="flex items-center justify-between w-full">
-                              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-yellow-500/25 text-yellow-400 border border-yellow-500/40">
-                                <Sparkles size={11} className="animate-spin" style={{ animationDuration: '4s' }} />
-                                Daily Event Challenge
-                              </span>
-                              <span className="ms-2 sm:ms-0 text-[8px] font-black text-indigo-300 uppercase tracking-wider font-mono">
-                                Hosted by @Variant Bot
-                              </span>
-                            </div>
-
-                            <div>
-                              <h3 className="text-base font-black text-white uppercase tracking-tight">
-                                Today's Daily Marathon Challenge 🏃‍♂️💨
-                              </h3>
-
-                            </div>
-
-                            <div className="flex items-center justify-between w-full border-t border-white/10 pt-0.5 sm:pt-1.5 mt-1">
-                              <span className="text-[8px] font-bold text-white/70 uppercase">
-                                Click to join and start playing
-                              </span>
-                              <span className="text-[8px] font-black uppercase tracking-wider text-correct flex items-center gap-1">
-                                Play Now &rarr;
-                              </span>
-                            </div>
-                          </motion.button>
+                          />
                         )}
 
                         <div className="flex items-center gap-2">
@@ -720,6 +686,35 @@ const AuthenticatedChallengeContent = memo(
                   </ul>
                 </section>
 
+                <section className="space-y-2">
+                  <h4 className="text-sm font-black uppercase text-white tracking-wide">
+                    🌀 Shape Shifter Mode
+                  </h4>
+                  <p className="text-xs leading-relaxed text-white">
+                    An adversarial mode where the secret target word changes dynamically in the background with each guess.
+                  </p>
+                  <ul className="list-disc pl-4 space-y-2 text-xs text-white">
+                    <li>
+                      <strong className="text-purple-400">
+                        Adversarial Shifting:
+                      </strong>{" "}
+                      The target word shifts, but all your previously guessed correct (green), misplaced (yellow), and absent (gray) letter feedback is strictly respected.
+                    </li>
+                    <li>
+                      <strong className="text-purple-400">
+                        10 Attempts:
+                      </strong>{" "}
+                      Because the algorithm shifts the word to avoid matching, the game limit is extended to <strong className="text-white">10 tries</strong> to help you "box it in".
+                    </li>
+                    <li>
+                      <strong className="text-purple-400">
+                        Word Timeline:
+                      </strong>{" "}
+                      Complete transparency. Once the game ends, you can inspect the full sequence of words the algorithm shifted through.
+                    </li>
+                  </ul>
+                </section>
+
                 <section className="space-y-3">
                   <h4 className="text-sm font-black uppercase text-white tracking-wide">
                     🛠️ Advanced Rules
@@ -778,6 +773,7 @@ const AuthenticatedChallengeContent = memo(
               hints_used: previewParticipant.hints_used,
               hint_record: previewParticipant.hint_record,
               time_taken: previewParticipant.time_taken,
+              target_words: previewParticipant.target_words || undefined,
             }}
             targetWord={selectedChallenge?.target_word}
             salt={selectedChallenge?.salt}
@@ -786,6 +782,7 @@ const AuthenticatedChallengeContent = memo(
               selectedChallenge?.creator_id === user?.id &&
               !!selectedChallenge?.is_custom_word
             }
+            isShapeshifter={selectedChallenge?.is_shapeshifter}
           />
         )}
       </div>
@@ -888,7 +885,7 @@ export const ChallengeModal = ({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
           className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
-            ? "h-[100svh] max-h-[100svh] rounded-none border-none"
+            ? "h-svh max-h-svh rounded-none border-none"
             : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
             }`}
         >

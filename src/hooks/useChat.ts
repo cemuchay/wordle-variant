@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { useAppStore } from "../store/useAppStore";
+import { logger } from "../lib/logger";
 
 export interface Message {
    id: string;
@@ -31,6 +32,7 @@ export interface ChatGroup {
    is_core: boolean;
    dm_partner?: { id: string; username: string; avatar_url: string };
    dm_key?: string | null;
+   members?: { user_id: string; username?: string; avatar_url?: string }[];
 }
 
 // --- Encryption Helpers for DMs (Client-Side E2EE) ---
@@ -322,6 +324,7 @@ export const useChat = (userId: string) => {
                // If type is DM, resolve the dm partner's profile
                let dmPartner = undefined;
                let groupName = cg.name;
+               let members = undefined;
 
                if (cg.type === "dm") {
                   const { data: partner } = await supabase
@@ -340,6 +343,20 @@ export const useChat = (userId: string) => {
                      };
                      groupName = p.username;
                   }
+               } else if (cg.type === "custom") {
+                  const { data: groupMembers } = await supabase
+                     .from("chat_group_members")
+                     .select("user_id, profiles(username, avatar_url)")
+                     .eq("group_id", cg.id)
+                     .eq("status", "joined");
+
+                  if (groupMembers) {
+                     members = groupMembers.map((gm: any) => ({
+                        user_id: gm.user_id,
+                        username: gm.profiles?.username,
+                        avatar_url: gm.profiles?.avatar_url,
+                     }));
+                  }
                }
 
                activeGroups.push({
@@ -350,6 +367,8 @@ export const useChat = (userId: string) => {
                   created_at: cg.created_at,
                   is_core: false,
                   dm_partner: dmPartner,
+                  dm_key: cg.dm_key,
+                  members: members,
                });
             }
          }
@@ -364,7 +383,10 @@ export const useChat = (userId: string) => {
             JSON.stringify(activeGroups),
          );
       } catch (error) {
-         console.log(error);
+         logger.error(
+            `an error occured while attempting tp restore chatgroups`,
+            error,
+         );
       }
    }, [userId]);
 
@@ -468,6 +490,7 @@ export const useChat = (userId: string) => {
                removePendingReadReceipt(activeRoomId);
             }
          });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [userId, activeRoomId, activeMessages, readReceipts]);
 
    // Flush pending read receipts on load or network restore
@@ -497,6 +520,7 @@ export const useChat = (userId: string) => {
 
       window.addEventListener("online", flushReceipts);
       return () => window.removeEventListener("online", flushReceipts);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [userId, pendingReadReceipts]);
 
    // Presence & typing updates
@@ -850,6 +874,8 @@ export const useChat = (userId: string) => {
    // Reaction
    const reactToMessage = async (messageId: string, emoji: string | null) => {
       if (!userId) return;
+
+      // Optimistic UI: update global store immediately
       const msg = globalMessages.find((m) => m.id === messageId);
       if (!msg) return;
 
@@ -864,13 +890,16 @@ export const useChat = (userId: string) => {
          .getState()
          .updateGlobalMessage({ id: messageId, reactions: currentReactions });
 
-      const { error } = await supabase
-         .from("messages")
-         .update({ reactions: currentReactions })
-         .eq("id", messageId);
+      // Resilience: Use RPC call for atomic DB update
+      const { error } = await supabase.rpc("toggle_message_reaction", {
+         p_message_id: messageId,
+         p_user_id: userId,
+         p_emoji: emoji,
+      });
 
       if (error) {
-         console.error("Failed to react:", error);
+         console.error("Failed to react resiliently:", error);
+         // Optionally rollback optimistic UI if it's a persistent failure
       }
    };
 

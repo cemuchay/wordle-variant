@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -17,6 +17,7 @@ interface AppHeaderProps {
     onShare: () => void;
     onRetrySync: () => void;
     isGameOver: boolean;
+    isRevealing?: boolean;
     usedHint: boolean;
     canShowHint: boolean;
     isHintLocked?: boolean;
@@ -25,7 +26,7 @@ interface AppHeaderProps {
     hideGameplayActions?: boolean;
 }
 
-const ICON_SIZE = 16;
+const ICON_SIZE = 17;
 
 export const AppHeader = ({
     onOpenSettings,
@@ -35,6 +36,7 @@ export const AppHeader = ({
     onShare,
     onRetrySync,
     isGameOver,
+    isRevealing,
     usedHint,
     canShowHint,
     isHintLocked,
@@ -45,21 +47,8 @@ export const AppHeader = ({
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
     const { isAdmin } = useAdminStatus(user?.id);
-    const { activeCall, onlineUsers, activeVoiceRooms, triggerToast } = useApp();
+    const { triggerToast, isDynamicIslandVisible } = useApp();
     const [isShaking, setIsShaking] = useState(false);
-    const [hasMascot, setHasMascot] = useState(false);
-
-    useEffect(() => {
-        const handleMascot = (e: Event) => {
-            const detail = (e as CustomEvent)?.detail;
-            setHasMascot(!!detail);
-        };
-        window.addEventListener('mascot-changed', handleMascot);
-        return () => window.removeEventListener('mascot-changed', handleMascot);
-    }, []);
-
-    const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
-    const isDynamicIslandVisible = otherOnlineUsers.length > 0 || !!activeCall || activeVoiceRooms.length > 0 || hasMascot;
 
     const handleLockedHintClick = () => {
         setIsShaking(true);
@@ -106,7 +95,7 @@ export const AppHeader = ({
                     {!hideGameplayActions && (
                         <>
                             <div className="flex items-center gap-0.5">
-                                {canShowHint && !isGameOver && (
+                                {canShowHint && (!isGameOver || isRevealing) && (
                                     <button
                                         onClick={isHintLocked && !usedHint ? handleLockedHintClick : onHint}
                                         disabled={usedHint}

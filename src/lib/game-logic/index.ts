@@ -208,9 +208,9 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
          return result;
       }
       return obfuscated;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
    } catch (e) {
       // If atob fails, it's definitely not obfuscated Base64.
-      console.log("Deobfuscation failed:", e);
       return obfuscated;
    }
 };
@@ -254,6 +254,7 @@ export const decryptGuesses = (encryptedStr: any, key: string) => {
          return typeof encryptedStr === "string"
             ? JSON.parse(encryptedStr)
             : encryptedStr;
+         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
          return encryptedStr;
       }
@@ -1221,7 +1222,6 @@ export const calculateSkillIndex = ({
 export const syncGameState = async (
    userId: string,
    date: string | null,
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any,
 ) => {
    if (!date) return;
@@ -1272,7 +1272,6 @@ export const syncGameState = async (
 export const syncWithRetry = async (
    userId: string,
    date: string | null,
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    payload: any,
    retries = 3,
 ): Promise<{ success: boolean; score: number }> => {
@@ -1288,3 +1287,92 @@ export const syncWithRetry = async (
    }
    return { success: false, score: 0 };
 };
+
+/**
+ * Shape Shifter Mode compatibility check.
+ * Checks if a candidate word is compatible with the feedback of a past guess.
+ */
+export function isGuessCompatible(candidate: string, pastGuess: GuessResult[]): boolean {
+   const guessWord = pastGuess.map(g => g.letter).join("").toUpperCase();
+   const feedback = checkGuess(guessWord, candidate);
+   for (let i = 0; i < feedback.length; i++) {
+      if (feedback[i].status !== pastGuess[i].status) {
+         return false;
+      }
+   }
+   return true;
+}
+
+/**
+ * Shape Shifter Mode shift algorithm.
+ * Uses a minimax bucket partitioning strategy to select the next target word.
+ */
+export function getShapeShifterFeedbackAndWord(
+   guess: string,
+   currentTargetWord: string,
+   pastGuesses: GuessResult[][],
+   wordLength: number
+): { nextWord: string; feedback: GuessResult[] } {
+   const { official } = getWordLists(wordLength);
+   const upperCurrent = currentTargetWord.toUpperCase();
+   const upperGuess = guess.toUpperCase();
+
+   // Filter candidates based on past guesses
+   let candidates = official.map(w => w.toUpperCase());
+   for (const pastGuess of pastGuesses) {
+      candidates = candidates.filter(w => isGuessCompatible(w, pastGuess));
+   }
+
+   // Ensure the current target word is at least in the pool if it satisfies past constraints
+   if (upperCurrent && !candidates.includes(upperCurrent)) {
+      const isCurrentCompatible = pastGuesses.every(g => isGuessCompatible(upperCurrent, g));
+      if (isCurrentCompatible) {
+         candidates.push(upperCurrent);
+      }
+   }
+
+   // Fallback if candidates pool is empty
+   if (candidates.length === 0) {
+      const fb = checkGuess(upperGuess, upperCurrent || "REACT");
+      return { nextWord: upperCurrent || "REACT", feedback: fb };
+   }
+
+   // Group candidates into buckets based on the feedback they produce against the new guess
+   const buckets = new Map<string, string[]>();
+   for (const w of candidates) {
+      const feedback = checkGuess(upperGuess, w);
+      const key = feedback.map(f => f.status).join(',');
+      if (!buckets.has(key)) {
+         buckets.set(key, []);
+      }
+      buckets.get(key)!.push(w);
+   }
+
+   // Select the largest bucket. Prefer buckets that do not make the user win immediately.
+   let maxBucketSize = -1;
+   let bestBucketWords: string[] = [];
+
+   for (const [key, words] of buckets.entries()) {
+      const isAllCorrect = key.split(',').every(s => s === 'correct');
+      if (
+         words.length > maxBucketSize || 
+         (words.length === maxBucketSize && !isAllCorrect)
+      ) {
+         maxBucketSize = words.length;
+         bestBucketWords = words;
+      }
+   }
+
+   // Choose the next target word from the selected bucket
+   // If the current target word is in the selected bucket, keep it. Otherwise, choose one from the bucket.
+   let nextWord = upperCurrent;
+   if (bestBucketWords.includes(upperCurrent)) {
+      nextWord = upperCurrent;
+   } else {
+      nextWord = bestBucketWords[0];
+   }
+
+   const feedback = checkGuess(upperGuess, nextWord);
+   return { nextWord, feedback };
+}
+

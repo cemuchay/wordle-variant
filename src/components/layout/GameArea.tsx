@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
-import { HelpCircle, Sparkles, X } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
-import { motion } from 'framer-motion';
 import { ANIMATION_DURATION } from '../../constants/ui';
+import { MarathonBanner } from '../common/MarathonBanner';
 
 interface GameAreaProps {
     wordLength: number;
@@ -20,7 +20,7 @@ interface GameAreaProps {
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
-    activeDailyMarathon: any;
+    activeDailyMarathons: any[];
     setIsChallengeOpen: any;
     setSelectedChallengeId: any;
     isAuthenticated: boolean;
@@ -39,7 +39,7 @@ export const GameArea = ({
     onChar,
     onDelete,
     onEnter,
-    activeDailyMarathon,
+    activeDailyMarathons,
     setIsChallengeOpen,
     setSelectedChallengeId,
     isAuthenticated,
@@ -51,40 +51,6 @@ export const GameArea = ({
     const helpRef = useRef<HTMLDivElement>(null);
 
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
-    const [timeLeft, setTimeLeft] = useState<string>('');
-
-    useEffect(() => {
-        if (!activeDailyMarathon?.expires_at) return;
-
-        const calculateTimeLeft = () => {
-            const expiresAt = new Date(activeDailyMarathon.expires_at).getTime();
-            const now = new Date().getTime();
-            const difference = expiresAt - now;
-
-            if (difference <= 0) {
-                setTimeLeft('Expired');
-                return;
-            }
-
-            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-            const parts = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0 || days > 0) parts.push(`${hours}h`);
-            if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
-            parts.push(`${seconds}s`);
-
-            setTimeLeft(parts.join(' '));
-        };
-
-        calculateTimeLeft();
-        const timer = setInterval(calculateTimeLeft, 1000);
-
-        return () => clearInterval(timer);
-    }, [activeDailyMarathon?.expires_at]);
 
     useEffect(() => {
         if (guesses.length === 0) {
@@ -129,49 +95,18 @@ export const GameArea = ({
 
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
-            {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-2 mx-auto w-full max-w-md bg-linear-to-r from-violet-600/20 via-indigo-600/20 to-blue-600/20 border border-indigo-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-400/50 transition-colors duration-300 shrink-0"
-                >
-                    <div className="absolute inset-0 bg-linear-to-r from-violet-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="flex items-center justify-between gap-2 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-indigo-500/20 rounded-xl border border-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
-                                <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
-                                        Active Marathon
-                                    </span>
-                                    <span className="text-[10px] text-gray-400 font-medium">
-                                        Daily Challenge • {timeLeft && <span className="text-indigo-400 font-black tabular-nums">{timeLeft} left</span>}
-                                    </span>
-                                </div>
-                                <h3 className="text-sm font-bold mt-1 text-white tracking-wide">
-                                    Bot Marathon Event
-                                </h3>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    Test your skills across multiple word lengths!
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                setSelectedChallengeId(activeDailyMarathon.id);
-                                setIsChallengeOpen(true);
-                            }}
-                            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
-                        >
-                            Play
-                        </button>
-                    </div>
-                </motion.div>
+            {isGameOver && activeDailyMarathons.length > 0 && hideKeyboard && isAuthenticated && (
+                <div className="mb-2 mx-auto w-full max-w-md shrink-0">
+                    <MarathonBanner
+                        challenges={activeDailyMarathons}
+                        onClick={(challenge) => {
+                            setSelectedChallengeId(challenge.id);
+                            setIsChallengeOpen(true);
+                        }}
+                    />
+                </div>
             )}
+
 
             <div className="flex-1 flex items-center justify-center min-h-0 w-full relative pt-6">
                 <div className="relative">

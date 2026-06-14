@@ -54,8 +54,9 @@ interface MarathonLengthItemProps {
 const MarathonLengthItem = memo(function MarathonLengthItem({
     game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked, lockReason
 }: MarathonLengthItemProps) {
+    const effectiveMaxAttempts = challenge.is_shapeshifter ? 10 : MAX_ATTEMPTS;
     const isCompleted = prog?.status === 'completed';
-    const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
+    const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
     const isFinished = isCompleted || isFailed;
 
     return (
@@ -89,7 +90,7 @@ const MarathonLengthItem = memo(function MarathonLengthItem({
                 )}
                 {isUnlocked && prog && (
                     <div className="text-right">
-                        <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/{MAX_ATTEMPTS} Tries</p>
+                        <p className="text-[10px] font-black uppercase text-gray-400">{prog.attempts}/{effectiveMaxAttempts} Tries</p>
                         {challenge.mode === 'LIVE' && prog.time_taken && (
                             <p className="text-[9px] font-black text-white/30">{formatTime(prog.time_taken)}</p>
                         )}
@@ -285,8 +286,9 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         for (let idx = 0; idx < marathonGames.length; idx++) {
             const game = marathonGames[idx];
             const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+            const effectiveMaxAttempts = challenge.is_shapeshifter ? 10 : MAX_ATTEMPTS;
             const isCompleted = prog?.status === 'completed';
-            const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= MAX_ATTEMPTS && !isCompleted);
+            const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
             const isFinished = isCompleted || isFailed;
 
             let isUnlocked = true;

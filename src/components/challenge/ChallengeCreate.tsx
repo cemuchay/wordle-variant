@@ -6,6 +6,8 @@ import { useConfirmation } from '../../hooks/useConfirmation';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
+import { useAppStore } from '../../store/useAppStore';
+
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
     tooltip: string;
@@ -319,6 +321,21 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     } = useChallengeContext();
     const { ask } = useConfirmation();
 
+    const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
+    const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
+
+    // Handle pre-selected user from Chat DM
+    useEffect(() => {
+        if (pendingChallengeUserId && !editingChallenge) {
+            const ids = pendingChallengeUserId.split(',').filter(Boolean);
+            if (ids.length > 0) {
+                setInvitedIds(ids);
+                // Clear the pending ID so it doesn't persist
+                setPendingChallengeUserId(null);
+            }
+        }
+    }, [pendingChallengeUserId, setInvitedIds, setPendingChallengeUserId, editingChallenge]);
+
     // Initialize edit fields
     useEffect(() => {
         if (editingChallenge) {
@@ -340,6 +357,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             }
             setIsCustomWord(!!editingChallenge.is_custom_word);
             setDisableHints(!!editingChallenge.disable_hints);
+            setIsShapeshifter(!!editingChallenge.is_shapeshifter);
 
             const hasHandicap = !!editingChallenge.handicap_starter || !!editingChallenge.handicap_starters;
             setIsHandicap(hasHandicap);
@@ -414,6 +432,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [isBotMarathon, setIsBotMarathon] = useState(false);
     const [isHandicap, setIsHandicap] = useState(false);
     const [disableHints, setDisableHints] = useState(false);
+    const [isShapeshifter, setIsShapeshifter] = useState(false);
     const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
     const [handicapEnforced, setHandicapEnforced] = useState(false);
     const [handicapStarter, setHandicapStarter] = useState('');
@@ -597,7 +616,9 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             invitedIds,
             disableHints,
             is_bot_marathon: isBotMarathon,
-            isBotMarathon: isBotMarathon
+            isBotMarathon: isBotMarathon,
+            isShapeshifter,
+            is_shapeshifter: isShapeshifter,
         };
 
         if (isCustomWord) {
@@ -638,13 +659,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (editingChallenge) {
             await handleEdit(editingChallenge.id, customParams);
         } else {
-            await handleCreate(customParams, !onSuccess);
+            await handleCreate(customParams, true);
         }
         
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints]);
 
     return (
         <div className="space-y-6">
@@ -812,6 +833,31 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         </div>
                     )}
 
+                    {/* Shape Shifter Option */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <OptionLabel 
+                                label="Shape Shifter Mode" 
+                                tooltip="The target word shifts in the background with each guess. Feedback is respected, and you must uniquely identify the word to win (up to 10 tries)." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="isShapeshifter" 
+                            />
+                            <input
+                                type="checkbox"
+                                checked={isShapeshifter}
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setIsShapeshifter(checked);
+                                    if (checked) {
+                                        setIsCustomWord(false);
+                                    }
+                                }}
+                                className="w-5 h-5 accent-correct cursor-pointer"
+                            />
+                        </div>
+                    </div>
+
                     {/* Disable Hints Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -909,63 +955,65 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     </div>
 
                     {/* Custom target word option */}
-                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Custom Word Challenge" 
-                                tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="customWord" 
-                            />
-                            <input
-                                type="checkbox"
-                                checked={isCustomWord}
-                                onChange={(e) => setIsCustomWord(e.target.checked)}
-                                className="w-5 h-5 accent-correct cursor-pointer"
-                            />
-                        </div>
-                        {isCustomWord && (
-                            <div className="space-y-3 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                {length === 1 ? (
-                                    <div className="space-y-2.5">
-                                        {marathonGames.map((l, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Word):</span>
-                                                <input
-                                                    type="text"
-                                                    maxLength={l}
-                                                    placeholder={`Enter ${l}-letter word`}
-                                                    value={customMarathonWords[idx] || ''}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/[^A-Za-z]/g, '');
-                                                        setCustomMarathonWords(prev => {
-                                                            const next = [...prev];
-                                                            next[idx] = val;
-                                                            return next;
-                                                        });
-                                                    }}
-                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-white">Target Word ({length === 0 ? '5-letter default' : `${length}-letter`}):</label>
-                                        <input
-                                            type="text"
-                                            maxLength={length === 0 ? 5 : length}
-                                            placeholder={`Enter ${length === 0 ? 5 : length}-letter word`}
-                                            value={customWord}
-                                            onChange={(e) => setCustomWord(e.target.value.replace(/[^A-Za-z]/g, ''))}
-                                            className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-3 text-sm focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                        />
-                                    </div>
-                                )}
+                    {!isShapeshifter && (
+                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Custom Word Challenge" 
+                                    tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="customWord" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isCustomWord}
+                                    onChange={(e) => setIsCustomWord(e.target.checked)}
+                                    className="w-5 h-5 accent-correct cursor-pointer"
+                                />
                             </div>
-                        )}
-                    </div>
+                            {isCustomWord && (
+                                <div className="space-y-3 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
+                                    {length === 1 ? (
+                                        <div className="space-y-2.5">
+                                            {marathonGames.map((l, idx) => (
+                                                <div key={idx} className="flex flex-col gap-1">
+                                                    <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Word):</span>
+                                                    <input
+                                                        type="text"
+                                                        maxLength={l}
+                                                        placeholder={`Enter ${l}-letter word`}
+                                                        value={customMarathonWords[idx] || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/[^A-Za-z]/g, '');
+                                                            setCustomMarathonWords(prev => {
+                                                                const next = [...prev];
+                                                                next[idx] = val;
+                                                                return next;
+                                                            });
+                                                        }}
+                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] font-black uppercase text-white">Target Word:</span>
+                                            <input
+                                                type="text"
+                                                maxLength={length === 0 ? 5 : length}
+                                                placeholder={`Enter custom ${length === 0 ? 5 : length}-letter word`}
+                                                value={customWord}
+                                                onChange={(e) => setCustomWord(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Handicap Options */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { useChat, type Message, getDMRoomKey, decryptDM } from "../hooks/useChat";
-import { MessageSquare, Lock, ChevronLeft, Plus, Users, User,  ShieldAlert, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { MessageSquare, Lock, ChevronLeft, Plus, Users, User, ShieldAlert, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import type { AppUser } from "../types/game";
 import { useAuth } from "../hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,7 @@ import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setIsChallengeOpen, allProfiles } = useApp();
+    const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, isChatConversationOpen } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -53,6 +53,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
     const pendingDMUserId = useAppStore(s => s.pendingDMUserId);
     const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
+    const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
 
     const [showSidebar, setShowSidebar] = useState(true);
     const [isStartingDM, setIsStartingDM] = useState(false);
@@ -420,7 +421,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative"
+            className={`flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative ${isDynamicIslandVisible && isChatConversationOpen ? 'mt-10 sm:mt-12' : ''}`}
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
         >
             {/* DM Loading Overlay */}
@@ -778,6 +779,16 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                 showSearchIcon={!showConversationSearch}
                                 onToggleSearch={() => { setShowConversationSearch(true); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                                 onChallenge={(activeRoom?.type === "dm" || activeRoom?.type === "custom") ? () => {
+                                    if (activeRoom.type === "dm" && activeRoom.dm_partner) {
+                                        setPendingChallengeUserId(activeRoom.dm_partner.id);
+                                    } else if (activeRoom.type === "custom" && activeRoom.members) {
+                                        // Select all members except current user
+                                        const otherMemberIds = activeRoom.members
+                                            .filter((m: any) => m.user_id !== user.id)
+                                            .map((m: any) => m.user_id)
+                                            .join(',');
+                                        setPendingChallengeUserId(otherMemberIds);
+                                    }
                                     if (onClose) onClose();
                                     setIsChallengeOpen(true);
                                 } : undefined}

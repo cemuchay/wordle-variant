@@ -47,6 +47,7 @@ const fadeVariants = {
 export default function App() {
   const { user } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
+  const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
   const {
     triggerToast,
     date,
@@ -67,13 +68,25 @@ export default function App() {
   // Core Game Engine
   const { state, actions, config, isHydrated } = useGameEngine(date as string);
 
+  // Stabilize UI state to wait for reveal animations
+  const [stableGuessesCount, setStableGuessesCount] = useState(state.guesses.length);
+  const [stableIsHintDisabled, setStableIsHintDisabled] = useState(state.isHintDisabled);
+
+  useEffect(() => {
+    if (!state.isRevealing) {
+      setStableGuessesCount(state.guesses.length);
+      setStableIsHintDisabled(state.isHintDisabled);
+    }
+  }, [state.guesses.length, state.isRevealing, state.isHintDisabled]);
+
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
   const { data: discoverChallenges } = useDiscoverChallenges();
 
-  const activeDailyMarathon = useMemo(() => {
-    if (!discoverChallenges) return null;
-    return discoverChallenges.find((c: { is_bot_marathon: boolean; expires_at: string; id: string }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+  const activeDailyMarathons = useMemo(() => {
+    if (!discoverChallenges) return [];
+    const botMarathons = discoverChallenges.filter((c: any) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+    return botMarathons.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()).slice(0, 2);
   }, [discoverChallenges]);
 
   const isMonday = useMemo(() => {
@@ -424,7 +437,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isChatConversationOpen && (
+      {!isPlayingChallenge && !isChatConversationOpen && !selectedChallenge && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -435,11 +448,12 @@ export default function App() {
             onShare={() => actions.setGameOverModalOpen(true)}
             onRetrySync={actions.retrySync}
             isGameOver={state.isGameOver}
+            isRevealing={state.isRevealing}
             usedHint={state.usedHint}
-            canShowHint={state.guesses.length >= 2}
+            canShowHint={stableGuessesCount >= 2}
             isHintLocked={
-              (state.guesses.length >= config.maxAttempts - 1 ||
-                state.isHintDisabled) &&
+              (stableGuessesCount >= config.maxAttempts - 1 ||
+                stableIsHintDisabled) &&
               !state.usedHint
             }
             syncStatus={state.syncStatus}
@@ -477,7 +491,7 @@ export default function App() {
                   onChar={actions.onChar}
                   onDelete={actions.onDelete}
                   onEnter={actions.onEnter}
-                  activeDailyMarathon={activeDailyMarathon}
+                  activeDailyMarathons={activeDailyMarathons}
                   setSelectedChallengeId={setSelectedChallengeId}
                   setIsChallengeOpen={setIsChallengeOpen}
                   isAuthenticated={user ? true : false}
