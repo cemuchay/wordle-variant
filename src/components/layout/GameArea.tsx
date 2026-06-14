@@ -20,7 +20,7 @@ interface GameAreaProps {
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
-    activeDailyMarathon: any;
+    activeDailyMarathons: any[];
     setIsChallengeOpen: any;
     setSelectedChallengeId: any;
     isAuthenticated: boolean;
@@ -39,7 +39,7 @@ export const GameArea = ({
     onChar,
     onDelete,
     onEnter,
-    activeDailyMarathon,
+    activeDailyMarathons,
     setIsChallengeOpen,
     setSelectedChallengeId,
     isAuthenticated,
@@ -95,12 +95,12 @@ export const GameArea = ({
 
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
-            {isGameOver && activeDailyMarathon && hideKeyboard && isAuthenticated && (
+            {isGameOver && activeDailyMarathons.length > 0 && hideKeyboard && isAuthenticated && (
                 <div className="mb-2 mx-auto w-full max-w-md shrink-0">
                     <MarathonBanner
-                        challenge={activeDailyMarathon}
-                        onClick={() => {
-                            setSelectedChallengeId(activeDailyMarathon.id);
+                        challenges={activeDailyMarathons}
+                        onClick={(challenge) => {
+                            setSelectedChallengeId(challenge.id);
                             setIsChallengeOpen(true);
                         }}
                     />

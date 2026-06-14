@@ -187,7 +187,7 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
-      dailyMarathonChallenge,
+      dailyMarathonChallenges,
       initialChallengeId,
     } = useChallengeContext();
 
@@ -232,13 +232,11 @@ const AuthenticatedChallengeContent = memo(
     }, [myChallenges]);
 
     const displayChallenges = useMemo(() => {
-      if (dailyMarathonChallenge) {
-        return filteredChallenges.filter(
-          (item: any) => (item.challenge_id || item.challenge?.id) !== (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id)
-        );
-      }
-      return filteredChallenges;
-    }, [filteredChallenges, dailyMarathonChallenge]);
+      const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
+      return filteredChallenges.filter(
+        (item: any) => !marathonIds.includes(item.challenge_id || item.challenge?.id)
+      );
+    }, [filteredChallenges, dailyMarathonChallenges]);
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -392,11 +390,11 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenge && (["open", "played"]).includes(listColumn) && (
+                        {dailyMarathonChallenges.length > 0 && (["open", "played"]).includes(listColumn) && (
                           <MarathonBanner
-                            challenge={dailyMarathonChallenge}
-                            onClick={() => {
-                              handleViewChallenge(initialChallengeId ? initialChallengeId : (dailyMarathonChallenge.challenge_id || dailyMarathonChallenge.challenge?.id))
+                            challenges={dailyMarathonChallenges}
+                            onClick={(challenge) => {
+                              handleViewChallenge(initialChallengeId ? initialChallengeId : (challenge.challenge_id || challenge.challenge?.id))
                             }}
                           />
                         )}

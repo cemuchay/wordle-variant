@@ -85,7 +85,7 @@ interface ChallengeContextType {
     participantsError: string | null;
     retryFetchParticipants: () => void;
     openChallengesCount: number;
-    dailyMarathonChallenge: any;
+    dailyMarathonChallenges: any[];
     initialChallengeId?: string | null | undefined;
 }
 
@@ -298,26 +298,38 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }));
     }, [openChallenges]);
 
-    const dailyMarathonChallenge = useMemo(() => {
-        // Find in openChallenges
-        const openDaily = discoverChallenges.find((c: any) => c.is_bot_marathon);
+    const dailyMarathonChallenges = useMemo(() => {
+        // Find all in openChallenges
+        const openDailies = discoverChallenges.filter((c: any) => c.is_bot_marathon).map((c: any) => ({
+            id: `open-${c.id}`,
+            challenge_id: c.id,
+            challenge: c,
+            status: 'open',
+            score: 0,
+            attempts: 0,
+            guesses: []
+        }));
 
-        if (openDaily) {
-            return {
-                id: `open-${openDaily.id}`,
-                challenge_id: openDaily.id,
-                challenge: openDaily,
-                status: 'open',
-                score: 0,
-                attempts: 0,
-                guesses: []
-            };
-        }
         // Find in myChallenges (pending status)
-        const pendingDaily = myChallenges.find((item: any) => item.challenge?.is_bot_marathon && item.status === 'pending');
-        if (pendingDaily) return pendingDaily;
+        const pendingDailies = myChallenges.filter((item: any) => item.challenge?.is_bot_marathon && item.status === 'pending');
 
-        return null;
+        const combined = [...openDailies, ...pendingDailies];
+        
+        // Remove duplicates if same challenge is in both
+        const unique = combined.reduce((acc: any[], curr: any) => {
+            const id = curr.challenge_id || curr.challenge?.id;
+            if (!acc.find(item => (item.challenge_id || item.challenge?.id) === id)) {
+                acc.push(curr);
+            }
+            return acc;
+        }, []);
+
+        // Sort by earliest to expire
+        return unique.sort((a, b) => {
+            const dateA = new Date(a.challenge?.expires_at).getTime();
+            const dateB = new Date(b.challenge?.expires_at).getTime();
+            return dateA - dateB;
+        }).slice(0, 2); // Up to 2
     }, [discoverChallenges, myChallenges]);
 
     const unplayedCount = useMemo(() =>
@@ -962,10 +974,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         participantsError,
         retryFetchParticipants,
         openChallengesCount: openChallenges.length,
-        dailyMarathonChallenge,
+        dailyMarathonChallenges,
         initialChallengeId,
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenge, initialChallengeId]);
+    }), [activeTab, setActiveTab, isPlaying, setIsPlaying, mode, setMode, length, setLength, maxTime, setMaxTime, selectedChallenge, setSelectedChallenge, myParticipation, setMyParticipation, participants, myChallenges, availableProfiles, invitedIds, setInvitedIds, searchQuery, setSearchQuery, statusFilter, setStatusFilter, modeFilter, setModeFilter, lengthFilter, setLengthFilter, clearFilters, filteredChallenges, handleViewChallenge, handleCreate, handleEdit, handleDelete, handleStartGame, toggleInvite, triggerToast, refetchChallenges, submitResult, isChallengesLoading, isDiscoverLoading, createMutation.isPending, submitMutation.isPending, joinMutation.isPending, startMutation.isPending, marathonMutation.isPending, updateMutation.isPending, deleteMutation.isPending, joinId, setJoinId, previewParticipant, setPreviewParticipant, previewMarathonLength, setPreviewMarathonLength, previewMarathonGameIndex, setPreviewMarathonGameIndex, unplayedCount, backAction, setBackAction, registerAnonymousUser, effectiveUser, isEditingChallenge, setIsEditingChallenge, listColumn, setListColumn, loadingParticipants, participantsError, retryFetchParticipants, isBackgroundFetching, openChallenges, dailyMarathonChallenges, initialChallengeId]);
 
     return (
         <ChallengeContext.Provider value={contextValue}>
