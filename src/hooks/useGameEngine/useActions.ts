@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { getWordLists } from '../../data/words';
 import { checkGuess, getLetterStatuses, isHintDisabled, getHint, updateStats, obfuscateWord } from '../../lib/game-logic';
 import { generateRoast } from '../../utils/roastEngine';
@@ -37,6 +37,8 @@ export const useActions = ({
    refresh,
    loadFromCloud,
 }: UseActionsProps) => {
+   const isSubmittingRef = useRef(false);
+
    const onChar = useCallback(
       (char: string) => {
          dispatch({ type: "ADD_LETTER", char, maxLength: config.length });
@@ -52,172 +54,179 @@ export const useActions = ({
       if (state.isGameOver || state.currentGuess.length !== config.length)
          return;
 
-      // Prevent submission if the game is already completed on the cloud (e.g. from another tab/device)
-      if (user && date) {
-         try {
-            const { data: cloudScore } = await supabase
-               .from("scores")
-               .select("status")
-               .eq("user_id", user.id)
-               .eq("game_date", date)
-               .maybeSingle();
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
 
-            if (
-               cloudScore &&
-               (cloudScore.status === "won" || cloudScore.status === "lost")
-            ) {
-               triggerToast("Game already completed.");
+      try {
+         // Prevent submission if the game is already completed on the cloud (e.g. from another tab/device)
+         if (user && date) {
+            try {
+               const { data: cloudScore } = await supabase
+                  .from("scores")
+                  .select("status")
+                  .eq("user_id", user.id)
+                  .eq("game_date", date)
+                  .maybeSingle();
 
-               // Fetch complete cloud state and override local
-               const cloudPayload = await loadFromCloud();
-               if (cloudPayload) {
-                  dispatch({ type: "LOAD_STATE", payload: cloudPayload });
-                  const localSalt = getLocalSalt(date, user.id);
-                  const savedPayload = {
-                     ...cloudPayload,
-                     config: {
-                        ...cloudPayload.config,
-                        word: obfuscateWord(
-                           cloudPayload.config.word,
-                           localSalt,
-                        ),
-                     },
-                  };
-                  safeLocalStorage.setItem(
-                     `wordle-${date}`,
-                     JSON.stringify(savedPayload),
-                  );
+               if (
+                  cloudScore &&
+                  (cloudScore.status === "won" || cloudScore.status === "lost")
+               ) {
+                  triggerToast("Game already completed.");
+
+                  // Fetch complete cloud state and override local
+                  const cloudPayload = await loadFromCloud();
+                  if (cloudPayload) {
+                     dispatch({ type: "LOAD_STATE", payload: cloudPayload });
+                     const localSalt = getLocalSalt(date, user.id);
+                     const savedPayload = {
+                        ...cloudPayload,
+                        config: {
+                           ...cloudPayload.config,
+                           word: obfuscateWord(
+                              cloudPayload.config.word,
+                              localSalt,
+                           ),
+                        },
+                     };
+                     safeLocalStorage.setItem(
+                        `wordle-${date}`,
+                        JSON.stringify(savedPayload),
+                     );
+                  }
+                  return;
                }
-               return;
+            } catch (e) {
+               console.error("Failed to verify cloud score state:", e);
             }
-         } catch (e) {
-            console.error("Failed to verify cloud score state:", e);
          }
-      }
 
-      const upperGuess = state.currentGuess.toUpperCase();
-      const { valid } = getWordLists(config.length);
+         const upperGuess = state.currentGuess.toUpperCase();
+         const { valid } = getWordLists(config.length);
 
-      if (!valid.has(upperGuess)) {
-         triggerToast("Not in word list.");
-         dispatch({ type: "SHAKE_GUESS" });
-         setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
-         return;
-      }
+         if (!valid.has(upperGuess)) {
+            triggerToast("Not in word list.");
+            dispatch({ type: "SHAKE_GUESS" });
+            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
+            return;
+         }
 
-      const alreadyGuessed = state.guesses.some((guess: any) => {
-         const word = guess
-            .map((charObj: any) => charObj.letter)
-            .join("")
-            .toUpperCase();
-         return word === upperGuess;
-      });
-
-      if (alreadyGuessed) {
-         const confirmSubmit = await ask({
-            title: "Duplicate Guess",
-            message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
-            confirmLabel: "Yes, submit",
-            cancelLabel: "No, cancel",
-            type: "info",
+         const alreadyGuessed = state.guesses.some((guess: any) => {
+            const word = guess
+               .map((charObj: any) => charObj.letter)
+               .join("")
+               .toUpperCase();
+            return word === upperGuess;
          });
-         if (!confirmSubmit) return;
-      }
 
-      const result = checkGuess(upperGuess, config.word);
-      const won = upperGuess === config.word;
-      const lost = state.guesses.length + 1 === config.maxAttempts;
-
-      const newGuesses = [...state.guesses, result];
-      const newStatus = won ? "won" : lost ? "lost" : "playing";
-
-      const message =
-         preferences.allowRoasts &&
-         (newStatus === "won" || newStatus === "lost")
-            ? generateRoast(
-                 newGuesses,
-                 config.word,
-                 state.usedHint,
-                 won,
-                 newGuesses.length,
-              )
-            : "";
-
-      const payload = {
-         date,
-         isGuest: !user,
-         guesses: newGuesses,
-         letterStatuses: getLetterStatuses(newGuesses),
-         status: newStatus,
-         usedHint: state.usedHint,
-         hintRecord: state.hintRecord,
-         config,
-         gameMessage: message,
-      };
-
-      // 1. Save locally FIRST with obfuscation to ensure data integrity
-      const localSalt = getLocalSalt(date, user?.id);
-      const savedPayload = {
-         ...payload,
-         config: {
-            ...payload.config,
-            word: obfuscateWord(payload.config.word, localSalt),
-         },
-      };
-      safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
-
-      if (user) {
-         const success = await performSync(payload);
-         if (!success) {
-            triggerToast(
-               "Cloud sync failed after 3 attempts. Progress saved locally.",
-               TOAST_DURATION.LONG + 1000,
-            );
-         }
-      }
-
-      // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
-      await new Promise((r) => setTimeout(r, 300));
-
-      // Calculate delay: use returnAnimationTime + extra buffer for safety
-      const revealDelay = returnAnimationTime(config.length) + 600;
-
-      // 2. Update UI (flips row)
-      dispatch({
-         type: "SUBMIT_GUESS",
-         result,
-         isWon: won,
-         isLost: lost,
-         message,
-      });
-
-      if (won || lost) {
-         const updatedStats = updateStats(won, newGuesses.length);
-         updateOptimistically(updatedStats);
-         await refresh();
-
-         if (lost) {
-            triggerToast(
-               `The word is: ${config.word}`,
-               TOAST_DURATION.LONG + 1000,
-            );
+         if (alreadyGuessed) {
+            const confirmSubmit = await ask({
+               title: "Duplicate Guess",
+               message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
+               confirmLabel: "Yes, submit",
+               cancelLabel: "No, cancel",
+               type: "info",
+            });
+            if (!confirmSubmit) return;
          }
 
-         setTimeout(() => {
-            dispatch({ type: "STOP_REVEALING" });
-            dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
+         const result = checkGuess(upperGuess, config.word);
+         const won = upperGuess === config.word;
+         const lost = state.guesses.length + 1 === config.maxAttempts;
 
-            if (won) {
+         const newGuesses = [...state.guesses, result];
+         const newStatus = won ? "won" : lost ? "lost" : "playing";
+
+         const message =
+            preferences.allowRoasts &&
+            (newStatus === "won" || newStatus === "lost")
+               ? generateRoast(
+                    newGuesses,
+                    config.word,
+                    state.usedHint,
+                    won,
+                    newGuesses.length,
+                 )
+               : "";
+
+         const payload = {
+            date,
+            isGuest: !user,
+            guesses: newGuesses,
+            letterStatuses: getLetterStatuses(newGuesses),
+            status: newStatus,
+            usedHint: state.usedHint,
+            hintRecord: state.hintRecord,
+            config,
+            gameMessage: message,
+         };
+
+         // 1. Save locally FIRST with obfuscation to ensure data integrity
+         const localSalt = getLocalSalt(date, user?.id);
+         const savedPayload = {
+            ...payload,
+            config: {
+               ...payload.config,
+               word: obfuscateWord(payload.config.word, localSalt),
+            },
+         };
+         safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+
+         if (user) {
+            const success = await performSync(payload);
+            if (!success) {
                triggerToast(
-                  message || state.gameMessage,
+                  "Cloud sync failed after 3 attempts. Progress saved locally.",
                   TOAST_DURATION.LONG + 1000,
                );
             }
-         }, revealDelay);
-      } else {
-         setTimeout(() => {
-            dispatch({ type: "STOP_REVEALING" });
-         }, revealDelay);
+         }
+
+         // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
+         await new Promise((r) => setTimeout(r, 300));
+
+         // Calculate delay: use returnAnimationTime + extra buffer for safety
+         const revealDelay = returnAnimationTime(config.length) + 600;
+
+         // 2. Update UI (flips row)
+         dispatch({
+            type: "SUBMIT_GUESS",
+            result,
+            isWon: won,
+            isLost: lost,
+            message,
+         });
+
+         if (won || lost) {
+            const updatedStats = updateStats(won, newGuesses.length);
+            updateOptimistically(updatedStats);
+            await refresh();
+
+            if (lost) {
+               triggerToast(
+                  `The word is: ${config.word}`,
+                  TOAST_DURATION.LONG + 1000,
+               );
+            }
+
+            setTimeout(() => {
+               dispatch({ type: "STOP_REVEALING" });
+               dispatch({ type: "SET_GAME_OVER_MODAL", isOpen: true });
+
+               if (won) {
+                  triggerToast(
+                     message || state.gameMessage,
+                     TOAST_DURATION.LONG + 1000,
+                  );
+               }
+            }, revealDelay);
+         } else {
+            setTimeout(() => {
+               dispatch({ type: "STOP_REVEALING" });
+            }, revealDelay);
+         }
+      } finally {
+         isSubmittingRef.current = false;
       }
    }, [
       state.isGameOver,

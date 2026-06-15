@@ -82,4 +82,17 @@ export const ANNOUNCEMENTS: Announcement[] = [
             <p>Goodluck in the new week!</p>
         `,
    },
+   {
+      id: "guess-submission-fix",
+      title: "Double Guess Bug Fixed! 🛠️",
+      date: "2026-06-15",
+      type: "update",
+      lifespanDays: 7,
+      content: `
+            <h3>Double Guess Issue Addressed</h3>
+            <p>We have resolved a race condition where double guesses could occasionally go through without a confirmation prompt under slow network connections.</p>
+            <p>If you encounter any other bugs or have suggestions, please report them in the <strong>Bugs & Features</strong> chat channel under <strong>/messages/</strong>.</p>
+            <p>Thank you for your patience and happy guessing!</p>
+        `,
+   },
 ];

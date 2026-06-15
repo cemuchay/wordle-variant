@@ -43,7 +43,7 @@ const ChatHeader = ({
                                 <Zap size={12} className="text-correct" />
                                 {activeRoom.name}
                             </>
-                        ) : "Chat (24h)"}
+                        ) : "Chat (7d)"}
                     </h4>
                     <div className="h-4 flex items-center">
                         <AnimatePresence mode="wait">
@@ -71,7 +71,7 @@ const ChatHeader = ({
                                     className="text-[8px] sm:text-[10px] text-white/60 font-bold uppercase tracking-widest flex items-center gap-1.5"
                                 >
                                     {activeRoom?.is_core && activeRoom.type !== "bugs_features" ? (
-                                        <span className="text-amber-400 font-bold">(24h)</span>
+                                        <span className="text-amber-400 font-bold">(7d)</span>
                                     ) : activeRoom?.type === "dm" ? (
                                         null
                                     ) : (
