@@ -424,8 +424,42 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     // Marathon Custom Timer States
     const [timerType, setTimerType] = useState<'same' | 'custom'>('same');
-    const [marathonTimersArray, setMarathonTimersArray] = useState<number[]>([3, 5, 5, 10, 10]);
-    const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(['3', '5', '5', '10', '10']);
+    const [marathonTimersArray, setMarathonTimersArray] = useState<number[]>(() => {
+        // Default timers
+        const defaults = [3, 5, 5, 10, 10];
+        try {
+            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const games = [3, 4, 5, 6, 7]; // Standard bot sequence
+                return games.map((l, idx) => {
+                    if (parsed[idx] && parsed[idx].length === l) return Number(parsed[idx].timer);
+                    return l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
+                });
+            }
+        } catch (e) {
+            console.error('Failed to initialize marathon timers from cache', e);
+        }
+        return defaults;
+    });
+    const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(() => {
+        const defaults = ['3', '5', '5', '10', '10'];
+        try {
+            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const games = [3, 4, 5, 6, 7];
+                return games.map((l, idx) => {
+                    if (parsed[idx] && parsed[idx].length === l) return String(parsed[idx].timer);
+                    const t = l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
+                    return String(t);
+                });
+            }
+        } catch (e) {
+            console.error('Failed to initialize marathon timer inputs from cache', e);
+        }
+        return defaults;
+    });
 
     // Handicap States
     const { isAdmin } = useAdminStatus(effectiveUser?.id);
@@ -482,8 +516,35 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             if (next.length < newGames.length) {
                 while (next.length < newGames.length) {
                     const addedLen = newGames[next.length];
+                    const idx = next.length;
+                    
+                    // Look for existing timer in CURRENT state first
+                    let existingTime = null;
+                    for (let i = 0; i < next.length; i++) {
+                        if (newGames[i] === addedLen) {
+                            existingTime = next[i];
+                            break;
+                        }
+                    }
+
+                    // For Daily Bot Challenges, look for cached preference by INDEX and LENGTH
+                    if (isBotMarathon) {
+                        try {
+                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                            if (cached) {
+                                const parsed = JSON.parse(cached);
+                                // Only use cache if the length for this specific index matches
+                                if (parsed[idx] && parsed[idx].length === addedLen) {
+                                    existingTime = Number(parsed[idx].timer);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to load daily marathon timers cache', e);
+                        }
+                    }
+
                     const defaultTime = addedLen === 3 ? 3 : addedLen === 4 ? 5 : addedLen === 5 ? 5 : 10;
-                    next.push(defaultTime);
+                    next.push(existingTime || defaultTime);
                 }
             } else if (next.length > newGames.length) {
                 next.length = newGames.length;
@@ -496,8 +557,35 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             if (next.length < newGames.length) {
                 while (next.length < newGames.length) {
                     const addedLen = newGames[next.length];
+                    const idx = next.length;
+
+                    // Look for existing timer input in CURRENT state first
+                    let existingTimeInput = null;
+                    for (let i = 0; i < next.length; i++) {
+                        if (newGames[i] === addedLen) {
+                            existingTimeInput = next[i];
+                            break;
+                        }
+                    }
+
+                    // For Daily Bot Challenges, look for cached preference by INDEX and LENGTH
+                    if (isBotMarathon) {
+                        try {
+                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                            if (cached) {
+                                const parsed = JSON.parse(cached);
+                                // Only use cache if the length for this specific index matches
+                                if (parsed[idx] && parsed[idx].length === addedLen) {
+                                    existingTimeInput = String(parsed[idx].timer);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to load daily marathon timers cache', e);
+                        }
+                    }
+
                     const defaultTime = addedLen === 3 ? 3 : addedLen === 4 ? 5 : addedLen === 5 ? 5 : 10;
-                    next.push(String(defaultTime));
+                    next.push(existingTimeInput || String(defaultTime));
                 }
             } else if (next.length > newGames.length) {
                 next.length = newGames.length;
@@ -1168,6 +1256,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                         next[idx] = val;
                                                         return next;
                                                     });
+
                                                     const num = Number(val);
                                                     if (!isNaN(num) && num >= 1 && num <= 60) {
                                                         setMarathonTimersArray(prev => {
@@ -1175,6 +1264,18 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                             next[idx] = num;
                                                             return next;
                                                         });
+
+                                                        // Persist preference to localStorage ONLY for Daily Bot Challenges
+                                                        if (isBotMarathon) {
+                                                            try {
+                                                                const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                                                                const parsed = cached ? JSON.parse(cached) : {};
+                                                                parsed[idx] = { length: marathonGames[idx], timer: num };
+                                                                localStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
+                                                            } catch (e) {
+                                                                console.error('Failed to cache marathon timer', e);
+                                                            }
+                                                        }
                                                     }
                                                 }}
                                                 onBlur={() => {
@@ -1193,6 +1294,18 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                         next[idx] = String(num);
                                                         return next;
                                                     });
+
+                                                    // Persist preference to localStorage ONLY for Daily Bot Challenges
+                                                    if (isBotMarathon) {
+                                                        try {
+                                                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                                                            const parsed = cached ? JSON.parse(cached) : {};
+                                                            parsed[idx] = { length: marathonGames[idx], timer: num };
+                                                            localStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
+                                                        } catch (e) {
+                                                            console.error('Failed to cache marathon timer', e);
+                                                        }
+                                                    }
                                                 }}
                                                 className="w-full bg-black/40 border border-white/15 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
                                             />

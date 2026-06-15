@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { getWordLists } from '../../data/words';
 import { checkGuess, getLetterStatuses, calculateSkillIndex, getShapeShifterFeedbackAndWord, isHintDisabled, getHint } from '../../lib/game-logic';
 import { logger } from '../../lib/logger';
@@ -65,7 +65,8 @@ export const useActions = ({
    usedHint,
    hintRecord,
    retrySync,
-}: UseActionsProps) => {
+ }: UseActionsProps) => {
+   const isSubmittingRef = useRef(false);
 
    const onChar = useCallback(
       (char: string) => {
@@ -82,212 +83,218 @@ export const useActions = ({
 
    const onEnter = useCallback(async () => {
       if (isGameOver || isSaving || state.currentGuess.length !== wordLength) return;
-
-      const upperGuess = state.currentGuess.toUpperCase();
-
-      const { valid } = getWordLists(wordLength);
-      if (!valid.has(upperGuess)) {
-         triggerToast("Not in word list.");
-         dispatch({ type: "SHAKE_GUESS" });
-         setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
-         return;
-      }
-
-      const alreadyGuessed = guesses.some((guess: any) => {
-         const word = guess
-            .map((charObj: any) => charObj.letter)
-            .join("")
-            .toUpperCase();
-         return word === upperGuess;
-      });
-
-      if (alreadyGuessed) {
-         const confirmSubmit = await ask({
-            title: "Duplicate Guess",
-            message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
-            confirmLabel: "Yes, submit",
-            cancelLabel: "No, cancel",
-            type: "info",
-         });
-         if (!confirmSubmit) return;
-      }
-
-      let result = checkGuess(upperGuess, targetWord);
-      let finalTargetWord = targetWord;
-      const updatedTargetWords = [...targetWords];
-
-      if (challenge.is_shapeshifter) {
-         const shiftResult = getShapeShifterFeedbackAndWord(
-            upperGuess,
-            targetWord,
-            guesses,
-            wordLength,
-         );
-         result = shiftResult.feedback;
-         finalTargetWord = shiftResult.nextWord;
-
-         if (updatedTargetWords.length === 0) {
-            updatedTargetWords.push(initialTargetWord);
-         }
-         updatedTargetWords.push(finalTargetWord);
-
-         setTargetWords(updatedTargetWords);
-         setActiveTargetWord(finalTargetWord);
-      }
-
-      const newGuesses = [...guesses, result];
-      const newStatuses = getLetterStatuses(newGuesses);
-      const won = upperGuess === finalTargetWord;
-      const lost = newGuesses.length === maxAttempts;
-
-      dispatch({
-         type: "SUBMIT_GUESS",
-         newGuesses,
-         newStatuses,
-         isWon: won,
-         isLost: lost,
-      });
-
-      setIsSaving(true);
-      setRetryCount(0);
-
-      let timeTaken: number | null = null;
-      if (challenge.mode === "LIVE" && effectiveMaxTime && state.timeLeft !== null) {
-         timeTaken = effectiveMaxTime * 60 - state.timeLeft;
-      }
-
-      let resultPayload: any;
-      if (isMarathon) {
-         if (won || lost) {
-            const skillScore = calculateSkillIndex({
-               attempts: newGuesses.length,
-               maxAttempts: maxAttempts,
-               usedHint: usedHint,
-               guesses: newGuesses,
-               gameDate: new Date().toISOString().split("T")[0],
-               hintRecord: hintRecord,
-            }).finalScore;
-            resultPayload = {
-               status: "completed",
-               score: skillScore,
-               attempts: newGuesses.length,
-               guesses: newGuesses,
-               hints_used: usedHint,
-               hint_record: hintRecord,
-               time_taken: timeTaken,
-               ...(challenge.is_shapeshifter
-                  ? { target_words: updatedTargetWords }
-                  : {}),
-            };
-         } else {
-            resultPayload = {
-               status: "playing",
-               guesses: newGuesses,
-               attempts: newGuesses.length,
-               hints_used: usedHint,
-               hint_record: hintRecord,
-               ...(challenge.is_shapeshifter
-                  ? { target_words: updatedTargetWords }
-                  : {}),
-            };
-         }
-      } else {
-         if (won || lost) {
-            const skillScore = calculateSkillIndex({
-               attempts: newGuesses.length,
-               maxAttempts: maxAttempts,
-               usedHint: usedHint,
-               guesses: newGuesses,
-               gameDate: new Date().toISOString().split("T")[0],
-               hintRecord: hintRecord,
-            }).finalScore;
-            resultPayload = {
-               status: "completed",
-               score: skillScore,
-               attempts: newGuesses.length,
-               guesses: newGuesses,
-               hints_used: usedHint,
-               hint_record: hintRecord,
-               time_taken: timeTaken,
-               ...(challenge.is_shapeshifter
-                  ? { target_words: updatedTargetWords }
-                  : {}),
-            };
-         } else {
-            resultPayload = {
-               status: "playing",
-               score: 0,
-               attempts: newGuesses.length,
-               guesses: newGuesses,
-               hints_used: usedHint,
-               hint_record: hintRecord,
-               ...(challenge.is_shapeshifter
-                  ? { target_words: updatedTargetWords }
-                  : {}),
-            };
-         }
-      }
-
-      let success = false;
-      let attempt = 0;
-      const maxSyncAttempts = 3;
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
 
       try {
-         while (attempt < maxSyncAttempts && !success) {
-            if (attempt > 0) {
-               setRetryCount(attempt);
-               await new Promise((r) => setTimeout(r, 1500));
-            }
-            success = await wrappedSubmitResult(
-               resultPayload,
-               isMarathon ? wordLength : undefined,
-               isMarathon ? gameIndex! : undefined,
-            );
-            attempt++;
+         const upperGuess = state.currentGuess.toUpperCase();
+
+         const { valid } = getWordLists(wordLength);
+         if (!valid.has(upperGuess)) {
+            triggerToast("Not in word list.");
+            dispatch({ type: "SHAKE_GUESS" });
+            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
+            return;
          }
-      } catch (e) {
-         logger.error("[Engine] Error during guess submission sync", {
-            error: e,
+
+         const alreadyGuessed = guesses.some((guess: any) => {
+            const word = guess
+               .map((charObj: any) => charObj.letter)
+               .join("")
+               .toUpperCase();
+            return word === upperGuess;
          });
-         success = false;
-      }
 
-      setIsSaving(false);
-      setRetryCount(0);
+         if (alreadyGuessed) {
+            const confirmSubmit = await ask({
+               title: "Duplicate Guess",
+               message: `You already guessed "${upperGuess}". Are you sure you want to submit it again?`,
+               confirmLabel: "Yes, submit",
+               cancelLabel: "No, cancel",
+               type: "info",
+            });
+            if (!confirmSubmit) return;
+         }
 
-      if (!success) {
-         setSyncFailed(true);
-         lastPayloadRef.current = {
-            payload: resultPayload,
-            wordLen: isMarathon ? wordLength : undefined,
-            gIdx: isMarathon ? gameIndex! : undefined,
-         };
-         triggerToast("Sync failed. Check connection.", 5000);
-      } else {
-         setSyncFailed(false);
-         lastPayloadRef.current = null;
-      }
+         let result = checkGuess(upperGuess, targetWord);
+         let finalTargetWord = targetWord;
+         const updatedTargetWords = [...targetWords];
 
-      if (won || lost) {
-         const transitionDelay = returnAnimationTime(wordLength) + 600;
-
-         setTimeout(() => {
-            dispatch({ type: "STOP_REVEALING" });
-            triggerToast(
-               won ? "Completed! 🎉" : `The word was ${targetWord}`,
-               5000,
+         if (challenge.is_shapeshifter) {
+            const shiftResult = getShapeShifterFeedbackAndWord(
+               upperGuess,
+               targetWord,
+               guesses,
+               wordLength,
             );
-            if (isMarathon) {
-               if (onLengthComplete) onLengthComplete();
-            } else {
-               onFinish();
+            result = shiftResult.feedback;
+            finalTargetWord = shiftResult.nextWord;
+
+            if (updatedTargetWords.length === 0) {
+               updatedTargetWords.push(initialTargetWord);
             }
-         }, transitionDelay);
-      } else {
-         const transitionDelay = returnAnimationTime(wordLength) + 600;
-         setTimeout(() => {
-            dispatch({ type: "STOP_REVEALING" });
-         }, transitionDelay);
+            updatedTargetWords.push(finalTargetWord);
+
+            setTargetWords(updatedTargetWords);
+            setActiveTargetWord(finalTargetWord);
+         }
+
+         const newGuesses = [...guesses, result];
+         const newStatuses = getLetterStatuses(newGuesses);
+         const won = upperGuess === finalTargetWord;
+         const lost = newGuesses.length === maxAttempts;
+
+         dispatch({
+            type: "SUBMIT_GUESS",
+            newGuesses,
+            newStatuses,
+            isWon: won,
+            isLost: lost,
+         });
+
+         setIsSaving(true);
+         setRetryCount(0);
+
+         let timeTaken: number | null = null;
+         if (challenge.mode === "LIVE" && effectiveMaxTime && state.timeLeft !== null) {
+            timeTaken = effectiveMaxTime * 60 - state.timeLeft;
+         }
+
+         let resultPayload: any;
+         if (isMarathon) {
+            if (won || lost) {
+               const skillScore = calculateSkillIndex({
+                  attempts: newGuesses.length,
+                  maxAttempts: maxAttempts,
+                  usedHint: usedHint,
+                  guesses: newGuesses,
+                  gameDate: new Date().toISOString().split("T")[0],
+                  hintRecord: hintRecord,
+               }).finalScore;
+               resultPayload = {
+                  status: "completed",
+                  score: skillScore,
+                  attempts: newGuesses.length,
+                  guesses: newGuesses,
+                  hints_used: usedHint,
+                  hint_record: hintRecord,
+                  time_taken: timeTaken,
+                  ...(challenge.is_shapeshifter
+                     ? { target_words: updatedTargetWords }
+                     : {}),
+               };
+            } else {
+               resultPayload = {
+                  status: "playing",
+                  guesses: newGuesses,
+                  attempts: newGuesses.length,
+                  hints_used: usedHint,
+                  hint_record: hintRecord,
+                  ...(challenge.is_shapeshifter
+                     ? { target_words: updatedTargetWords }
+                     : {}),
+               };
+            }
+         } else {
+            if (won || lost) {
+               const skillScore = calculateSkillIndex({
+                  attempts: newGuesses.length,
+                  maxAttempts: maxAttempts,
+                  usedHint: usedHint,
+                  guesses: newGuesses,
+                  gameDate: new Date().toISOString().split("T")[0],
+                  hintRecord: hintRecord,
+               }).finalScore;
+               resultPayload = {
+                  status: "completed",
+                  score: skillScore,
+                  attempts: newGuesses.length,
+                  guesses: newGuesses,
+                  hints_used: usedHint,
+                  hint_record: hintRecord,
+                  time_taken: timeTaken,
+                  ...(challenge.is_shapeshifter
+                     ? { target_words: updatedTargetWords }
+                     : {}),
+               };
+            } else {
+               resultPayload = {
+                  status: "playing",
+                  score: 0,
+                  attempts: newGuesses.length,
+                  guesses: newGuesses,
+                  hints_used: usedHint,
+                  hint_record: hintRecord,
+                  ...(challenge.is_shapeshifter
+                     ? { target_words: updatedTargetWords }
+                     : {}),
+               };
+            }
+         }
+
+         let success = false;
+         let attempt = 0;
+         const maxSyncAttempts = 3;
+
+         try {
+            while (attempt < maxSyncAttempts && !success) {
+               if (attempt > 0) {
+                  setRetryCount(attempt);
+                  await new Promise((r) => setTimeout(r, 1500));
+               }
+               success = await wrappedSubmitResult(
+                  resultPayload,
+                  isMarathon ? wordLength : undefined,
+                  isMarathon ? gameIndex! : undefined,
+               );
+               attempt++;
+            }
+         } catch (e) {
+            logger.error("[Engine] Error during guess submission sync", {
+               error: e,
+            });
+            success = false;
+         }
+
+         setIsSaving(false);
+         setRetryCount(0);
+
+         if (!success) {
+            setSyncFailed(true);
+            lastPayloadRef.current = {
+               payload: resultPayload,
+               wordLen: isMarathon ? wordLength : undefined,
+               gIdx: isMarathon ? gameIndex! : undefined,
+            };
+            triggerToast("Sync failed. Check connection.", 5000);
+         } else {
+            setSyncFailed(false);
+            lastPayloadRef.current = null;
+         }
+
+         if (won || lost) {
+            const transitionDelay = returnAnimationTime(wordLength) + 600;
+
+            setTimeout(() => {
+               dispatch({ type: "STOP_REVEALING" });
+               triggerToast(
+                  won ? "Completed! 🎉" : `The word was ${targetWord}`,
+                  5000,
+               );
+               if (isMarathon) {
+                  if (onLengthComplete) onLengthComplete();
+               } else {
+                  onFinish();
+               }
+            }, transitionDelay);
+         } else {
+            const transitionDelay = returnAnimationTime(wordLength) + 600;
+            setTimeout(() => {
+               dispatch({ type: "STOP_REVEALING" });
+            }, transitionDelay);
+         }
+      } finally {
+         isSubmittingRef.current = false;
       }
    }, [
       isGameOver,
