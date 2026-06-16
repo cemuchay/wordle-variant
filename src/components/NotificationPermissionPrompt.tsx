@@ -21,7 +21,7 @@ export default function NotificationPermissionPrompt() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDismissed(dismissed);
 
-    if (isStandalone && notGranted && !dismissed) {
+    if ((isStandalone || import.meta.env.DEV) && notGranted && !dismissed) {
       setShowPrompt(true);
     }
   }, []);

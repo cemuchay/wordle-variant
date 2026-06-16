@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       // Fetch subscriptions for the specific user
       const { data: subs, error } = await supabaseAdmin
          .from("push_subscriptions")
-         .select("subscription")
+         .select("id, subscription")
          .eq("user_id", user_id);
 
       if (error || !subs) throw error || new Error("No subscriptions found");
@@ -45,9 +45,32 @@ Deno.serve(async (req) => {
          ),
       );
 
-      await Promise.allSettled(notifications);
+      const results = await Promise.allSettled(notifications);
+      
+      let successfulCount = 0;
+      const staleIds: string[] = [];
 
-      return new Response(JSON.stringify({ sent: subs.length }), {
+      results.forEach((res, i) => {
+         if (res.status === "fulfilled") {
+            successfulCount++;
+         } else {
+            console.error(`[Push Error] Failed to send to subscription ${i}:`, res.reason);
+            // 410 Gone means the subscription has expired or been revoked
+            if (res.reason?.statusCode === 410) {
+               staleIds.push(subs[i].id);
+            }
+         }
+      });
+
+      if (staleIds.length > 0) {
+         console.log(`[Push Cleanup] Deleting ${staleIds.length} stale subscriptions...`);
+         await supabaseAdmin
+            .from("push_subscriptions")
+            .delete()
+            .in("id", staleIds);
+      }
+
+      return new Response(JSON.stringify({ sent: subs.length, successful: successfulCount, results }), {
          headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
    } catch (err) {
