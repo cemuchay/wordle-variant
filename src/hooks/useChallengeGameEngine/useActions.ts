@@ -126,6 +126,7 @@ export const useActions = ({
                targetWord,
                guesses,
                wordLength,
+               hintRecord
             );
             result = shiftResult.feedback;
             finalTargetWord = shiftResult.nextWord;
@@ -366,6 +367,7 @@ export const useActions = ({
                attempts: guesses.length,
                hints_used: true,
                hint_record: hintWithRow,
+               ...(challenge.is_shapeshifter ? { target_words: targetWords } : {}),
             };
          } else {
             resultPayload = {
@@ -375,6 +377,7 @@ export const useActions = ({
                guesses: guesses,
                hints_used: true,
                hint_record: hintWithRow,
+               ...(challenge.is_shapeshifter ? { target_words: targetWords } : {}),
             };
          }
          try {

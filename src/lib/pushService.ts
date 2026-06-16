@@ -14,8 +14,56 @@ function urlBase64ToUint8Array(base64String: string) {
    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+const MAX_SUBSCRIPTIONS_PER_USER = 3;
+let isSubscribing = false;
+
+/**
+ * Ensures the user doesn't exceed the maximum number of push subscriptions.
+ * If the limit is reached, it deletes the oldest subscription(s).
+ */
+async function enforceSubscriptionLimit(userId: string, newEndpoint: string) {
+   try {
+      // 1. Get all subscriptions for this user, ordered by age
+      const { data: subs, error } = await supabase
+         .from("push_subscriptions")
+         .select("id, endpoint")
+         .eq("user_id", userId)
+         .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      if (!subs || subs.length < MAX_SUBSCRIPTIONS_PER_USER) return;
+
+      // 2. Check if the new endpoint is already in the list
+      const exists = subs.some((s) => s.endpoint === newEndpoint);
+
+      // If the endpoint already exists, we are just updating an existing subscription.
+      // We only need to trim if the count is strictly GREATER than the limit.
+      const limit = exists
+         ? MAX_SUBSCRIPTIONS_PER_USER
+         : MAX_SUBSCRIPTIONS_PER_USER - 1;
+
+      if (subs.length <= limit) return;
+
+      // 3. Delete the oldest ones until we are under the limit
+      const toDeleteCount = subs.length - limit;
+      const staleIds = subs.slice(0, toDeleteCount).map((s) => s.id);
+
+      await supabase.from("push_subscriptions").delete().in("id", staleIds);
+   } catch (err) {
+      console.warn("[Push Service] Failed to enforce subscription limit:", err);
+   }
+}
+
 export async function subscribeToPush() {
+   if (isSubscribing) {
+      console.warn(
+         "[Push Service] Subscription already in progress, ignoring duplicate request.",
+      );
+      return;
+   }
+
    const toast = useAppStore.getState().triggerToast;
+   isSubscribing = true;
 
    try {
       const permission = await Notification.requestPermission();
@@ -26,7 +74,7 @@ export async function subscribeToPush() {
 
       const registration = await navigator.serviceWorker.ready;
 
-      // Unsubscribe from any active subscriptions first to clear out old keys/stale endpoints
+      // Unsubscribe from any active subscriptions first to clear out old keys/stale endpoints in browser
       try {
          const existingSub = await registration.pushManager.getSubscription();
          if (existingSub) {
@@ -58,13 +106,24 @@ export async function subscribeToPush() {
                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
 
-            // Save to Supabase
+            const {
+               data: { user },
+            } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not authenticated");
+
+            // Enforce limit before saving to Supabase
+            await enforceSubscriptionLimit(user.id, subscription.endpoint);
+
+            // Save to Supabase - UPSERT will handle updates if endpoint already exists
+            const subData = subscription.toJSON();
             const { error } = await supabase.from("push_subscriptions").upsert(
                {
-                  subscription: subscription.toJSON(),
-                  user_id: (await supabase.auth.getUser()).data.user?.id,
+                  subscription: subData,
+                  user_id: user.id,
+                  endpoint: subData.endpoint,
+                  last_seen_at: new Date().toISOString(),
                },
-               { onConflict: "subscription" },
+               { onConflict: "endpoint" },
             );
 
             if (error) {
@@ -99,6 +158,8 @@ export async function subscribeToPush() {
    } catch (err: any) {
       console.error("[Push Service] Fatal error in subscribeToPush:", err);
       throw err;
+   } finally {
+      isSubscribing = false;
    }
 }
 
@@ -107,16 +168,22 @@ export async function unsubscribeFromPush() {
    try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
+
       if (subscription) {
-         // Delete from Supabase first
+         const endpoint = subscription.endpoint;
+
+         // Delete only THIS specific subscription from Supabase
          const user = (await supabase.auth.getUser()).data.user;
          if (user) {
             await supabase
                .from("push_subscriptions")
                .delete()
-               .eq("user_id", user.id);
+               .eq("user_id", user.id)
+               .eq("endpoint", endpoint);
+
+            console.log("[Push Service] Deleted subscription from database.");
          }
-         
+
          // Unsubscribe in browser
          await subscription.unsubscribe();
          toast("Notifications disabled.", 3000);
@@ -129,42 +196,84 @@ export async function unsubscribeFromPush() {
 
 export async function syncPushSubscriptionIfNeeded() {
    try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+         data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       // Check if notification permission is granted
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ("Notification" in window && Notification.permission === "granted") {
          const registration = await navigator.serviceWorker.ready;
          const subscription = await registration.pushManager.getSubscription();
 
          if (subscription) {
-            // Check if this subscription exists in the database
+            const endpoint = subscription.endpoint;
+
+            // Check if THIS specific subscription exists and its last activity
             const { data, error } = await supabase
                .from("push_subscriptions")
-               .select("id")
+               .select("id, last_seen_at")
                .eq("user_id", user.id)
+               .eq("endpoint", endpoint)
                .maybeSingle();
 
             if (!error && !data) {
                // Subscription exists in browser but not in DB, so upsert it
-               console.log("[Push Service] Syncing subscription in background...");
-               await supabase.from("push_subscriptions").upsert({
-                  subscription: subscription.toJSON(),
-                  user_id: user.id,
-               });
+               console.log(
+                  "[Push Service] Syncing missing subscription in background...",
+               );
+
+               await enforceSubscriptionLimit(user.id, endpoint);
+
+               const subData = subscription.toJSON();
+               await supabase.from("push_subscriptions").upsert(
+                  {
+                     subscription: subData,
+                     user_id: user.id,
+                     endpoint: endpoint,
+                     last_seen_at: new Date().toISOString(),
+                  },
+                  { onConflict: "endpoint" },
+               );
+            } else if (!error && data) {
+               // Throttle: Only update last_seen_at if it's been more than 24 hours
+               const lastSeen = new Date(data.last_seen_at).getTime();
+               const now = new Date().getTime();
+               const hoursSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60);
+
+               if (hoursSinceLastSeen > 24) {
+                  console.log(
+                     "[Push Service] Refreshing activity timestamp...",
+                  );
+                  await supabase
+                     .from("push_subscriptions")
+                     .update({ last_seen_at: new Date().toISOString() })
+                     .eq("endpoint", endpoint);
+               }
             }
          } else {
             // Permission is granted but browser doesn't have a subscription yet!
             // We can automatically generate one in the background
-            console.log("[Push Service] Generating missing subscription in background...");
+            console.log(
+               "[Push Service] Generating missing subscription in background...",
+            );
             const newSub = await registration.pushManager.subscribe({
                userVisibleOnly: true,
                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
-            await supabase.from("push_subscriptions").upsert({
-               subscription: newSub.toJSON(),
-               user_id: user.id,
-            });
+
+            await enforceSubscriptionLimit(user.id, newSub.endpoint);
+
+            const subData = newSub.toJSON();
+            await supabase.from("push_subscriptions").upsert(
+               {
+                  subscription: subData,
+                  user_id: user.id,
+                  endpoint: subData.endpoint,
+                  last_seen_at: new Date().toISOString(),
+               },
+               { onConflict: "endpoint" },
+            );
          }
       }
    } catch (e) {
