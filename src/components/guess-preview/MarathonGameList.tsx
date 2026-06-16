@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import type { MarathonGame } from './types';
 
 interface MarathonGameListProps {
@@ -29,6 +29,26 @@ export const MarathonGameList = memo(({
     isCreator,
     marathonGamesRef,
 }: MarathonGameListProps) => {
+    // Calculate total occurrences of each length to decide if we need numbering (e.g., (1), (2))
+    const lengthTotals = useMemo(() => {
+        const counts: Record<number, number> = {};
+        marathonGames.forEach(g => {
+            counts[g.wordLength] = (counts[g.wordLength] || 0) + 1;
+        });
+        return counts;
+    }, [marathonGames]);
+
+    // Generate descriptive labels for each game based on its occurrence in the marathon
+    const gameLabels = useMemo(() => {
+        const currentCounts: Record<number, number> = {};
+        return marathonGames.map(g => {
+            const len = g.wordLength;
+            currentCounts[len] = (currentCounts[len] || 0) + 1;
+            const total = lengthTotals[len] || 0;
+            return total > 1 ? `${len}L (${currentCounts[len]})` : `${len}L`;
+        });
+    }, [marathonGames, lengthTotals]);
+
     return (
         <div ref={marathonGamesRef} className="mb-4 border-b border-white/5 py-4 w-full scroll-mt-20">
             <div className="flex justify-between items-center mb-3 px-1">
@@ -81,7 +101,7 @@ export const MarathonGameList = memo(({
                                 }}
                                 className={`w-full px-1.5 py-2 h-auto min-h-[32px] rounded-lg text-[10px] font-black transition-all flex items-center justify-center text-center ${marathonGameIndex === idx ? "bg-correct text-black scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
                             >
-                                #{idx + 1} ({game.wordLength}L)
+                                #{idx + 1} ({gameLabels[idx]})
                             </button>
                         );
                     })}
@@ -130,7 +150,7 @@ export const MarathonGameList = memo(({
                                                 }}
                                                 className={`w-full px-1.5 py-2 h-auto min-h-[32px] rounded-lg text-[10px] font-black transition-all flex items-center justify-center text-center ${marathonGameIndex === idx ? "bg-correct text-black scale-105 shadow-md shadow-correct/20 z-10" : canSelect ? "bg-white/10 text-white hover:bg-white/20" : "bg-white/5 text-gray-400 hover:bg-white/10 cursor-pointer"}`}
                                             >
-                                                #{idx + 1}
+                                                {gameLabels[idx]}
                                             </button>
                                         );
                                     })}

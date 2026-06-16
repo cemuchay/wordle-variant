@@ -54,7 +54,7 @@ interface MarathonLengthItemProps {
 const MarathonLengthItem = memo(function MarathonLengthItem({
     game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked, lockReason
 }: MarathonLengthItemProps) {
-    const effectiveMaxAttempts = challenge.is_shapeshifter ? 10 : MAX_ATTEMPTS;
+    const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
     const isCompleted = prog?.status === 'completed';
     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
     const isFinished = isCompleted || isFailed;
@@ -286,7 +286,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         for (let idx = 0; idx < marathonGames.length; idx++) {
             const game = marathonGames[idx];
             const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-            const effectiveMaxAttempts = challenge.is_shapeshifter ? 10 : MAX_ATTEMPTS;
+            const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
             const isCompleted = prog?.status === 'completed';
             const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
             const isFinished = isCompleted || isFailed;

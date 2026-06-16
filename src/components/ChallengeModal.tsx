@@ -704,9 +704,9 @@ const AuthenticatedChallengeContent = memo(
                     </li>
                     <li>
                       <strong className="text-purple-400">
-                        10 Attempts:
+                        20 Attempts:
                       </strong>{" "}
-                      Because the algorithm shifts the word to avoid matching, the game limit is extended to <strong className="text-white">10 tries</strong> to help you "box it in".
+                      Because the algorithm shifts the word to avoid matching, the game limit is extended to <strong className="text-white">20 tries</strong> to help you "box it in".
                     </li>
                     <li>
                       <strong className="text-purple-400">
