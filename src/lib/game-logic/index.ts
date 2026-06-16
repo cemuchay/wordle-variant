@@ -1311,21 +1311,30 @@ export function getShapeShifterFeedbackAndWord(
    guess: string,
    currentTargetWord: string,
    pastGuesses: GuessResult[][],
-   wordLength: number
+   wordLength: number,
+   hintRecord?: { letter: string; index: number } | null
 ): { nextWord: string; feedback: GuessResult[] } {
    const { official } = getWordLists(wordLength);
    const upperCurrent = currentTargetWord.toUpperCase();
    const upperGuess = guess.toUpperCase();
 
-   // Filter candidates based on past guesses
+   // Filter candidates based on past guesses AND hintRecord
    let candidates = official.map(w => w.toUpperCase());
    for (const pastGuess of pastGuesses) {
       candidates = candidates.filter(w => isGuessCompatible(w, pastGuess));
    }
 
-   // Ensure the current target word is at least in the pool if it satisfies past constraints
+   // If a hint was used, only keep candidates that match the hint
+   if (hintRecord && hintRecord.letter) {
+      const hintLetter = hintRecord.letter.toUpperCase();
+      candidates = candidates.filter(w => w[hintRecord.index] === hintLetter);
+   }
+
+   // Ensure the current target word is at least in the pool if it satisfies constraints
    if (upperCurrent && !candidates.includes(upperCurrent)) {
-      const isCurrentCompatible = pastGuesses.every(g => isGuessCompatible(upperCurrent, g));
+      const isCurrentCompatible = pastGuesses.every(g => isGuessCompatible(upperCurrent, g)) &&
+         (!hintRecord || upperCurrent[hintRecord.index] === hintRecord.letter.toUpperCase());
+      
       if (isCurrentCompatible) {
          candidates.push(upperCurrent);
       }

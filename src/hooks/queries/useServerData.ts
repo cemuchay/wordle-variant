@@ -34,7 +34,6 @@ export const useProfile = (userId: string | undefined) => {
       queryKey: ["profile", userId],
       queryFn: async () => {
          if (!userId) return null;
-         console.log("[Cache] Fetching fresh profile...");
          const { data, error } = await supabase
             .from("profiles")
             .select("*")
@@ -71,7 +70,6 @@ export const useChallengeStatus = (userId: string | undefined) => {
       queryKey: ["challenge-unread", userId],
       queryFn: async () => {
          if (!userId) return { unreadCount: 0, participations: [] };
-         console.log("[Cache] Fetching fresh challenge status...");
 
          const { data, error } = await supabase
             .from("challenge_participants")

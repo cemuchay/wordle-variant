@@ -17,6 +17,7 @@ import {
     Home,
     X,
     FileCode,
+    Bell,
     Trophy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,6 +68,7 @@ export const AdminPage: React.FC = () => {
     // Database Status
     const [flaggedMap, setFlaggedMap] = useState<Map<string, FlaggedWordData>>(new Map());
     const [loadingFlags, setLoadingFlags] = useState(false);
+    const [pushSubCount, setPushSubCount] = useState<number | null>(null);
 
     // Modal States
     const [activeModal, setActiveModal] = useState<'flag' | 'edit' | null>(null);
@@ -88,7 +90,6 @@ export const AdminPage: React.FC = () => {
 
             if (error) {
                 console.error('Error fetching flagged words:', error);
-                // triggerToast is defined later, using alert as fallback during init
             } else {
                 const map = new Map<string, FlaggedWordData>();
                 data?.forEach((row: any) => {
@@ -96,6 +97,13 @@ export const AdminPage: React.FC = () => {
                 });
                 setFlaggedMap(map);
             }
+
+            // Also fetch push sub count
+            const { count, error: countError } = await supabase
+                .from('push_subscriptions')
+                .select('*', { count: 'exact', head: true });
+
+            if (!countError) setPushSubCount(count);
         } finally {
             setLoadingFlags(false);
         }
@@ -316,11 +324,11 @@ SELECT create_admin_user(
                 const now = new Date();
                 const lagosOffset = 1 * 60 * 60 * 1000; // Lagos is UTC+1
                 const lagosNow = new Date(now.getTime() + lagosOffset);
-                
+
                 const daysUntilMonday = (8 - lagosNow.getUTCDay()) % 7 || 7;
                 const nextMonday = new Date(lagosNow.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
                 nextMonday.setUTCHours(0, 0, 0, 0);
-                
+
                 const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000);
                 nextSunday.setUTCHours(23, 59, 59, 999);
 
@@ -340,7 +348,7 @@ SELECT create_admin_user(
 
                 // Pre-generate words for the entire week (Monday to Sunday)
                 const allGeneratedWords = [];
-                
+
                 for (let d = 0; d < 7; d++) {
                     const currentDay = new Date(nextMonday.getTime() + d * 24 * 60 * 60 * 1000);
                     const playDateStr = currentDay.toISOString().split('T')[0];
@@ -349,7 +357,7 @@ SELECT create_admin_user(
                         const pool = OFFICIAL_WORDS[len]();
                         const word = pool[Math.floor(Math.random() * pool.length)];
                         const salt = Math.random().toString(36).substring(2, 15);
-                        
+
                         allGeneratedWords.push({
                             play_date: playDateStr,
                             word_length: len,
@@ -577,11 +585,10 @@ SELECT create_admin_user(
                         </div>
                         <button
                             onClick={() => setShowSqlHelper(!showSqlHelper)}
-                            className={`p-2 rounded-full border transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer ${
-                                showSqlHelper
+                            className={`p-2 rounded-full border transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer ${showSqlHelper
                                     ? 'bg-correct border-correct text-black'
                                     : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/30'
-                            }`}
+                                }`}
                             title="SQL Helper"
                         >
                             <FileCode size={16} />
@@ -598,26 +605,24 @@ SELECT create_admin_user(
             </header>
 
             <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
-                
+
                 {/* Dashboard Navigation Tabs */}
                 <div className="flex items-center gap-2 bg-gray-900 border border-white/10 p-1.5 rounded-2xl self-start">
                     <button
                         onClick={() => setActiveTab('words')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
-                            activeTab === 'words'
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'words'
                                 ? 'bg-white text-black shadow-lg shadow-white/5'
                                 : 'text-gray-500 hover:text-white'
-                        }`}
+                            }`}
                     >
                         <FileCode size={14} /> Word Vetting
                     </button>
                     <button
                         onClick={() => setActiveTab('marathon')}
-                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
-                            activeTab === 'marathon'
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'marathon'
                                 ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
                                 : 'text-gray-500 hover:text-white'
-                        }`}
+                            }`}
                     >
                         <Trophy size={14} /> Bot Marathon
                     </button>
@@ -650,7 +655,7 @@ SELECT create_admin_user(
                                         </p>
                                         <div className="relative">
                                             <pre className="bg-black/60 text-correct border border-white/5 rounded-xl p-4 text-[11px] font-mono overflow-x-auto whitespace-pre leading-relaxed select-all">
-{`-- Execute in Supabase SQL editor to create a new Admin user
+                                                {`-- Execute in Supabase SQL editor to create a new Admin user
 SELECT create_admin_user(
   'newadmin@wordle.com',   -- Admin Email
   'securepassword123',     -- Admin Password
@@ -671,7 +676,7 @@ SELECT create_admin_user(
                         </AnimatePresence>
 
                         {/* Dashboard stats cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                             <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 flex items-center justify-between">
                                 <div>
                                     <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">3-Letter Words (Official)</span>
@@ -703,6 +708,18 @@ SELECT create_admin_user(
                                     <Flag size={20} />
                                 </div>
                             </div>
+
+                            <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Active Push Devices</span>
+                                    <h4 className="text-3xl font-black mt-1 text-indigo-400">
+                                        {pushSubCount === null ? <RefreshCw className="w-5 h-5 animate-spin inline-block text-indigo-400" /> : pushSubCount}
+                                    </h4>
+                                </div>
+                                <div className="bg-indigo-500/10 p-3 rounded-xl text-indigo-400 border border-indigo-500/20">
+                                    <Bell size={20} />
+                                </div>
+                            </div>
                         </div>
 
                         {/* Control Panel Filter Area */}
@@ -713,21 +730,19 @@ SELECT create_admin_user(
                                 <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/5 self-start">
                                     <button
                                         onClick={() => setActiveLength(3)}
-                                        className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                            activeLength === 3 
-                                                ? 'bg-correct text-black shadow-md' 
+                                        className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeLength === 3
+                                                ? 'bg-correct text-black shadow-md'
                                                 : 'text-gray-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         3-Letter Words
                                     </button>
                                     <button
                                         onClick={() => setActiveLength(4)}
-                                        className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                            activeLength === 4 
-                                                ? 'bg-correct text-black shadow-md' 
+                                        className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeLength === 4
+                                                ? 'bg-correct text-black shadow-md'
                                                 : 'text-gray-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         4-Letter Words
                                     </button>
@@ -737,31 +752,28 @@ SELECT create_admin_user(
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
                                         onClick={() => setFilterType('all')}
-                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                                            filterType === 'all'
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${filterType === 'all'
                                                 ? 'bg-white border-white text-black'
                                                 : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         All Words ({processedWords.length})
                                     </button>
                                     <button
                                         onClick={() => setFilterType('flagged')}
-                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                            filterType === 'flagged'
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${filterType === 'flagged'
                                                 ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20'
                                                 : 'bg-red-500/5 border-red-500/10 text-red-400 hover:bg-red-500/10'
-                                        }`}
+                                            }`}
                                     >
                                         <Flag size={12} /> Flagged
                                     </button>
                                     <button
                                         onClick={() => setFilterType('unflagged')}
-                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                            filterType === 'unflagged'
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${filterType === 'unflagged'
                                                 ? 'bg-correct border-correct text-black shadow-lg shadow-correct/20'
                                                 : 'bg-correct/5 border-correct/10 text-correct hover:bg-correct/10'
-                                        }`}
+                                            }`}
                                     >
                                         <Check size={12} /> Safe
                                     </button>
@@ -821,11 +833,10 @@ SELECT create_admin_user(
                                 <div className="flex flex-wrap gap-1.5">
                                     <button
                                         onClick={() => setStartLetter(null)}
-                                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                                            startLetter === null
+                                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${startLetter === null
                                                 ? 'bg-correct border-correct text-black'
                                                 : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         ALL
                                     </button>
@@ -837,11 +848,10 @@ SELECT create_admin_user(
                                             <button
                                                 key={letter}
                                                 onClick={() => setStartLetter(startLetter === letter ? null : letter)}
-                                                className={`w-7.5 h-7.5 rounded-lg text-[10px] font-black border transition-all flex items-center justify-center cursor-pointer ${
-                                                    startLetter === letter
+                                                className={`w-7.5 h-7.5 rounded-lg text-[10px] font-black border transition-all flex items-center justify-center cursor-pointer ${startLetter === letter
                                                         ? 'bg-correct border-correct text-black shadow-md'
                                                         : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                                }`}
+                                                    }`}
                                                 title={`${countForLetter} words`}
                                             >
                                                 {letter}
@@ -984,7 +994,7 @@ SELECT create_admin_user(
                                         >
                                             <ChevronLeft size={16} />
                                         </button>
-                                        
+
                                         {/* Pages representation */}
                                         {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
                                             // Make page numbers pivot around current page
@@ -1001,11 +1011,10 @@ SELECT create_admin_user(
                                                 <button
                                                     key={pageNum}
                                                     onClick={() => setCurrentPage(pageNum)}
-                                                    className={`w-9.5 h-9.5 text-[10px] font-black rounded-xl border transition-all flex items-center justify-center cursor-pointer ${
-                                                        currentPage === pageNum
+                                                    className={`w-9.5 h-9.5 text-[10px] font-black rounded-xl border transition-all flex items-center justify-center cursor-pointer ${currentPage === pageNum
                                                             ? 'bg-correct border-correct text-black shadow-md shadow-correct/10'
                                                             : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {pageNum}
                                                 </button>
