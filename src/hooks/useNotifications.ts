@@ -89,7 +89,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
 
     // 3. Derived State
     const unreadCount = useMemo(() => 
-        notifications.filter(n => !n.is_read).length, 
+        notifications.filter(n => !n.is_read && !n.delivered_via_push).length, 
     [notifications]);
 
     // 4. Mutations

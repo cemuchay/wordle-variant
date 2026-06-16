@@ -13,8 +13,8 @@ Deno.serve(async (req) => {
       return new Response("ok", { headers: corsHeaders });
    }
 
-   try {
-      const { user_id, title, body } = await req.json();
+    try {
+      const { user_id, notification_id, title, body } = await req.json();
 
       // Initialize Supabase Admin (Bypasses RLS to fetch all user devices)
       const supabaseAdmin = createClient(
@@ -68,6 +68,15 @@ Deno.serve(async (req) => {
             .from("push_subscriptions")
             .delete()
             .in("id", staleIds);
+      }
+
+      // If at least one push notification succeeded, mark it in the database
+      if (successfulCount > 0 && notification_id) {
+         console.log(`[Push Success] Marking notification ${notification_id} as delivered via push...`);
+         await supabaseAdmin
+            .from("notifications")
+            .update({ delivered_via_push: true })
+            .eq("id", notification_id);
       }
 
       return new Response(JSON.stringify({ sent: subs.length, successful: successfulCount, results }), {

@@ -14,6 +14,8 @@ import { TransitionLoader } from "./components/layout/TransitionLoader";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
+import { Bell } from "lucide-react";
+import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { useApp } from "./context/AppContext";
@@ -127,6 +129,35 @@ export default function App() {
     active: false,
     message: "",
   });
+
+  // User-gesture push prompt bar
+  const [showNotificationBar, setShowNotificationBar] = useState(false);
+
+  useEffect(() => {
+    const checkNotificationBar = () => {
+      const supported = 'Notification' in window;
+      const notGranted = supported && Notification.permission !== 'granted';
+      const dismissed = safeLocalStorage.getItem('header_notification_dismissed') === 'true';
+      setShowNotificationBar(!!user && notGranted && !dismissed);
+    };
+    checkNotificationBar();
+  }, [user]);
+
+  const handleEnablePush = async () => {
+    try {
+      const sub = await subscribeToPush();
+      if (sub) {
+        setShowNotificationBar(false);
+      }
+    } catch (e) {
+      console.warn("Header push enable failed:", e);
+    }
+  };
+
+  const handleDismissNotificationBar = () => {
+    safeLocalStorage.setItem('header_notification_dismissed', 'true');
+    setShowNotificationBar(false);
+  };
 
   // Preload ChatRoom in the background when the app is idle
   useEffect(() => {
@@ -462,6 +493,32 @@ export default function App() {
             syncStatus={state.syncStatus}
             isMonday={isMonday}
           />
+          {showNotificationBar && (
+            <div className="mt-2 animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-slate-900/80 border border-slate-800/60 backdrop-blur-md px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Bell size={13} className="text-indigo-400 shrink-0" />
+                  <p className="text-[10px] font-bold tracking-wide text-gray-200 truncate">
+                    Enable Push Notifications to receive real-time updates.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={handleEnablePush}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Enable
+                  </button>
+                  <button
+                    onClick={handleDismissNotificationBar}
+                    className="text-gray-500 hover:text-gray-300 px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -16,6 +16,8 @@ export function usePWAInstall() {
    const [isStandalone, setIsStandalone] = useState(false);
    const [isDismissed, setIsDismissed] = useState(false);
 
+   const [isInstalling, setIsInstalling] = useState(false);
+
    useEffect(() => {
       // 1. Check if running in standalone mode (already installed & opened as PWA)
       const checkStandalone =
@@ -46,22 +48,46 @@ export function usePWAInstall() {
          setDeferredPrompt(e as BeforeInstallPromptEvent);
       };
 
+      // 5. Track native app installation finished
+      const handleAppInstalled = () => {
+         setIsInstalling(false);
+      };
+
+      // 6. Track background Service Worker installation state
+      if ("serviceWorker" in navigator) {
+         navigator.serviceWorker.getRegistration().then((reg) => {
+            if (reg?.installing) {
+               setIsInstalling(true);
+               reg.installing.addEventListener("statechange", (e: any) => {
+                  if (e.target.state === "activated") {
+                     setIsInstalling(false);
+                  }
+               });
+            }
+         });
+      }
+
       window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.addEventListener("appinstalled", handleAppInstalled);
 
       return () => {
          window.removeEventListener(
             "beforeinstallprompt",
             handleBeforeInstallPrompt,
          );
+         window.removeEventListener("appinstalled", handleAppInstalled);
       };
    }, []);
 
    const handleInstall = async () => {
       if (!deferredPrompt) return;
+      setIsInstalling(true);
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
          setDeferredPrompt(null);
+      } else {
+         setIsInstalling(false);
       }
    };
 
@@ -79,6 +105,7 @@ export function usePWAInstall() {
    return {
       showBanner,
       isIOS,
+      isInstalling,
       handleInstall,
       handleDismiss,
    };
