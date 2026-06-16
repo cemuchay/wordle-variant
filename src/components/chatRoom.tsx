@@ -17,7 +17,7 @@ import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, isChatConversationOpen } = useApp();
+    const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -71,7 +71,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [chatSearchQuery, setChatSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-    
+
     const [showUnreadLine, setShowUnreadLine] = useState(true);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
@@ -172,6 +172,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             const groupExists = groups.some(g => g.id === pendingChatGroupId);
             if (groupExists) {
                 setActiveRoomId(pendingChatGroupId);
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setShowSidebar(false);
                 setPendingChatGroupId(null);
             }
@@ -303,6 +304,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     };
 
     // Unified chats list sorted by unread first, then latest message timestamp
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const sortedAllRooms = useMemo(() => sortRooms(groups), [groups, unreadCounts, lastMessages]);
 
     // Filtered chats list based on search query
@@ -436,8 +438,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     return (
         <div
             className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92vh] max-h-[92vh]`}
-            style={{ 
-                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' 
+            style={{
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
             }}
         >
             {/* DM Loading Overlay */}
