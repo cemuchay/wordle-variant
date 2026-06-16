@@ -17,8 +17,11 @@ export const useAuthoritativeDate = () => {
       },
       placeholderData: () => {
          const cached = safeLocalStorage.getItem("cached-server-date");
-         if (cached) console.log("[Cache] Serving server-date from cache");
-         return JSON.parse(cached) || undefined;
+         if (cached) {
+            console.log("[Cache] Serving server-date from cache");
+            return JSON.parse(cached as string);
+         }
+         return undefined;
       },
       staleTime: 1000 * 60 * 60, // 1 hour
    });

@@ -7,6 +7,7 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
 import { useAppStore } from '../../store/useAppStore';
+import { safeLocalStorage } from '../../utils/storage';
 
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
@@ -428,7 +429,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         // Default timers
         const defaults = [3, 5, 5, 10, 10];
         try {
-            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
             if (cached) {
                 const parsed = JSON.parse(cached);
                 const games = [3, 4, 5, 6, 7]; // Standard bot sequence
@@ -445,7 +446,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(() => {
         const defaults = ['3', '5', '5', '10', '10'];
         try {
-            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
             if (cached) {
                 const parsed = JSON.parse(cached);
                 const games = [3, 4, 5, 6, 7];
@@ -530,7 +531,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     // For Daily Bot Challenges, look for cached preference by INDEX and LENGTH
                     if (isBotMarathon) {
                         try {
-                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
                             if (cached) {
                                 const parsed = JSON.parse(cached);
                                 // Only use cache if the length for this specific index matches
@@ -571,7 +572,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     // For Daily Bot Challenges, look for cached preference by INDEX and LENGTH
                     if (isBotMarathon) {
                         try {
-                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
                             if (cached) {
                                 const parsed = JSON.parse(cached);
                                 // Only use cache if the length for this specific index matches
@@ -1268,10 +1269,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                         // Persist preference to localStorage ONLY for Daily Bot Challenges
                                                         if (isBotMarathon) {
                                                             try {
-                                                                const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                                                                const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
                                                                 const parsed = cached ? JSON.parse(cached) : {};
                                                                 parsed[idx] = { length: marathonGames[idx], timer: num };
-                                                                localStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
+                                                                safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
                                                             } catch (e) {
                                                                 console.error('Failed to cache marathon timer', e);
                                                             }
@@ -1298,10 +1299,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                                     // Persist preference to localStorage ONLY for Daily Bot Challenges
                                                     if (isBotMarathon) {
                                                         try {
-                                                            const cached = localStorage.getItem('wordle_daily_marathon_timers');
+                                                            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
                                                             const parsed = cached ? JSON.parse(cached) : {};
                                                             parsed[idx] = { length: marathonGames[idx], timer: num };
-                                                            localStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
+                                                            safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
                                                         } catch (e) {
                                                             console.error('Failed to cache marathon timer', e);
                                                         }

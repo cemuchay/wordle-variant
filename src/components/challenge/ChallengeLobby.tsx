@@ -18,7 +18,7 @@ import { formatTime } from "./lib";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useApp } from "../../context/AppContext";
 import { ConfirmationModal } from "../ConfirmationModal";
-import { safeSessionStorage } from "../../utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 import { ChallengeChat } from "./ChallengeChat";
 import { useChallengeChat } from "../../hooks/useChallengeChat";
 import {
@@ -182,7 +182,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   const isGuest = useMemo(() => {
     if (!effectiveUser) return false;
-    return effectiveUser.id === localStorage.getItem('wordle_anon_id');
+    return effectiveUser.id === safeLocalStorage.getItem('wordle_anon_id');
   }, [effectiveUser]);
 
   const { messages, sendMessage, editMessage, deleteMessage, reactToMessage, typingUsers, setTyping, loading: chatLoading } = useChallengeChat(

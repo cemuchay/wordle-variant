@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 import { useApp } from '../context/AppContext';
+import { safeLocalStorage } from '../utils/storage';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -69,9 +70,9 @@ export const useAuth = () => {
       triggerToast("Error signing out");
     } else {
       // Clear localStorage that starts with wordle
-      Object.keys(localStorage).forEach(key => {
+      safeLocalStorage.getAllKeys().forEach(key => {
         if (key.startsWith('wordle')) {
-          localStorage.removeItem(key);
+          safeLocalStorage.removeItem(key);
         }
       });
       triggerToast("Signed out successfully");

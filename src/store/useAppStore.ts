@@ -130,7 +130,7 @@ export const useAppStore = create<AppState>()(
          joinedGroupIds: [],
          pendingReadReceipts: (() => {
             try {
-               const val = localStorage.getItem('pendingReadReceipts');
+               const val = safeLocalStorage.getItem('pendingReadReceipts');
                return val ? JSON.parse(val) : {};
             } catch {
                return {};
@@ -189,14 +189,14 @@ export const useAppStore = create<AppState>()(
          })),
          setPendingReadReceipts: (pendingReadReceipts) => {
             try {
-               localStorage.setItem('pendingReadReceipts', JSON.stringify(pendingReadReceipts));
+               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(pendingReadReceipts));
             } catch {}
             set({ pendingReadReceipts });
          },
          updatePendingReadReceipt: (groupId, timestamp) => set((state) => {
             const next = { ...state.pendingReadReceipts, [groupId]: timestamp };
             try {
-               localStorage.setItem('pendingReadReceipts', JSON.stringify(next));
+               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(next));
             } catch {}
             return { pendingReadReceipts: next };
          }),
@@ -204,7 +204,7 @@ export const useAppStore = create<AppState>()(
             const next = { ...state.pendingReadReceipts };
             delete next[groupId];
             try {
-               localStorage.setItem('pendingReadReceipts', JSON.stringify(next));
+               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(next));
             } catch {}
             return { pendingReadReceipts: next };
          }),
