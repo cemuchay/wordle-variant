@@ -28,8 +28,9 @@ self.addEventListener("push", (event) => {
          .matchAll({ type: "window", includeUncontrolled: true })
          .then((windowClients) => {
             const isAppFocused = windowClients.some((client) => client.focused);
-            // Temporarily allow push notifications even if the app is focused/open
-            if (true || !isAppFocused) {
+            
+            // Only show push notification if the app is NOT focused
+            if (!isAppFocused) {
                return self.registration.showNotification(title, options);
             }
          })

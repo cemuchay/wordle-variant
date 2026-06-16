@@ -24,8 +24,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 .limit(50);
 
             if (error) throw error;
-            // Filter out DM_MESSAGE notifications from the in-app notifications system
-            return (data as AppNotification[]).filter(n => n.type !== 'DM_MESSAGE');
+            return data as AppNotification[];
         },
         enabled: !!userId,
     });
@@ -46,7 +45,6 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
                 },
                 (payload) => {
                     const newNotif = payload.new as AppNotification;
-                    if (newNotif.type === 'DM_MESSAGE') return; // Ignore DM message notifications in-app
                     
                     // Optimistically add to query cache
                     queryClient.setQueryData(['notifications', userId], (old: AppNotification[] = []) => [
@@ -91,7 +89,7 @@ export const useNotifications = (userId: string | undefined, options: { enableRe
 
     // 3. Derived State
     const unreadCount = useMemo(() => 
-        notifications.filter(n => !n.is_read && !n.delivered_via_push).length, 
+        notifications.filter(n => !n.is_read && n.type !== 'DM_MESSAGE').length, 
     [notifications]);
 
     // 4. Mutations
