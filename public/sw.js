@@ -23,7 +23,16 @@ self.addEventListener("push", (event) => {
       data: { url: data.url || "/" },
    };
 
-   event.waitUntil(self.registration.showNotification(title, options));
+   event.waitUntil(
+      self.clients
+         .matchAll({ type: "window", includeUncontrolled: true })
+         .then((windowClients) => {
+            const isAppFocused = windowClients.some((client) => client.focused);
+            if (!isAppFocused) {
+               return self.registration.showNotification(title, options);
+            }
+         })
+   );
 });
 
 self.addEventListener("notificationclick", (event) => {

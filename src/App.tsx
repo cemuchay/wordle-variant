@@ -12,6 +12,7 @@ import { ModalsManager } from "./components/layout/ModalsManager";
 import { ImageModal } from "./components/common/ImageModal";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
 import PWAInstallBanner from "./components/PWAInstallBanner";
+import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
@@ -634,6 +635,7 @@ export default function App() {
 
       <ImageModal />
       <PWAInstallBanner />
+      <NotificationPermissionPrompt />
     </div>
   );
 }

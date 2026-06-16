@@ -1,7 +1,7 @@
 {
-  "name": "Variant: 4-5-6 Challenge",
+  "name": "Variant",
   "short_name": "Variant",
-  "description": "Daily word challenge with 4, 5, and 6 letter words",
+  "description": "Daily word challenge with multi letter words",
   "theme_color": "#121213",
   "background_color": "#121213",
   "display": "standalone",

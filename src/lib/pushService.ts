@@ -13,6 +13,11 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export async function subscribeToPush() {
+   const permission = await Notification.requestPermission();
+   if (permission !== "granted") {
+      throw new Error("Notification permission not granted");
+   }
+
    const registration = await navigator.serviceWorker.ready;
 
    const subscription = await registration.pushManager.subscribe({
