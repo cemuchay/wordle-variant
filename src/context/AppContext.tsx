@@ -7,6 +7,7 @@ import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
 import { useAppStore, type VoiceCallState } from '../store/useAppStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AppContextType {
     profile: any | null;
@@ -54,6 +55,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<any>(null);
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
@@ -62,6 +64,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected'>('connected');
+    const lastSyncRef = useRef<number>(0);
 
     useEffect(() => {
         // Monitor socket connection status via a shared real-time channel
@@ -483,7 +486,58 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
         };
 
+        const syncMessages = async () => {
+            if (!user?.id) return;
+
+            // Throttle syncs to once every 10 seconds to avoid spamming
+            const now = Date.now();
+            if (now - lastSyncRef.current < 10000) return;
+            lastSyncRef.current = now;
+
+            // 1. Force refresh notification query
+            queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+            
+            const currentMessages = useAppStore.getState().globalMessages;
+            if (currentMessages.length === 0) {
+                fetchMessagesAndReceipts();
+                return;
+            }
+
+            const lastMessage = currentMessages[currentMessages.length - 1];
+            const lastCreatedAt = lastMessage?.created_at;
+
+            if (!lastCreatedAt) return;
+
+            // Fetch only messages created after our last known message
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*, profiles(username, avatar_url)')
+                .gt('created_at', lastCreatedAt)
+                .order('created_at', { ascending: true });
+
+            if (!error && data && data.length > 0) {
+                data.forEach(msg => {
+                    useAppStore.getState().addGlobalMessage(msg);
+                });
+            }
+        };
+
         fetchMessagesAndReceipts();
+
+        // Re-sync messages when app comes back to foreground or connection is restored
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                syncMessages();
+            }
+        };
+
+        const handleOnline = () => {
+            syncMessages();
+        };
+
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('focus', handleOnline);
 
         const channel = supabase
             .channel('global_chat_channel')
@@ -553,6 +607,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return () => {
             supabase.removeChannel(channel);
             supabase.removeChannel(receiptsChannel);
+            window.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('focus', handleOnline);
         };
     }, [user?.id]);
 

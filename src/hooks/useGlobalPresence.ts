@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface PresenceUser {
     id: string;
@@ -14,14 +15,23 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
     const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
     const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
     const channelRef = useRef<any>(null);
+    const queryClient = useQueryClient();
 
     const fetchProfiles = useCallback(async () => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const { data } = await supabase
             .from('profiles')
             .select('id, username, avatar_url, last_seen_at')
+            .gte('last_seen_at', thirtyDaysAgo.toISOString())
             .order('username');
-        if (data) setAllProfiles(data as PresenceUser[]);
-    }, []);
+        if (data) {
+            setAllProfiles(data as PresenceUser[]);
+            // Also invalidate global profile queries if they exist to keep entire app in sync
+            queryClient.invalidateQueries({ queryKey: ['profile'] });
+        }
+    }, [queryClient]);
 
     const updateLastSeen = useCallback(async () => {
         if (!userId) return;
@@ -70,10 +80,16 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             setOnlineUsers(Array.from(online.values()));
         };
 
+        const handleLeave = () => {
+            syncPresence();
+            // Fresh fetch of profiles to get the absolute latest last_seen_at from DB
+            fetchProfiles();
+        };
+
         channel
             .on('presence', { event: 'sync' }, syncPresence)
             .on('presence', { event: 'join' }, syncPresence)
-            .on('presence', { event: 'leave' }, syncPresence)
+            .on('presence', { event: 'leave' }, handleLeave)
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     const { data: profile } = await supabase
