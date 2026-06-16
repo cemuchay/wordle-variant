@@ -1,266 +1,266 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Data Deletion Instructions - Wordle Variant</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --bg-color: #030712;
-        --card-bg: #0b0f19;
-        --border-color: #1f2937;
-        --text-primary: #f3f4f6;
-        --text-secondary: #9ca3af;
-        --text-muted: #6b7280;
-        --accent-color: #6366f1;
-        --accent-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        --danger-color: #ef4444;
-      }
 
-      body {
-        background-color: var(--bg-color);
-        color: var(--text-primary);
-        font-family: "Inter", sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Deletion Instructions - Variant</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --bg-color: #030712;
+      --card-bg: #0b0f19;
+      --border-color: #1f2937;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-color: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      --danger-color: #ef4444;
+    }
 
-      .container {
-        max-width: 600px;
-        width: 100%;
-        padding: 40px 20px;
-        box-sizing: border-box;
-      }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      font-family: "Inter", sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
 
-      .card {
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 24px;
-        padding: 40px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        position: relative;
-        overflow: hidden;
-      }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      padding: 40px 20px;
+      box-sizing: border-box;
+    }
 
-      .card::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: var(--accent-gradient);
-      }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
 
-      .logo {
-        font-family: "Outfit", sans-serif;
-        font-size: 24px;
-        font-weight: 900;
-        letter-spacing: -0.05em;
-        text-transform: uppercase;
-        margin-bottom: 24px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--accent-gradient);
+    }
 
-      .logo span {
-        background: var(--accent-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
+    .logo {
+      font-family: "Outfit", sans-serif;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-      h1 {
-        font-family: "Outfit", sans-serif;
-        font-size: 28px;
-        font-weight: 900;
-        letter-spacing: -0.025em;
-        margin-top: 0;
-        margin-bottom: 12px;
-        text-transform: uppercase;
-      }
+    .logo span {
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
-      p.subtitle {
-        color: var(--text-secondary);
-        font-size: 15px;
-        line-height: 1.6;
-        margin-top: 0;
-        margin-bottom: 32px;
-      }
+    h1 {
+      font-family: "Outfit", sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.025em;
+      margin-top: 0;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
 
-      h2 {
-        font-family: "Outfit", sans-serif;
-        font-size: 18px;
-        font-weight: 800;
-        margin-top: 28px;
-        margin-bottom: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-primary);
-      }
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-top: 0;
+      margin-bottom: 32px;
+    }
 
-      ul,
-      ol {
-        padding-left: 20px;
-        margin: 12px 0;
-      }
+    h2 {
+      font-family: "Outfit", sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-primary);
+    }
 
-      li {
-        color: var(--text-secondary);
-        font-size: 14px;
-        line-height: 1.6;
-        margin-bottom: 8px;
-      }
+    ul,
+    ol {
+      padding-left: 20px;
+      margin: 12px 0;
+    }
 
-      .step-box {
-        background-color: rgba(31, 41, 55, 0.2);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 20px;
-        margin: 20px 0;
-      }
+    li {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
 
-      .step-title {
-        font-weight: 700;
-        color: var(--text-primary);
-        margin-bottom: 8px;
-        font-size: 15px;
-      }
+    .step-box {
+      background-color: rgba(31, 41, 55, 0.2);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      margin: 20px 0;
+    }
 
-      .email-link {
-        color: var(--accent-color);
-        text-decoration: none;
-        font-weight: 600;
-        border-bottom: 1px dashed var(--accent-color);
-        transition: all 0.2s ease;
-      }
+    .step-title {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
 
-      .email-link:hover {
-        color: #818cf8;
-        border-bottom-style: solid;
-      }
+    .email-link {
+      color: var(--accent-color);
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 1px dashed var(--accent-color);
+      transition: all 0.2s ease;
+    }
 
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px 24px;
-        background-color: rgba(31, 41, 55, 0.4);
-        border: 1px solid var(--border-color);
-        color: var(--text-primary);
-        text-decoration: none;
-        font-family: "Outfit", sans-serif;
-        font-size: 12px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        border-radius: 12px;
-        margin-top: 24px;
-        transition: all 0.2s ease;
-        cursor: pointer;
-      }
+    .email-link:hover {
+      color: #818cf8;
+      border-bottom-style: solid;
+    }
 
-      .btn:hover {
-        background-color: var(--border-color);
-        border-color: #374151;
-        transform: translateY(-1px);
-      }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 24px;
+      background-color: rgba(31, 41, 55, 0.4);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      text-decoration: none;
+      font-family: "Outfit", sans-serif;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-radius: 12px;
+      margin-top: 24px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
 
-      .footer-note {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 40px;
-        border-top: 1px solid var(--border-color);
-        padding-top: 16px;
-        text-align: center;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="card">
-        <div class="logo">🧩 <span>Wordle Variant</span></div>
-        <h1>Data Deletion Instructions</h1>
-        <p class="subtitle">
-          Wordle Variant values your privacy. According to Facebook's Platform
-          Rules, we provide this instructions page to explain how you can
-          request the deletion of your account and associated data from our
-          servers.
-        </p>
+    .btn:hover {
+      background-color: var(--border-color);
+      border-color: #374151;
+      transform: translateY(-1px);
+    }
 
-        <h2>What Data is Deleted?</h2>
-        <ul>
-          <li>
-            Your profile information (Username, Avatar URL, and associated
-            Facebook/Google metadata).
-          </li>
-          <li>
-            Your daily play history, game statistics, current streaks, and
-            scoring records.
-          </li>
-          <li>Your multiplayer challenge participation records.</li>
-          <li>
-            Any chat messages sent in the global chat rooms (anonymized or
-            removed).
-          </li>
-        </ul>
+    .footer-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 40px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
 
-        <h2>How to Delete Your Data</h2>
-        <p class="subtitle">
-          You can request data deletion using either of the following two
-          options:
-        </p>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo">🧩 <span> Variant</span></div>
+      <h1>Data Deletion Instructions</h1>
+      <p class="subtitle">
+        Variant values your privacy. According to Facebook's Platform
+        Rules, we provide this instructions page to explain how you can
+        request the deletion of your account and associated data from our
+        servers.
+      </p>
 
-        <div class="step-box">
-          <div class="step-title">Option 1: Request Deletion via Email</div>
-          <li>
-            Send an email to our support team at
-            <a href="mailto:cemuchay@gmail.com" class="email-link"
-              >[EMAIL_ADDRESS]</a
-            >.
-          </li>
-          <li>
-            Use the subject line:
-            <strong>Wordle Variant Data Deletion Request</strong>.
-          </li>
-          <li>
-            Please send the email from the address associated with your Wordle
-            Variant account (or your Facebook-registered email address).
-          </li>
-          <li>
-            Your request will be processed, and all associated personal data
-            will be purged within 72 hours.
-          </li>
-        </div>
+      <h2>What Data is Deleted?</h2>
+      <ul>
+        <li>
+          Your profile information (Username, Avatar URL, and associated
+          Facebook/Google metadata).
+        </li>
+        <li>
+          Your daily play history, game statistics, current streaks, and
+          scoring records.
+        </li>
+        <li>Your multiplayer challenge participation records.</li>
+        <li>
+          Any chat messages sent in the global chat rooms (anonymized or
+          removed).
+        </li>
+      </ul>
 
-        <div class="step-box">
-          <div class="step-title">Option 2: Delete Directly In-App</div>
-          <li>Open the Wordle Variant application.</li>
-          <li>Sign in to your account.</li>
-          <li>
-            Open your <strong>Profile Settings</strong> (by clicking on your
-            avatar or username).
-          </li>
-          <li>
-            Select **Delete Account** to instantly and permanently remove all
-            your game data.
-          </li>
-        </div>
+      <h2>How to Delete Your Data</h2>
+      <p class="subtitle">
+        You can request data deletion using either of the following two
+        options:
+      </p>
 
-        <a href="/" class="btn">Back to Game</a>
+      <div class="step-box">
+        <div class="step-title">Option 1: Request Deletion via Email</div>
+        <li>
+          Send an email to our support team at
+          <a href="mailto:cemuchay@gmail.com" class="email-link">[EMAIL_ADDRESS]</a>.
+        </li>
+        <li>
+          Use the subject line:
+          <strong> Variant Data Deletion Request</strong>.
+        </li>
+        <li>
+          Please send the email from the address associated with your
+          Variant account (or your Facebook-registered email address).
+        </li>
+        <li>
+          Your request will be processed, and all associated personal data
+          will be purged within 72 hours.
+        </li>
+      </div>
 
-        <div class="footer-note">
-          Wordle Variant &copy; 2026. All rights reserved.
-        </div>
+      <div class="step-box">
+        <div class="step-title">Option 2: Delete Directly In-App</div>
+        <li>Open the Variant application.</li>
+        <li>Sign in to your account.</li>
+        <li>
+          Open your <strong>Profile Settings</strong> (by clicking on your
+          avatar or username).
+        </li>
+        <li>
+          Select **Delete Account** to instantly and permanently remove all
+          your game data.
+        </li>
+      </div>
+
+      <a href="/" class="btn">Back to Game</a>
+
+      <div class="footer-note">
+        Variant &copy; 2026. All rights reserved.
       </div>
     </div>
-  </body>
+  </div>
+</body>
+
 </html>

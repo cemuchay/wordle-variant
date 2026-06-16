@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
+import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -20,6 +21,9 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [receiveEmails, setReceiveEmails] = useState(true);
+    const [pushSupported, setPushSupported] = useState(false);
+    const [pushEnabled, setPushEnabled] = useState(false);
+    const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -59,11 +63,68 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     }
                 }
             };
+            const fetchPushStatus = async () => {
+                const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+                setPushSupported(supported);
+                if (supported) {
+                    setPushPermission(Notification.permission);
+                    try {
+                        const reg = await navigator.serviceWorker.ready;
+                        const sub = await reg.pushManager.getSubscription();
+                        setPushEnabled(!!sub && Notification.permission === 'granted');
+                    } catch (err) {
+                        console.warn("[Settings] Error checking push subscription status:", err);
+                    }
+                }
+            };
             
             fetchAuthData();
             fetchEmailPreferences();
+            fetchPushStatus();
         }
     }, [isOpen, profile?.id]);
+
+    const handlePushToggle = async () => {
+        if (!pushSupported) return;
+
+        if (pushEnabled) {
+            // Disable
+            setLoading(true);
+            await unsubscribeFromPush();
+            setPushEnabled(false);
+            setLoading(false);
+        } else {
+            // Enable
+            if (pushPermission === 'denied') {
+                triggerToast('Notifications are blocked by your browser settings. Please allow them manually.');
+                return;
+            }
+
+            // 2-Tier Double Opt-in Prompt
+            const confirmed = await ask({
+                title: 'Enable Notifications',
+                message: 'Would you like to receive real-time push notifications for word challenges, global chat messages, and updates?',
+                confirmLabel: 'Yes, Enable',
+                cancelLabel: 'Maybe Later',
+                type: 'info'
+            });
+
+            if (!confirmed) return;
+
+            setLoading(true);
+            try {
+                const sub = await subscribeToPush();
+                if (sub) {
+                    setPushEnabled(true);
+                    setPushPermission('granted');
+                }
+            } catch (err) {
+                console.error("[Settings] Push subscription toggle failed:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleSave = async () => {
         setLoading(true);
@@ -191,6 +252,58 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${receiveEmails ? 'left-7' : 'left-1'
                                     }`} />
                             </button>
+                        </div>
+                    </section>
+
+                    {/* Push Notifications Preferences */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Bell size={14} className="text-indigo-400" />
+                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                Push Notifications
+                            </label>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                            <div className="flex-1 pr-4">
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-bold text-gray-100">Live Push Updates</p>
+                                    {pushSupported && (
+                                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                                            pushPermission === 'granted' && pushEnabled
+                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                : pushPermission === 'denied'
+                                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                        }`}>
+                                            {pushPermission === 'granted' && pushEnabled 
+                                                ? 'Active' 
+                                                : pushPermission === 'denied' 
+                                                    ? 'Blocked' 
+                                                    : 'Not Active'}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                                    {!pushSupported 
+                                        ? 'Not supported by this browser/device.' 
+                                        : 'Get instant notifications for challenges, chat messages, and leaderboard news.'}
+                                </p>
+                            </div>
+                            {pushSupported && (
+                                <button
+                                    onClick={handlePushToggle}
+                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${
+                                        pushEnabled && pushPermission === 'granted'
+                                            ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
+                                            : 'bg-gray-800'
+                                    }`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${
+                                        pushEnabled && pushPermission === 'granted' ? 'left-7' : 'left-1'
+                                    }`} />
+                                </button>
+                            )}
                         </div>
                     </section>
 

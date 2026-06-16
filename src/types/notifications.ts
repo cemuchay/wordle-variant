@@ -1,4 +1,4 @@
-export type NotificationType = 'CHALLENGE_INVITE' | 'CHALLENGE_STARTED' | 'CHALLENGE_COMPLETED' | 'SYSTEM' | 'GENERAL' | 'MARATHON_GAME_COMPLETED' | 'LEADERBOARD_OVERTAKEN';
+export type NotificationType = 'CHALLENGE_INVITE' | 'CHALLENGE_STARTED' | 'CHALLENGE_COMPLETED' | 'SYSTEM' | 'GENERAL' | 'MARATHON_GAME_COMPLETED' | 'LEADERBOARD_OVERTAKEN' | 'DM_MESSAGE' | 'CHAT_MENTION';
 
 export interface AppNotification {
     id: string;
@@ -8,5 +8,6 @@ export interface AppNotification {
     message: string;
     data: Record<string, any>;
     is_read: boolean;
+    delivered_via_push?: boolean;
     created_at: string;
 }

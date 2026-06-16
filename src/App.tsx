@@ -11,7 +11,11 @@ import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
 import { ImageModal } from "./components/common/ImageModal";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
+import PWAInstallBanner from "./components/PWAInstallBanner";
+import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
+import { Bell } from "lucide-react";
+import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { useApp } from "./context/AppContext";
@@ -23,6 +27,7 @@ import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
 import { type AppUser, type Challenge } from "./types/game";
 import { useChallengeStore } from "./store/useChallengeStore";
+import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,10 +61,10 @@ export default function App() {
     isChallengeOpen,
     setIsChallengeOpen,
     isChatOpen,
-          isChatConversationOpen,
-          setIsChatOpen,
-          isNotificationsOpen,
-          setIsNotificationsOpen,
+    isChatConversationOpen,
+    setIsChatOpen,
+    isNotificationsOpen,
+    setIsNotificationsOpen,
     setChallengeUnreadCount,
     challengeUnreadCount,
     realtimeStatus,
@@ -74,6 +79,7 @@ export default function App() {
 
   useEffect(() => {
     if (!state.isRevealing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStableGuessesCount(state.guesses.length);
       setStableIsHintDisabled(state.isHintDisabled);
     }
@@ -85,7 +91,7 @@ export default function App() {
 
   const activeDailyMarathons = useMemo(() => {
     if (!discoverChallenges) return [];
-    const botMarathons = discoverChallenges.filter((c: any) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+    const botMarathons = discoverChallenges.filter((c: { is_bot_marathon: boolean, expires_at: Date }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
     return botMarathons.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()).slice(0, 2);
   }, [discoverChallenges]);
 
@@ -124,6 +130,35 @@ export default function App() {
     active: false,
     message: "",
   });
+
+  // User-gesture push prompt bar
+  const [showNotificationBar, setShowNotificationBar] = useState(false);
+
+  useEffect(() => {
+    const checkNotificationBar = () => {
+      const supported = 'Notification' in window;
+      const notGranted = supported && Notification.permission !== 'granted';
+      const dismissed = safeLocalStorage.getItem('header_notification_dismissed') === 'true';
+      setShowNotificationBar(!!user && notGranted && !dismissed);
+    };
+    checkNotificationBar();
+  }, [user]);
+
+  const handleEnablePush = async () => {
+    try {
+      const sub = await subscribeToPush();
+      if (sub) {
+        setShowNotificationBar(false);
+      }
+    } catch (e) {
+      console.warn("Header push enable failed:", e);
+    }
+  };
+
+  const handleDismissNotificationBar = () => {
+    safeLocalStorage.setItem('header_notification_dismissed', 'true');
+    setShowNotificationBar(false);
+  };
 
   // Preload ChatRoom in the background when the app is idle
   useEffect(() => {
@@ -189,10 +224,10 @@ export default function App() {
 
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('mascot-changed', {
-        detail: { 
-          mascotFace: face, 
-          mascotLabel: greeting, 
-          animationClass: "animate-in slide-in-from-top-2 duration-500" 
+        detail: {
+          mascotFace: face,
+          mascotLabel: greeting,
+          animationClass: "animate-in slide-in-from-top-2 duration-500"
         }
       }));
     }, 2000);
@@ -222,6 +257,47 @@ export default function App() {
     window.addEventListener("open-auth-modal", handleOpenAuth);
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
   }, []);
+
+  // Handle URL query parameters for notifications routing
+  useEffect(() => {
+    const parseUrlParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      
+      const challengeId = params.get("challenge");
+      if (challengeId) {
+        setIsChallengeOpen(true);
+        setSelectedChallengeId(challengeId);
+      }
+
+      const open = params.get("open");
+      const groupId = params.get("group_id");
+      const dmUserId = params.get("dm_user_id");
+
+      if (open === "chat" || groupId || dmUserId) {
+        setIsChatOpen(true);
+        if (groupId) {
+          useAppStore.getState().setPendingChatGroupId(groupId);
+        }
+        if (dmUserId) {
+          useAppStore.getState().setPendingDMUserId(dmUserId);
+        }
+      } else if (open === "leaderboard") {
+        setStatsActiveTab("leaderboard");
+        setIsStatsOpen(true);
+      } else if (open === "notifications") {
+        setIsNotificationsOpen(true);
+      }
+    };
+
+    // Run on initial mount
+    parseUrlParams();
+
+    // Listen to browser navigation changes
+    window.addEventListener("popstate", parseUrlParams);
+    return () => {
+      window.removeEventListener("popstate", parseUrlParams);
+    };
+  }, [setIsChallengeOpen, setIsChatOpen, setIsNotificationsOpen, setIsStatsOpen]);
 
   // Re-open challenge modal after successful login/signup if initiated from the challenge screen
   useEffect(() => {
@@ -459,6 +535,32 @@ export default function App() {
             syncStatus={state.syncStatus}
             isMonday={isMonday}
           />
+          {showNotificationBar && (
+            <div className="mt-2 animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-slate-900/80 border border-slate-800/60 backdrop-blur-md px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Bell size={13} className="text-indigo-400 shrink-0" />
+                  <p className="text-[10px] font-bold tracking-wide text-gray-200 truncate">
+                    Enable Push Notifications to receive real-time updates.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={handleEnablePush}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Enable
+                  </button>
+                  <button
+                    onClick={handleDismissNotificationBar}
+                    className="text-gray-500 hover:text-gray-300 px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -631,6 +733,8 @@ export default function App() {
       </div>
 
       <ImageModal />
+      <PWAInstallBanner />
+      <NotificationPermissionPrompt />
     </div>
   );
 }

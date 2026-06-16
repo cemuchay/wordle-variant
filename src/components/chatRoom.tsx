@@ -53,6 +53,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const setChatConversationOpen = useAppStore(s => s.setChatConversationOpen);
     const pendingDMUserId = useAppStore(s => s.pendingDMUserId);
     const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
+    const pendingChatGroupId = useAppStore(s => s.pendingChatGroupId);
+    const setPendingChatGroupId = useAppStore(s => s.setPendingChatGroupId);
     const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
 
     const [showSidebar, setShowSidebar] = useState(true);
@@ -163,6 +165,18 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         };
         initDM();
     }, [pendingDMUserId, startDM, setPendingDMUserId]);
+
+    // Handle pending group selection (e.g. from push notifications routing)
+    useEffect(() => {
+        if (pendingChatGroupId && groups.length > 0) {
+            const groupExists = groups.some(g => g.id === pendingChatGroupId);
+            if (groupExists) {
+                setActiveRoomId(pendingChatGroupId);
+                setShowSidebar(false);
+                setPendingChatGroupId(null);
+            }
+        }
+    }, [pendingChatGroupId, groups, setActiveRoomId, setPendingChatGroupId]);
 
     const handleScroll = () => {
         if (showUnreadLine) {

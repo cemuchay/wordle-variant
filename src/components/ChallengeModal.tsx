@@ -203,6 +203,7 @@ const AuthenticatedChallengeContent = memo(
     useEffect(() => {
       if (pendingChallengeUserId) {
         setSelectedChallenge(null);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsCreatingChallenge(true);
       }
     }, [pendingChallengeUserId, setSelectedChallenge]);
@@ -619,7 +620,7 @@ const AuthenticatedChallengeContent = memo(
                     🏆 What is Challenge Mode?
                   </h4>
                   <p className="text-xs leading-relaxed text-white">
-                    Challenge Mode allows you to create custom Wordle games and
+                    Challenge Mode allows you to create custom variant games and
                     compete directly against friends or players globally. You
                     can play live in real-time or asynchronously at your own
                     pace.
