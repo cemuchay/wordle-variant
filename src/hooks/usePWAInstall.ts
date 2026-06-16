@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 export interface BeforeInstallPromptEvent extends Event {
    readonly platforms: string[];
