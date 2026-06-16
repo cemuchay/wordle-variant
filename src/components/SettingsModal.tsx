@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -24,6 +25,9 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
     const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+
+    const { isStandalone, handleInstall, isInstalling, isIOS } = usePWAInstall();
+    const [showIOSInstallInstructions, setShowIOSInstallInstructions] = useState(false);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -306,6 +310,61 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             )}
                         </div>
                     </section>
+
+                    {/* App Installation (PWA) */}
+                    {!isStandalone && (
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Download size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Application
+                                </label>
+                            </div>
+
+                            <div className="p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-gray-100">Install Variant</p>
+                                        <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                                            Add Variant to your home screen for quick, fullscreen word challenges.
+                                        </p>
+                                    </div>
+                                    {!isIOS ? (
+                                        <button
+                                            onClick={handleInstall}
+                                            disabled={isInstalling}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white uppercase tracking-widest rounded-lg shadow-lg shadow-indigo-900/20 transition-all disabled:opacity-50 shrink-0"
+                                        >
+                                            {isInstalling ? 'INSTALLING...' : 'INSTALL'}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => setShowIOSInstallInstructions(!showIOSInstallInstructions)}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white uppercase tracking-widest rounded-lg shadow-lg shadow-indigo-900/20 transition-all shrink-0"
+                                        >
+                                            {showIOSInstallInstructions ? 'HIDE' : 'HOW TO'}
+                                        </button>
+                                    )}
+                                </div>
+                                {isIOS && showIOSInstallInstructions && (
+                                    <div className="mt-4 p-3 bg-black/40 rounded-lg border border-gray-800/50 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">iOS Instructions:</p>
+                                        <ol className="text-[11px] text-gray-500 space-y-1.5 list-decimal pl-4">
+                                            <li>Tap the <span className="inline-flex align-middle bg-gray-800 p-0.5 rounded text-white">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                                                    <polyline points="16 6 12 2 8 6" />
+                                                    <line x1="12" y1="2" x2="12" y2="15" />
+                                                </svg>
+                                            </span> share button in Safari.</li>
+                                            <li>Scroll and select <span className="text-gray-300 font-bold">"Add to Home Screen"</span>.</li>
+                                            <li>Tap <span className="text-indigo-400 font-bold">"Add"</span> to finish.</li>
+                                        </ol>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
 
                     {/* Debugging & Diagnostics */}
                     <section className="space-y-4">
