@@ -1,69 +1,85 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
+   readonly platforms: string[];
+   readonly userChoice: Promise<{
+      outcome: "accepted" | "dismissed";
+      platform: string;
+   }>;
+   prompt(): Promise<void>;
 }
 
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
+   const [deferredPrompt, setDeferredPrompt] =
+      useState<BeforeInstallPromptEvent | null>(null);
+   const [isIOS, setIsIOS] = useState(false);
+   const [isStandalone, setIsStandalone] = useState(false);
+   const [isDismissed, setIsDismissed] = useState(false);
 
-  useEffect(() => {
-    // 1. Check if running in standalone mode (already installed & opened as PWA)
-    const checkStandalone = 
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
-    
-    setIsStandalone(checkStandalone);
+   useEffect(() => {
+      // 1. Check if running in standalone mode (already installed & opened as PWA)
+      const checkStandalone =
+         window.matchMedia("(display-mode: standalone)").matches ||
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         (window.navigator as any).standalone === true;
 
-    // 2. Check iOS
-    const checkIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(checkIOS);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsStandalone(checkStandalone);
 
-    // 3. Check dismissal
-    const dismissed = localStorage.getItem('pwa_install_dismissed') === 'true';
-    setIsDismissed(dismissed);
+      // 2. Check iOS
+      const checkIOS =
+         /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+         !(window as any).MSStream;
+      setIsIOS(checkIOS);
 
-    // 4. Listen for beforeinstallprompt (Android/Chrome/Edge/etc.)
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
+      // 3. Check dismissal
+      const dismissCount = Number(
+         localStorage.getItem("pwa_install_dismiss_count") || 0,
+      );
+      const sessionDismissed =
+         sessionStorage.getItem("pwa_install_session_dismissed") === "true";
+      setIsDismissed(dismissCount >= 2 || sessionDismissed);
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      // 4. Listen for beforeinstallprompt (Android/Chrome/Edge/etc.)
+      const handleBeforeInstallPrompt = (e: Event) => {
+         e.preventDefault();
+         setDeferredPrompt(e as BeforeInstallPromptEvent);
+      };
 
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
-  };
+      return () => {
+         window.removeEventListener(
+            "beforeinstallprompt",
+            handleBeforeInstallPrompt,
+         );
+      };
+   }, []);
 
-  const handleDismiss = () => {
-    localStorage.setItem('pwa_install_dismissed', 'true');
-    setIsDismissed(true);
-  };
+   const handleInstall = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+         setDeferredPrompt(null);
+      }
+   };
 
-  const showBanner = !isStandalone && !isDismissed && (deferredPrompt !== null || isIOS);
+   const handleDismiss = () => {
+      const nextCount =
+         Number(localStorage.getItem("pwa_install_dismiss_count") || 0) + 1;
+      localStorage.setItem("pwa_install_dismiss_count", String(nextCount));
+      sessionStorage.setItem("pwa_install_session_dismissed", "true");
+      setIsDismissed(true);
+   };
 
-  return {
-    showBanner,
-    isIOS,
-    handleInstall,
-    handleDismiss,
-  };
+   const showBanner =
+      !isStandalone && !isDismissed && (deferredPrompt !== null || isIOS);
+
+   return {
+      showBanner,
+      isIOS,
+      handleInstall,
+      handleDismiss,
+   };
 }

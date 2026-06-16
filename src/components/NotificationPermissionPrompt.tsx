@@ -17,11 +17,13 @@ export default function NotificationPermissionPrompt() {
     const notGranted = notificationsSupported && Notification.permission !== 'granted';
 
     // Check dismissal state
-    const dismissed = localStorage.getItem('pwa_notification_prompt_dismissed') === 'true';
+    const dismissCount = Number(localStorage.getItem('pwa_notification_dismiss_count') || 0);
+    const sessionDismissed = sessionStorage.getItem('pwa_notification_session_dismissed') === 'true';
+    const isMuted = dismissCount >= 2 || sessionDismissed;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsDismissed(dismissed);
+    setIsDismissed(isMuted);
 
-    if ((isStandalone || import.meta.env.DEV) && notGranted && !dismissed) {
+    if ((isStandalone || import.meta.env.DEV) && notGranted && !isMuted) {
       setShowPrompt(true);
     }
   }, []);
@@ -40,7 +42,9 @@ export default function NotificationPermissionPrompt() {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem('pwa_notification_prompt_dismissed', 'true');
+    const nextCount = Number(localStorage.getItem('pwa_notification_dismiss_count') || 0) + 1;
+    localStorage.setItem('pwa_notification_dismiss_count', String(nextCount));
+    sessionStorage.setItem('pwa_notification_session_dismissed', 'true');
     setIsDismissed(true);
     setShowPrompt(false);
   };

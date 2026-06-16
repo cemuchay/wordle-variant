@@ -101,3 +101,73 @@ export async function subscribeToPush() {
       throw err;
    }
 }
+
+export async function unsubscribeFromPush() {
+   const toast = useAppStore.getState().triggerToast;
+   try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+         // Delete from Supabase first
+         const user = (await supabase.auth.getUser()).data.user;
+         if (user) {
+            await supabase
+               .from("push_subscriptions")
+               .delete()
+               .eq("user_id", user.id);
+         }
+         
+         // Unsubscribe in browser
+         await subscription.unsubscribe();
+         toast("Notifications disabled.", 3000);
+      }
+   } catch (err: any) {
+      console.error("[Push Service] Unsubscribe failed:", err);
+      toast("Failed to disable notifications.", 3000);
+   }
+}
+
+export async function syncPushSubscriptionIfNeeded() {
+   try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if notification permission is granted
+      if ('Notification' in window && Notification.permission === 'granted') {
+         const registration = await navigator.serviceWorker.ready;
+         const subscription = await registration.pushManager.getSubscription();
+
+         if (subscription) {
+            // Check if this subscription exists in the database
+            const { data, error } = await supabase
+               .from("push_subscriptions")
+               .select("id")
+               .eq("user_id", user.id)
+               .maybeSingle();
+
+            if (!error && !data) {
+               // Subscription exists in browser but not in DB, so upsert it
+               console.log("[Push Service] Syncing subscription in background...");
+               await supabase.from("push_subscriptions").upsert({
+                  subscription: subscription.toJSON(),
+                  user_id: user.id,
+               });
+            }
+         } else {
+            // Permission is granted but browser doesn't have a subscription yet!
+            // We can automatically generate one in the background
+            console.log("[Push Service] Generating missing subscription in background...");
+            const newSub = await registration.pushManager.subscribe({
+               userVisibleOnly: true,
+               applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+            await supabase.from("push_subscriptions").upsert({
+               subscription: newSub.toJSON(),
+               user_id: user.id,
+            });
+         }
+      }
+   } catch (e) {
+      console.warn("[Push Service] Background auto-subscribe sync failed:", e);
+   }
+}
