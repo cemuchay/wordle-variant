@@ -44,7 +44,7 @@ export const AppNavigation = ({
     ];
 
     return (
-        <nav className="w-full z-140 bg-dark border-t border-white/10 px-1 py-1.5 sm:self-center sm:mb-2 sm:rounded-2xl sm:border sm:border-white/10 sm:max-w-lg sm:px-6 sm:py-2 sm:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-300">
+        <nav className="w-full z-140 bg-dark border-t border-white/10 px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+6px)] sm:self-center sm:mb-2 sm:rounded-2xl sm:border sm:border-white/10 sm:max-w-lg sm:px-6 sm:py-2 sm:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-300">
             <div className="flex items-center justify-around w-full max-w-lg mx-auto sm:max-w-none">
                 {navItems.map((item) => {
                     const Icon = item.icon;
