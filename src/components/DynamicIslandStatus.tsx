@@ -41,6 +41,22 @@ export const DynamicIslandStatus = () => {
 
     // Default persistent state
     const [localTime, setLocalTime] = useState("");
+    const [resumeKey, setResumeKey] = useState(0);
+
+    // Force re-render on resume to fix PWA layout bugs
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                setResumeKey(prev => prev + 1);
+            }
+        };
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleVisibilityChange);
+        return () => {
+            window.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleVisibilityChange);
+        };
+    }, []);
 
     useEffect(() => {
         const updateTime = () => {
@@ -185,7 +201,7 @@ export const DynamicIslandStatus = () => {
     };
 
     return (
-        <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
+        <div key={resumeKey} className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
             <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
