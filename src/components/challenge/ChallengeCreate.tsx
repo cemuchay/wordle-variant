@@ -1,13 +1,116 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2 } from 'lucide-react';
+import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2, Save, Download, Trash2 } from 'lucide-react';
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore, type ChallengePreset } from '../../store/useAppStore';
 import { safeLocalStorage } from '../../utils/storage';
+
+const LoadPresetsList = memo(({ 
+    onLoad, 
+    presets,
+    onRemove
+}: { 
+    onLoad: (preset: ChallengePreset) => void,
+    presets: ChallengePreset[],
+    onRemove: (id: string) => void
+}) => {
+    if (presets.length === 0) return null;
+
+    return (
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all animate-in fade-in duration-300">
+            <div className="flex items-center gap-2">
+                <Download size={16} className="text-correct" />
+                <span className="text-xs font-black uppercase tracking-widest text-white">Load Preset</span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+                {presets.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between bg-black/20 p-3 rounded-xl border border-white/5 group">
+                        <button
+                            onClick={() => onLoad(p)}
+                            className="flex-1 text-left flex items-center gap-3"
+                        >
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-correct/10 transition-colors">
+                                <Save size={14} className="text-white/40 group-hover:text-correct" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-black text-white group-hover:text-correct transition-colors">{p.name}</p>
+                                <p className="text-[9px] text-white/50 uppercase font-bold">
+                                    {p.config.length === 1 ? 'Marathon' : `${p.config.length === 0 ? 'Random' : p.config.length + 'L'}`} • {p.config.mode}
+                                </p>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => onRemove(p.id)}
+                            className="p-2 text-white/20 hover:text-red-500 transition-colors"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+});
+
+const SavePresetForm = memo(({ onSave, canSave }: { onSave: (name: string) => void, canSave: boolean }) => {
+    const [isSaving, setIsSaving] = useState(false);
+    const [presetName, setPresetName] = useState('');
+
+    const handleSave = () => {
+        if (!presetName.trim()) return;
+        onSave(presetName.trim());
+        setPresetName('');
+        setIsSaving(false);
+    };
+
+    if (!canSave) return null;
+
+    return (
+        <div className="bg-black/20 border border-white/5 p-4 rounded-xl space-y-3">
+            {!isSaving ? (
+                <button
+                    onClick={() => setIsSaving(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase text-white/60 hover:text-correct transition-colors"
+                >
+                    <Save size={14} />
+                    Save current setup as preset
+                </button>
+            ) : (
+                <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <input
+                        type="text"
+                        placeholder="Preset Name (e.g. Daily Marathon)..."
+                        value={presetName}
+                        onChange={(e) => setPresetName(e.target.value)}
+                        autoFocus
+                        className="flex-1 bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct outline-none text-white transition-all"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSave();
+                            if (e.key === 'Escape') setIsSaving(false);
+                        }}
+                    />
+                    <button
+                        onClick={handleSave}
+                        className="bg-correct text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-correct/10"
+                    >
+                        Save
+                    </button>
+                    <button
+                        onClick={() => setIsSaving(false)}
+                        className="bg-white/10 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+});
 
 const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, tooltipId, className = "" }: {
     label: string;
@@ -324,6 +427,79 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
     const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
+    const challengePresets = useAppStore(s => s.challengePresets);
+    const addChallengePreset = useAppStore(s => s.addChallengePreset);
+    const removeChallengePreset = useAppStore(s => s.removeChallengePreset);
+
+    // Tooltip & Rule States
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+    const [marathonForceOrder, setMarathonForceOrder] = useState(false);
+
+    // Marathon Mode States
+    const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
+    const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
+
+    // Advanced UI States
+    const [showAdvanced, setShowAdvanced] = useState(true);
+    const [isPublic, setIsPublic] = useState(false);
+    const [maxParticipants, setMaxParticipants] = useState<number>(10);
+    const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
+    const [lifespanHours, setLifespanHours] = useState<number>(24);
+
+    // Custom Target Word States
+    const [isCustomWord, setIsCustomWord] = useState(false);
+    const [customWord, setCustomWord] = useState('');
+    const [customMarathonWords, setCustomMarathonWords] = useState<string[]>(() => Array(5).fill(''));
+
+    // Marathon Custom Timer States
+    const [timerType, setTimerType] = useState<'same' | 'custom'>('same');
+    const [marathonTimersArray, setMarathonTimersArray] = useState<number[]>(() => {
+        // Default timers
+        const defaults = [3, 5, 5, 10, 10];
+        try {
+            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const games = [3, 4, 5, 6, 7]; // Standard bot sequence
+                return games.map((l, idx) => {
+                    if (parsed[idx] && parsed[idx].length === l) return Number(parsed[idx].timer);
+                    return l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
+                });
+            }
+        } catch (e) {
+            console.error('Failed to initialize marathon timers from cache', e);
+        }
+        return defaults;
+    });
+    const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(() => {
+        const defaults = ['3', '5', '5', '10', '10'];
+        try {
+            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const games = [3, 4, 5, 6, 7];
+                return games.map((l, idx) => {
+                    if (parsed[idx] && parsed[idx].length === l) return String(parsed[idx].timer);
+                    const t = l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
+                    return String(t);
+                });
+            }
+        } catch (e) {
+            console.error('Failed to initialize marathon timer inputs from cache', e);
+        }
+        return defaults;
+    });
+
+    // Handicap States
+    const { isAdmin } = useAdminStatus(effectiveUser?.id);
+    const [isBotMarathon, setIsBotMarathon] = useState(false);
+    const [isHandicap, setIsHandicap] = useState(false);
+    const [disableHints, setDisableHints] = useState(false);
+    const [isShapeshifter, setIsShapeshifter] = useState(false);
+    const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
+    const [handicapEnforced, setHandicapEnforced] = useState(false);
+    const [handicapStarter, setHandicapStarter] = useState('');
+    const [handicapStartersArray, setHandicapStartersArray] = useState<string[]>(() => Array(5).fill(''));
 
     // Handle pre-selected user from Chat DM
     useEffect(() => {
@@ -403,75 +579,68 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         }
     }, [editingChallenge, setMode, setLength, setMaxTime, setInvitedIds]);
 
-    // Tooltip & Rule States
-    const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-    const [marathonForceOrder, setMarathonForceOrder] = useState(false);
+    const handleSavePreset = useCallback((name: string) => {
+        const config = {
+            mode,
+            length,
+            maxTime,
+            marathonForceOrder,
+            marathonGames,
+            marathonType,
+            isPublic,
+            maxParticipants,
+            lifespanHours,
+            isCustomWord,
+            customWord,
+            customMarathonWords,
+            timerType,
+            marathonTimersArray,
+            marathonTimersInput,
+            isHandicap,
+            handicapMode,
+            handicapEnforced,
+            handicapStarter,
+            handicapStartersArray,
+            disableHints,
+            isShapeshifter,
+            isBotMarathon
+        };
+        addChallengePreset({
+            id: crypto.randomUUID(),
+            name,
+            config
+        });
+    }, [mode, length, maxTime, marathonForceOrder, marathonGames, marathonType, isPublic, maxParticipants, lifespanHours, isCustomWord, customWord, customMarathonWords, timerType, marathonTimersArray, marathonTimersInput, isHandicap, handicapMode, handicapEnforced, handicapStarter, handicapStartersArray, disableHints, isShapeshifter, isBotMarathon, addChallengePreset]);
 
-    // Marathon Mode States
-    const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
-    const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
-
-    // Advanced UI States
-    const [showAdvanced, setShowAdvanced] = useState(true);
-    const [isPublic, setIsPublic] = useState(false);
-    const [maxParticipants, setMaxParticipants] = useState<number>(10);
-    const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
-    const [lifespanHours, setLifespanHours] = useState<number>(24);
-
-    // Custom Target Word States
-    const [isCustomWord, setIsCustomWord] = useState(false);
-    const [customWord, setCustomWord] = useState('');
-    const [customMarathonWords, setCustomMarathonWords] = useState<string[]>(() => Array(5).fill(''));
-
-    // Marathon Custom Timer States
-    const [timerType, setTimerType] = useState<'same' | 'custom'>('same');
-    const [marathonTimersArray, setMarathonTimersArray] = useState<number[]>(() => {
-        // Default timers
-        const defaults = [3, 5, 5, 10, 10];
-        try {
-            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                const games = [3, 4, 5, 6, 7]; // Standard bot sequence
-                return games.map((l, idx) => {
-                    if (parsed[idx] && parsed[idx].length === l) return Number(parsed[idx].timer);
-                    return l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
-                });
-            }
-        } catch (e) {
-            console.error('Failed to initialize marathon timers from cache', e);
+    const handleLoadPreset = useCallback((preset: ChallengePreset) => {
+        const c = preset.config;
+        if (c.mode !== undefined) setMode(c.mode);
+        if (c.length !== undefined) setLength(c.length);
+        if (c.maxTime !== undefined) setMaxTime(c.maxTime);
+        if (c.marathonForceOrder !== undefined) setMarathonForceOrder(c.marathonForceOrder);
+        if (c.marathonGames !== undefined) setMarathonGames(c.marathonGames);
+        if (c.marathonType !== undefined) setMarathonType(c.marathonType);
+        if (c.isPublic !== undefined) setIsPublic(c.isPublic);
+        if (c.maxParticipants !== undefined) {
+            setMaxParticipants(c.maxParticipants);
+            setMaxParticipantsInput(String(c.maxParticipants));
         }
-        return defaults;
-    });
-    const [marathonTimersInput, setMarathonTimersInput] = useState<string[]>(() => {
-        const defaults = ['3', '5', '5', '10', '10'];
-        try {
-            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                const games = [3, 4, 5, 6, 7];
-                return games.map((l, idx) => {
-                    if (parsed[idx] && parsed[idx].length === l) return String(parsed[idx].timer);
-                    const t = l === 3 ? 3 : l === 4 ? 5 : l === 5 ? 5 : 10;
-                    return String(t);
-                });
-            }
-        } catch (e) {
-            console.error('Failed to initialize marathon timer inputs from cache', e);
-        }
-        return defaults;
-    });
-
-    // Handicap States
-    const { isAdmin } = useAdminStatus(effectiveUser?.id);
-    const [isBotMarathon, setIsBotMarathon] = useState(false);
-    const [isHandicap, setIsHandicap] = useState(false);
-    const [disableHints, setDisableHints] = useState(false);
-    const [isShapeshifter, setIsShapeshifter] = useState(false);
-    const [handicapMode, setHandicapMode] = useState<'random' | 'custom'>('random');
-    const [handicapEnforced, setHandicapEnforced] = useState(false);
-    const [handicapStarter, setHandicapStarter] = useState('');
-    const [handicapStartersArray, setHandicapStartersArray] = useState<string[]>(() => Array(5).fill(''));
+        if (c.lifespanHours !== undefined) setLifespanHours(c.lifespanHours);
+        if (c.isCustomWord !== undefined) setIsCustomWord(c.isCustomWord);
+        if (c.customWord !== undefined) setCustomWord(c.customWord);
+        if (c.customMarathonWords !== undefined) setCustomMarathonWords(c.customMarathonWords);
+        if (c.timerType !== undefined) setTimerType(c.timerType);
+        if (c.marathonTimersArray !== undefined) setMarathonTimersArray(c.marathonTimersArray);
+        if (c.marathonTimersInput !== undefined) setMarathonTimersInput(c.marathonTimersInput);
+        if (c.isHandicap !== undefined) setIsHandicap(c.isHandicap);
+        if (c.handicapMode !== undefined) setHandicapMode(c.handicapMode);
+        if (c.handicapEnforced !== undefined) setHandicapEnforced(c.handicapEnforced);
+        if (c.handicapStarter !== undefined) setHandicapStarter(c.handicapStarter);
+        if (c.handicapStartersArray !== undefined) setHandicapStartersArray(c.handicapStartersArray);
+        if (c.disableHints !== undefined) setDisableHints(c.disableHints);
+        if (c.isShapeshifter !== undefined) setIsShapeshifter(c.isShapeshifter);
+        if (c.isBotMarathon !== undefined) setIsBotMarathon(c.isBotMarathon);
+    }, [setMode, setLength, setMaxTime]);
 
     // Handle lifespan options alignment based on challenge type
     useEffect(() => {
@@ -758,6 +927,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     return (
         <div className="space-y-6">
+            {!editingChallenge && (
+                <LoadPresetsList 
+                    presets={challengePresets}
+                    onLoad={handleLoadPreset}
+                    onRemove={removeChallengePreset}
+                />
+            )}
             <ModeSelector mode={mode} setMode={setMode} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
             <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
 
@@ -1336,6 +1512,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 activeTooltip={activeTooltip}
                 setActiveTooltip={setActiveTooltip}
             />
+
+            {!editingChallenge && (
+                <SavePresetForm 
+                    onSave={handleSavePreset} 
+                    canSave={challengePresets.length < 5} 
+                />
+            )}
 
             <div className="pt-4 border-t border-white/5 space-y-4">
                 {!editingChallenge && (
