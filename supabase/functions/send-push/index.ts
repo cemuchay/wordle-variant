@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
    }
 
     try {
-      const { user_id, notification_id, title, body } = await req.json();
+      const { user_id, notification_id, title, body, url } = await req.json();
 
       // Initialize Supabase Admin (Bypasses RLS to fetch all user devices)
       const supabaseAdmin = createClient(
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       const notifications = subs.map((s) =>
          webpush.sendNotification(
             s.subscription,
-            JSON.stringify({ title, body }),
+            JSON.stringify({ title, body, url: url || "/" }),
          ),
       );
 

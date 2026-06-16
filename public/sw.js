@@ -45,12 +45,25 @@ self.addEventListener("notificationclick", (event) => {
       self.clients
          .matchAll({ type: "window", includeUncontrolled: true })
          .then((windowClients) => {
-            // Check if the tab is already open and focus it
+            // Find a window with matching origin and path
+            let matchingClient = null;
+            const targetUrlObj = new URL(urlToOpen, self.location.origin);
             for (const client of windowClients) {
-               if (client.url === urlToOpen && "focus" in client) {
-                  return client.focus();
+               const clientUrlObj = new URL(client.url, self.location.origin);
+               if (clientUrlObj.origin === targetUrlObj.origin && clientUrlObj.pathname === targetUrlObj.pathname) {
+                  matchingClient = client;
+                  break;
                }
             }
+
+            if (matchingClient && "focus" in matchingClient) {
+               matchingClient.focus();
+               if (matchingClient.navigate) {
+                  return matchingClient.navigate(urlToOpen);
+               }
+               return;
+            }
+
             // If not open, open a new window
             if (self.clients.openWindow) {
                return self.clients.openWindow(urlToOpen);

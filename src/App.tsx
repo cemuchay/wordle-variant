@@ -27,6 +27,7 @@ import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
 import { type AppUser, type Challenge } from "./types/game";
 import { useChallengeStore } from "./store/useChallengeStore";
+import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import { motion, AnimatePresence } from "framer-motion";
@@ -256,6 +257,47 @@ export default function App() {
     window.addEventListener("open-auth-modal", handleOpenAuth);
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
   }, []);
+
+  // Handle URL query parameters for notifications routing
+  useEffect(() => {
+    const parseUrlParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      
+      const challengeId = params.get("challenge");
+      if (challengeId) {
+        setIsChallengeOpen(true);
+        setSelectedChallengeId(challengeId);
+      }
+
+      const open = params.get("open");
+      const groupId = params.get("group_id");
+      const dmUserId = params.get("dm_user_id");
+
+      if (open === "chat" || groupId || dmUserId) {
+        setIsChatOpen(true);
+        if (groupId) {
+          useAppStore.getState().setPendingChatGroupId(groupId);
+        }
+        if (dmUserId) {
+          useAppStore.getState().setPendingDMUserId(dmUserId);
+        }
+      } else if (open === "leaderboard") {
+        setStatsActiveTab("leaderboard");
+        setIsStatsOpen(true);
+      } else if (open === "notifications") {
+        setIsNotificationsOpen(true);
+      }
+    };
+
+    // Run on initial mount
+    parseUrlParams();
+
+    // Listen to browser navigation changes
+    window.addEventListener("popstate", parseUrlParams);
+    return () => {
+      window.removeEventListener("popstate", parseUrlParams);
+    };
+  }, [setIsChallengeOpen, setIsChatOpen, setIsNotificationsOpen, setIsStatsOpen]);
 
   // Re-open challenge modal after successful login/signup if initiated from the challenge screen
   useEffect(() => {
