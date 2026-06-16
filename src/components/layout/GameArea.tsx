@@ -6,6 +6,7 @@ import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
 import { ANIMATION_DURATION } from '../../constants/ui';
 import { MarathonBanner } from '../common/MarathonBanner';
+import { useApp } from '../../context/AppContext';
 
 interface GameAreaProps {
     wordLength: number;
@@ -44,6 +45,7 @@ export const GameArea = ({
     setSelectedChallengeId,
     isAuthenticated,
 }: GameAreaProps) => {
+    const { preferences } = useApp();
     const wasGameOverOnMount = useRef(isGameOver);
     // eslint-disable-next-line react-hooks/refs
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
@@ -118,6 +120,7 @@ export const GameArea = ({
                         hintRecord={hintRecord}
                         isShake={isShake}
                         isSaving={isSaving}
+                        compact={preferences.compactMode}
                         gameplayType="regular"
                     />
 

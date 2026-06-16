@@ -21,6 +21,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [sendingLogs, setSendingLogs] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
+    const [compactMode, setCompactMode] = useState(preferences.compactMode);
     const [receiveEmails, setReceiveEmails] = useState(true);
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
@@ -45,8 +46,8 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
     // Sync internal state when preferences change
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAllowRoasts(preferences.allowRoasts);
+        setCompactMode(preferences.compactMode);
     }, [preferences]);
 
     useEffect(() => {
@@ -175,6 +176,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 preferences: {
                     ...profile.preferences,
                     allowRoasts: allowRoasts,
+                    compactMode: compactMode,
                 }
             })
             .eq('id', profile.id);
@@ -251,21 +253,40 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                            <div className="flex-1 pr-4">
-                                <p className="text-sm font-bold text-gray-100">Sassy Roasts</p>
-                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                    The app will roast you based on your game score.
-                                </p>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-gray-100">Sassy Roasts</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        The app will roast you based on your game score.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setAllowRoasts(!allowRoasts)}
+                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${allowRoasts ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                        }`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
+                                        }`} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setAllowRoasts(!allowRoasts)}
-                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${allowRoasts ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                    }`}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
-                                    }`} />
-                            </button>
+
+                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-gray-100">Compact Mode</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Reduce spacing in the game grid for smaller screens.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setCompactMode(!compactMode)}
+                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${compactMode ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                        }`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${compactMode ? 'left-7' : 'left-1'
+                                        }`} />
+                                </button>
+                            </div>
                         </div>
                     </section>
 

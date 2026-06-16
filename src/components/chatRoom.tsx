@@ -17,7 +17,7 @@ import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
 
 const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) => {
-    const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, isChatConversationOpen } = useApp();
+    const { setIsChallengeOpen, allProfiles, isDynamicIslandVisible, } = useApp();
     const { ask } = useConfirmation();
     const {
         groups,
@@ -71,7 +71,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [chatSearchQuery, setChatSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-    
+
     const [showUnreadLine, setShowUnreadLine] = useState(true);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
@@ -172,6 +172,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             const groupExists = groups.some(g => g.id === pendingChatGroupId);
             if (groupExists) {
                 setActiveRoomId(pendingChatGroupId);
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setShowSidebar(false);
                 setPendingChatGroupId(null);
             }
@@ -303,6 +304,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     };
 
     // Unified chats list sorted by unread first, then latest message timestamp
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const sortedAllRooms = useMemo(() => sortRooms(groups), [groups, unreadCounts, lastMessages]);
 
     // Filtered chats list based on search query
@@ -435,9 +437,9 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92dvh] max-h-[92dvh] ${isDynamicIslandVisible && isChatConversationOpen ? 'mt-4 sm:mt-6' : ''}`}
-            style={{ 
-                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' 
+            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92vh] max-h-[92vh]`}
+            style={{
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
             }}
         >
             {/* DM Loading Overlay */}
@@ -477,7 +479,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         className="flex flex-col h-full z-10"
                     >
                         {/* Sidebar Header */}
-                        <div className="p-6 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center shrink-0">
+                        <div className={`p-6 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center shrink-0 transition-all ${isDynamicIslandVisible ? 'mt-7 sm:mt-9' : ''}`}>
                             <h2 className="text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
                                 <MessageSquare className="text-correct" size={20} /> Messages
                             </h2>
@@ -773,7 +775,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         className="flex flex-col h-full z-10 relative"
                     >
                         {/* Custom header overrides within ChatHeader */}
-                        <div className="shrink-0 relative">
+                        <div className={`shrink-0 relative transition-all ${isDynamicIslandVisible ? 'mt-7 sm:mt-9' : ''}`}>
                             {/* Back to sidebar controls */}
                             <div className="absolute top-1/2 left-3 -translate-y-1/2 z-30 flex items-center">
                                 <button

@@ -89,10 +89,14 @@ self.addEventListener("push", (event) => {
       self.clients
          .matchAll({ type: "window", includeUncontrolled: true })
          .then((windowClients) => {
-            const isAppFocused = windowClients.some((client) => client.focused);
+            // On iOS, client.focused can be unreliable in PWA standalone mode.
+            // We check both focused and visibilityState for better robustness.
+            const isAppActive = windowClients.some(
+               (client) => client.focused || client.visibilityState === "visible"
+            );
             
-            // Only show push notification if the app is NOT focused
-            if (!isAppFocused) {
+            // Only show push notification if the app is NOT active
+            if (!isAppActive) {
                return self.registration.showNotification(title, options);
             }
          })

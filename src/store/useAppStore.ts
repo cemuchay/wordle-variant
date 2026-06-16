@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -41,14 +42,20 @@ export interface VoiceCallState {
       | "failed";
 }
 
+export interface ChallengePreset {
+   id: string;
+   name: string;
+   config: any;
+}
+
 interface AppState {
    // UI State
    toast: { show: boolean; message: string; duration?: number };
    isChallengeOpen: boolean;
    isNotificationsOpen: boolean;
    isChatOpen: boolean;
-       isChatConversationOpen: boolean;
-       isLoadingDate: boolean;
+   isChatConversationOpen: boolean;
+   isLoadingDate: boolean;
 
    // Auth-related Local State
    preferences: UserPreferences;
@@ -69,6 +76,7 @@ interface AppState {
    pendingChatGroupId: string | null;
    pendingChallengeUserId: string | null;
    previewImage: string | null;
+   challengePresets: ChallengePreset[];
 
    // Actions
    triggerToast: (message: string, duration?: number) => void;
@@ -80,8 +88,8 @@ interface AppState {
    setChallengeOpen: (val: boolean) => void;
    setNotificationsOpen: (val: boolean) => void;
    setChatOpen: (val: boolean) => void;
-       setChatConversationOpen: (val: boolean) => void;
-       setUnreadCount: (val: number) => void;
+   setChatConversationOpen: (val: boolean) => void;
+   setUnreadCount: (val: number) => void;
    setChallengeUnreadCount: (val: number) => void;
    setActiveCall: (call: VoiceCallState | null) => void;
    setPreferences: (prefs: UserPreferences) => void;
@@ -103,6 +111,8 @@ interface AppState {
    setPendingChatGroupId: (id: string | null) => void;
    setPendingChallengeUserId: (id: string | null) => void;
    setPreviewImage: (url: string | null) => void;
+   addChallengePreset: (preset: ChallengePreset) => void;
+   removeChallengePreset: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -115,8 +125,8 @@ export const useAppStore = create<AppState>()(
          ),
          isNotificationsOpen: false,
          isChatOpen: false,
-             isChatConversationOpen: false,
-             isLoadingDate: true,
+         isChatConversationOpen: false,
+         isLoadingDate: true,
          preferences: defaultPreferences,
          stats: INITIAL_STATS,
          myParticipations: [],
@@ -130,7 +140,7 @@ export const useAppStore = create<AppState>()(
          joinedGroupIds: [],
          pendingReadReceipts: (() => {
             try {
-               const val = safeLocalStorage.getItem('pendingReadReceipts');
+               const val = safeLocalStorage.getItem("pendingReadReceipts");
                return val ? JSON.parse(val) : {};
             } catch {
                return {};
@@ -140,15 +150,18 @@ export const useAppStore = create<AppState>()(
          pendingChatGroupId: null,
          pendingChallengeUserId: null,
          previewImage: null,
+         challengePresets: [],
 
          // Actions
          triggerToast: (message, duration = 3000) =>
             set({ toast: { show: true, message, duration } }),
          setToast: (toast) => set({ toast }),
          setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),
-         setNotificationsOpen: (isNotificationsOpen) => set({ isNotificationsOpen }),
+         setNotificationsOpen: (isNotificationsOpen) =>
+            set({ isNotificationsOpen }),
          setChatOpen: (isChatOpen) => set({ isChatOpen }),
-          setChatConversationOpen: (isChatConversationOpen) => set({ isChatConversationOpen }),
+         setChatConversationOpen: (isChatConversationOpen) =>
+            set({ isChatConversationOpen }),
          setUnreadCount: (unreadCount) => set({ unreadCount }),
          setChallengeUnreadCount: (challengeUnreadCount) =>
             set({ challengeUnreadCount }),
@@ -181,50 +194,81 @@ export const useAppStore = create<AppState>()(
             set((state) => ({
                readReceipts: { ...state.readReceipts, [groupId]: timestamp },
             })),
-         addFailedMessageId: (id) => set((state) => ({
-            failedMessageIds: [...state.failedMessageIds, id]
-         })),
-         removeFailedMessageId: (id) => set((state) => ({
-            failedMessageIds: state.failedMessageIds.filter((mid) => mid !== id)
-         })),
+         addFailedMessageId: (id) =>
+            set((state) => ({
+               failedMessageIds: [...state.failedMessageIds, id],
+            })),
+         removeFailedMessageId: (id) =>
+            set((state) => ({
+               failedMessageIds: state.failedMessageIds.filter(
+                  (mid) => mid !== id,
+               ),
+            })),
          setPendingReadReceipts: (pendingReadReceipts) => {
             try {
-               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(pendingReadReceipts));
+               safeLocalStorage.setItem(
+                  "pendingReadReceipts",
+                  JSON.stringify(pendingReadReceipts),
+               );
             } catch {}
             set({ pendingReadReceipts });
          },
-         updatePendingReadReceipt: (groupId, timestamp) => set((state) => {
-            const next = { ...state.pendingReadReceipts, [groupId]: timestamp };
-            try {
-               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(next));
-            } catch {}
-            return { pendingReadReceipts: next };
-         }),
-         removePendingReadReceipt: (groupId) => set((state) => {
-            const next = { ...state.pendingReadReceipts };
-            delete next[groupId];
-            try {
-               safeLocalStorage.setItem('pendingReadReceipts', JSON.stringify(next));
-            } catch {}
-            return { pendingReadReceipts: next };
-         }),
+         updatePendingReadReceipt: (groupId, timestamp) =>
+            set((state) => {
+               const next = {
+                  ...state.pendingReadReceipts,
+                  [groupId]: timestamp,
+               };
+               try {
+                  safeLocalStorage.setItem(
+                     "pendingReadReceipts",
+                     JSON.stringify(next),
+                  );
+               } catch {}
+               return { pendingReadReceipts: next };
+            }),
+         removePendingReadReceipt: (groupId) =>
+            set((state) => {
+               const next = { ...state.pendingReadReceipts };
+               delete next[groupId];
+               try {
+                  safeLocalStorage.setItem(
+                     "pendingReadReceipts",
+                     JSON.stringify(next),
+                  );
+               } catch {}
+               return { pendingReadReceipts: next };
+            }),
          setJoinedGroupIds: (joinedGroupIds) => set({ joinedGroupIds }),
          setPendingDMUserId: (pendingDMUserId) => set({ pendingDMUserId }),
-         setPendingChatGroupId: (pendingChatGroupId) => set({ pendingChatGroupId }),
-         setPendingChallengeUserId: (pendingChallengeUserId) => set({ pendingChallengeUserId }),
+         setPendingChatGroupId: (pendingChatGroupId) =>
+            set({ pendingChatGroupId }),
+         setPendingChallengeUserId: (pendingChallengeUserId) =>
+            set({ pendingChallengeUserId }),
          setPreviewImage: (previewImage) => set({ previewImage }),
+         addChallengePreset: (preset) =>
+            set((state) => ({
+               challengePresets: [...state.challengePresets.slice(-4), preset],
+            })),
+         removeChallengePreset: (id) =>
+            set((state) => ({
+               challengePresets: state.challengePresets.filter(
+                  (p) => p.id !== id,
+               ),
+            })),
       }),
       {
          name: "variant-app-storage",
          storage: createJSONStorage(() => safeLocalStorage),
          // Only persist specific keys to keep it lightweight
-         partialize: (state) => ({ 
-            preferences: state.preferences, 
+         partialize: (state) => ({
+            preferences: state.preferences,
             stats: state.stats,
             myParticipations: state.myParticipations,
             readReceipts: state.readReceipts,
-            joinedGroupIds: state.joinedGroupIds
+            joinedGroupIds: state.joinedGroupIds,
+            challengePresets: state.challengePresets,
          }),
-      }
-   )
+      },
+   ),
 );

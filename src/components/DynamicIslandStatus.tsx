@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Phone, Users, Check, X, PhoneOff, MessageCircle, BellRing } from 'lucide-react';
+import { Clock, Phone, Users, Check, X, PhoneOff, MessageCircle, BellRing, Trophy } from 'lucide-react';
 import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useEffect, useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
@@ -12,6 +12,7 @@ import { useAppStore } from '../store/useAppStore';
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
     const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
+    const setPendingChallengeUserId = useAppStore(s => s.setPendingChallengeUserId);
     const {
         activeCall,
         setIsChallengeOpen,
@@ -570,6 +571,20 @@ export const DynamicIslandStatus = () => {
                                             </div>
 
                                             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                {p.id !== user?.id && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPendingChallengeUserId(p.id);
+                                                            setIsChallengeOpen(true);
+                                                            setIsExpanded(false);
+                                                        }}
+                                                        className="p-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black rounded-lg transition-all"
+                                                        title={`Challenge ${p.username}`}
+                                                    >
+                                                        <Trophy size={10} />
+                                                    </button>
+                                                )}
+
                                                 {p.id !== user?.id && (
                                                     <button
                                                         onClick={() => {
