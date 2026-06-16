@@ -4,49 +4,117 @@ import webpush from "npm:web-push";
 const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
+      "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
+// Define Expected Payload (Standard or Supabase Webhook)
+interface PushPayload {
+   user_id?: string;
+   notification_id?: string;
+   title?: string;
+   body?: string;
+   url?: string;
+   // Webhook specific fields
+   record?: any;
+   type?: string;
+   table?: string;
+}
+
 Deno.serve(async (req) => {
-   // Handle CORS preflight
    if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });
    }
 
-    try {
-      const { user_id, notification_id, title, body, url } = await req.json();
+   // Security Check
+   const internalSecret = req.headers.get("x-internal-secret");
+   if (internalSecret !== Deno.env.get("INTERNAL_SECRET")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+         status: 401,
+         headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+   }
 
-      // Initialize Supabase Admin (Bypasses RLS to fetch all user devices)
+   try {
+      const body = await req.json();
+      let payload: { user_id: string; notification_id?: string; title: string; body: string; url: string };
+
+      // Handle Supabase Webhook format
+      if (body.record && body.table === "notifications") {
+         const record = body.record;
+         let targetUrl = "/";
+
+         // Move URL logic from SQL to TypeScript
+         if (['CHALLENGE_INVITE', 'CHALLENGE_STARTED', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED'].includes(record.type)) {
+            if (record.data?.challenge_id) {
+               targetUrl = `/?challenge=${record.data.challenge_id}`;
+            }
+         } else if (record.type === 'DM_MESSAGE') {
+            if (record.data?.group_id) {
+               targetUrl = `/?open=chat&group_id=${record.data.group_id}`;
+            }
+         } else if (record.type === 'LEADERBOARD_OVERTAKEN') {
+            targetUrl = '/?open=leaderboard';
+         }
+
+         payload = {
+            user_id: record.user_id,
+            notification_id: record.id,
+            title: record.title || "New Notification",
+            body: record.message || "You have a new update.",
+            url: targetUrl
+         };
+      } else {
+         // Handle manual/legacy format
+         payload = {
+            user_id: body.user_id,
+            notification_id: body.notification_id,
+            title: body.title || "New Notification",
+            body: body.body || "You have a new update.",
+            url: body.url || "/"
+         };
+      }
+
+      if (!payload.user_id) {
+         throw new Error("Missing user_id in payload");
+      }
+
       const supabaseAdmin = createClient(
-         Deno.env.get("SUPABASE_URL") ?? "",
-         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+         Deno.env.get("SUPABASE_URL")!,
+         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       );
 
-      // Get VAPID keys from env
       webpush.setVapidDetails(
          Deno.env.get("VAPID_SUBJECT")!,
          Deno.env.get("VAPID_PUBLIC_KEY")!,
          Deno.env.get("VAPID_PRIVATE_KEY")!,
       );
 
-      // Fetch subscriptions for the specific user
       const { data: subs, error } = await supabaseAdmin
          .from("push_subscriptions")
          .select("id, subscription")
-         .eq("user_id", user_id);
+         .eq("user_id", payload.user_id);
 
-      if (error || !subs) throw error || new Error("No subscriptions found");
+      if (error) throw error;
+      
+      if (!subs || subs.length === 0) {
+         return new Response(JSON.stringify({ sent: 0, message: "No subscriptions found" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
 
-      // Send notifications in parallel
-      const notifications = subs.map((s) =>
-         webpush.sendNotification(
-            s.subscription,
-            JSON.stringify({ title, body, url: url || "/" }),
-         ),
+      const results = await Promise.allSettled(
+         subs.map((s) =>
+            webpush.sendNotification(
+               s.subscription,
+               JSON.stringify({ 
+                  title: payload.title, 
+                  body: payload.body, 
+                  url: payload.url 
+               }),
+            )
+         )
       );
 
-      const results = await Promise.allSettled(notifications);
-      
       let successfulCount = 0;
       const staleIds: string[] = [];
 
@@ -54,36 +122,31 @@ Deno.serve(async (req) => {
          if (res.status === "fulfilled") {
             successfulCount++;
          } else {
-            console.error(`[Push Error] Failed to send to subscription ${i}:`, res.reason);
-            // 410 Gone means the subscription has expired or been revoked
-            if (res.reason?.statusCode === 410) {
+            const error = res.reason;
+            if (error?.statusCode === 410 || error?.statusCode === 404) {
                staleIds.push(subs[i].id);
             }
          }
       });
 
       if (staleIds.length > 0) {
-         console.log(`[Push Cleanup] Deleting ${staleIds.length} stale subscriptions...`);
-         await supabaseAdmin
-            .from("push_subscriptions")
-            .delete()
-            .in("id", staleIds);
+         await supabaseAdmin.from("push_subscriptions").delete().in("id", staleIds);
       }
 
-      // If at least one push notification succeeded, mark it in the database
-      if (successfulCount > 0 && notification_id) {
-         console.log(`[Push Success] Marking notification ${notification_id} as delivered via push...`);
+      if (successfulCount > 0 && payload.notification_id) {
          await supabaseAdmin
             .from("notifications")
             .update({ delivered_via_push: true })
-            .eq("id", notification_id);
+            .eq("id", payload.notification_id);
       }
 
-      return new Response(JSON.stringify({ sent: subs.length, successful: successfulCount, results }), {
-         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-   } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(
+         JSON.stringify({ sent: subs.length, successful: successfulCount }),
+         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+   } catch (err: any) {
+      console.error("[Push Fatal Error]", err);
+      return new Response(JSON.stringify({ error: err.message || "Internal error" }), {
          headers: { ...corsHeaders, "Content-Type": "application/json" },
          status: 400,
       });

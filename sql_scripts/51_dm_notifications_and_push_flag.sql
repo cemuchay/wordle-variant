@@ -28,19 +28,13 @@ BEGIN
             SELECT username INTO sender_username FROM public.profiles WHERE id = NEW.user_id;
             sender_username := COALESCE(sender_username, 'Someone');
 
-            -- Trim content for preview
-            msg_content := substring(NEW.content from 1 for 60);
-            IF char_length(NEW.content) > 60 THEN
-                msg_content := msg_content || '...';
-            END IF;
-
-            -- Insert the private notification
+            -- Insert the private notification with a generic message for privacy
             INSERT INTO public.notifications (user_id, type, title, message, data)
             VALUES (
                 recipient_id,
                 'DM_MESSAGE',
                 'New Message',
-                sender_username || ': ' || msg_content,
+                'You have a new message from ' || sender_username || ', open to see.',
                 jsonb_build_object(
                     'group_id', NEW.group_id,
                     'message_id', NEW.id,

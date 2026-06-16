@@ -4,13 +4,17 @@
 CREATE OR REPLACE FUNCTION public.handle_new_notification_push()
 RETURNS TRIGGER
 SECURITY DEFINER
+SET search_path = public, net
 LANGUAGE plpgsql
 AS $$
 DECLARE
   payload JSONB;
   target_url TEXT := '/';
+  ef_url TEXT;
+  ef_secret TEXT;
+  base_url TEXT;
 BEGIN
-  -- Determine URL based on notification type and data
+  -- 1. Determine Target URL for deep-linking
   IF NEW.type IN ('CHALLENGE_INVITE', 'CHALLENGE_STARTED', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED') THEN
     IF NEW.data ? 'challenge_id' THEN
       target_url := '/?challenge=' || (NEW.data->>'challenge_id');
@@ -23,7 +27,7 @@ BEGIN
     target_url := '/?open=leaderboard';
   END IF;
 
-  -- Construct the JSON payload for the edge function, including notification_id and url
+  -- 2. Construct Payload
   payload := jsonb_build_object(
     'user_id', NEW.user_id,
     'notification_id', NEW.id,
@@ -32,18 +36,30 @@ BEGIN
     'url', target_url
   );
 
-  -- Perform the asynchronous HTTP POST to the send-push Edge Function
+  -- 3. Fetch Configuration (Standard Project Pattern)
+  SELECT value INTO ef_url FROM public.cache_settings WHERE key = 'edge_function_url';
+  SELECT value INTO ef_secret FROM public.cache_settings WHERE key = 'internal_secret';
+
+  IF ef_url IS NULL OR ef_secret IS NULL OR ef_url = '' OR ef_secret = '' THEN
+    RETURN NEW;
+  END IF;
+
+  -- 4. Robust URL Construction
+  -- Extract base URL up to /v1/ and append send-push
+  base_url := substring(ef_url from '(^.*/functions/v1/)');
+  IF base_url IS NOT NULL THEN
+     ef_url := base_url || 'send-push';
+  ELSE
+     -- Fallback if pattern fails
+     ef_url := REPLACE(REPLACE(ef_url, 'redis-cache', 'send-push'), 'email-notifications', 'send-push');
+  END IF;
+
+  -- 5. Perform the asynchronous HTTP POST
   PERFORM net.http_post(
-    url := concat(
-      COALESCE(
-        current_setting('supabase.url', true),
-        'https://your-project-ref.supabase.co'
-      ),
-      '/functions/v1/send-push'
-    ),
+    url := ef_url,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', concat('Bearer ', (SELECT decrypted_secret FROM vault.decrypted_secrets where name = 'service_role_key' limit 1))
+      'x-internal-secret', ef_secret
     ),
     body := payload
   );
@@ -51,3 +67,13 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Ensure ownership to bypass any RLS on settings table during trigger execution
+ALTER FUNCTION public.handle_new_notification_push() OWNER TO postgres;
+
+-- Recreate the trigger
+DROP TRIGGER IF EXISTS on_notification_created ON public.notifications;
+CREATE TRIGGER on_notification_created
+  AFTER INSERT ON public.notifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_notification_push();

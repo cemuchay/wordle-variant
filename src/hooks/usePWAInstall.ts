@@ -105,6 +105,7 @@ export function usePWAInstall() {
    return {
       showBanner,
       isIOS,
+      isStandalone,
       isInstalling,
       handleInstall,
       handleDismiss,

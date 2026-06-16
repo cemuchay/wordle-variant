@@ -5,8 +5,8 @@
   --text: #6b6375;
   --custom:#121213;
   --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
+  --bg: #121213;
+  --border: #2e303a;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
@@ -21,7 +21,7 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -38,7 +38,7 @@
   :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
-    --bg: #16171d;
+    --bg: #121213;
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
@@ -74,10 +74,24 @@ html, body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
+  /* Hard clearance for Dynamic Island + notch */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 40px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+  background-color: #121213;
+}
+
+@media (min-width: 640px) {
+  #root {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 48px);
+  }
+}
+
+@media (max-width: 1126px) {
+  #root {
+    border-inline: none;
+  }
 }
 
 h1,
