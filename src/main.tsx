@@ -188,3 +188,35 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
+// ==========================================
+// 🧹 LEGACY CACHE PURGE & SERVICE WORKER REGISTRATION
+// ==========================================
+try {
+  // Clear any legacy Workbox/PWA caches to ensure no asset caching is active
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      names.forEach((name) => {
+        caches.delete(name);
+      });
+    }).catch((err) => {
+      console.warn('[Cache Cleanup] Failed to clear legacy caches:', err);
+    });
+  }
+
+  // Register the service worker manually for push notifications
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          logger.info('[Service Worker] Registered successfully with scope:', reg.scope);
+        })
+        .catch((err) => {
+          logger.error('[Service Worker] Registration failed:', err);
+        });
+    });
+  }
+} catch (err) {
+  console.error('[Service Worker Initialization] Error:', err);
+}
+
+

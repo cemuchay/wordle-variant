@@ -1,0 +1,24 @@
+{
+  "name": "Variant: 4-5-6 Challenge",
+  "short_name": "Variant",
+  "description": "Daily word challenge with 4, 5, and 6 letter words",
+  "theme_color": "#121213",
+  "background_color": "#121213",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/pwa_192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa_512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

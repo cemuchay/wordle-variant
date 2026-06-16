@@ -11,6 +11,7 @@ import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
 import { ImageModal } from "./components/common/ImageModal";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
+import PWAInstallBanner from "./components/PWAInstallBanner";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
@@ -56,10 +57,10 @@ export default function App() {
     isChallengeOpen,
     setIsChallengeOpen,
     isChatOpen,
-          isChatConversationOpen,
-          setIsChatOpen,
-          isNotificationsOpen,
-          setIsNotificationsOpen,
+    isChatConversationOpen,
+    setIsChatOpen,
+    isNotificationsOpen,
+    setIsNotificationsOpen,
     setChallengeUnreadCount,
     challengeUnreadCount,
     realtimeStatus,
@@ -74,6 +75,7 @@ export default function App() {
 
   useEffect(() => {
     if (!state.isRevealing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStableGuessesCount(state.guesses.length);
       setStableIsHintDisabled(state.isHintDisabled);
     }
@@ -85,7 +87,7 @@ export default function App() {
 
   const activeDailyMarathons = useMemo(() => {
     if (!discoverChallenges) return [];
-    const botMarathons = discoverChallenges.filter((c: any) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
+    const botMarathons = discoverChallenges.filter((c: { is_bot_marathon: boolean, expires_at: Date }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
     return botMarathons.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()).slice(0, 2);
   }, [discoverChallenges]);
 
@@ -189,10 +191,10 @@ export default function App() {
 
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('mascot-changed', {
-        detail: { 
-          mascotFace: face, 
-          mascotLabel: greeting, 
-          animationClass: "animate-in slide-in-from-top-2 duration-500" 
+        detail: {
+          mascotFace: face,
+          mascotLabel: greeting,
+          animationClass: "animate-in slide-in-from-top-2 duration-500"
         }
       }));
     }, 2000);
@@ -631,6 +633,7 @@ export default function App() {
       </div>
 
       <ImageModal />
+      <PWAInstallBanner />
     </div>
   );
 }
