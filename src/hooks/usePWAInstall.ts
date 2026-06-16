@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 export interface BeforeInstallPromptEvent extends Event {
    readonly platforms: string[];
@@ -31,15 +32,16 @@ export function usePWAInstall() {
       // 2. Check iOS
       const checkIOS =
          /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
          !(window as any).MSStream;
       setIsIOS(checkIOS);
 
       // 3. Check dismissal
       const dismissCount = Number(
-         localStorage.getItem("pwa_install_dismiss_count") || 0,
+         safeLocalStorage.getItem("pwa_install_dismiss_count") || 0,
       );
       const sessionDismissed =
-         sessionStorage.getItem("pwa_install_session_dismissed") === "true";
+         safeSessionStorage.getItem("pwa_install_session_dismissed") === "true";
       setIsDismissed(dismissCount >= 2 || sessionDismissed);
 
       // 4. Listen for beforeinstallprompt (Android/Chrome/Edge/etc.)
@@ -58,6 +60,7 @@ export function usePWAInstall() {
          navigator.serviceWorker.getRegistration().then((reg) => {
             if (reg?.installing) {
                setIsInstalling(true);
+               // eslint-disable-next-line @typescript-eslint/no-explicit-any
                reg.installing.addEventListener("statechange", (e: any) => {
                   if (e.target.state === "activated") {
                      setIsInstalling(false);
@@ -93,9 +96,9 @@ export function usePWAInstall() {
 
    const handleDismiss = () => {
       const nextCount =
-         Number(localStorage.getItem("pwa_install_dismiss_count") || 0) + 1;
-      localStorage.setItem("pwa_install_dismiss_count", String(nextCount));
-      sessionStorage.setItem("pwa_install_session_dismissed", "true");
+         Number(safeLocalStorage.getItem("pwa_install_dismiss_count") || 0) + 1;
+      safeLocalStorage.setItem("pwa_install_dismiss_count", String(nextCount));
+      safeSessionStorage.setItem("pwa_install_session_dismissed", "true");
       setIsDismissed(true);
    };
 

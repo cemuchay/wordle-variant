@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { useAppStore } from "../store/useAppStore";
 import { logger } from "../lib/logger";
+import { safeLocalStorage } from "../utils/storage";
 
 export interface Message {
    id: string;
@@ -210,7 +211,7 @@ export const useChat = (userId: string) => {
    const [groups, setGroups] = useState<ChatGroup[]>(() => {
       if (!userId) return defaultCores;
       try {
-         const cached = localStorage.getItem(`chat_groups_${userId}`);
+         const cached = safeLocalStorage.getItem(`chat_groups_${userId}`);
          return cached ? JSON.parse(cached) : defaultCores;
       } catch {
          return defaultCores;
@@ -378,7 +379,7 @@ export const useChat = (userId: string) => {
       setInvites(incomingInvites);
       useAppStore.getState().setJoinedGroupIds(activeGroups.map((g) => g.id));
       try {
-         localStorage.setItem(
+         safeLocalStorage.setItem(
             `chat_groups_${userId}`,
             JSON.stringify(activeGroups),
          );

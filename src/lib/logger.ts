@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./supabaseClient";
+import { safeLocalStorage } from "../utils/storage";
 
 export type LogLevel = "info" | "warn" | "error" | "fatal";
 
@@ -168,16 +169,14 @@ class Logger {
 
    public async sendLogsToAdmin() {
       const storage: Record<string, any> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-         const key = localStorage.key(i);
-         if (key) {
-            const value = localStorage.getItem(key) || "";
-            try {
-               // Attempt to parse JSON for better formatting in the diagnostic report
-               storage[key] = JSON.parse(value);
-            } catch {
-               storage[key] = value;
-            }
+      const keys = safeLocalStorage.getAllKeys();
+      for (const key of keys) {
+         const value = safeLocalStorage.getItem(key) || "";
+         try {
+            // Attempt to parse JSON for better formatting in the diagnostic report
+            storage[key] = JSON.parse(value);
+         } catch {
+            storage[key] = value;
          }
       }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { subscribeToPush } from '../lib/pushService';
+import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 export default function NotificationPermissionPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -17,8 +18,8 @@ export default function NotificationPermissionPrompt() {
     const notGranted = notificationsSupported && Notification.permission !== 'granted';
 
     // Check dismissal state
-    const dismissCount = Number(localStorage.getItem('pwa_notification_dismiss_count') || 0);
-    const sessionDismissed = sessionStorage.getItem('pwa_notification_session_dismissed') === 'true';
+    const dismissCount = Number(safeLocalStorage.getItem('pwa_notification_dismiss_count') || 0);
+    const sessionDismissed = safeSessionStorage.getItem('pwa_notification_session_dismissed') === 'true';
     const isMuted = dismissCount >= 2 || sessionDismissed;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDismissed(isMuted);
@@ -42,9 +43,9 @@ export default function NotificationPermissionPrompt() {
   };
 
   const handleDismiss = () => {
-    const nextCount = Number(localStorage.getItem('pwa_notification_dismiss_count') || 0) + 1;
-    localStorage.setItem('pwa_notification_dismiss_count', String(nextCount));
-    sessionStorage.setItem('pwa_notification_session_dismissed', 'true');
+    const nextCount = Number(safeLocalStorage.getItem('pwa_notification_dismiss_count') || 0) + 1;
+    safeLocalStorage.setItem('pwa_notification_dismiss_count', String(nextCount));
+    safeSessionStorage.setItem('pwa_notification_session_dismissed', 'true');
     setIsDismissed(true);
     setShowPrompt(false);
   };

@@ -130,6 +130,43 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
+    const handlePurgeCache = async () => {
+        const confirmed = await ask({
+            title: 'Purge Cache & Reload',
+            message: 'This will unregister the service worker and clear all local application caches. Use this if the app is behaving unexpectedly or not updating. The page will reload immediately.',
+            confirmLabel: 'Purge & Reload',
+            type: 'danger'
+        });
+
+        if (confirmed) {
+            setLoading(true);
+            try {
+                // 1. Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                // 2. Clear all caches
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for (const key of keys) {
+                        await caches.delete(key);
+                    }
+                }
+
+                // 3. Reload
+                window.location.reload();
+            } catch (err) {
+                console.error("[Settings] Cache purge failed:", err);
+                triggerToast('Failed to purge cache');
+                setLoading(false);
+            }
+        }
+    };
+
     const handleSave = async () => {
         setLoading(true);
         const { error } = await supabase
@@ -375,25 +412,42 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                            <div className="flex-1 pr-4">
-                                <p className="text-sm font-bold text-gray-100">Session Logs</p>
-                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                    Send diagnostic logs to admin to help us debug issues.
-                                </p>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-gray-100">Session Logs</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Send diagnostic logs to admin to help us debug issues.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        setSendingLogs(true);
+                                        await logger.sendLogsToAdmin();
+                                        setSendingLogs(false);
+                                        triggerToast('Logs Sent to Admin');
+                                    }}
+                                    disabled={sendingLogs}
+                                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
+                                >
+                                    {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
+                                </button>
                             </div>
-                            <button
-                                onClick={async () => {
-                                    setSendingLogs(true);
-                                    await logger.sendLogsToAdmin();
-                                    setSendingLogs(false);
-                                    triggerToast('Logs Sent to Admin');
-                                }}
-                                disabled={sendingLogs}
-                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
-                            >
-                                {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
-                            </button>
+
+                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-gray-100">Purge Cache</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Clears all local application cache and reloads the page.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handlePurgeCache}
+                                    className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/40 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all"
+                                >
+                                    PURGE & RELOAD
+                                </button>
+                            </div>
                         </div>
                     </section>
 
