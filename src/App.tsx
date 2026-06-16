@@ -463,7 +463,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-svh w-full flex flex-col text-white font-sans overflow-hidden bg-dark">
+    <div className="h-dvh w-full flex flex-col text-white font-sans overflow-hidden bg-dark">
       <LandscapeBlocker />
       <DynamicIslandStatus />
       <AudioConnectionLog />
