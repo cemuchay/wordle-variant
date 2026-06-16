@@ -71,6 +71,29 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [chatSearchQuery, setChatSearchQuery] = useState("");
     const [newGroupName, setNewGroupName] = useState("");
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+    
+    // Dynamic viewport height to handle mobile keyboards correctly
+    const [viewportHeight, setViewportHeight] = useState(window.visualViewport?.height || window.innerHeight);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.visualViewport) {
+                setViewportHeight(window.visualViewport.height);
+            } else {
+                setViewportHeight(window.innerHeight);
+            }
+        };
+
+        window.visualViewport?.addEventListener('resize', handleResize);
+        window.visualViewport?.addEventListener('scroll', handleResize);
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            window.visualViewport?.removeEventListener('resize', handleResize);
+            window.visualViewport?.removeEventListener('scroll', handleResize);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
 
     const [showUnreadLine, setShowUnreadLine] = useState(true);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -435,8 +458,11 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className={`flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative ${isDynamicIslandVisible && isChatConversationOpen ? 'mt-10 sm:mt-12' : ''}`}
-            style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative ${isDynamicIslandVisible && isChatConversationOpen ? 'mt-10 sm:mt-12' : ''}`}
+            style={{ 
+                height: `${viewportHeight * 0.92}px`,
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' 
+            }}
         >
             {/* DM Loading Overlay */}
             <AnimatePresence>
