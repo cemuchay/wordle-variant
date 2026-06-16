@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./supabaseClient";
+import { useAppStore } from "../store/useAppStore";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -13,29 +15,89 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export async function subscribeToPush() {
-   const permission = await Notification.requestPermission();
-   if (permission !== "granted") {
-      throw new Error("Notification permission not granted");
+   const toast = useAppStore.getState().triggerToast;
+
+   try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+         toast("Notification permission was denied.", 4000);
+         throw new Error("Notification permission not granted");
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+
+      // Unsubscribe from any active subscriptions first to clear out old keys/stale endpoints
+      try {
+         const existingSub = await registration.pushManager.getSubscription();
+         if (existingSub) {
+            await existingSub.unsubscribe();
+            console.log(
+               "[Push Service] Unsubscribed from legacy subscription successfully.",
+            );
+         }
+      } catch (err) {
+         console.warn(
+            "[Push Service] Error clearing legacy subscription:",
+            err,
+         );
+      }
+
+      let attempt = 0;
+      const maxAttempts = 3;
+      let subscription: PushSubscription | null = null;
+      let dbError: any = null;
+
+      while (attempt < maxAttempts) {
+         attempt++;
+         try {
+            console.log(
+               `[Push Service] Subscribing attempt ${attempt}/${maxAttempts}...`,
+            );
+            subscription = await registration.pushManager.subscribe({
+               userVisibleOnly: true,
+               applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+
+            // Save to Supabase
+            const { error } = await supabase.from("push_subscriptions").upsert(
+               {
+                  subscription: subscription.toJSON(),
+                  user_id: (await supabase.auth.getUser()).data.user?.id,
+               },
+               { onConflict: "subscription" },
+            );
+
+            if (error) {
+               dbError = error;
+               throw error;
+            }
+
+            // If we succeed, exit the retry loop
+            dbError = null;
+            break;
+         } catch (err: any) {
+            console.warn(
+               `[Push Service] Attempt ${attempt} failed:`,
+               err.message || err,
+            );
+            dbError = err;
+            if (attempt < maxAttempts) {
+               await new Promise((resolve) => setTimeout(resolve, 1500)); // Wait 1.5s before retry
+            }
+         }
+      }
+
+      if (dbError || !subscription) {
+         const errorMsg =
+            dbError?.message || "Failed to register push subscription";
+         toast(`Push Notification Error: ${errorMsg}`, 5000);
+         throw dbError || new Error("Push subscription registration failed");
+      }
+
+      toast("Notifications successfully enabled!", 3000);
+      return subscription;
+   } catch (err: any) {
+      console.error("[Push Service] Fatal error in subscribeToPush:", err);
+      throw err;
    }
-
-   const registration = await navigator.serviceWorker.ready;
-
-   const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-   });
-
-   // Save to Supabase
-
-   const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-         subscription: subscription.toJSON(),
-         user_id: (await supabase.auth.getUser()).data.user?.id,
-      },
-      { onConflict: "subscription" }
-   );
-
-   if (error) throw error;
-   return subscription;
 }

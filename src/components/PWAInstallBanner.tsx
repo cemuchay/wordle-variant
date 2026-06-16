@@ -8,7 +8,7 @@ export default function PWAInstallBanner() {
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed top-16 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-[9999] animate-in fade-in slide-in-from-top-5 duration-300">
       <div className="bg-slate-900 border border-slate-800/80 rounded-2xl shadow-2xl shadow-black/50 p-4 md:p-5 backdrop-blur-xl relative overflow-hidden">
         {/* Decorative subtle background gradient glow */}
         <div className="absolute -top-12 -right-12 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />

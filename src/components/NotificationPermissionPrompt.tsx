@@ -48,7 +48,7 @@ export default function NotificationPermissionPrompt() {
   if (!showPrompt || isDismissed) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed top-16 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-[9999] animate-in fade-in slide-in-from-top-5 duration-300">
       <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl shadow-2xl shadow-indigo-500/10 p-4 md:p-5 backdrop-blur-xl relative overflow-hidden">
         {/* Glowing gradient border line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-linear-to-r from-indigo-500 via-purple-500 to-indigo-500" />
