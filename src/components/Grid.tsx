@@ -309,65 +309,89 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
             const isWinningRow = isWon && i === guesses.length - 1 && !isCurrentRevealing;
 
             return (
-              <div key={`row-past-${i}`} className={`flex justify-center ${rowGapClass}`}>
-                {guess.map((res, j) => (
-                  <Cell
-                    key={`past-${i}-${j}`}
-                    letter={res.letter}
-                    status={res.status}
-                    isRevealing={isRevealing}
-                    revealIndex={j}
-                    isWinner={isWinningRow}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                ))}
+              <div key={`row-past-${i}`} className="flex items-center gap-2">
+                {maxAttempts > 6 && (
+                  <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                    #{i + 1}
+                  </div>
+                )}
+                <div className={`flex justify-center ${rowGapClass}`}>
+                  {guess.map((res, j) => (
+                    <Cell
+                      key={`past-${i}-${j}`}
+                      letter={res.letter}
+                      status={res.status}
+                      isRevealing={isRevealing}
+                      revealIndex={j}
+                      isWinner={isWinningRow}
+                      compact={compact}
+                      gameplayType={gameplayType}
+                      wordLength={wordLength}
+                    />
+                  ))}
+                </div>
               </div>
             );
           })}
 
           {/* Current Guess Row */}
           {guesses.length < maxAttempts && revealingRowIndex === null && (
-            <div ref={currentRowRef} className={`flex justify-center ${rowGapClass}`}>
-              {Array.from({ length: wordLength }).map((_, i) => {
-                const isHinted = hintRecord?.index === i;
-                const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+            <div ref={currentRowRef} className="flex items-center gap-2">
+              {maxAttempts > 6 && (
+                <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                  #{guesses.length + 1}
+                </div>
+              )}
+              <div className={`flex justify-center ${rowGapClass}`}>
+                {Array.from({ length: wordLength }).map((_, i) => {
+                  const isHinted = hintRecord?.index === i;
+                  const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
-                return (
-                  <Cell
-                    key={`current-${i}`}
-                    letter={letter}
-                    isPop={!!currentGuess[i]}
-                    isShake={isShake}
-                    isHinted={isHinted}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                );
-              })}
+                  return (
+                    <Cell
+                      key={`current-${i}`}
+                      letter={letter}
+                      isPop={!!currentGuess[i]}
+                      isShake={isShake}
+                      isHinted={isHinted}
+                      compact={compact}
+                      gameplayType={gameplayType}
+                      wordLength={wordLength}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {/* Empty Rows */}
-          {Array.from({ length: empties }).map((_, i) => (
-            <div key={`row-empty-${i}`} className={`flex justify-center ${rowGapClass}`}>
-              {Array.from({ length: wordLength }).map((_, j) => {
-                const isHinted = hintRecord?.index === j;
-                return (
-                  <Cell
-                    key={`empty-${i}-${j}`}
-                    letter={isHinted ? hintRecord?.letter : ''}
-                    isHinted={isHinted}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                );
-              })}
-            </div>
-          ))}
+          {Array.from({ length: empties }).map((_, i) => {
+            const rowIndex = guesses.length + (revealingRowIndex !== null ? 0 : 1) + i;
+            return (
+              <div key={`row-empty-${i}`} className="flex items-center gap-2">
+                {maxAttempts > 6 && (
+                  <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                    #{rowIndex + 1}
+                  </div>
+                )}
+                <div className={`flex justify-center ${rowGapClass}`}>
+                  {Array.from({ length: wordLength }).map((_, j) => {
+                    const isHinted = hintRecord?.index === j;
+                    return (
+                      <Cell
+                        key={`empty-${i}-${j}`}
+                        letter={isHinted ? hintRecord?.letter : ''}
+                        isHinted={isHinted}
+                        compact={compact}
+                        gameplayType={gameplayType}
+                        wordLength={wordLength}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
