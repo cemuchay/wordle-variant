@@ -435,7 +435,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92dvh] max-h-[92dvh] ${isDynamicIslandVisible && isChatConversationOpen ? 'mt-4 sm:mt-6' : ''}`}
+            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92vh] max-h-[92vh]`}
             style={{ 
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' 
             }}
@@ -477,7 +477,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         className="flex flex-col h-full z-10"
                     >
                         {/* Sidebar Header */}
-                        <div className="p-6 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center shrink-0">
+                        <div className={`p-6 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center shrink-0 transition-all ${isDynamicIslandVisible ? 'mt-7 sm:mt-9' : ''}`}>
                             <h2 className="text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
                                 <MessageSquare className="text-correct" size={20} /> Messages
                             </h2>
@@ -773,7 +773,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         className="flex flex-col h-full z-10 relative"
                     >
                         {/* Custom header overrides within ChatHeader */}
-                        <div className="shrink-0 relative">
+                        <div className={`shrink-0 relative transition-all ${isDynamicIslandVisible ? 'mt-7 sm:mt-9' : ''}`}>
                             {/* Back to sidebar controls */}
                             <div className="absolute top-1/2 left-3 -translate-y-1/2 z-30 flex items-center">
                                 <button
