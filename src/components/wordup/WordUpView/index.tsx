@@ -126,7 +126,7 @@ export const WordUpView = () => {
    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
       setMatchId(mId);
       setRole(mRole);
-      const match = await loadAndSubscribeMatch(mId);
+      const match = await loadAndSubscribeMatch(mId, mRole);
       if (match) {
          wordupAudio.playMatchStart();
          setView("countdown");

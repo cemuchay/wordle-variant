@@ -50,7 +50,10 @@ export const useWordUpGameLoop = (
 
    const timerRef = useRef<number | null>(null);
    const botTimerRef = useRef<number | null>(null);
+   const botActionRef = useRef<any>(null);
    const isSubmittingAnswerRef = useRef(false);
+   const isAdvancingRef = useRef(false);
+   const isRevealingRef = useRef(false);
    const matchChannelRef = useRef<any>(null);
 
    const currentIdxRef = useRef(currentIdx);
@@ -58,17 +61,33 @@ export const useWordUpGameLoop = (
    const questionsRef = useRef(questions);
    const revealAnswersRef = useRef(revealAnswers);
    const timeLeftRef = useRef(timeLeft);
+   const roleRef = useRef(role);
 
    useEffect(() => { currentIdxRef.current = currentIdx; }, [currentIdx]);
    useEffect(() => { matchDataRef.current = matchData; }, [matchData]);
    useEffect(() => { questionsRef.current = questions; }, [questions]);
    useEffect(() => { revealAnswersRef.current = revealAnswers; }, [revealAnswers]);
    useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+   useEffect(() => { roleRef.current = role; }, [role]);
+
+   const stopRoundTimer = useCallback(() => {
+      if (timerRef.current) {
+         clearInterval(timerRef.current);
+         timerRef.current = null;
+      }
+   }, []);
+
+   const stopBotTimer = useCallback(() => {
+      if (botTimerRef.current) {
+         clearTimeout(botTimerRef.current);
+         botTimerRef.current = null;
+      }
+   }, []);
 
    const cleanUpIntervals = useCallback(() => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (botTimerRef.current) clearTimeout(botTimerRef.current);
-   }, []);
+      stopRoundTimer();
+      stopBotTimer();
+   }, [stopRoundTimer, stopBotTimer]);
 
    const endGame = useCallback(async (match: any) => {
       try {
@@ -94,10 +113,24 @@ export const useWordUpGameLoop = (
 
    const advanceRound = useCallback(
       async (mId: string, nextIdx: number) => {
+         if (isAdvancingRef.current) return;
+         isAdvancingRef.current = true;
+
          try {
             console.log(`[WordUp Logs] advanceRound: Advancing to index ${nextIdx}`);
             await fetchWithRetry(
                async () => {
+                  const { data: curr, error: fetchErr } = await supabase
+                     .from("wordup_matches")
+                     .select("current_question_index")
+                     .eq("id", mId)
+                     .single();
+
+                  if (!fetchErr && curr && curr.current_question_index >= nextIdx) {
+                     console.log("[WordUp Logs] Already advanced to or beyond this index.");
+                     return;
+                  }
+
                   const { error } = await supabase
                      .from("wordup_matches")
                      .update({
@@ -116,6 +149,8 @@ export const useWordUpGameLoop = (
             );
          } catch (e) {
             console.error("[WordUp Logs] Failed to advance round:", e);
+         } finally {
+            isAdvancingRef.current = false;
          }
       },
       [getSyncedNow],
@@ -133,7 +168,8 @@ export const useWordUpGameLoop = (
 
          isSubmittingAnswerRef.current = true;
          setSelectedAnswer(choice);
-         cleanUpIntervals();
+         // Only stop the countdown timer, don't stop the bot timer if it's running
+         stopRoundTimer();
 
          const q = questionsRef.current[currentIdxRef.current];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -181,7 +217,55 @@ export const useWordUpGameLoop = (
                );
             }
 
-            if (role === "player1") {
+            if (latestMatch.is_bot_match && roleRef.current === "player1") {
+               // Bot match: sync both human and bot answers in one go
+               const botAction = botActionRef.current;
+               let botPoints = 0;
+               if (botAction?.correct) {
+                  const speedBonus = Math.max(
+                     0,
+                     Math.round((1.0 - botAction.time_taken / duration) * 50),
+                  );
+                  botPoints = 100 + speedBonus;
+               }
+
+               const p1Answers = [...(latestMatch.p1_answers || [])];
+               const p2Answers = [...(latestMatch.p2_answers || [])];
+               
+               if (p1Answers.some((a: any) => a.question_idx === currentIdxRef.current)) {
+                   console.warn("[WordUp Logs] Answer already submitted.");
+                   isSubmittingAnswerRef.current = false;
+                   return;
+               }
+
+               p1Answers.push(submission);
+               p2Answers.push({
+                  question_idx: currentIdxRef.current,
+                  correct: botAction?.correct,
+                  time_taken: botAction?.time_taken,
+                  points: botPoints,
+               });
+
+               await fetchWithRetry(
+                  async () => {
+                     const { error } = await supabase
+                        .from("wordup_matches")
+                        .update({
+                           p1_answers: p1Answers,
+                           p1_answered: true,
+                           p1_score: (latestMatch.p1_score || 0) + points,
+                           p2_answers: p2Answers,
+                           p2_answered: true,
+                           p2_score: (latestMatch.p2_score || 0) + botPoints,
+                        })
+                        .eq("id", matchId);
+                     if (error) throw error;
+                  },
+                  3,
+                  1000,
+               );
+               console.log("[WordUp Logs] Bot match sync successful.");
+            } else if (roleRef.current === "player1") {
                const answers = [...(latestMatch.p1_answers || [])];
                if (answers.some((a: any) => a.question_idx === currentIdxRef.current)) {
                   console.warn("[WordUp Logs] Answer for this round already submitted in database.");
@@ -241,8 +325,7 @@ export const useWordUpGameLoop = (
       [
          selectedAnswer,
          matchId,
-         role,
-         cleanUpIntervals,
+         stopRoundTimer,
          triggerToast,
       ],
    );
@@ -250,6 +333,10 @@ export const useWordUpGameLoop = (
    const startQuestionRound = useCallback(
       (match: any, index: number) => {
          console.log(`[WordUp Logs] startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
+         
+         // Immediately update the ref to prevent multiple transitions
+         currentIdxRef.current = index;
+         
          cleanUpIntervals();
          setCurrentIdx(index);
          setSelectedAnswer(null);
@@ -278,64 +365,30 @@ export const useWordUpGameLoop = (
 
             if (remaining <= 0) {
                console.log(`[WordUp Logs] Timer expired for round ${index + 1}`);
-               if (timerRef.current) clearInterval(timerRef.current);
-               handleAnswerSelect("");
+               stopRoundTimer();
+               if (selectedAnswer === null) {
+                  handleAnswerSelect("");
+               }
             }
          }, 50);
 
-         if (match.is_bot_match && role === "player1" && questionsRef.current[index]) {
+         if (match.is_bot_match && roleRef.current === "player1" && questionsRef.current[index]) {
             const q = questionsRef.current[index];
             const botProf = match.bot_profile || "average";
             const botAction = simulateBotResponse(q, botProf);
 
             // Scale bot action time to fit within the adaptive duration
             const botTime = Math.min(botAction.time_taken, duration - 0.5);
-            console.log(`[WordUp Logs] Bot response scheduled to submit in ${botTime}s (Profile: ${botProf})`);
+            botActionRef.current = { ...botAction, time_taken: botTime };
+            console.log(`[WordUp Logs] Bot response pre-calculated (Profile: ${botProf}, Time: ${botTime}s)`);
 
             botTimerRef.current = window.setTimeout(async () => {
-               console.log(`[WordUp Logs] Bot submitting answer for round ${index + 1}...`);
-               const botAnswers = [...(match.p2_answers || [])];
-
-               let botPoints = 0;
-               if (botAction.correct) {
-                  const speedBonus = Math.max(
-                     0,
-                     Math.round((1.0 - botTime / duration) * 50),
-                  );
-                  botPoints = 100 + speedBonus;
-               }
-
-               botAnswers.push({
-                  question_idx: index,
-                  correct: botAction.correct,
-                  time_taken: parseFloat(botTime.toFixed(2)),
-                  points: botPoints,
-               });
-
-               try {
-                  await fetchWithRetry(
-                     async () => {
-                        const { error } = await supabase
-                           .from("wordup_matches")
-                           .update({
-                              p2_answers: botAnswers,
-                              p2_answered: true,
-                              p2_score: (match.p2_score || 0) + botPoints,
-                           })
-                           .eq("id", match.id);
-                        if (error) throw error;
-                     },
-                     3,
-                     1000,
-                  );
-                  console.log(`[WordUp Logs] Bot answer synced successfully.`);
-               } catch (e) {
-                  console.error("[WordUp Logs] Bot round submission update failed:", e);
-               }
+               console.log(`[WordUp Logs] Bot "answered" (local optimistic update)`);
+               setMatchData({ ...matchDataRef.current, p2_answered: true });
             }, botTime * 1000);
          }
       },
-      [cleanUpIntervals, getSyncedNow, handleAnswerSelect, role],
+      [cleanUpIntervals, stopRoundTimer, getSyncedNow, handleAnswerSelect, setMatchData],
    );
 
    const handleMatchUpdate = useCallback(
@@ -343,17 +396,23 @@ export const useWordUpGameLoop = (
          console.log(`[WordUp Logs] handleMatchUpdate: Received UPDATE. Match index: ${newMatch.current_question_index}, local index: ${currentIdxRef.current}, p1_answered: ${newMatch.p1_answered}, p2_answered: ${newMatch.p2_answered}, status: ${newMatch.status}`);
          setMatchData(newMatch);
 
-         if (newMatch.p1_answered && newMatch.p2_answered && !revealAnswersRef.current) {
+         const bothAnswered = newMatch.p1_answered && newMatch.p2_answered;
+
+         if (bothAnswered && !revealAnswersRef.current && !isRevealingRef.current) {
+            isRevealingRef.current = true;
             console.log("[WordUp Logs] Both players answered. Revealing answers...");
-            cleanUpIntervals();
+            
+            stopRoundTimer();
+            stopBotTimer();
             setRevealAnswers(true);
 
             setTimeout(() => {
+               isRevealingRef.current = false;
                const nextIdx = newMatch.current_question_index + 1;
                if (nextIdx >= 7) {
                   console.log("[WordUp Logs] Reached end of 7 rounds. Ending match...");
                   endGame(newMatch);
-               } else if (role === "player2" || newMatch.is_bot_match) {
+               } else if (roleRef.current === "player2" || newMatch.is_bot_match) {
                   console.log(`[WordUp Logs] Triggering advance to index ${nextIdx}...`);
                   advanceRound(newMatch.id, nextIdx);
                }
@@ -374,12 +433,12 @@ export const useWordUpGameLoop = (
          }
       },
       [
-         role,
          endGame,
          advanceRound,
          startQuestionRound,
          onGameOver,
-         cleanUpIntervals,
+         stopRoundTimer,
+         stopBotTimer,
       ],
    );
 
@@ -388,8 +447,8 @@ export const useWordUpGameLoop = (
       handleMatchUpdateRef.current = handleMatchUpdate;
    }, [handleMatchUpdate]);
 
-   const loadAndSubscribeMatch = useCallback(
-      async (mId: string) => {
+    const loadAndSubscribeMatch = useCallback(
+      async (mId: string, activeRole: "player1" | "player2") => {
          const { data: match, error } = await supabase
             .from("wordup_matches")
             .select("*")
@@ -415,7 +474,7 @@ export const useWordUpGameLoop = (
             }
          }
 
-         const oppId = role === "player1" ? match.player2_id : match.player1_id;
+         const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {
             const { data: oppProf } = await supabase
                .from("wordup_profiles")
@@ -464,7 +523,7 @@ export const useWordUpGameLoop = (
          matchChannelRef.current = chan;
          return match;
       },
-      [role],
+      [],
    );
 
    useEffect(() => {
