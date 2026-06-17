@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Award, Play } from "lucide-react";
+import { Swords, Award, Play, Clock } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../hooks/useAuth";
 import { useApp } from "../../context/AppContext";
+import { fetchWithRetry } from "../../utils/fetchWithRetry";
 import {
    generateWordUpQuestions,
    generateSecretKey,
@@ -38,7 +39,7 @@ const CATEGORIES = [
 
 export const WordUpView = () => {
    const { user } = useAuth();
-   const { triggerToast } = useApp();
+   const { triggerToast, realtimeStatus } = useApp();
 
    // Game Views: 'menu' | 'matchmaking' | 'countdown' | 'battle' | 'gameover'
    const [view, setView] = useState<"menu" | "matchmaking" | "countdown" | "battle" | "gameover">("menu");
@@ -57,7 +58,6 @@ export const WordUpView = () => {
    const [revealAnswers, setRevealAnswers] = useState(false);
 
    // Bot state
-   const [_botProfileKey, setBotProfileKey] = useState<string | null>(null);
    const botTimerRef = useRef<number | null>(null);
 
    // Profiles & Stats
@@ -68,38 +68,12 @@ export const WordUpView = () => {
    const [countdownText, setCountdownText] = useState("3");
 
    const timerRef = useRef<number | null>(null);
+   const isSubmittingAnswerRef = useRef(false);
    const queueTimeoutRef = useRef<number | null>(null);
    const matchChannelRef = useRef<any>(null);
 
    // Server-local clock offset
    const clockOffset = useRef(0);
-
-   // Fetch user's WordUp profile on mount
-   useEffect(() => {
-      if (user) {
-         // eslint-disable-next-line react-hooks/immutability
-         fetchUserProfile();
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [user]);
-
-   const fetchUserProfile = async () => {
-      try {
-         const { data, error } = await supabase
-            .from("wordup_profiles")
-            .select("*")
-            .eq("id", user?.id)
-            .single();
-
-         if (error) {
-            console.error("Error loading profile:", error);
-         } else if (data) {
-            setUserStats(data);
-         }
-      } catch (err) {
-         console.error(err);
-      }
-   };
 
    // Sync Server Time Offset
    useEffect(() => {
@@ -116,7 +90,6 @@ export const WordUpView = () => {
       getOffset();
    }, []);
 
-   // eslint-disable-next-line react-hooks/purity
    const getSyncedNow = () => Date.now() + clockOffset.current;
 
    // cleanup helper
@@ -135,181 +108,327 @@ export const WordUpView = () => {
       };
    }, []);
 
-   // -------------------------------------------------------------
-   // Matchmaking Logic
-   // -------------------------------------------------------------
-   const startMatchmaking = async () => {
-      if (!user) {
-         window.dispatchEvent(new CustomEvent("open-auth-modal"));
-         return;
-      }
-
-      setView("matchmaking");
-      cleanUpIntervals();
-
+   const fetchUserProfile = useCallback(async () => {
+      if (!user) return;
       try {
-         // Call join_wordup_queue RPC
-         const { data, error } = await supabase.rpc("join_wordup_queue", {
-            p_user_id: user.id,
-            p_category: category
-         });
+         const data = await fetchWithRetry(async () => {
+            const { data, error } = await supabase
+               .from("wordup_profiles")
+               .select("*")
+               .eq("id", user.id)
+               .single();
+            if (error) throw error;
+            return data;
+         }, 3, 1500);
 
-         if (error) {
-            triggerToast("Matchmaking error: " + error.message, 3000);
-            setView("menu");
-            return;
-         }
-
-         const result = typeof data === "string" ? JSON.parse(data) : data;
-
-         if (result.status === "queued" || !result.match_id) {
-            // Player 1: Queued, wait for player 2 or bot fallback
-            setRole("player1");
-            setMatchId(null);
-
-            // Set 5 seconds matchmaking timeout for bot fallback
-            queueTimeoutRef.current = window.setTimeout(() => {
-               triggerBotFallback();
-            }, 5000);
-
-            // Listen to matches table for when player2 updates it to countdown
-            subscribeToMatchmaking();
-         } else {
-            // Player 2: Match found! We must generate questions and key, encrypt, and push to database
-            setRole("player2");
-            const newMatchId = result.match_id;
-            setMatchId(newMatchId);
-
-            // Generate match details
-            const rawQuestions = generateWordUpQuestions(category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-            // Save encrypted questions and set match to countdown
-            const { error: updateError } = await supabase
-               .from("wordup_matches")
-               .update({
-                  questions: encryptedStr,
-                  encryption_key: secretKey,
-                  status: "countdown",
-                  question_started_at: new Date(getSyncedNow()).toISOString()
-               })
-               .eq("id", newMatchId);
-
-            if (updateError) {
-               console.error("Failed to setup match:", updateError);
-               setView("menu");
-            } else {
-               // Load match
-               loadAndSubscribeMatch(newMatchId);
-            }
+         if (data) {
+            setUserStats(data);
          }
       } catch (err) {
-         console.error(err);
-         setView("menu");
+         console.error("fetchUserProfile failed:", err);
       }
-   };
+   }, [user]);
 
-   // Player 1 matchmaking listener
-   const subscribeToMatchmaking = () => {
-      const channel = supabase
-         .channel(`wordup_lobby_${user?.id}`)
-         .on(
-            "postgres_changes",
-            {
-               event: "INSERT",
-               schema: "public",
-               table: "wordup_matches",
-               filter: `player1_id=eq.${user?.id}`
-            },
-            async (payload) => {
-               const match = payload.new;
-               if (match.status === "countdown" || match.status === "waiting") {
-                  cleanUpIntervals();
-                  setMatchId(match.id);
-                  loadAndSubscribeMatch(match.id);
-               }
-            }
-         )
-         .on(
-            "postgres_changes",
-            {
-               event: "UPDATE",
-               schema: "public",
-               table: "wordup_matches",
-               filter: `player1_id=eq.${user?.id}`
-            },
-            async (payload) => {
-               const match = payload.new;
-               if (match.status === "countdown") {
-                  cleanUpIntervals();
-                  setMatchId(match.id);
-                  loadAndSubscribeMatch(match.id);
-               }
-            }
-         )
-         .subscribe();
+   // Fetch user's WordUp profile on mount
+   useEffect(() => {
+      // eslint-disable-next-line react-hooks/immutability
+      fetchUserProfile();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [user]);
 
-      matchChannelRef.current = channel;
-   };
-
-   const cancelMatchmaking = async () => {
-      cleanUpIntervals();
-      if (user) {
-         await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+   const getRankColor = useCallback((rankName: string) => {
+      switch (rankName) {
+         case "Master": return "text-purple-400 border-purple-500/30 bg-purple-500/10";
+         case "Diamond": return "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
+         case "Gold": return "text-yellow-400 border-yellow-500/30 bg-yellow-500/10";
+         case "Silver": return "text-slate-300 border-slate-500/30 bg-slate-500/10";
+         default: return "text-amber-600 border-amber-600/30 bg-amber-600/10";
       }
-      if (matchChannelRef.current) {
-         supabase.removeChannel(matchChannelRef.current);
-      }
-      setView("menu");
-   };
+   }, []);
 
-   // Bot fallback trigger
-   const triggerBotFallback = async () => {
+   const calculateFinalStats = useCallback(async (match: any) => {
       if (!user) return;
+
+      const isP1 = role === "player1";
+      const myScore = isP1 ? match.p1_score : match.p2_score;
+      const oppScore = isP1 ? match.p2_score : match.p1_score;
+
+      const won = myScore > oppScore;
+      const tied = myScore === oppScore;
+
+      // Calculate XP
+      // +50 standard completion, +100 for win, +10 for correct answers
+      const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
+      const correctCount = myAnswers.filter((a: any) => a.correct).length;
+
+      const xpReward = 50 + (won ? 100 : 0) + (correctCount * 10);
+
+      // Elo Change calculations (dynamic Elo)
+      const eloGain = won ? 18 + Math.max(0, correctCount) : tied ? 2 : -12;
+
+      // Update Database profiles with retry
+      try {
+         const currentProf = await fetchWithRetry(async () => {
+            const { data, error } = await supabase
+               .from("wordup_profiles")
+               .select("*")
+               .eq("id", user.id)
+               .single();
+            if (error) throw error;
+            return data;
+         }, 3, 1000);
+
+         if (currentProf) {
+            const newRating = Math.max(800, currentProf.rating + eloGain);
+            const newXp = currentProf.xp + xpReward;
+
+            // Determine Rank
+            let rank = "Bronze";
+            if (newXp > 3000) rank = "Master";
+            else if (newXp > 1800) rank = "Diamond";
+            else if (newXp > 1000) rank = "Gold";
+            else if (newXp > 400) rank = "Silver";
+
+            await fetchWithRetry(async () => {
+               const { error } = await supabase
+                  .from("wordup_profiles")
+                  .update({
+                     rating: newRating,
+                     xp: newXp,
+                     games_played: currentProf.games_played + 1,
+                     games_won: currentProf.games_won + (won ? 1 : 0),
+                     games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
+                     games_tied: currentProf.games_tied + (tied ? 1 : 0),
+                     rank_name: rank
+                  })
+                  .eq("id", user.id);
+               if (error) throw error;
+            }, 3, 1000);
+
+            // Refresh profile states
+            fetchUserProfile();
+         }
+      } catch (err) {
+         console.error("Rating update transaction failed:", err);
+         triggerToast("Rating update delayed. Syncing in background...", 4000);
+      }
+   }, [user, role, fetchUserProfile, triggerToast]);
+
+   const endGame = useCallback(async (match: any) => {
+      try {
+         await fetchWithRetry(async () => {
+            const { error } = await supabase
+               .from("wordup_matches")
+               .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString()
+               })
+               .eq("id", match.id);
+            if (error) throw error;
+         }, 3, 1000);
+      } catch (e) {
+         console.error("Failed to complete match status:", e);
+      }
+   }, []);
+
+   const advanceRound = useCallback(async (mId: string, nextIdx: number) => {
+      try {
+         await fetchWithRetry(async () => {
+            const { error } = await supabase
+               .from("wordup_matches")
+               .update({
+                  current_question_index: nextIdx,
+                  p1_answered: false,
+                  p2_answered: false,
+                  question_started_at: new Date(getSyncedNow()).toISOString()
+               })
+               .eq("id", mId);
+            if (error) throw error;
+         }, 3, 1000);
+      } catch (e) {
+         console.error("Failed to advance round:", e);
+      }
+   }, []);
+
+   const handleAnswerSelect = useCallback(async (choice: string) => {
+      if (isSubmittingAnswerRef.current || selectedAnswer !== null || revealAnswers) return;
+
+      isSubmittingAnswerRef.current = true;
+      setSelectedAnswer(choice);
       cleanUpIntervals();
 
-      // Remove from queue
-      await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+      // Measure local elapsed time from start of round
+      const elapsed = parseFloat((10.0 - timeLeft).toFixed(2));
+      const q = questions[currentIdx];
+      const correct = choice === q.answer;
 
-      setRole("player1");
-      const botProfile = getRandomBotProfile();
-      setBotProfileKey(botProfile);
-
-      const rawQuestions = generateWordUpQuestions(category);
-      const secretKey = generateSecretKey();
-      const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-      // Create bot match row in database
-      const { data, error } = await supabase
-         .from("wordup_matches")
-         .insert({
-            category,
-            player1_id: user.id,
-            player2_id: null,
-            is_bot_match: true,
-            bot_profile: botProfile,
-            questions: encryptedStr,
-            encryption_key: secretKey,
-            status: "countdown",
-            question_started_at: new Date(getSyncedNow()).toISOString()
-         })
-         .select()
-         .single();
-
-      if (error) {
-         console.error("Bot match insertion failed:", error);
-         setView("menu");
-      } else if (data) {
-         setMatchId(data.id);
-         loadAndSubscribeMatch(data.id);
+      // Scoring: Correct = 100, speed bonus up to 50
+      let points = 0;
+      if (correct) {
+         const speedBonus = Math.max(0, Math.round((1.0 - elapsed / 10.0) * 50));
+         points = 100 + speedBonus;
       }
-   };
 
-   // -------------------------------------------------------------
-   // Game Loop Sync
-   // -------------------------------------------------------------
-   const loadAndSubscribeMatch = async (mId: string) => {
+      const submission = {
+         question_idx: currentIdx,
+         correct,
+         time_taken: elapsed,
+         points
+      };
+
+      try {
+         if (role === "player1") {
+            const answers = [...(matchData.p1_answers || [])];
+            answers.push(submission);
+
+            await fetchWithRetry(async () => {
+               const { error } = await supabase
+                  .from("wordup_matches")
+                  .update({
+                     p1_answers: answers,
+                     p1_answered: true,
+                     p1_score: (matchData.p1_score || 0) + points
+                  })
+                  .eq("id", matchId!);
+               if (error) throw error;
+            }, 3, 1000);
+         } else {
+            const answers = [...(matchData.p2_answers || [])];
+            answers.push(submission);
+
+            await fetchWithRetry(async () => {
+               const { error } = await supabase
+                  .from("wordup_matches")
+                  .update({
+                     p2_answers: answers,
+                     p2_answered: true,
+                     p2_score: (matchData.p2_score || 0) + points
+                  })
+                  .eq("id", matchId!);
+               if (error) throw error;
+            }, 3, 1000);
+         }
+      } catch (err) {
+         console.error("Score submission update failed:", err);
+         triggerToast("Sync error. Recovering score...", 3000);
+         isSubmittingAnswerRef.current = false;
+      }
+   }, [selectedAnswer, revealAnswers, timeLeft, questions, currentIdx, role, matchData, matchId, triggerToast]);
+
+   const startQuestionRound = useCallback((match: any, index: number) => {
+      cleanUpIntervals();
+      setCurrentIdx(index);
+      setSelectedAnswer(null);
+      setRevealAnswers(false);
+      setTimeLeft(10.0);
+      isSubmittingAnswerRef.current = false;
+
+      // Start realtimer countdown based on question_started_at
+      const startTime = match.question_started_at
+         ? new Date(match.question_started_at).getTime()
+         : getSyncedNow();
+
+      timerRef.current = window.setInterval(() => {
+         const now = getSyncedNow();
+         const elapsed = (now - startTime) / 1000;
+         const remaining = Math.max(0, 10.0 - elapsed);
+
+         setTimeLeft(parseFloat(remaining.toFixed(2)));
+
+         if (remaining <= 0) {
+            clearInterval(timerRef.current!);
+            // Timeout user answer
+            handleAnswerSelect("");
+         }
+      }, 50);
+
+      // Bot Turn Simulation Trigger
+      if (match.is_bot_match && role === "player1") {
+         const q = questions[index];
+         const botProf = match.bot_profile || "average";
+         const botAction = simulateBotResponse(q, botProf);
+
+         botTimerRef.current = window.setTimeout(async () => {
+            // Update match with bot submission
+            const botAnswers = [...(match.p2_answers || [])];
+            botAnswers.push({
+               question_idx: index,
+               correct: botAction.correct,
+               time_taken: botAction.time_taken,
+               points: botAction.points
+            });
+
+            try {
+               await fetchWithRetry(async () => {
+                  const { error } = await supabase
+                     .from("wordup_matches")
+                     .update({
+                        p2_answers: botAnswers,
+                        p2_answered: true,
+                        p2_score: (match.p2_score || 0) + botAction.points
+                     })
+                     .eq("id", match.id);
+                  if (error) throw error;
+               }, 3, 1000);
+            } catch (e) {
+               console.error("Bot round submission update failed:", e);
+            }
+
+         }, botAction.time_taken * 1000);
+      }
+   }, [questions, role, handleAnswerSelect]);
+
+   const startCountdown = useCallback((match: any) => {
+      let count = 3;
+      setCountdownText("3");
+      const interval = setInterval(() => {
+         count--;
+         if (count === 0) {
+            clearInterval(interval);
+            // Move to battle view
+            setView("battle");
+            startQuestionRound(match, 0);
+         } else {
+            setCountdownText(String(count));
+         }
+      }, 1000);
+   }, [startQuestionRound]);
+
+   const handleMatchUpdate = useCallback((newMatch: any) => {
+      setMatchData(newMatch);
+
+      // Check if both players answered
+      if (newMatch.p1_answered && newMatch.p2_answered && !revealAnswers) {
+         // Both answered, show correct answer for 1.5s
+         cleanUpIntervals();
+         setRevealAnswers(true);
+
+         setTimeout(() => {
+            // Next question or end game
+            const nextIdx = newMatch.current_question_index + 1;
+            if (nextIdx >= 7) {
+               // Game complete!
+               endGame(newMatch);
+            } else if (role === "player2") {
+               // Only Player 2 updates round parameters to avoid double execution
+               advanceRound(newMatch.id, nextIdx);
+            }
+         }, 1800);
+      }
+
+      // Check if question index advanced
+      if (newMatch.current_question_index !== currentIdx && newMatch.status === "active") {
+         startQuestionRound(newMatch, newMatch.current_question_index);
+      }
+
+      // Completed
+      if (newMatch.status === "completed" && view !== "gameover") {
+         setView("gameover");
+         calculateFinalStats(newMatch);
+      }
+   }, [revealAnswers, role, endGame, advanceRound, currentIdx, startQuestionRound, view, calculateFinalStats]);
+
+   const loadAndSubscribeMatch = useCallback(async (mId: string) => {
       // 1. Fetch initial match state
       const { data: match, error } = await supabase
          .from("wordup_matches")
@@ -324,7 +443,6 @@ export const WordUpView = () => {
       }
 
       setMatchData(match);
-      setBotProfileKey(match.bot_profile);
 
       // Decrypt questions
       if (match.questions && match.encryption_key) {
@@ -384,258 +502,185 @@ export const WordUpView = () => {
       // Start Countdown view
       setView("countdown");
       startCountdown(match);
-   };
+   }, [role, handleMatchUpdate, startCountdown]);
 
-   const startCountdown = (match: any) => {
-      let count = 3;
-      setCountdownText("3");
-      const interval = setInterval(() => {
-         count--;
-         if (count === 0) {
-            clearInterval(interval);
-            // Move to battle view
-            setView("battle");
-            startQuestionRound(match, 0);
-         } else {
-            setCountdownText(String(count));
-         }
-      }, 1000);
-   };
-
-   const startQuestionRound = (match: any, index: number) => {
-      cleanUpIntervals();
-      setCurrentIdx(index);
-      setSelectedAnswer(null);
-      setRevealAnswers(false);
-      setTimeLeft(10.0);
-
-      // Start realtimer countdown based on question_started_at
-      const startTime = match.question_started_at
-         ? new Date(match.question_started_at).getTime()
-         : getSyncedNow();
-
-      timerRef.current = window.setInterval(() => {
-         const now = getSyncedNow();
-         const elapsed = (now - startTime) / 1000;
-         const remaining = Math.max(0, 10.0 - elapsed);
-
-         setTimeLeft(parseFloat(remaining.toFixed(2)));
-
-         if (remaining <= 0) {
-            clearInterval(timerRef.current!);
-            // Timeout user answer
-            handleAnswerSelect("");
-         }
-      }, 50);
-
-      // Bot Turn Simulation Trigger
-      if (match.is_bot_match && role === "player1") {
-         const q = questions[index];
-         const botProf = match.bot_profile || "average";
-         const botAction = simulateBotResponse(q, botProf);
-
-         botTimerRef.current = window.setTimeout(async () => {
-            // Update match with bot submission
-            const botAnswers = [...(match.p2_answers || [])];
-            botAnswers.push({
-               question_idx: index,
-               correct: botAction.correct,
-               time_taken: botAction.time_taken,
-               points: botAction.points
-            });
-
-            await supabase
-               .from("wordup_matches")
-               .update({
-                  p2_answers: botAnswers,
-                  p2_answered: true,
-                  p2_score: (match.p2_score || 0) + botAction.points
-               })
-               .eq("id", match.id);
-
-         }, botAction.time_taken * 1000);
-      }
-   };
-
-   const handleMatchUpdate = (newMatch: any) => {
-      setMatchData(newMatch);
-
-      // Check if both players answered
-      if (newMatch.p1_answered && newMatch.p2_answered && !revealAnswers) {
-         // Both answered, show correct answer for 1.5s
-         cleanUpIntervals();
-         setRevealAnswers(true);
-
-         setTimeout(() => {
-            // Next question or end game
-            const nextIdx = newMatch.current_question_index + 1;
-            if (nextIdx >= 7) {
-               // Game complete!
-               endGame(newMatch);
-            } else if (role === "player2") {
-               // Only Player 2 (creator or joiner) updates round parameters to avoid double execution
-               advanceRound(newMatch.id, nextIdx);
+   // Player 1 matchmaking listener
+   const subscribeToMatchmaking = useCallback(() => {
+      const channel = supabase
+         .channel(`wordup_lobby_${user?.id}`)
+         .on(
+            "postgres_changes",
+            {
+               event: "INSERT",
+               schema: "public",
+               table: "wordup_matches",
+               filter: `player1_id=eq.${user?.id}`
+            },
+            async (payload) => {
+               const match = payload.new;
+               if (match.status === "countdown" || match.status === "waiting") {
+                  cleanUpIntervals();
+                  setMatchId(match.id);
+                  loadAndSubscribeMatch(match.id);
+               }
             }
-         }, 1800);
-      }
+         )
+         .on(
+            "postgres_changes",
+            {
+               event: "UPDATE",
+               schema: "public",
+               table: "wordup_matches",
+               filter: `player1_id=eq.${user?.id}`
+            },
+            async (payload) => {
+               const match = payload.new;
+               if (match.status === "countdown") {
+                  cleanUpIntervals();
+                  setMatchId(match.id);
+                  loadAndSubscribeMatch(match.id);
+               }
+            }
+         )
+         .subscribe();
 
-      // Check if question index advanced
-      if (newMatch.current_question_index !== currentIdx && newMatch.status === "active") {
-         startQuestionRound(newMatch, newMatch.current_question_index);
-      }
+      matchChannelRef.current = channel;
+   }, [user, loadAndSubscribeMatch]);
 
-      // Completed
-      if (newMatch.status === "completed" && view !== "gameover") {
-         setView("gameover");
-         calculateFinalStats(newMatch);
-      }
-   };
-
-   const advanceRound = async (mId: string, nextIdx: number) => {
-      await supabase
-         .from("wordup_matches")
-         .update({
-            current_question_index: nextIdx,
-            p1_answered: false,
-            p2_answered: false,
-            question_started_at: new Date(getSyncedNow()).toISOString()
-         })
-         .eq("id", mId);
-   };
-
-   // -------------------------------------------------------------
-   // Answer Submission
-   // -------------------------------------------------------------
-   const handleAnswerSelect = async (choice: string) => {
-      if (selectedAnswer !== null || revealAnswers) return;
-
-      setSelectedAnswer(choice);
+   // Bot fallback trigger
+   const triggerBotFallback = useCallback(async () => {
+      if (!user) return;
       cleanUpIntervals();
 
-      // Measure local elapsed time from start of round
-      const elapsed = parseFloat((10.0 - timeLeft).toFixed(2));
-      const q = questions[currentIdx];
-      const correct = choice === q.answer;
-
-      // Scoring: Correct = 100, speed bonus up to 50
-      let points = 0;
-      if (correct) {
-         const speedBonus = Math.max(0, Math.round((1.0 - elapsed / 10.0) * 50));
-         points = 100 + speedBonus;
+      // Remove from queue
+      try {
+         await fetchWithRetry(async () => {
+            const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+            if (error) throw error;
+         }, 3, 1000);
+      } catch (e) {
+         console.warn("Queue purge failed, continuing:", e);
       }
 
-      const submission = {
-         question_idx: currentIdx,
-         correct,
-         time_taken: elapsed,
-         points
-      };
+      setRole("player1");
+      const botProfile = getRandomBotProfile();
 
-      if (role === "player1") {
-         const answers = [...(matchData.p1_answers || [])];
-         answers.push(submission);
+      const rawQuestions = generateWordUpQuestions(category);
+      const secretKey = generateSecretKey();
+      const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
-         await supabase
-            .from("wordup_matches")
-            .update({
-               p1_answers: answers,
-               p1_answered: true,
-               p1_score: (matchData.p1_score || 0) + points
-            })
-            .eq("id", matchId!);
-      } else {
-         const answers = [...(matchData.p2_answers || [])];
-         answers.push(submission);
+      // Create bot match row in database with retry
+      try {
+         const data = await fetchWithRetry(async () => {
+            const { data, error } = await supabase
+               .from("wordup_matches")
+               .insert({
+                  category,
+                  player1_id: user.id,
+                  player2_id: null,
+                  is_bot_match: true,
+                  bot_profile: botProfile,
+                  questions: encryptedStr,
+                  encryption_key: secretKey,
+                  status: "countdown",
+                  question_started_at: new Date(getSyncedNow()).toISOString()
+               })
+               .select()
+               .single();
+            if (error) throw error;
+            return data;
+         }, 3, 1000);
 
-         await supabase
-            .from("wordup_matches")
-            .update({
-               p2_answers: answers,
-               p2_answered: true,
-               p2_score: (matchData.p2_score || 0) + points
-            })
-            .eq("id", matchId!);
+         if (data) {
+            setMatchId(data.id);
+            loadAndSubscribeMatch(data.id);
+         }
+      } catch (err) {
+         console.error("Bot match insertion failed:", err);
+         setView("menu");
       }
-   };
+   }, [user, category, loadAndSubscribeMatch]);
 
-   // -------------------------------------------------------------
-   // GameOver & Rating calculations
-   // -------------------------------------------------------------
-   const endGame = async (match: any) => {
-      await supabase
-         .from("wordup_matches")
-         .update({
-            status: "completed",
-            completed_at: new Date().toISOString()
-         })
-         .eq("id", match.id);
-   };
-
-   const calculateFinalStats = async (match: any) => {
-      if (!user) return;
-
-      const isP1 = role === "player1";
-      const myScore = isP1 ? match.p1_score : match.p2_score;
-      const oppScore = isP1 ? match.p2_score : match.p1_score;
-
-      const won = myScore > oppScore;
-      const tied = myScore === oppScore;
-
-      // Calculate XP
-      // +50 standard completion, +100 for win, +10 for correct answers
-      const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
-      const correctCount = myAnswers.filter((a: any) => a.correct).length;
-
-      const xpReward = 50 + (won ? 100 : 0) + (correctCount * 10);
-
-      // Elo Change calculations (dynamic Elo)
-      const eloGain = won ? 18 + Math.max(0, correctCount) : tied ? 2 : -12;
-
-      // Update Database profiles
-      const { data: currentProf } = await supabase
-         .from("wordup_profiles")
-         .select("*")
-         .eq("id", user.id)
-         .single();
-
-      if (currentProf) {
-         const newRating = Math.max(800, currentProf.rating + eloGain);
-         const newXp = currentProf.xp + xpReward;
-
-         // Determine Rank
-         let rank = "Bronze";
-         if (newXp > 3000) rank = "Master";
-         else if (newXp > 1800) rank = "Diamond";
-         else if (newXp > 1000) rank = "Gold";
-         else if (newXp > 400) rank = "Silver";
-
-         await supabase
-            .from("wordup_profiles")
-            .update({
-               rating: newRating,
-               xp: newXp,
-               games_played: currentProf.games_played + 1,
-               games_won: currentProf.games_won + (won ? 1 : 0),
-               games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
-               games_tied: currentProf.games_tied + (tied ? 1 : 0),
-               rank_name: rank
-            })
-            .eq("id", user.id);
-
-         // Refresh profile states
-         fetchUserProfile();
+   const startMatchmaking = useCallback(async () => {
+      if (!user) {
+         window.dispatchEvent(new CustomEvent("open-auth-modal"));
+         return;
       }
-   };
 
-   const getRankColor = (rankName: string) => {
-      switch (rankName) {
-         case "Master": return "text-purple-400 border-purple-500/30 bg-purple-500/10";
-         case "Diamond": return "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
-         case "Gold": return "text-yellow-400 border-yellow-500/30 bg-yellow-500/10";
-         case "Silver": return "text-slate-300 border-slate-500/30 bg-slate-500/10";
-         default: return "text-amber-600 border-amber-600/30 bg-amber-600/10";
+      setView("matchmaking");
+      cleanUpIntervals();
+
+      try {
+         // Call join_wordup_queue RPC with retry support
+         const result = await fetchWithRetry(async () => {
+            const { data, error } = await supabase.rpc("join_wordup_queue", {
+               p_user_id: user.id,
+               p_category: category
+            });
+            if (error) throw error;
+            return typeof data === "string" ? JSON.parse(data) : data;
+         }, 3, 1000);
+
+         if (result.status === "queued" || !result.match_id) {
+            // Player 1: Queued, wait for player 2 or bot fallback
+            setRole("player1");
+            setMatchId(null);
+
+            // Set 5 seconds matchmaking timeout for bot fallback
+            queueTimeoutRef.current = window.setTimeout(() => {
+               triggerBotFallback();
+            }, 5000);
+
+            // Listen to matches table for when player2 updates it to countdown
+            subscribeToMatchmaking();
+         } else {
+            // Player 2: Match found! We must generate questions and key, encrypt, and push to database
+            setRole("player2");
+            const newMatchId = result.match_id;
+            setMatchId(newMatchId);
+
+            // Generate match details
+            const rawQuestions = generateWordUpQuestions(category);
+            const secretKey = generateSecretKey();
+            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+            // Save encrypted questions and set match to countdown
+            await fetchWithRetry(async () => {
+               const { error: updateError } = await supabase
+                  .from("wordup_matches")
+                  .update({
+                     questions: encryptedStr,
+                     encryption_key: secretKey,
+                     status: "countdown",
+                     question_started_at: new Date(getSyncedNow()).toISOString()
+                  })
+                  .eq("id", newMatchId);
+               if (updateError) throw updateError;
+            }, 3, 1000);
+
+            // Load match
+            loadAndSubscribeMatch(newMatchId);
+         }
+      } catch (err: any) {
+         console.error("Matchmaking startup failed:", err);
+         triggerToast("Failed to join arena. Please try again.", 4000);
+         setView("menu");
       }
-   };
+   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, loadAndSubscribeMatch]);
+
+   const cancelMatchmaking = useCallback(async () => {
+      cleanUpIntervals();
+      if (user) {
+         await fetchWithRetry(async () => {
+            const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+            if (error) throw error;
+         }, 3, 1000);
+      }
+      if (matchChannelRef.current) {
+         supabase.removeChannel(matchChannelRef.current);
+      }
+      setView("menu");
+   }, [user]);
 
    // -------------------------------------------------------------
    // Render Helpers
@@ -924,6 +969,21 @@ export const WordUpView = () => {
                </motion.div>
             )}
          </AnimatePresence>
+
+         {/* Connection Lost Overlay */}
+         {realtimeStatus === "disconnected" && view === "battle" && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center z-50 p-6 text-center animate-in fade-in duration-200">
+               <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-3xl max-w-xs space-y-4 shadow-2xl">
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mx-auto animate-pulse">
+                     <Clock size={24} />
+                  </div>
+                  <h3 className="text-sm font-black uppercase text-amber-400 tracking-wider">Connection Lost</h3>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                     We lost sync with the battle arena. Hold tight while we attempt to reconnect you...
+                  </p>
+               </div>
+            </div>
+         )}
       </div>
    );
 };
