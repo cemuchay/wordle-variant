@@ -452,12 +452,37 @@ export const useWordUpGameLoop = (
 
    const handleMatchUpdate = useCallback(
       (newMatch: any) => {
-         console.log(
-            `[WordUp Logs] handleMatchUpdate: Received UPDATE. Match index: ${newMatch.current_question_index}, local index: ${currentIdxRef.current}, p1_answered: ${newMatch.p1_answered}, p2_answered: ${newMatch.p2_answered}, status: ${newMatch.status}`,
-         );
-         setMatchData(newMatch);
+         const currentMatch = matchDataRef.current;
+         
+         // 1. Robust state merging: Only accept updates that represent progress or same state
+         // If Postgres update is older than local state (e.g. local has more answers), merge them.
+         const mergedMatch = { ...currentMatch, ...newMatch };
 
-         const bothAnswered = newMatch.p1_answered && newMatch.p2_answered;
+         if (currentMatch) {
+            // Ensure we don't lose answers that we already know about locally
+            if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
+               mergedMatch.p1_answers = currentMatch.p1_answers;
+               mergedMatch.p1_score = currentMatch.p1_score;
+               mergedMatch.p1_answered = currentMatch.p1_answered;
+            }
+            if ((currentMatch.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)) {
+               mergedMatch.p2_answers = currentMatch.p2_answers;
+               mergedMatch.p2_score = currentMatch.p2_score;
+               mergedMatch.p2_answered = currentMatch.p2_answered;
+            }
+            // Keep the highest question index
+            mergedMatch.current_question_index = Math.max(currentMatch.current_question_index || 0, newMatch.current_question_index || 0);
+            
+            // If local status is already active/completed, don't let it go back to countdown
+            if (currentMatch.status === "active" && newMatch.status === "countdown") {
+               mergedMatch.status = "active";
+            }
+         }
+
+         console.log(`[WordUp Logs] handleMatchUpdate: Merged index: ${mergedMatch.current_question_index}, status: ${mergedMatch.status}, p1: ${mergedMatch.p1_answered}, p2: ${mergedMatch.p2_answered}`);
+         setMatchData(mergedMatch);
+
+         const bothAnswered = mergedMatch.p1_answered && mergedMatch.p2_answered;
 
          if (
             bothAnswered &&
@@ -475,37 +500,37 @@ export const useWordUpGameLoop = (
 
             setTimeout(() => {
                isRevealingRef.current = false;
-               const nextIdx = newMatch.current_question_index + 1;
+               const nextIdx = mergedMatch.current_question_index + 1;
                if (nextIdx >= 7) {
                   console.log(
                      "[WordUp Logs] Reached end of 7 rounds. Ending match...",
                   );
-                  endGame(newMatch);
+                  endGame(mergedMatch);
                } else if (
                   roleRef.current === "player2" ||
-                  newMatch.is_bot_match
+                  mergedMatch.is_bot_match
                ) {
                   console.log(
                      `[WordUp Logs] Triggering advance to index ${nextIdx}...`,
                   );
-                  advanceRound(newMatch.id, nextIdx);
+                  advanceRound(mergedMatch.id, nextIdx);
                }
             }, 1800);
          }
 
          if (
-            newMatch.current_question_index !== currentIdxRef.current &&
-            (newMatch.status === "active" || newMatch.status === "countdown")
+            mergedMatch.current_question_index !== currentIdxRef.current &&
+            (mergedMatch.status === "active" || mergedMatch.status === "countdown")
          ) {
             console.log(
-               `[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${newMatch.current_question_index}`,
+               `[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${mergedMatch.current_question_index}`,
             );
-            startQuestionRound(newMatch, newMatch.current_question_index);
+            startQuestionRound(mergedMatch, mergedMatch.current_question_index);
          }
 
-         if (newMatch.status === "completed") {
+         if (mergedMatch.status === "completed") {
             console.log("[WordUp Logs] Match marked as completed.");
-            onGameOver(newMatch);
+            onGameOver(mergedMatch);
          }
       },
       [
@@ -634,6 +659,12 @@ export const useWordUpGameLoop = (
                };
                handleMatchUpdateRef.current(updatedMatch);
             })
+            .on("broadcast", { event: "game_active" }, () => {
+               console.log("[WordUp Logs] Broadcast: game_active");
+               const currentMatch = matchDataRef.current;
+               if (!currentMatch) return;
+               handleMatchUpdateRef.current({ ...currentMatch, status: "active" });
+            })
             .subscribe();
 
          matchChannelRef.current = chan;
@@ -653,6 +684,8 @@ export const useWordUpGameLoop = (
 
    return {
       matchData,
+      setMatchData,
+      matchChannelRef,
       questions,
       currentIdx,
       timeLeft,

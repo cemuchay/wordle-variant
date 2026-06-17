@@ -86,6 +86,8 @@ export const WordUpView = () => {
       questions,
       currentIdx,
       matchData,
+      setMatchData,
+      matchChannelRef,
       opponentStats,
       timeLeft,
       maxTime,
@@ -97,6 +99,15 @@ export const WordUpView = () => {
       cleanUpIntervals: cleanUpGameLoop
    } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver);
 
+   // Reactive sync: If matchData status changes to active externally, jump to battle
+   useEffect(() => {
+      if (matchData?.status === "active" && view === "countdown") {
+         console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
+         setView("battle");
+         startQuestionRound(matchData, matchData.current_question_index || 0);
+      }
+   }, [matchData?.status, view, setView, startQuestionRound, matchData]);
+
    const startCountdown = useCallback((match: any) => {
       let count = 3;
       setCountdownText("3");
@@ -106,15 +117,24 @@ export const WordUpView = () => {
             clearInterval(interval);
             setView("battle");
 
-            // Set match status to active in database
+            // Broadcast game_active to opponent for zero-latency start
+            matchChannelRef.current?.send({
+               type: "broadcast",
+               event: "game_active",
+            });
+
+            // Update local state immediately
+            setMatchData({ ...match, status: "active" });
+
+            // Set match status to active in database in background
             if (role === "player2" || match.is_bot_match) {
-               supabase
-                  .from("wordup_matches")
-                  .update({ status: "active" })
-                  .eq("id", match.id)
-                  .then(({ error }: any) => {
-                     if (error) console.error("Failed to set match status to active:", error);
-                  });
+               fetchWithRetry(async () => {
+                  const { error } = await supabase
+                     .from("wordup_matches")
+                     .update({ status: "active" })
+                     .eq("id", match.id);
+                  if (error) throw error;
+               }, 3, 500).catch(err => console.error("Failed to sync active status to DB:", err));
             }
 
             startQuestionRound(match, 0);
@@ -122,7 +142,7 @@ export const WordUpView = () => {
             setCountdownText(String(count));
          }
       }, 1000);
-   }, [startQuestionRound, role]);
+   }, [startQuestionRound, role, setView, setMatchData, matchChannelRef]);
 
    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
       setMatchId(mId);
