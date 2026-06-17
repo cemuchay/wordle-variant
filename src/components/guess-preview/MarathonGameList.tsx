@@ -73,7 +73,7 @@ export const MarathonGameList = memo(({
 
             {sortMode === "number" ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5 w-full">
-                    {marathonGames.map((game, idx) => {
+                    {marathonGames.map((_, idx) => {
                         const prog = entry.marathon_progress?.find(
                             (p: any) => p.game_index === idx,
                         );

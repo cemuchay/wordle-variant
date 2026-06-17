@@ -3,6 +3,7 @@ import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 import returnAnimationTime from '../utils/returnAnimationTime';
 import { useAppStore } from '../store/useAppStore';
+import { useIsResponsive } from '../hooks/useResponsive';
 
 interface CellProps {
   letter: string;
@@ -73,27 +74,6 @@ const TILE_SIZES = [
 
 
 
-// A simple custom hook to check for responsive breakpoints
-const useIsResponsive = () => {
-  const [state, setState] = useState({
-    isDesktop: window.innerWidth >= 640,
-    isSmall: window.innerWidth <= 375 && window.innerHeight <= 667,
-    isSuperTiny: window.innerWidth <= 350 && window.innerHeight <= 500
-  });
-
-  useEffect(() => {
-    const handleResize = () => setState({
-      isDesktop: window.innerWidth >= 640,
-      isSmall: window.innerWidth <= 375 && window.innerHeight <= 667,
-      isSuperTiny: window.innerWidth <= 350 && window.innerHeight <= 500
-    });
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return state;
-};
-
 const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
   const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
@@ -127,7 +107,7 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     }
   }
   if (isSuperTiny) {
-    scale = { h: 0.6, w: 0.9 }
+    scale = { h: 0.7, w: 0.7 }
   }
   const finalWidth = dimensions.w * scale.w;
   const finalHeight = dimensions.h * scale.h;
@@ -203,7 +183,6 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       }, returnAnimationTime(wordLength));
       return () => clearTimeout(timer);
     } else if (guesses.length < revealedRowsCount) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedRowsCount(guesses.length);
     }
   }, [guesses.length, revealedRowsCount, wordLength]);
