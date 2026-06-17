@@ -86,8 +86,6 @@ export const WordUpView = () => {
       questions,
       currentIdx,
       matchData,
-      setMatchData,
-      matchChannelRef,
       opponentStats,
       timeLeft,
       maxTime,
@@ -96,8 +94,16 @@ export const WordUpView = () => {
       handleAnswerSelect,
       loadAndSubscribeMatch,
       startQuestionRound,
-      cleanUpIntervals: cleanUpGameLoop
-   } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver);
+      cleanUpIntervals: cleanUpGameLoop,
+      rematchState,
+      rematchCountdown,
+      showRematchButton,
+      sendRematch,
+      acceptRematch
+   } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver, (newMId, newRole) => {
+      // eslint-disable-next-line react-hooks/immutability
+      onMatchFound(newMId, newRole);
+   });
 
    // Reactive sync: If matchData status changes to active externally, jump to battle
    useEffect(() => {
@@ -117,24 +123,15 @@ export const WordUpView = () => {
             clearInterval(interval);
             setView("battle");
 
-            // Broadcast game_active to opponent for zero-latency start
-            matchChannelRef.current?.send({
-               type: "broadcast",
-               event: "game_active",
-            });
-
-            // Update local state immediately
-            setMatchData({ ...match, status: "active" });
-
-            // Set match status to active in database in background
+            // Set match status to active in database
             if (role === "player2" || match.is_bot_match) {
-               fetchWithRetry(async () => {
-                  const { error } = await supabase
-                     .from("wordup_matches")
-                     .update({ status: "active" })
-                     .eq("id", match.id);
-                  if (error) throw error;
-               }, 3, 500).catch(err => console.error("Failed to sync active status to DB:", err));
+               supabase
+                  .from("wordup_matches")
+                  .update({ status: "active" })
+                  .eq("id", match.id)
+                  .then(({ error }: any) => {
+                     if (error) console.error("Failed to set match status to active:", error);
+                  });
             }
 
             startQuestionRound(match, 0);
@@ -142,8 +139,9 @@ export const WordUpView = () => {
             setCountdownText(String(count));
          }
       }, 1000);
-   }, [startQuestionRound, role, setView, setMatchData, matchChannelRef]);
+   }, [startQuestionRound, role]);
 
+   // eslint-disable-next-line react-hooks/preserve-manual-memoization
    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
       setMatchId(mId);
       setRole(mRole);
@@ -164,6 +162,12 @@ export const WordUpView = () => {
       startMatchmaking,
       cancelMatchmaking
    } = useWordUpMatchmaking(user, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
+
+   useEffect(() => {
+      return () => {
+         cancelMatchmaking();
+      };
+   }, [cancelMatchmaking]);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
@@ -225,6 +229,12 @@ export const WordUpView = () => {
                         setView(newView);
                      }
                   }}
+                  role={role}
+                  rematchState={rematchState}
+                  rematchCountdown={rematchCountdown}
+                  showRematchButton={showRematchButton}
+                  sendRematch={sendRematch}
+                  acceptRematch={() => acceptRematch(onMatchFound)}
                />
             )}
          </AnimatePresence>

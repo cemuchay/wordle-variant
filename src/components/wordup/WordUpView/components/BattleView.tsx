@@ -30,6 +30,35 @@ export const BattleView = ({
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
 
+   const isP1 = role === "player1";
+   const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
+   const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);
+
+   let p1Status = "Thinking...";
+   let p1Color = "bg-gray-700";
+   if (matchData?.p1_answered) {
+      p1Status = "Submitted";
+      p1Color = "bg-correct animate-pulse";
+   } else if (role === "player1" && selectedAnswer !== null) {
+      p1Status = "Syncing...";
+      p1Color = "bg-yellow-500 animate-pulse";
+   }
+
+   let p2Status = "Thinking...";
+   let p2Color = "bg-gray-700";
+   if (matchData?.p2_answered) {
+      p2Status = "Submitted";
+      p2Color = "bg-pink-500 animate-pulse";
+   } else if (role === "player2" && selectedAnswer !== null) {
+      p2Status = "Syncing...";
+      p2Color = "bg-yellow-500 animate-pulse";
+   }
+
+   const myStatus = isP1 ? p1Status : p2Status;
+   const myColor = isP1 ? p1Color : p2Color;
+   const oppStatus = isP1 ? p2Status : p1Status;
+   const oppColor = isP1 ? p2Color : p1Color;
+
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -44,7 +73,7 @@ export const BattleView = ({
                </div>
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase">You</p>
-                  <p className="text-sm font-black text-white">{matchData?.p1_score || 0} pts</p>
+                  <p className="text-sm font-black text-white">{myScore} pts</p>
                </div>
             </div>
             <div className="flex items-center gap-2 min-w-0 justify-end text-right">
@@ -54,7 +83,7 @@ export const BattleView = ({
                         ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
                         : (opponentStats ? "Opponent" : "Matching Bot")}
                   </p>
-                  <p className="text-sm font-black text-white">{matchData?.p2_score || 0} pts</p>
+                  <p className="text-sm font-black text-white">{oppScore} pts</p>
                </div>
                <div className="w-8 h-8 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-xs font-black shrink-0">
                   {matchData?.is_bot_match ? "🤖" : "VS"}
@@ -63,45 +92,26 @@ export const BattleView = ({
          </div>
 
          {/* Score Indicators / Answer Status */}
-         {(() => {
-            let p1Status = "Thinking...";
-            let p1Color = "bg-gray-700";
-            if (matchData?.p1_answered) {
-               p1Status = "Submitted";
-               p1Color = "bg-correct animate-pulse";
-            } else if (role === "player1" && selectedAnswer !== null) {
-               p1Status = "Syncing...";
-               p1Color = "bg-yellow-500 animate-pulse";
-            }
-
-            let p2Status = "Thinking...";
-            let p2Color = "bg-gray-700";
-            if (matchData?.p2_answered) {
-               p2Status = "Submitted";
-               p2Color = "bg-pink-500 animate-pulse";
-            } else if (role === "player2" && selectedAnswer !== null) {
-               p2Status = "Syncing...";
-               p2Color = "bg-yellow-500 animate-pulse";
-            }
-
-            return (
-               <div className="flex justify-between items-center px-2 py-2 shrink-0">
-                  <div className="flex items-center gap-1">
-                     <span className={`w-2.5 h-2.5 rounded-full ${p1Color}`} />
-                     <span className="text-[9px] text-gray-500 uppercase font-black">
-                        {p1Status}
-                     </span>
-                  </div>
-                  <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
-                  <div className="flex items-center gap-1 justify-end">
-                     <span className="text-[9px] text-gray-500 uppercase font-black">
-                        {p2Status}
-                     </span>
-                     <span className={`w-2.5 h-2.5 rounded-full ${p2Color}`} />
-                  </div>
-               </div>
-            );
-         })()}
+         <div className="flex justify-between items-center px-2 py-2 shrink-0">
+            <div className="flex items-center gap-1">
+               <span className={`w-2.5 h-2.5 rounded-full ${myColor}`} />
+               <span className="text-[9px] text-gray-500 uppercase font-black">
+                  {myStatus}
+               </span>
+            </div>
+            <div className="flex flex-col items-center">
+               <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
+               {currentIdx === 6 && (
+                  <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ DOUBLE POINTS</span>
+               )}
+            </div>
+            <div className="flex items-center gap-1 justify-end">
+               <span className="text-[9px] text-gray-500 uppercase font-black">
+                  {oppStatus}
+               </span>
+               <span className={`w-2.5 h-2.5 rounded-full ${oppColor}`} />
+            </div>
+         </div>
 
          {/* Timer Bar */}
          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
@@ -114,7 +124,8 @@ export const BattleView = ({
          {/* Question Container */}
          <div className="flex-1 flex flex-col justify-center gap-6 py-6 min-h-0">
             <div className="text-center space-y-2">
-               <p className="text-[10px] font-black uppercase text-correct tracking-widest">
+               <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+                  {currentIdx === 6 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
                <h2 className="text-xl font-black tracking-tight leading-relaxed text-white">

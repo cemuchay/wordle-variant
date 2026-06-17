@@ -1,5 +1,6 @@
-import { motion } from "framer-motion";
-import { Swords, Play, Volume2, VolumeX } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Swords, Play, Volume2, VolumeX, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 
@@ -22,6 +23,8 @@ export const LobbyView = ({
    soundEnabled,
    onToggleSound
 }: LobbyViewProps) => {
+   const [showHelp, setShowHelp] = useState(false);
+
    return (
       <motion.div
          initial={{ opacity: 0, y: 15 }}
@@ -96,6 +99,68 @@ export const LobbyView = ({
          >
             <Play size={16} fill="black" /> Search Opponent
          </button>
+
+         {/* Collapsible Help Section */}
+         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
+            <button
+               onClick={() => setShowHelp(!showHelp)}
+               className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
+            >
+               <div className="flex items-center gap-2">
+                  <HelpCircle size={14} className="text-correct" />
+                  <span>How to Play & Scoring</span>
+               </div>
+               {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            
+            <AnimatePresence initial={false}>
+               {showHelp && (
+                  <motion.div
+                     initial={{ opacity: 0, height: 0 }}
+                     animate={{ opacity: 1, height: "auto" }}
+                     exit={{ opacity: 0, height: 0 }}
+                     transition={{ duration: 0.2 }}
+                     className="px-4 pb-5 text-[11px] text-gray-400 space-y-4 border-t border-white/5 pt-4 overflow-hidden"
+                  >
+                     <div>
+                        <p className="font-black text-white uppercase tracking-wider mb-1">Game Flow</p>
+                        <p>You and your opponent answer the same 7 questions simultaneously. Both players must submit their answer before the next round begins, or wait for the timer to expire.</p>
+                     </div>
+                     <div>
+                        <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                           <li><strong className="text-correct">Correct answer</strong>: Base 100 points + up to 50 points speed bonus.</li>
+                           <li><strong className="text-correct">Speed Bonus</strong>: Faster submissions receive more bonus points (decaying from +50 to +0 over the question duration).</li>
+                           <li><strong className="text-pink-500">Round 7 (Final Round)</strong>: All points are <strong className="text-pink-500">DOUBLED</strong>! Make it count!</li>
+                        </ul>
+                     </div>
+                     <div>
+                        <p className="font-black text-white uppercase tracking-wider mb-1">Question Types</p>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Anagrams</strong> Scramble letters back into a word.
+                           </div>
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Definitions</strong> Match the word to its dictionary definition.
+                           </div>
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Reverse Wordle</strong> Guess the word that generated the pattern.
+                           </div>
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Real / Fake</strong> Spot authentic words vs fake mutations.
+                           </div>
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Missing Letter</strong> Complete the blank to spell a valid word.
+                           </div>
+                           <div className="bg-white/5 p-2 rounded-lg">
+                              <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
+                           </div>
+                        </div>
+                     </div>
+                  </motion.div>
+               )}
+            </AnimatePresence>
+         </div>
       </motion.div>
    );
 };
