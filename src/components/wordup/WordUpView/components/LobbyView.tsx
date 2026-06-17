@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Play, Volume2, VolumeX, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Swords, Play, Volume2, VolumeX, HelpCircle, ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
+import { supabase } from "../../../../lib/supabaseClient";
+import { useWordUpStore } from "../../../../store/useWordUpStore";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -12,6 +14,10 @@ interface LobbyViewProps {
    getRankColor: (rankName: string) => string;
    soundEnabled: boolean;
    onToggleSound: () => void;
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   onlineUsers: any[];
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   currentUser: any;
 }
 
 export const LobbyView = ({
@@ -21,9 +27,110 @@ export const LobbyView = ({
    startMatchmaking,
    getRankColor,
    soundEnabled,
-   onToggleSound
+   onToggleSound,
+   onlineUsers,
+   currentUser
 }: LobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
+   const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
+   const timeoutRef = useRef<number | null>(null);
+
+   useEffect(() => {
+      const handleRejected = (e: Event) => {
+         const detail = (e as CustomEvent)?.detail;
+         setOutgoingInvite((prev) => {
+            if (prev) {
+               window.dispatchEvent(new CustomEvent("MascoChanged", {
+                  detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
+               }));
+            }
+            return null;
+         });
+         if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+         }
+      };
+
+      const handleBusy = () => {
+         setOutgoingInvite((prev) => {
+            if (prev) {
+               window.dispatchEvent(new CustomEvent("MascoChanged", {
+                  detail: { mascotFace: "(•_•)", mascotLabel: `${prev.targetUsername} is currently busy.` }
+               }));
+            }
+            return null;
+         });
+         if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+         }
+      };
+
+      const handleAccepted = (e: Event) => {
+         const detail = (e as CustomEvent)?.detail;
+         setOutgoingInvite(null);
+         if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+         }
+         // Transition to match
+         useWordUpStore.getState().setMatchId(detail.matchId);
+         useWordUpStore.getState().setRole("player1");
+      };
+
+      window.addEventListener("wordup-invite-rejected", handleRejected);
+      window.addEventListener("wordup-invite-busy", handleBusy);
+      window.addEventListener("wordup-invite-accepted", handleAccepted);
+
+      return () => {
+         window.removeEventListener("wordup-invite-rejected", handleRejected);
+         window.removeEventListener("wordup-invite-busy", handleBusy);
+         window.removeEventListener("wordup-invite-accepted", handleAccepted);
+         if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      };
+   }, []);
+
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   const handleSendInvite = (targetUser: any) => {
+      if (!currentUser) {
+         window.dispatchEvent(new CustomEvent("open-auth-modal"));
+         return;
+      }
+
+      setOutgoingInvite({ targetUserId: targetUser.id, targetUsername: targetUser.username });
+
+      // Send the broadcast
+      const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
+      targetChannel.subscribe((status) => {
+         if (status === "SUBSCRIBED") {
+            targetChannel.send({
+               type: "broadcast",
+               event: "wordup_invite",
+               payload: {
+                  senderId: currentUser.id,
+                  senderName: currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Someone",
+                  category: category
+               }
+            });
+            // Cleanup one-shot channel
+            setTimeout(() => supabase.removeChannel(targetChannel), 1000);
+         }
+      });
+
+      // 15 seconds ring timeout
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = window.setTimeout(() => {
+         setOutgoingInvite((prev) => {
+            if (prev) {
+               window.dispatchEvent(new CustomEvent("MascoChanged", {
+                  detail: { mascotFace: "(•_•)", mascotLabel: `Invitation to ${prev.targetUsername} timed out.` }
+               }));
+            }
+            return null;
+         });
+      }, 15000);
+   };
 
    return (
       <motion.div
@@ -79,8 +186,8 @@ export const LobbyView = ({
                      key={cat.id}
                      onClick={() => setCategory(cat.id)}
                      className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${category === cat.id
-                           ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-                           : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
+                        ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
                         }`}
                   >
                      <div className="flex items-center gap-2">
@@ -100,6 +207,65 @@ export const LobbyView = ({
             <Play size={16} fill="black" /> Search Opponent
          </button>
 
+         {/* Direct Invite Online Players Section */}
+         <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Invite Online Players</p>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+               {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 ? (
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto scrollbar-hide">
+                     {onlineUsers
+                        .filter((u) => u.id !== currentUser?.id)
+                        .map((opp) => (
+                           <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
+                              <div className="flex items-center gap-2 min-w-0">
+                                 <img
+                                    src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
+                                    alt={opp.username}
+                                    className="w-7 h-7 rounded-full border border-white/10 shrink-0"
+                                 />
+                                 <span className="text-xs font-black text-white truncate max-w-[120px]">{opp.username}</span>
+                                 <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse shrink-0" />
+                              </div>
+                              <button
+                                 onClick={() => handleSendInvite(opp)}
+                                 disabled={outgoingInvite !== null}
+                                 className="flex items-center gap-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black border border-correct/20 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                 <Send size={10} />
+                                 Invite
+                              </button>
+                           </div>
+                        ))}
+                  </div>
+               ) : (
+                  <p className="text-[10px] text-gray-500 text-center py-2">No other players online right now.</p>
+               )}
+            </div>
+         </div>
+
+         {outgoingInvite && (
+            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+               <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4 flex flex-col items-center">
+                  <Loader2 className="w-8 h-8 text-correct animate-spin" />
+                  <div>
+                     <h3 className="text-sm font-black uppercase tracking-wider text-white">Challenging Player</h3>
+                     <p className="text-[10px] text-gray-400 mt-1">
+                        Waiting for <strong className="text-white">{outgoingInvite.targetUsername}</strong> to accept your invite...
+                     </p>
+                  </div>
+                  <button
+                     onClick={() => {
+                        setOutgoingInvite(null);
+                        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                     }}
+                     className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer"
+                  >
+                     Cancel Challenge
+                  </button>
+               </div>
+            </div>
+         )}
+
          {/* Collapsible Help Section */}
          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
             <button
@@ -112,7 +278,7 @@ export const LobbyView = ({
                </div>
                {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
-            
+
             <AnimatePresence initial={false}>
                {showHelp && (
                   <motion.div

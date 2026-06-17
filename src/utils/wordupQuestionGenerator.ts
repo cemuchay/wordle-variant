@@ -582,10 +582,38 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          const choices = new Set<string>();
          choices.add(word);
 
-         // Add 3 other words of same length
+         const scrambleWord = (w: string) => {
+            return w.split("").sort(() => Math.random() - 0.5).join("");
+         };
+
+         // 1. Add another scramble of the word itself (e.g. RHEAT)
+         let attempts = 0;
+         while (choices.size < 2 && attempts < 20) {
+            const extraScramble = scrambleWord(word);
+            if (extraScramble !== word && extraScramble !== scrambled) {
+               choices.add(extraScramble);
+            }
+            attempts++;
+         }
+
+         // 2. Add scrambles of the word with 1 letter replaced (e.g. RHEAY)
+         attempts = 0;
+         while (choices.size < 4 && attempts < 50) {
+            const chars = word.split("");
+            const replaceIdx = Math.floor(Math.random() * chars.length);
+            let replacement = chars[replaceIdx];
+            while (replacement === chars[replaceIdx]) {
+               replacement = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            }
+            chars[replaceIdx] = replacement;
+            const mutatedScramble = scrambleWord(chars.join(""));
+            choices.add(mutatedScramble);
+            attempts++;
+         }
+
+         // Fallback
          while (choices.size < 4) {
-            const dummy = randomWord();
-            choices.add(dummy);
+            choices.add(scrambleWord(word) + "X");
          }
 
          questions.push({
@@ -604,12 +632,23 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                test: (w: string) => w.includes("ING"),
             },
             {
-               query: "Contains double letters?",
+               query: "Contains exactly double letters?",
                test: (w: string) => {
-                  for (let j = 0; j < w.length - 1; j++) {
-                     if (w[j] === w[j + 1]) return true;
+                  const counts: Record<string, number> = {};
+                  for (const char of w) {
+                     counts[char] = (counts[char] || 0) + 1;
                   }
-                  return false;
+                  return Object.values(counts).includes(2);
+               },
+            },
+            {
+               query: "Contains exactly triple letters?",
+               test: (w: string) => {
+                  const counts: Record<string, number> = {};
+                  for (const char of w) {
+                     counts[char] = (counts[char] || 0) + 1;
+                  }
+                  return Object.values(counts).includes(3);
                },
             },
             { query: "Contains 'QU'?", test: (w: string) => w.includes("QU") },
@@ -639,6 +678,11 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          });
       }
    }
+
+   // Randomly shuffle choices for all generated questions to prevent fixed coherent positions
+   questions.forEach((q) => {
+      q.choices = [...q.choices].sort(() => Math.random() - 0.5);
+   });
 
    return questions;
 };

@@ -14,7 +14,9 @@ import { TransitionLoader } from "./components/layout/TransitionLoader";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
-import { Bell } from "lucide-react";
+import { Bell, Swords } from "lucide-react";
+import { useWordUpStore } from "./store/useWordUpStore";
+import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "./utils/wordupQuestionGenerator";
 import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
@@ -68,6 +70,8 @@ export default function App() {
     setChallengeUnreadCount,
     challengeUnreadCount,
     realtimeStatus,
+    incomingWordUpInvite,
+    setIncomingWordUpInvite
   } = useApp();
 
   // Core Game Engine
@@ -131,7 +135,7 @@ export default function App() {
         // Force a layout recalculation
         window.scrollTo(0, 0);
       };
-      
+
       resetHeight();
       // Small delay for mobile browsers to settle after keyboard dismissal
       const timer = setTimeout(resetHeight, 100);
@@ -285,7 +289,7 @@ export default function App() {
   useEffect(() => {
     const parseUrlParams = () => {
       const params = new URLSearchParams(window.location.search);
-      
+
       const challengeId = params.get("challenge");
       if (challengeId) {
         setIsChallengeOpen(true);
@@ -754,6 +758,105 @@ export default function App() {
           User Data Deletion
         </a>
       </div>
+
+      {incomingWordUpInvite && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4"
+          >
+            <div className="inline-flex p-3 bg-correct/10 rounded-2xl border border-correct/20 text-correct mx-auto">
+              <Swords size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-wider text-white">WordUp Battle Challenge</h3>
+            <p className="text-xs text-gray-400">
+              <strong className="text-white">{incomingWordUpInvite.senderName}</strong> has challenged you to a rapid match in category <strong className="text-correct">{incomingWordUpInvite.category.replace('_', ' ')}</strong>!
+            </p>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={async () => {
+                  const invite = incomingWordUpInvite;
+                  setIncomingWordUpInvite(null);
+                  try {
+                    // Generate questions
+                    const rawQuestions = generateWordUpQuestions(invite.category);
+                    const secretKey = generateSecretKey();
+                    const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+                    // Insert match
+                    const { data: newMatch, error } = await supabase
+                      .from("wordup_matches")
+                      .insert({
+                        category: invite.category,
+                        player1_id: invite.senderId,
+                        player2_id: user?.id,
+                        questions: encryptedStr,
+                        encryption_key: secretKey,
+                        status: "countdown",
+                        question_started_at: new Date().toISOString()
+                      })
+                      .select()
+                      .single();
+
+                    if (error || !newMatch) throw error || new Error("Failed to create match");
+
+                    // Broadcast accepted
+                    const acceptChannel = supabase.channel(`user_signals_${invite.senderId}`);
+                    acceptChannel.subscribe((status) => {
+                      if (status === 'SUBSCRIBED') {
+                        acceptChannel.send({
+                          type: 'broadcast',
+                          event: 'wordup_invite_accepted',
+                          payload: { matchId: newMatch.id }
+                        });
+                        // Remove channel after broadcast
+                        setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
+                      }
+                    });
+
+                    // Update Zustand
+                    useWordUpStore.getState().setMatchId(newMatch.id);
+                    useWordUpStore.getState().setRole("player2");
+
+                    // Navigate to WordUp
+                    handleNavigation("wordup");
+                  } catch (e) {
+                    console.error("Failed to accept invite:", e);
+                    triggerToast("Failed to start match.", 4000);
+                  }
+                }}
+                className="bg-correct hover:bg-correct/90 text-black text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => {
+                  const invite = incomingWordUpInvite;
+                  setIncomingWordUpInvite(null);
+
+                  // Broadcast rejected
+                  const rejectChannel = supabase.channel(`user_signals_${invite.senderId}`);
+                  rejectChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                      rejectChannel.send({
+                        type: 'broadcast',
+                        event: 'wordup_invite_rejected',
+                        payload: { senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+                      });
+                      setTimeout(() => supabase.removeChannel(rejectChannel), 1000);
+                    }
+                  });
+                }}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Decline
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <ImageModal />
       <PWAInstallBanner />

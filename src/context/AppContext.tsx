@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useGlobalPresence, type PresenceUser } from '../hooks/useGlobalPresence';
 import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
 import { useAppStore, type VoiceCallState } from '../store/useAppStore';
+import { useWordUpStore } from '../store/useWordUpStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
 import { useQueryClient } from '@tanstack/react-query';
@@ -49,12 +50,17 @@ interface AppContextType {
     activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
     realtimeStatus: 'connected' | 'disconnected';
     isDynamicIslandVisible: boolean;
+
+    // WordUp Direct Invite State
+    incomingWordUpInvite: { senderId: string; senderName: string; category: string } | null;
+    setIncomingWordUpInvite: (invite: { senderId: string; senderName: string; category: string } | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<any>(null);
+    const [incomingWordUpInvite, setIncomingWordUpInvite] = useState<{ senderId: string; senderName: string; category: string } | null>(null);
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -397,6 +403,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     setActiveCall(null);
                 }
             })
+            .on('broadcast', { event: 'wordup_invite' }, ({ payload }) => {
+                // If invitee is already in a match or call, send busy back
+                const currentCall = useAppStore.getState().activeCall;
+                const activeMatchId = useWordUpStore.getState().matchId;
+                if ((currentCall && currentCall.status !== 'idle') || activeMatchId) {
+                    const busyChannel = supabase.channel(`user_signals_${payload.senderId}`);
+                    trackOneShotChannel(busyChannel);
+                    busyChannel.subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            busyChannel.send({
+                                type: 'broadcast',
+                                event: 'wordup_invite_busy',
+                                payload: { senderId: payload.senderId }
+                            });
+                        }
+                    });
+                    return;
+                }
+                setIncomingWordUpInvite(payload);
+            })
+            .on('broadcast', { event: 'wordup_invite_rejected' }, ({ payload }) => {
+                window.dispatchEvent(new CustomEvent('wordup-invite-rejected', { detail: payload }));
+            })
+            .on('broadcast', { event: 'wordup_invite_busy' }, ({ payload }) => {
+                window.dispatchEvent(new CustomEvent('wordup-invite-busy', { detail: payload }));
+            })
+            .on('broadcast', { event: 'wordup_invite_accepted' }, ({ payload }) => {
+                window.dispatchEvent(new CustomEvent('wordup-invite-accepted', { detail: payload }));
+            })
             .subscribe();
 
         signalingChannelRef.current = channel;
@@ -680,7 +715,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         rejectCall,
         hangUpCall,
         realtimeStatus,
-        isDynamicIslandVisible: true
+        isDynamicIslandVisible: true,
+        incomingWordUpInvite,
+        setIncomingWordUpInvite
     }), [
         profile, preferences, isProfileLoading, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
@@ -694,7 +731,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         onlineUsers,
         allProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
-        acceptCall, rejectCall, hangUpCall, realtimeStatus
+        acceptCall, rejectCall, hangUpCall, realtimeStatus,
+        incomingWordUpInvite, setIncomingWordUpInvite
     ]);
 
     return (
