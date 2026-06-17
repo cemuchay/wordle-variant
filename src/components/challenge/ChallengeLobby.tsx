@@ -29,7 +29,6 @@ import {
   getHandicapStarter,
 } from "../../utils/marathon";
 import { deobfuscateWord } from "../../lib/game-logic";
-import { AnimatePresence, motion } from "framer-motion";
 
 const MODE_DEFINITIONS = {
   LIVE: {
