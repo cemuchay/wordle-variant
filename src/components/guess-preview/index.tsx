@@ -18,6 +18,7 @@ import { TargetWordSection } from "./TargetWordSection";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { GuessGrid } from "./GuessGrid";
 import { MarathonGameList } from "./MarathonGameList";
+import { useChallengeContext } from "../../context/ChallengeContext";
 
 interface GuessPreviewModalProps {
   entry: any; // More flexible for challenge participants
@@ -30,6 +31,7 @@ interface GuessPreviewModalProps {
   yesterday?: boolean;
   isCreator?: boolean;
   isShapeshifter?: boolean;
+  challenge?: any;
   initialData?: {
     guesses: any[] | null;
     hints_used?: boolean;
@@ -51,8 +53,18 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   yesterday,
   isCreator,
   isShapeshifter,
+  challenge: challengeProp,
   initialData,
 }) => {
+    // Attempt to get challenge from context if not passed as prop
+    let context: any = null;
+    try {
+      context = useChallengeContext();
+    } catch (e) {
+      // Not inside ChallengeProvider
+    }
+    const challenge = challengeProp || context?.selectedChallenge;
+
     const isMarathon = lengthOfWord === 1;
     const [marathonGameIndex, setMarathonGameIndex] = useState<number>(
       initialMarathonGameIndex ?? 0,
@@ -64,7 +76,9 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       return parseMarathonGames(targetWord, salt);
     }, [isMarathon, targetWord, salt]);
 
-    const [sortMode, setSortMode] = useState<"number" | "length">(() => {
+    const [sortMode, setSortMode] = useState<"number" | "length" | "day">(() => {
+      const isBotMarathon = challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon;
+      if (isBotMarathon) return "day";
       return marathonGames.length > 15 ? "length" : "number";
     });
     
@@ -532,6 +546,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                   profile={profile}
                   isCreator={!!isCreator}
                   marathonGamesRef={marathonGamesRef}
+                  isBotMarathon={challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon}
                 />
               )}
 

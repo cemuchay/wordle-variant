@@ -779,6 +779,7 @@ const AuthenticatedChallengeContent = memo(
             }}
             targetWord={selectedChallenge?.target_word}
             salt={selectedChallenge?.salt}
+            challenge={selectedChallenge}
             lengthOfWord={selectedChallenge?.word_length}
             isCreator={
               selectedChallenge?.creator_id === user?.id &&
