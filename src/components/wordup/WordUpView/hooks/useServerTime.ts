@@ -7,7 +7,7 @@ export const useServerTime = () => {
    useEffect(() => {
       const getOffset = async () => {
          const start = Date.now();
-         const { data } = await supabase.rpc("now");
+         const { data } = await supabase.rpc("get_server_time");
          const end = Date.now();
          if (data) {
             const serverTime = new Date(data).getTime();

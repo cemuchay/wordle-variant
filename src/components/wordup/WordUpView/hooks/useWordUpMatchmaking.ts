@@ -18,12 +18,21 @@ export const useWordUpMatchmaking = (
 ) => {
    const [matchId, setMatchId] = useState<string | null>(null);
    const [role, setRole] = useState<"player1" | "player2" | null>(null);
-   const queueTimeoutRef = useRef<number | null>(null);
+   const [countdownSecs, setCountdownSecs] = useState(10);
+   const matchmakingIntervalRef = useRef<number | null>(null);
    const matchmakingChannelRef = useRef<any>(null);
+
+   const cleanUpMatchmaking = useCallback(() => {
+      cleanUpIntervals();
+      if (matchmakingIntervalRef.current) {
+         clearInterval(matchmakingIntervalRef.current);
+         matchmakingIntervalRef.current = null;
+      }
+   }, [cleanUpIntervals]);
 
    const triggerBotFallback = useCallback(async () => {
       if (!user) return;
-      cleanUpIntervals();
+      cleanUpMatchmaking();
 
       try {
          await fetchWithRetry(async () => {
@@ -68,7 +77,7 @@ export const useWordUpMatchmaking = (
       } catch (err) {
          console.error("Bot match insertion failed:", err);
       }
-   }, [user, category, getSyncedNow, cleanUpIntervals, onMatchFound]);
+   }, [user, category, getSyncedNow, cleanUpMatchmaking, onMatchFound]);
 
    const subscribeToMatchmaking = useCallback(() => {
       const channel = supabase
@@ -84,7 +93,7 @@ export const useWordUpMatchmaking = (
             async (payload) => {
                const match = payload.new;
                if (match.status === "countdown" || match.status === "waiting") {
-                  cleanUpIntervals();
+                  cleanUpMatchmaking();
                   setMatchId(match.id);
                   setRole("player1");
                   onMatchFound(match.id, "player1");
@@ -102,7 +111,7 @@ export const useWordUpMatchmaking = (
             async (payload) => {
                const match = payload.new;
                if (match.status === "countdown") {
-                  cleanUpIntervals();
+                  cleanUpMatchmaking();
                   setMatchId(match.id);
                   setRole("player1");
                   onMatchFound(match.id, "player1");
@@ -112,7 +121,7 @@ export const useWordUpMatchmaking = (
          .subscribe();
 
       matchmakingChannelRef.current = channel;
-   }, [user, cleanUpIntervals, onMatchFound]);
+   }, [user, cleanUpMatchmaking, onMatchFound]);
 
    const startMatchmaking = useCallback(async () => {
       if (!user) {
@@ -120,7 +129,7 @@ export const useWordUpMatchmaking = (
          return;
       }
 
-      cleanUpIntervals();
+      cleanUpMatchmaking();
 
       try {
          const result = await fetchWithRetry(async () => {
@@ -135,9 +144,22 @@ export const useWordUpMatchmaking = (
          if (result.status === "queued" || !result.match_id) {
             setRole("player1");
             setMatchId(null);
-            queueTimeoutRef.current = window.setTimeout(() => {
-               triggerBotFallback();
-            }, 5000);
+            setCountdownSecs(10);
+
+            matchmakingIntervalRef.current = window.setInterval(() => {
+               setCountdownSecs((prev) => {
+                  if (prev <= 1) {
+                     if (matchmakingIntervalRef.current) {
+                        clearInterval(matchmakingIntervalRef.current);
+                        matchmakingIntervalRef.current = null;
+                     }
+                     triggerBotFallback();
+                     return 0;
+                  }
+                  return prev - 1;
+               });
+            }, 1000);
+
             subscribeToMatchmaking();
          } else {
             const newMatchId = result.match_id;
@@ -167,10 +189,10 @@ export const useWordUpMatchmaking = (
          console.error("Matchmaking startup failed:", err);
          triggerToast("Failed to join arena. Please try again.", 4000);
       }
-   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpIntervals]);
+   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking]);
 
    const cancelMatchmaking = useCallback(async () => {
-      cleanUpIntervals();
+      cleanUpMatchmaking();
       if (user) {
          await fetchWithRetry(async () => {
             const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
@@ -180,11 +202,12 @@ export const useWordUpMatchmaking = (
       if (matchmakingChannelRef.current) {
          supabase.removeChannel(matchmakingChannelRef.current);
       }
-   }, [user, cleanUpIntervals]);
+   }, [user, cleanUpMatchmaking]);
 
    return {
       matchId,
       role,
+      countdownSecs,
       startMatchmaking,
       cancelMatchmaking,
       matchmakingChannelRef

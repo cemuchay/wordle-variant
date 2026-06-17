@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../hooks/useAuth";
 import { useApp } from "../../../context/AppContext";
@@ -7,6 +7,7 @@ import { useServerTime } from "./hooks/useServerTime";
 import { useWordUpProfile } from "./hooks/useWordUpProfile";
 import { useWordUpMatchmaking } from "./hooks/useWordUpMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
+import { wordupAudio } from "../../../utils/wordupAudio";
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -27,6 +28,25 @@ export const WordUpView = () => {
 
    const { getSyncedNow } = useServerTime();
    const { userStats, getRankColor, updateStats } = useWordUpProfile(user);
+
+   const [soundEnabled, setSoundEnabled] = useState(wordupAudio.isEnabled());
+
+   const handleToggleSound = useCallback(() => {
+      const newVal = !soundEnabled;
+      setSoundEnabled(newVal);
+      wordupAudio.setEnabled(newVal);
+   }, [soundEnabled]);
+
+   useEffect(() => {
+      if (view === "matchmaking" || view === "countdown" || view === "battle") {
+         wordupAudio.startAmbient();
+      } else {
+         wordupAudio.stopAmbient();
+      }
+      return () => {
+         wordupAudio.stopAmbient();
+      };
+   }, [view]);
 
    const onGameOver = useCallback(async (match: any) => {
       if (view === "gameover") return;
@@ -87,6 +107,7 @@ export const WordUpView = () => {
       setLocalRole(mRole);
       const match = await loadAndSubscribeMatch(mId);
       if (match) {
+         wordupAudio.playMatchStart();
          setView("countdown");
          startCountdown(match);
       }
@@ -97,6 +118,7 @@ export const WordUpView = () => {
    }, [cleanUpGameLoop]);
 
    const {
+      countdownSecs,
       startMatchmaking,
       cancelMatchmaking
    } = useWordUpMatchmaking(user, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
@@ -119,6 +141,8 @@ export const WordUpView = () => {
                      startMatchmaking();
                   }}
                   getRankColor={getRankColor}
+                  soundEnabled={soundEnabled}
+                  onToggleSound={handleToggleSound}
                />
             )}
 
@@ -126,6 +150,7 @@ export const WordUpView = () => {
                <MatchmakingView
                   category={category}
                   cancelMatchmaking={handleCancelMatchmaking}
+                  countdownSecs={countdownSecs}
                />
             )}
 

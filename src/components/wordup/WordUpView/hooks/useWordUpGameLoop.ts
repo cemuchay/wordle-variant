@@ -1,12 +1,30 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
+import { wordupAudio } from "../../../../utils/wordupAudio";
 import {
    decryptQuestions,
    simulateBotResponse,
    type WordUpQuestion
 } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
+
+export const getQuestionDuration = (type: string): number => {
+   switch (type) {
+      case "real_fake":
+      case "length":
+      case "missing_letter":
+         return 8;
+      case "definition":
+      case "anagram":
+      case "pattern":
+         return 12;
+      case "reverse_wordle":
+         return 15;
+      default:
+         return 10;
+   }
+};
 
 export const useWordUpGameLoop = (
    matchId: string | null,
@@ -76,14 +94,23 @@ export const useWordUpGameLoop = (
       setSelectedAnswer(choice);
       cleanUpIntervals();
 
-      const elapsed = parseFloat((10.0 - timeLeft).toFixed(2));
       const q = questions[currentIdx];
+      const duration = q ? getQuestionDuration(q.type) : 10.0;
+      const elapsed = parseFloat((duration - timeLeft).toFixed(2));
       const correct = choice === q?.answer;
 
       let points = 0;
       if (correct) {
-         const speedBonus = Math.max(0, Math.round((1.0 - elapsed / 10.0) * 50));
+         const speedBonus = Math.max(0, Math.round((1.0 - elapsed / duration) * 50));
          points = 100 + speedBonus;
+      }
+
+      if (choice !== "") {
+         if (correct) {
+            wordupAudio.playCorrect();
+         } else {
+            wordupAudio.playIncorrect();
+         }
       }
 
       const submission = {
@@ -137,19 +164,29 @@ export const useWordUpGameLoop = (
       setCurrentIdx(index);
       setSelectedAnswer(null);
       setRevealAnswers(false);
-      setTimeLeft(10.0);
+      
+      const q = questions[index];
+      const duration = q ? getQuestionDuration(q.type) : 10.0;
+      setTimeLeft(duration);
       isSubmittingAnswerRef.current = false;
 
       const startTime = match.question_started_at
          ? new Date(match.question_started_at).getTime()
          : getSyncedNow();
 
+      let lastTicked = Math.ceil(duration) + 1;
       timerRef.current = window.setInterval(() => {
          const now = getSyncedNow();
          const elapsed = (now - startTime) / 1000;
-         const remaining = Math.max(0, 10.0 - elapsed);
+         const remaining = Math.max(0, duration - elapsed);
 
          setTimeLeft(parseFloat(remaining.toFixed(2)));
+
+         const currentSec = Math.ceil(remaining);
+         if (remaining <= 3.0 && currentSec < lastTicked) {
+            lastTicked = currentSec;
+            wordupAudio.playTicking();
+         }
 
          if (remaining <= 0) {
             if (timerRef.current) clearInterval(timerRef.current);
@@ -162,31 +199,41 @@ export const useWordUpGameLoop = (
          const botProf = match.bot_profile || "average";
          const botAction = simulateBotResponse(q, botProf);
 
+         // Scale bot action time to fit within the adaptive duration
+         const botTime = Math.min(botAction.time_taken, duration - 0.5);
+
          botTimerRef.current = window.setTimeout(async () => {
             const botAnswers = [...(match.p2_answers || [])];
+            
+            let botPoints = 0;
+            if (botAction.correct) {
+               const speedBonus = Math.max(0, Math.round((1.0 - botTime / duration) * 50));
+               botPoints = 100 + speedBonus;
+            }
+
             botAnswers.push({
                question_idx: index,
                correct: botAction.correct,
-               time_taken: botAction.time_taken,
-               points: botAction.points
+               time_taken: parseFloat(botTime.toFixed(2)),
+               points: botPoints
             });
 
             try {
                await fetchWithRetry(async () => {
                   const { error } = await supabase
-                     .from("wordup_matches")
-                     .update({
-                        p2_answers: botAnswers,
-                        p2_answered: true,
-                        p2_score: (match.p2_score || 0) + botAction.points
-                     })
-                     .eq("id", match.id);
+                      .from("wordup_matches")
+                      .update({
+                         p2_answers: botAnswers,
+                         p2_answered: true,
+                         p2_score: (match.p2_score || 0) + botPoints
+                      })
+                      .eq("id", match.id);
                   if (error) throw error;
                }, 3, 1000);
             } catch (e) {
                console.error("Bot round submission update failed:", e);
             }
-         }, botAction.time_taken * 1000);
+         }, botTime * 1000);
       }
    }, [cleanUpIntervals, getSyncedNow, handleAnswerSelect, role, questions]);
 
@@ -201,7 +248,7 @@ export const useWordUpGameLoop = (
             const nextIdx = newMatch.current_question_index + 1;
             if (nextIdx >= 7) {
                endGame(newMatch);
-            } else if (role === "player2") {
+            } else if (role === "player2" || newMatch.is_bot_match) {
                advanceRound(newMatch.id, nextIdx);
             }
          }, 1800);

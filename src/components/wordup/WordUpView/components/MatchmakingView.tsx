@@ -5,9 +5,10 @@ import { CATEGORIES } from "../constants";
 interface MatchmakingViewProps {
    category: string;
    cancelMatchmaking: () => void;
+   countdownSecs: number;
 }
 
-export const MatchmakingView = ({ category, cancelMatchmaking }: MatchmakingViewProps) => {
+export const MatchmakingView = ({ category, cancelMatchmaking, countdownSecs }: MatchmakingViewProps) => {
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -26,7 +27,7 @@ export const MatchmakingView = ({ category, cancelMatchmaking }: MatchmakingView
                Category: {CATEGORIES.find(c => c.id === category)?.name}
             </p>
             <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider mt-4">
-               Bot joins in 5 seconds...
+               Bot joins in {countdownSecs} seconds...
             </p>
          </div>
 
