@@ -117,6 +117,28 @@ export default function App() {
 
   // UI State
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+
+  // PWA Height Fix: Global listener to reset viewport height when leaving modals (especially Chat)
+  useEffect(() => {
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    if (!isPWA) return;
+
+    // Reset height whenever chat, conversation, or notifications modal is closed
+    if (!isChatOpen && !isChatConversationOpen && !isNotificationsOpen) {
+      const resetHeight = () => {
+        document.documentElement.style.height = '100dvh';
+        document.body.style.height = '100dvh';
+        // Force a layout recalculation
+        window.scrollTo(0, 0);
+      };
+      
+      resetHeight();
+      // Small delay for mobile browsers to settle after keyboard dismissal
+      const timer = setTimeout(resetHeight, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isChatOpen, isChatConversationOpen, isNotificationsOpen]);
+
   const [statsActiveTab, setStatsActiveTab] = useState<"stats" | "leaderboard">(
     "leaderboard",
   );

@@ -596,8 +596,15 @@ export const useChallengeGameEngine = ({
 
    // Sync currentKey with initializedRef for re-hydration logic
    useEffect(() => {
-      if (
-         isSaving ||
+      const handleRehydrate = () => {
+         initializedRef.current = "";
+      };
+      window.addEventListener('app-visibility-visible', handleRehydrate);
+      return () => window.removeEventListener('app-visibility-visible', handleRehydrate);
+   }, []);
+
+   useEffect(() => {
+      if (isSaving ||
          (isMarathon && (gameIndex === undefined || gameIndex === null))
       )
          return;

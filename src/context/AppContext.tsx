@@ -528,11 +528,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 syncMessages();
+                // Refresh authoritative date and trigger a global event for game engines to re-hydrate
+                queryClient.invalidateQueries({ queryKey: ['server-date'] });
+                window.dispatchEvent(new CustomEvent('app-visibility-visible'));
             }
         };
 
         const handleOnline = () => {
             syncMessages();
+            queryClient.invalidateQueries({ queryKey: ['server-date'] });
+            window.dispatchEvent(new CustomEvent('app-visibility-visible'));
         };
 
         window.addEventListener('visibilitychange', handleVisibilityChange);

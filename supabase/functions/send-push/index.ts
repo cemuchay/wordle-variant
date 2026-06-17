@@ -41,6 +41,15 @@ Deno.serve(async (req) => {
       // Handle Supabase Webhook format
       if (body.record && body.table === "notifications") {
          const record = body.record;
+
+         // Skip sending push notifications for DM_MESSAGE and CHAT_MENTION to avoid spamming
+         if (["DM_MESSAGE", "CHAT_MENTION"].includes(record.type)) {
+            return new Response(
+               JSON.stringify({ sent: 0, message: `Skipped push notification for type ${record.type}` }),
+               { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+         }
+
          let targetUrl = "/";
 
          // Move URL logic from SQL to TypeScript
