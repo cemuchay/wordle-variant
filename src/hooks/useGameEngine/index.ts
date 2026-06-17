@@ -1,11 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-   useEffect,
-   useMemo,
-   useReducer,
-   useRef,
-   useState,
-} from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../useAuth";
 import {
@@ -60,6 +54,14 @@ export const useGameEngine = (date: string) => {
    });
 
    // Hydration & Authentication Swap Logic
+   useEffect(() => {
+      const handleRehydrate = () => {
+         setIsHydrated(false);
+      };
+      window.addEventListener('app-visibility-visible', handleRehydrate);
+      return () => window.removeEventListener('app-visibility-visible', handleRehydrate);
+   }, []);
+
    useEffect(() => {
       if (!date || isAuthLoading) {
          // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -235,6 +237,7 @@ export const useGameEngine = (date: string) => {
       triggerToast,
       performSync,
       loadFromCloud,
+      isHydrated,
    ]);
 
    const letterStatuses = useMemo(
