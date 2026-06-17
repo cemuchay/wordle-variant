@@ -7,13 +7,13 @@ export function CloudSyncMenu({ status, onRetry }: { status: SyncStatus, onRetry
       {status === 'syncing' && (
         <>
           <Loader2 className="w-3 h-2 animate-spin text-blue-500" />
-          <span>Syncing to Cloud...</span>
+          <span>Syncing...</span>
         </>
       )}
       {status === 'synced' && (
         <>
           <CloudCheck className="w-3 h-3 text-green-500" />
-          <span>Game Saved</span>
+          <span>Saved</span>
         </>
       )}
       {status === 'error' && (

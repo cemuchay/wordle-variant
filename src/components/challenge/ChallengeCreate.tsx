@@ -421,7 +421,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         mode, setMode, length, setLength, maxTime, setMaxTime,
         availableProfiles, invitedIds, toggleInvite,
         joinId, setJoinId, handleViewChallenge, handleCreate, loading,
-        handleEdit, setInvitedIds, effectiveUser
+        handleEdit, setInvitedIds, effectiveUser,
+        maxAttempts, setMaxAttempts
     } = useChallengeContext();
     const { ask } = useConfirmation();
 
@@ -762,7 +763,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             }
             return next;
         });
-    }, []);
+    }, [isBotMarathon]);
 
     const handleSetMarathonType = useCallback((type: 'standard' | 'custom') => {
         setMarathonType(type);
@@ -851,7 +852,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         }
 
         return errs;
-    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge]);
+    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
 
     const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
@@ -936,6 +937,30 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             )}
             <ModeSelector mode={mode} setMode={setMode} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
             <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
+
+            <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
+                <OptionLabel 
+                    label="Max Attempts" 
+                    tooltip="The maximum number of guesses allowed for this challenge (between 3 and 10). Default is 6." 
+                    activeTooltip={activeTooltip} 
+                    setActiveTooltip={setActiveTooltip} 
+                    tooltipId="maxAttempts" 
+                />
+                <div className="flex gap-2 flex-wrap">
+                    {[3, 4, 5, 6, 7, 8, 9, 10].map((a) => (
+                        <button
+                            key={a}
+                            type="button"
+                            onClick={() => {
+                                setMaxAttempts(a);
+                            }}
+                            className={`w-11 h-11 rounded-xl border font-black transition-all ${maxAttempts === a ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10 text-xs'}`}
+                        >
+                            {a}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
             {length === 1 && (
                 <div className="p-5 rounded-2xl border border-yellow-500/25 bg-yellow-500/5 space-y-4 animate-in fade-in duration-300">

@@ -16,6 +16,7 @@ interface ChallengeState {
     // Form State
     mode: 'LIVE' | 'ANYTIME';
     length: number;
+    maxAttempts: number;
     maxTime: number | null;
     invitedIds: string[];
 
@@ -42,6 +43,7 @@ interface ChallengeState {
     setBackAction: (fn: (() => void) | null) => void;
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
     setLength: (length: number) => void;
+    setMaxAttempts: (attempts: number) => void;
     setMaxTime: (time: number | null) => void;
     setInvitedIds: (ids: string[]) => void;
     toggleInvite: (id: string) => void;
@@ -69,6 +71,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     backAction: null,
     mode: 'ANYTIME',
     length: 5,
+    maxAttempts: 6,
     maxTime: null,
     invitedIds: [],
     selectedChallenge: null,
@@ -94,6 +97,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     })),
     setMode: (mode) => set({ mode, maxTime: mode === 'LIVE' ? 5 : null }),
     setLength: (length) => set({ length }),
+    setMaxAttempts: (maxAttempts) => set({ maxAttempts }),
     setMaxTime: (maxTime) => set({ maxTime }),
     setInvitedIds: (invitedIds) => set({ invitedIds }),
     toggleInvite: (id) => set((state) => ({
@@ -117,6 +121,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     resetForm: () => set({
         mode: 'ANYTIME',
         length: 5,
+        maxAttempts: 6,
         maxTime: null,
         invitedIds: []
     })

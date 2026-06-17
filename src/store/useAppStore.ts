@@ -77,6 +77,7 @@ interface AppState {
    pendingChallengeUserId: string | null;
    previewImage: string | null;
    challengePresets: ChallengePreset[];
+   isPWAInstalled: boolean;
 
    // Actions
    triggerToast: (message: string, duration?: number) => void;
@@ -113,9 +114,10 @@ interface AppState {
    setPreviewImage: (url: string | null) => void;
    addChallengePreset: (preset: ChallengePreset) => void;
    removeChallengePreset: (id: string) => void;
-}
+   setIsPWAInstalled: (val: boolean) => void;
+   }
 
-export const useAppStore = create<AppState>()(
+   export const useAppStore = create<AppState>()(
    persist(
       (set) => ({
          // Initial State
@@ -151,6 +153,7 @@ export const useAppStore = create<AppState>()(
          pendingChallengeUserId: null,
          previewImage: null,
          challengePresets: [],
+         isPWAInstalled: false,
 
          // Actions
          triggerToast: (message, duration = 3000) =>
@@ -256,6 +259,8 @@ export const useAppStore = create<AppState>()(
                   (p) => p.id !== id,
                ),
             })),
+         setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
+
       }),
       {
          name: "variant-app-storage",

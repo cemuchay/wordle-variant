@@ -24,6 +24,8 @@ interface ChallengeContextType {
     setMode: (mode: 'LIVE' | 'ANYTIME') => void;
     length: number;
     setLength: (length: number) => void;
+    maxAttempts: number;
+    setMaxAttempts: (attempts: number) => void;
     maxTime: number | null;
     setMaxTime: (time: number | null) => void;
 
@@ -143,6 +145,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setMode = useChallengeStore(s => s.setMode);
     const length = useChallengeStore(s => s.length);
     const setLength = useChallengeStore(s => s.setLength);
+    const maxAttempts = useChallengeStore(s => s.maxAttempts);
+    const setMaxAttempts = useChallengeStore(s => s.setMaxAttempts);
     const maxTime = useChallengeStore(s => s.maxTime);
     const setMaxTime = useChallengeStore(s => s.setMaxTime);
     const selectedChallenge = useChallengeStore(s => s.selectedChallenge);
@@ -528,6 +532,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 setSelectedChallenge(challenge);
                 setActiveTab('join');
 
+                // Initialize form state with challenge data
+                if (challenge.mode) setMode(challenge.mode as any);
+                if (challenge.word_length) setLength(challenge.word_length);
+                if (challenge.max_attempts) setMaxAttempts(challenge.max_attempts);
+                if (challenge.max_time) setMaxTime(challenge.max_time);
+
                 const currentUser = effectiveUserRef.current;
                 // If user is authenticated or has guest ID, load/join participation
                 if (currentUser) {
@@ -660,6 +670,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 creatorId: creatorId,
                 mode: mode,
                 length: length,
+                max_attempts: maxAttempts,
                 maxTime: mode === 'LIVE' ? maxTime : null,
                 invitedIds: invitedIds,
                 ...customParams
@@ -688,7 +699,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const handleEdit = useCallback(async (challengeId: string, params: any) => {
         try {
-            await updateMutation.mutateAsync({ challengeId, params });
+            await updateMutation.mutateAsync({ 
+                challengeId, 
+                params: {
+                    ...params,
+                    max_attempts: maxAttempts
+                } 
+            });
             triggerToast("Challenge updated successfully!", 3000);
             setIsEditingChallenge(false);
         } catch (err: any) {
@@ -696,7 +713,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             triggerToast(err?.message || "Failed to update challenge.", 4000);
             throw err;
         }
-    }, [updateMutation, triggerToast]);
+    }, [updateMutation, triggerToast, maxAttempts]);
 
     const handleDelete = useCallback(async (challengeId: string) => {
         try {
@@ -894,6 +911,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         setMode,
         length,
         setLength,
+        maxAttempts,
+        setMaxAttempts,
         maxTime,
         setMaxTime,
         selectedChallenge,

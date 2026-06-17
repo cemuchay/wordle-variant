@@ -11,6 +11,7 @@ import {
   Lock,
   Hourglass,
   Trash2,
+  Trophy,
 } from "lucide-react";
 import { memo, useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useChallengeContext } from "../../context/ChallengeContext";
@@ -700,6 +701,26 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     : selectedChallenge.is_custom_word
                       ? "Host Custom Word"
                       : "System Generated"}
+                </p>
+              </div>
+
+              {/* Attempts Info */}
+              <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1">
+                <p className="text-[8px] font-black uppercase text-white/70">
+                  Attempts
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <Trophy size={12} className="text-indigo-400" />
+                  <span className="text-xs font-bold text-white">
+                    {selectedChallenge.is_shapeshifter ? 20 : (selectedChallenge.max_attempts || 6)} Tries
+                  </span>
+                </div>
+                <p className="text-[9px] text-white">
+                  {selectedChallenge.is_shapeshifter
+                    ? "Shifter Limit"
+                    : (selectedChallenge.max_attempts && selectedChallenge.max_attempts !== 6
+                      ? "Custom Limit"
+                      : "Standard Limit")}
                 </p>
               </div>
 

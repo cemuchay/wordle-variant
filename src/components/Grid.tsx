@@ -2,6 +2,7 @@ import React, { memo, useState, useEffect } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 import returnAnimationTime from '../utils/returnAnimationTime';
+import { useAppStore } from '../store/useAppStore';
 
 interface CellProps {
   letter: string;
@@ -76,13 +77,15 @@ const TILE_SIZES = [
 const useIsResponsive = () => {
   const [state, setState] = useState({
     isDesktop: window.innerWidth >= 640,
-    isSmall: window.innerWidth <= 375
+    isSmall: window.innerWidth <= 375 && window.innerHeight <= 667,
+    isSuperTiny: window.innerWidth <= 350 && window.innerHeight <= 500
   });
 
   useEffect(() => {
     const handleResize = () => setState({
       isDesktop: window.innerWidth >= 640,
-      isSmall: window.innerWidth <= 375
+      isSmall: window.innerWidth <= 375 && window.innerHeight <= 667,
+      isSuperTiny: window.innerWidth <= 350 && window.innerHeight <= 500
     });
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -93,7 +96,8 @@ const useIsResponsive = () => {
 
 const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
-  const { isDesktop, isSmall } = useIsResponsive(); // Detect responsive state
+  const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
+  const isPWA = useAppStore(s => s.isPWAInstalled)
 
   // 1. Get the current size profile based on word length
   const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
@@ -102,9 +106,31 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   const dimensions = isDesktop ? sizeConfig.desktop : (isSmall ? sizeConfig.small : sizeConfig.mobile);
 
   // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
-  const scale = isChallenge ? 0.85 : 1;
-  const finalWidth = dimensions.w * scale;
-  const finalHeight = dimensions.h * scale;
+  let scale: {
+    h: number,
+    w: number
+  } = isChallenge ? { h: 0.85, w: 0.85 } : { h: 1, w: 1 };
+
+  if (isPWA && !isDesktop) {
+    scale = isChallenge ? { h: 1, w: 1 } : { h: 1.3, w: 1.3 }
+    if (isChallenge && wordLength > 9) {
+      scale = { h: 0.85, w: 0.85 }
+    }
+
+    if (!isChallenge && wordLength > 6) {
+      scale = { h: 1.2, w: 1.2 }
+    }
+  } else if (!isPWA && !isDesktop) {
+
+    if (!isChallenge) {
+      scale = { h: 1.1, w: 1.1 }
+    }
+  }
+  if (isSuperTiny) {
+    scale = { h: 0.6, w: 0.9 }
+  }
+  const finalWidth = dimensions.w * scale.w;
+  const finalHeight = dimensions.h * scale.h;
 
   const tileClass = `
     flex items-center justify-center 

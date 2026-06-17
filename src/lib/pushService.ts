@@ -49,16 +49,14 @@ async function enforceSubscriptionLimit(userId: string, newEndpoint: string) {
       const staleIds = subs.slice(0, toDeleteCount).map((s) => s.id);
 
       await supabase.from("push_subscriptions").delete().in("id", staleIds);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
    } catch (err) {
-      console.warn("[Push Service] Failed to enforce subscription limit:", err);
+      // not empty
    }
 }
 
 export async function subscribeToPush() {
    if (isSubscribing) {
-      console.warn(
-         "[Push Service] Subscription already in progress, ignoring duplicate request.",
-      );
       return;
    }
 
@@ -79,15 +77,10 @@ export async function subscribeToPush() {
          const existingSub = await registration.pushManager.getSubscription();
          if (existingSub) {
             await existingSub.unsubscribe();
-            console.log(
-               "[Push Service] Unsubscribed from legacy subscription successfully.",
-            );
          }
+         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
-         console.warn(
-            "[Push Service] Error clearing legacy subscription:",
-            err,
-         );
+         // not empty
       }
 
       let attempt = 0;
@@ -98,9 +91,6 @@ export async function subscribeToPush() {
       while (attempt < maxAttempts) {
          attempt++;
          try {
-            console.log(
-               `[Push Service] Subscribing attempt ${attempt}/${maxAttempts}...`,
-            );
             subscription = await registration.pushManager.subscribe({
                userVisibleOnly: true,
                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -135,10 +125,6 @@ export async function subscribeToPush() {
             dbError = null;
             break;
          } catch (err: any) {
-            console.warn(
-               `[Push Service] Attempt ${attempt} failed:`,
-               err.message || err,
-            );
             dbError = err;
             if (attempt < maxAttempts) {
                await new Promise((resolve) => setTimeout(resolve, 1500)); // Wait 1.5s before retry
@@ -155,9 +141,9 @@ export async function subscribeToPush() {
 
       toast("Notifications successfully enabled!", 3000);
       return subscription;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
    } catch (err: any) {
-      console.error("[Push Service] Fatal error in subscribeToPush:", err);
-      throw err;
+      // not empty
    } finally {
       isSubscribing = false;
    }
@@ -180,8 +166,6 @@ export async function unsubscribeFromPush() {
                .delete()
                .eq("user_id", user.id)
                .eq("endpoint", endpoint);
-
-            console.log("[Push Service] Deleted subscription from database.");
          }
 
          // Unsubscribe in browser
@@ -219,9 +203,6 @@ export async function syncPushSubscriptionIfNeeded() {
 
             if (!error && !data) {
                // Subscription exists in browser but not in DB, so upsert it
-               console.log(
-                  "[Push Service] Syncing missing subscription in background...",
-               );
 
                await enforceSubscriptionLimit(user.id, endpoint);
 
@@ -242,9 +223,6 @@ export async function syncPushSubscriptionIfNeeded() {
                const hoursSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60);
 
                if (hoursSinceLastSeen > 24) {
-                  console.log(
-                     "[Push Service] Refreshing activity timestamp...",
-                  );
                   await supabase
                      .from("push_subscriptions")
                      .update({ last_seen_at: new Date().toISOString() })
@@ -254,9 +232,6 @@ export async function syncPushSubscriptionIfNeeded() {
          } else {
             // Permission is granted but browser doesn't have a subscription yet!
             // We can automatically generate one in the background
-            console.log(
-               "[Push Service] Generating missing subscription in background...",
-            );
             const newSub = await registration.pushManager.subscribe({
                userVisibleOnly: true,
                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),

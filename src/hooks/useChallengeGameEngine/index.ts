@@ -105,7 +105,9 @@ export const useChallengeGameEngine = ({
          : 5
       : challenge.word_length;
 
-   const maxAttempts = challenge.is_shapeshifter ? 20 : 6;
+   const maxAttempts = challenge.is_shapeshifter 
+      ? 20 
+      : (challenge.max_attempts || 6);
 
    const [targetWords, setTargetWords] = useState<string[]>([]);
    const [activeTargetWord, setActiveTargetWord] = useState<string>("");
