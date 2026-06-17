@@ -50,7 +50,7 @@ export interface ChallengePreset {
 
 interface AppState {
    // UI State
-   toast: { show: boolean; message: string; duration?: number };
+   toast: { show: boolean; message: string; duration?: number; isLarge?: boolean };
    isChallengeOpen: boolean;
    isNotificationsOpen: boolean;
    isChatOpen: boolean;
@@ -80,11 +80,12 @@ interface AppState {
    isPWAInstalled: boolean;
 
    // Actions
-   triggerToast: (message: string, duration?: number) => void;
+   triggerToast: (message: string, duration?: number, isLarge?: boolean) => void;
    setToast: (toast: {
       show: boolean;
       message: string;
       duration?: number;
+      isLarge?: boolean;
    }) => void;
    setChallengeOpen: (val: boolean) => void;
    setNotificationsOpen: (val: boolean) => void;
@@ -156,8 +157,8 @@ interface AppState {
          isPWAInstalled: false,
 
          // Actions
-         triggerToast: (message, duration = 3000) =>
-            set({ toast: { show: true, message, duration } }),
+         triggerToast: (message, duration = 3000, isLarge = false) =>
+            set({ toast: { show: true, message, duration, isLarge } }),
          setToast: (toast) => set({ toast }),
          setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),
          setNotificationsOpen: (isNotificationsOpen) =>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Eye,
   Play,
@@ -28,6 +29,71 @@ import {
   getHandicapStarter,
 } from "../../utils/marathon";
 import { deobfuscateWord } from "../../lib/game-logic";
+import { AnimatePresence, motion } from "framer-motion";
+
+const MODE_DEFINITIONS = {
+  LIVE: {
+    title: "Live Race",
+    description: "A real-time competition where all players start at the same time and race to the finish. Speed is key!",
+    color: "bg-red-500/20 text-red-400 border-red-500/30"
+  },
+  ANYTIME: {
+    title: "Anytime Mode",
+    description: "Play at your own pace any time before the challenge expires. Highest skill score wins.",
+    color: "bg-green-500/20 text-green-400 border-green-500/30"
+  },
+  MARATHON: {
+    title: "Marathon Mode",
+    description: "A series of multiple words of increasing lengths that you must solve in sequence.",
+    color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+  },
+  BOT_MARATHON: {
+    title: "Daily Event",
+    description: "A special recurring marathon event curated by the Variant Bot with daily rewards.",
+    color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+  },
+  SHAPESHIFTER: {
+    title: "Shape Shifter",
+    description: "An adversarial mode where the target word changes with each guess, respecting your previous feedback. Boxing it in is the goal!",
+    color: "bg-purple-500/20 text-purple-400 border-purple-500/30"
+  },
+  PUBLIC: {
+    title: "Public Room",
+    description: "This challenge is open to anyone with the link. Compete with the community!",
+    color: "bg-correct/20 text-correct border-correct/30"
+  },
+  DISABLE_HINTS: {
+    title: "Hardcore Mode",
+    description: "Hints are completely disabled for this challenge. Pure skill only!",
+    color: "bg-orange-500/20 text-orange-400 border-orange-500/30"
+  },
+  HANDICAP: {
+    title: "Handicap Starter",
+    description: "Players are given a specific starting word to use. This can be a strategic hint or a mandatory first guess.",
+    color: "bg-correct/20 text-correct border-correct/30"
+  }
+};
+
+const ClickableModeLabel = memo(({ type, children, className, isPlain }: { type: keyof typeof MODE_DEFINITIONS, children: React.ReactNode, className?: string, isPlain?: boolean }) => {
+  const { triggerToast } = useApp();
+  const def = MODE_DEFINITIONS[type];
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    triggerToast(`${def.title}: ${def.description}`, 12000, true);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={isPlain
+        ? `cursor-help transition-all hover:text-white text-left ${className}`
+        : `inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center border cursor-help transition-all hover:scale-105 active:scale-95 ${def.color} ${className}`}
+    >
+      {children}
+    </button>
+  );
+});
 
 interface ParticipantItemProps {
   p: ChallengeParticipant;
@@ -330,35 +396,44 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span
-              className={`inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center ${selectedChallenge.mode === "LIVE" ? "bg-red-500/20 text-red-500" : "bg-blue-500/20 text-blue-500"}`}
-            >
-              <span className="hidden sm:inline">{selectedChallenge.mode} Mode</span>
+            <ClickableModeLabel type={selectedChallenge.mode as any}>
+              <span className="hidden sm:inline">{selectedChallenge.mode === "LIVE" ? "Live Race" : "Anytime Mode"}</span>
               <span className="sm:hidden">{selectedChallenge.mode === "LIVE" ? "⚡ Live" : "⏳ Async"}</span>
-            </span>
+            </ClickableModeLabel>
+
             {isMarathon && (
-              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-yellow-500/20 text-yellow-500">
+              <ClickableModeLabel type="MARATHON">
                 <span className="hidden sm:inline">Marathon</span>
                 <span className="sm:hidden">🏃 Mar.</span>
-              </span>
+              </ClickableModeLabel>
             )}
+
             {selectedChallenge.is_public && (
-              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-correct/20 text-correct">
+              <ClickableModeLabel type="PUBLIC">
                 <span className="hidden sm:inline">Public</span>
                 <span className="sm:hidden">🌍 Pub</span>
-              </span>
+              </ClickableModeLabel>
             )}
+
             {selectedChallenge.is_bot_marathon && (
-              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              <ClickableModeLabel type="BOT_MARATHON">
                 <span className="hidden sm:inline">Daily Event</span>
                 <span className="sm:hidden">🤖 Daily</span>
-              </span>
+              </ClickableModeLabel>
             )}
+
             {selectedChallenge.is_shapeshifter && (
-              <span className="inline-flex items-center justify-center px-2 sm:px-3 py-1 rounded-full text-[0.5rem] sm:text-[0.625rem] font-black uppercase tracking-widest leading-none text-center bg-purple-500/20 text-purple-400 border border-purple-500/30 animate-pulse">
+              <ClickableModeLabel type="SHAPESHIFTER" className="animate-pulse">
                 <span className="hidden sm:inline">Shape Shifter</span>
                 <span className="sm:hidden">🌀 Shift</span>
-              </span>
+              </ClickableModeLabel>
+            )}
+
+            {selectedChallenge.disable_hints && (
+              <ClickableModeLabel type="DISABLE_HINTS">
+                <span className="hidden sm:inline">No Hints</span>
+                <span className="sm:hidden">🚫 Hints</span>
+              </ClickableModeLabel>
             )}
           </div>
           <div className="flex gap-4">
@@ -728,9 +803,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               <div className="bg-white/3 p-3 rounded-xl border border-white/5 space-y-1 col-span-2">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase text-white/70">
+                    <ClickableModeLabel type="HANDICAP" isPlain className="text-[8px] font-black uppercase text-white/70">
                       Handicap Starter
-                    </p>
+                    </ClickableModeLabel>
                     <div className="flex items-center gap-1.5">
                       <Shield
                         size={12}

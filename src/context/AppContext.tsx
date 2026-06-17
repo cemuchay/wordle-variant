@@ -14,8 +14,8 @@ interface AppContextType {
     preferences: any;
     loading: boolean;
     refreshProfile: () => Promise<void>;
-    toast: { show: boolean; message: string; duration?: number };
-    triggerToast: (msg: string, duration?: number) => void;
+    toast: { show: boolean; message: string; duration?: number; isLarge?: boolean };
+    triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void;
     setToast: any;
     unreadCount: number;
     setUnreadCount: (val: number) => void;
