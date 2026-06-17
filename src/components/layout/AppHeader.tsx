@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share } from 'lucide-react';
+import { SettingsIcon, Shield, Lightbulb, RotateCcw, Share, HelpCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { NotificationBell } from '../notifications/NotificationBell';
@@ -11,6 +11,7 @@ import { useApp } from '../../context/AppContext';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
+    onOpenInfo?: () => void;
     onOpenWeeklyWrapped?: () => void;
     onHint: () => void;
     onReset: () => void;
@@ -30,6 +31,7 @@ const ICON_SIZE = 17;
 
 export const AppHeader = ({
     onOpenSettings,
+    onOpenInfo,
     onOpenWeeklyWrapped,
     onHint,
     onReset,
@@ -161,6 +163,10 @@ export const AppHeader = ({
                         )}
 
                         {user && <NotificationBell />}
+
+                        <button onClick={onOpenInfo} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0" title="Rules & How to Play">
+                            <HelpCircle size={ICON_SIZE} />
+                        </button>
 
                         <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0" title="Settings">
                             <SettingsIcon size={ICON_SIZE} />

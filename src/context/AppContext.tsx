@@ -64,6 +64,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected'>('connected');
+    const wasDisconnectedRef = useRef(false);
+    const lastHiddenTimeRef = useRef<number>(Date.now());
     const lastSyncRef = useRef<number>(0);
 
     useEffect(() => {
@@ -75,6 +77,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     setRealtimeStatus('connected');
                 } else {
                     setRealtimeStatus('disconnected');
+                    wasDisconnectedRef.current = true;
                 }
             });
 
@@ -528,9 +531,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 syncMessages();
-                // Refresh authoritative date and trigger a global event for game engines to re-hydrate
-                queryClient.invalidateQueries({ queryKey: ['server-date'] });
-                window.dispatchEvent(new CustomEvent('app-visibility-visible'));
+                
+                const timeHidden = Date.now() - lastHiddenTimeRef.current;
+                const shouldRefresh = wasDisconnectedRef.current || timeHidden > 30 * 60 * 1000;
+
+                if (shouldRefresh) {
+                    // Refresh authoritative date and trigger a global event for game engines to re-hydrate
+                    queryClient.invalidateQueries({ queryKey: ['server-date'] });
+                    window.dispatchEvent(new CustomEvent('app-visibility-visible'));
+                    wasDisconnectedRef.current = false;
+                }
+            } else {
+                lastHiddenTimeRef.current = Date.now();
             }
         };
 
@@ -538,11 +550,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             syncMessages();
             queryClient.invalidateQueries({ queryKey: ['server-date'] });
             window.dispatchEvent(new CustomEvent('app-visibility-visible'));
+            wasDisconnectedRef.current = false;
         };
 
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('online', handleOnline);
-        window.addEventListener('focus', handleOnline);
 
         const channel = supabase
             .channel('global_chat_channel')
