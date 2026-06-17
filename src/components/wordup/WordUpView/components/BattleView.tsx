@@ -11,6 +11,7 @@ interface BattleViewProps {
    selectedAnswer: string | null;
    revealAnswers: boolean;
    handleAnswerSelect: (choice: string) => void;
+   role: "player1" | "player2" | null;
 }
 
 export const BattleView = ({
@@ -21,7 +22,8 @@ export const BattleView = ({
    timeLeft,
    selectedAnswer,
    revealAnswers,
-   handleAnswerSelect
+   handleAnswerSelect,
+   role
 }: BattleViewProps) => {
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
@@ -59,21 +61,45 @@ export const BattleView = ({
          </div>
 
          {/* Score Indicators / Answer Status */}
-         <div className="flex justify-between items-center px-2 py-2 shrink-0">
-            <div className="flex items-center gap-1">
-               <span className={`w-2.5 h-2.5 rounded-full ${matchData?.p1_answered ? "bg-correct animate-pulse" : "bg-gray-700"}`} />
-               <span className="text-[9px] text-gray-500 uppercase font-black">
-                  {matchData?.p1_answered ? "Submitted" : "Thinking..."}
-               </span>
-            </div>
-            <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
-            <div className="flex items-center gap-1 justify-end">
-               <span className="text-[9px] text-gray-500 uppercase font-black">
-                  {matchData?.p2_answered ? "Submitted" : "Thinking..."}
-               </span>
-               <span className={`w-2.5 h-2.5 rounded-full ${matchData?.p2_answered ? "bg-pink-500 animate-pulse" : "bg-gray-700"}`} />
-            </div>
-         </div>
+         {(() => {
+            let p1Status = "Thinking...";
+            let p1Color = "bg-gray-700";
+            if (matchData?.p1_answered) {
+               p1Status = "Submitted";
+               p1Color = "bg-correct animate-pulse";
+            } else if (role === "player1" && selectedAnswer !== null) {
+               p1Status = "Syncing...";
+               p1Color = "bg-yellow-500 animate-pulse";
+            }
+
+            let p2Status = "Thinking...";
+            let p2Color = "bg-gray-700";
+            if (matchData?.p2_answered) {
+               p2Status = "Submitted";
+               p2Color = "bg-pink-500 animate-pulse";
+            } else if (role === "player2" && selectedAnswer !== null) {
+               p2Status = "Syncing...";
+               p2Color = "bg-yellow-500 animate-pulse";
+            }
+
+            return (
+               <div className="flex justify-between items-center px-2 py-2 shrink-0">
+                  <div className="flex items-center gap-1">
+                     <span className={`w-2.5 h-2.5 rounded-full ${p1Color}`} />
+                     <span className="text-[9px] text-gray-500 uppercase font-black">
+                        {p1Status}
+                     </span>
+                  </div>
+                  <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
+                  <div className="flex items-center gap-1 justify-end">
+                     <span className="text-[9px] text-gray-500 uppercase font-black">
+                        {p2Status}
+                     </span>
+                     <span className={`w-2.5 h-2.5 rounded-full ${p2Color}`} />
+                  </div>
+               </div>
+            );
+         })()}
 
          {/* Timer Bar */}
          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden shrink-0">

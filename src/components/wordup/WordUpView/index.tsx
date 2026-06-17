@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../hooks/useAuth";
 import { useApp } from "../../../context/AppContext";
-import { type WordUpGameState } from "./types";
 import { useServerTime } from "./hooks/useServerTime";
 import { useWordUpProfile } from "./hooks/useWordUpProfile";
 import { useWordUpMatchmaking } from "./hooks/useWordUpMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
 import { wordupAudio } from "../../../utils/wordupAudio";
+import { supabase } from "../../../lib/supabaseClient";
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -16,15 +17,23 @@ import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
 
+import { useWordUpStore } from "../../../store/useWordUpStore";
+
 export const WordUpView = () => {
    const { user } = useAuth();
    const { triggerToast, realtimeStatus } = useApp();
 
-   const [view, setView] = useState<WordUpGameState>("menu");
-   const [category, setCategory] = useState("mixed");
+   const view = useWordUpStore((s) => s.view);
+   const setView = useWordUpStore((s) => s.setView);
+   const category = useWordUpStore((s) => s.category);
+   const setCategory = useWordUpStore((s) => s.setCategory);
+   const matchId = useWordUpStore((s) => s.matchId);
+   const setMatchId = useWordUpStore((s) => s.setMatchId);
+   const role = useWordUpStore((s) => s.role);
+   const setRole = useWordUpStore((s) => s.setRole);
+   const resetGame = useWordUpStore((s) => s.resetGame);
+
    const [countdownText, setCountdownText] = useState("3");
-   const [matchId, setLocalMatchId] = useState<string | null>(null);
-   const [role, setLocalRole] = useState<"player1" | "player2" | null>(null);
 
    const { getSyncedNow } = useServerTime();
    const { userStats, getRankColor, updateStats } = useWordUpProfile(user);
@@ -95,23 +104,35 @@ export const WordUpView = () => {
          if (count === 0) {
             clearInterval(interval);
             setView("battle");
+
+            // Set match status to active in database
+            if (role === "player2" || match.is_bot_match) {
+               supabase
+                  .from("wordup_matches")
+                  .update({ status: "active" })
+                  .eq("id", match.id)
+                  .then(({ error }: any) => {
+                     if (error) console.error("Failed to set match status to active:", error);
+                  });
+            }
+
             startQuestionRound(match, 0);
          } else {
             setCountdownText(String(count));
          }
       }, 1000);
-   }, [startQuestionRound]);
+   }, [startQuestionRound, role]);
 
    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
-      setLocalMatchId(mId);
-      setLocalRole(mRole);
+      setMatchId(mId);
+      setRole(mRole);
       const match = await loadAndSubscribeMatch(mId);
       if (match) {
          wordupAudio.playMatchStart();
          setView("countdown");
          startCountdown(match);
       }
-   }, [loadAndSubscribeMatch, startCountdown]);
+   }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
 
    const cleanUpAll = useCallback(() => {
       cleanUpGameLoop();
@@ -168,13 +189,20 @@ export const WordUpView = () => {
                   selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers}
                   handleAnswerSelect={handleAnswerSelect}
+                  role={role}
                />
             )}
 
             {view === "gameover" && (
                <GameOverView
                   matchData={matchData}
-                  setView={setView}
+                  setView={(newView) => {
+                     if (newView === "menu") {
+                        resetGame();
+                     } else {
+                        setView(newView);
+                     }
+                  }}
                />
             )}
          </AnimatePresence>

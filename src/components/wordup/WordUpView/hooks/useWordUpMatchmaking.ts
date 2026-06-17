@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import {
@@ -7,6 +7,7 @@ import {
    encryptQuestions,
    getRandomBotProfile,
 } from "../../../../utils/wordupQuestionGenerator";
+import { useWordUpStore } from "../../../../store/useWordUpStore";
 
 export const useWordUpMatchmaking = (
    user: any,
@@ -16,9 +17,12 @@ export const useWordUpMatchmaking = (
    onMatchFound: (matchId: string, role: "player1" | "player2") => void,
    cleanUpIntervals: () => void
 ) => {
-   const [matchId, setMatchId] = useState<string | null>(null);
-   const [role, setRole] = useState<"player1" | "player2" | null>(null);
-   const [countdownSecs, setCountdownSecs] = useState(10);
+   const matchId = useWordUpStore((s) => s.matchId);
+   const setMatchId = useWordUpStore((s) => s.setMatchId);
+   const role = useWordUpStore((s) => s.role);
+   const setRole = useWordUpStore((s) => s.setRole);
+   const countdownSecs = useWordUpStore((s) => s.countdownSecs);
+   const setCountdownSecs = useWordUpStore((s) => s.setCountdownSecs);
    const matchmakingIntervalRef = useRef<number | null>(null);
    const matchmakingChannelRef = useRef<any>(null);
 
@@ -55,7 +59,7 @@ export const useWordUpMatchmaking = (
                .insert({
                   category,
                   player1_id: user.id,
-                  player2_id: null,
+                  player2_id: "00000000-0000-0000-0000-000000000b0b",
                   is_bot_match: true,
                   bot_profile: botProfile,
                   questions: encryptedStr,
@@ -147,17 +151,17 @@ export const useWordUpMatchmaking = (
             setCountdownSecs(10);
 
             matchmakingIntervalRef.current = window.setInterval(() => {
-               setCountdownSecs((prev) => {
-                  if (prev <= 1) {
-                     if (matchmakingIntervalRef.current) {
-                        clearInterval(matchmakingIntervalRef.current);
-                        matchmakingIntervalRef.current = null;
-                     }
-                     triggerBotFallback();
-                     return 0;
+               const current = useWordUpStore.getState().countdownSecs;
+               if (current <= 1) {
+                  if (matchmakingIntervalRef.current) {
+                     clearInterval(matchmakingIntervalRef.current);
+                     matchmakingIntervalRef.current = null;
                   }
-                  return prev - 1;
-               });
+                  setCountdownSecs(0);
+                  triggerBotFallback();
+               } else {
+                  setCountdownSecs(current - 1);
+               }
             }, 1000);
 
             subscribeToMatchmaking();
