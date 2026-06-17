@@ -10,6 +10,7 @@ export interface WordUpQuestion {
       | "reverse_wordle"
       | "definition"
       | "anagram"
+      | "anagram_scrambled"
       | "pattern";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
@@ -413,7 +414,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
    const getTypeByWeight = (): WordUpQuestion["type"] => {
       const typeWeights: { type: WordUpQuestion["type"]; weight: number }[] = [
-         { type: "anagram", weight: 1.2 },
+         { type: "anagram", weight: 0.6 },
+         { type: "anagram_scrambled", weight: 0.6 },
          { type: "real_fake", weight: 0.9 },
          { type: "pattern", weight: 0.9 },
          { type: "length", weight: 1.0 },
@@ -582,8 +584,40 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          const choices = new Set<string>();
          choices.add(word);
 
+         // Add 3 other words of same length
+         while (choices.size < 4) {
+            const dummy = randomWord();
+            choices.add(dummy);
+         }
+
+         questions.push({
+            type: "anagram",
+            prompt: scrambled,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5),
+            answer: word,
+         });
+      } else if (type === "anagram_scrambled") {
+         const word = randomWord();
+         // Scramble word characters
+         let scrambled = word
+            .split("")
+            .sort(() => Math.random() - 0.5)
+            .join("");
+         while (scrambled === word && word.length > 2) {
+            scrambled = word
+               .split("")
+               .sort(() => Math.random() - 0.5)
+               .join("");
+         }
+
+         const choices = new Set<string>();
+         choices.add(scrambled); // The correct scramble
+
          const scrambleWord = (w: string) => {
-            return w.split("").sort(() => Math.random() - 0.5).join("");
+            return w
+               .split("")
+               .sort(() => Math.random() - 0.5)
+               .join("");
          };
 
          // 1. Add another scramble of the word itself (e.g. RHEAT)
@@ -603,7 +637,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             const replaceIdx = Math.floor(Math.random() * chars.length);
             let replacement = chars[replaceIdx];
             while (replacement === chars[replaceIdx]) {
-               replacement = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+               replacement = String.fromCharCode(
+                  65 + Math.floor(Math.random() * 26),
+               );
             }
             chars[replaceIdx] = replacement;
             const mutatedScramble = scrambleWord(chars.join(""));
@@ -617,10 +653,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          }
 
          questions.push({
-            type: "anagram",
-            prompt: scrambled,
+            type: "anagram_scrambled",
+            prompt: word,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
-            answer: word,
+            answer: scrambled,
          });
       } else {
          // type === "pattern"
@@ -699,26 +735,26 @@ export interface BotProfile {
 
 export const BOT_PROFILES: Record<string, BotProfile> = {
    slow_thinker: {
-      name: "Slow Thinker (Bot)",
+      name: "Sloths ",
       accuracy: 0.6,
       minDelay: 6.0,
       maxDelay: 9.0,
    },
    average: {
-      name: "Average Player (Bot)",
+      name: "Player",
       accuracy: 0.75,
       minDelay: 4.0,
       maxDelay: 7.5,
    },
-   fast: { name: "Speedy Bot", accuracy: 0.85, minDelay: 2.0, maxDelay: 5.0 },
+   fast: { name: "Speedy", accuracy: 0.85, minDelay: 2.0, maxDelay: 5.0 },
    master: {
-      name: "Dictionary Master (Bot)",
+      name: "Zeeny",
       accuracy: 0.95,
       minDelay: 1.5,
       maxDelay: 3.5,
    },
    impossible: {
-      name: "DeepWord (AI Bot)",
+      name: "Variant",
       accuracy: 1.0,
       minDelay: 0.5,
       maxDelay: 1.8,
