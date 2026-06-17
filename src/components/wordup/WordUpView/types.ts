@@ -7,6 +7,8 @@ export interface ProfileStats {
    games_lost: number;
    games_tied: number;
    rank_name: string;
+   username?: string;
+   avatar_url?: string | null;
 }
 
 export type WordUpGameState = "menu" | "matchmaking" | "countdown" | "battle" | "gameover";

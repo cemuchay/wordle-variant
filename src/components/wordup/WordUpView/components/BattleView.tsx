@@ -13,6 +13,7 @@ interface BattleViewProps {
    revealAnswers: boolean;
    handleAnswerSelect: (choice: string) => void;
    role: "player1" | "player2" | null;
+   playerProfile: any | null;
 }
 
 export const BattleView = ({
@@ -25,7 +26,8 @@ export const BattleView = ({
    selectedAnswer,
    revealAnswers,
    handleAnswerSelect,
-   role
+   role,
+   playerProfile
 }: BattleViewProps) => {
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
@@ -59,6 +61,16 @@ export const BattleView = ({
    const oppStatus = isP1 ? p2Status : p1Status;
    const oppColor = isP1 ? p2Color : p1Color;
 
+   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot") : "Opponent");
+
+   const getAvatarUrl = (avatarUrl: string | null | undefined, seed: string) => {
+      return avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
+   };
+
+   // Resolve opponent choice
+   const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
+   const oppChoice = oppAnswers?.[currentIdx]?.choice;
+
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -68,26 +80,28 @@ export const BattleView = ({
          {/* Players Panel */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-               <div className="w-8 h-8 rounded-full bg-correct/20 border border-correct/30 flex items-center justify-center text-xs font-black shrink-0">
-                  YOU
-               </div>
+               <img
+                  src={getAvatarUrl(playerProfile?.avatar_url, playerProfile?.username || "You")}
+                  alt="You"
+                  className="w-8 h-8 rounded-full border border-correct/30 object-cover shrink-0"
+               />
                <div className="truncate">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">You</p>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                   <p className="text-sm font-black text-white">{myScore} pts</p>
                </div>
             </div>
             <div className="flex items-center gap-2 min-w-0 justify-end text-right">
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">
-                     {matchData?.is_bot_match
-                        ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
-                        : (opponentStats ? "Opponent" : "Matching Bot")}
+                     {opponentName}
                   </p>
                   <p className="text-sm font-black text-white">{oppScore} pts</p>
                </div>
-               <div className="w-8 h-8 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-xs font-black shrink-0">
-                  {matchData?.is_bot_match ? "🤖" : "VS"}
-               </div>
+               <img
+                  src={getAvatarUrl(opponentStats?.avatar_url, opponentName)}
+                  alt={opponentName}
+                  className="w-8 h-8 rounded-full border border-pink-500/30 object-cover shrink-0"
+               />
             </div>
          </div>
 
@@ -143,6 +157,7 @@ export const BattleView = ({
                {activeQuestion.choices.map((choice) => {
                   const isSelected = selectedAnswer === choice;
                   const isCorrect = choice === activeQuestion.answer;
+                  const isOppSelected = revealAnswers && oppChoice === choice;
 
                   let btnClass = "bg-white/5 border-white/10 text-white hover:bg-white/10";
                   if (selectedAnswer !== null) {
@@ -155,15 +170,30 @@ export const BattleView = ({
                      }
                   }
 
+                  if (isOppSelected) {
+                     btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                  }
+
                   return (
                      <button
                         key={choice}
                         disabled={selectedAnswer !== null || revealAnswers}
                         onClick={() => handleAnswerSelect(choice)}
-                        className={`p-4 rounded-2xl border text-center font-black uppercase tracking-wider transition-all active:scale-95 text-xs flex items-center justify-center min-h-[56px] ${selectedAnswer === null ? "cursor-pointer" : "cursor-default"
+                        className={`p-4 rounded-2xl border text-center font-black uppercase tracking-wider transition-all active:scale-95 text-xs flex items-center justify-between min-h-[56px] relative ${selectedAnswer === null ? "cursor-pointer" : "cursor-default"
                            } ${btnClass}`}
                      >
-                        {choice}
+                        <span className="flex-1 text-center pr-8">{choice}</span>
+
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
+                           {isSelected && (
+                              <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                           )}
+                           {isOppSelected && (
+                              <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 {opponentName.slice(0, 5)}
+                              </span>
+                           )}
+                        </div>
                      </button>
                   );
                })}

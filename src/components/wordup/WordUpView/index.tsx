@@ -21,7 +21,7 @@ import { useWordUpStore } from "../../../store/useWordUpStore";
 
 export const WordUpView = () => {
    const { user } = useAuth();
-   const { triggerToast, realtimeStatus } = useApp();
+   const { triggerToast, realtimeStatus, onlineUsers, profile } = useApp();
 
    const view = useWordUpStore((s) => s.view);
    const setView = useWordUpStore((s) => s.setView);
@@ -114,44 +114,52 @@ export const WordUpView = () => {
       }
    }, [matchData?.status, view, setView, startQuestionRound, matchData]);
 
-   const startCountdown = useCallback((match: any) => {
-      let count = 3;
-      setCountdownText("3");
-      const interval = setInterval(() => {
-         count--;
-         if (count === 0) {
-            clearInterval(interval);
-            setView("battle");
+    const startCountdown = useCallback((match: any) => {
+       let count = 3;
+       setCountdownText("3");
+       const interval = setInterval(() => {
+          count--;
+          if (count === 0) {
+             clearInterval(interval);
+             setView("battle");
 
-            // Set match status to active in database
-            if (role === "player2" || match.is_bot_match) {
-               supabase
-                  .from("wordup_matches")
-                  .update({ status: "active" })
-                  .eq("id", match.id)
-                  .then(({ error }: any) => {
-                     if (error) console.error("Failed to set match status to active:", error);
-                  });
-            }
+             // Set match status to active in database
+             if (role === "player2" || match.is_bot_match) {
+                supabase
+                   .from("wordup_matches")
+                   .update({ status: "active" })
+                   .eq("id", match.id)
+                   .then(({ error }: any) => {
+                      if (error) console.error("Failed to set match status to active:", error);
+                   });
+             }
 
-            startQuestionRound(match, 0);
-         } else {
-            setCountdownText(String(count));
-         }
-      }, 1000);
-   }, [startQuestionRound, role]);
+             startQuestionRound(match, 0);
+          } else {
+             setCountdownText(String(count));
+          }
+       }, 1000);
+    }, [startQuestionRound, role]);
 
-   // eslint-disable-next-line react-hooks/preserve-manual-memoization
-   const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
-      setMatchId(mId);
-      setRole(mRole);
-      const match = await loadAndSubscribeMatch(mId, mRole);
-      if (match) {
-         wordupAudio.playMatchStart();
-         setView("countdown");
-         startCountdown(match);
-      }
-   }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
+       setMatchId(mId);
+       setRole(mRole);
+       const match = await loadAndSubscribeMatch(mId, mRole);
+       if (match) {
+          wordupAudio.playMatchStart();
+          setView("countdown");
+          startCountdown(match);
+       }
+    }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
+
+    // Reactive sync for direct invites and rematch transitions
+    useEffect(() => {
+       if (matchId && role && (view === "menu" || view === "matchmaking" || view === "gameover")) {
+          console.log("[WordUp Logs] Direct matchId set in store. Launching match...", matchId, role);
+          onMatchFound(matchId, role);
+       }
+    }, [matchId, role, view, onMatchFound]);
 
    const cleanUpAll = useCallback(() => {
       cleanUpGameLoop();
@@ -189,6 +197,8 @@ export const WordUpView = () => {
                   getRankColor={getRankColor}
                   soundEnabled={soundEnabled}
                   onToggleSound={handleToggleSound}
+                  onlineUsers={onlineUsers}
+                  currentUser={user}
                />
             )}
 
@@ -216,6 +226,7 @@ export const WordUpView = () => {
                   revealAnswers={revealAnswers}
                   handleAnswerSelect={handleAnswerSelect}
                   role={role}
+                  playerProfile={profile}
                />
             )}
 

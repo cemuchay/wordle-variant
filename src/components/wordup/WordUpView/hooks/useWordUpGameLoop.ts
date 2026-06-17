@@ -233,6 +233,7 @@ export const useWordUpGameLoop = (
             correct,
             time_taken: elapsed,
             points,
+            choice,
          };
 
          try {
@@ -257,6 +258,12 @@ export const useWordUpGameLoop = (
                   console.log(`[WordUp Logs] Bot double points in final round: ${botPoints}`);
                }
 
+               let botChoice = q?.answer;
+               if (!botAction?.correct && q?.choices) {
+                  const wrongChoices = q.choices.filter((c: string) => c !== q.answer);
+                  botChoice = wrongChoices[Math.floor(Math.random() * wrongChoices.length)] || "WRONG";
+               }
+
                const p1Answers = [...(latestMatch.p1_answers || [])];
                const p2Answers = [...(latestMatch.p2_answers || [])];
                p1Answers.push(submission);
@@ -265,6 +272,7 @@ export const useWordUpGameLoop = (
                   correct: botAction?.correct,
                   time_taken: botAction?.time_taken,
                   points: botPoints,
+                  choice: botChoice,
                });
 
                updatedMatch = {
@@ -536,12 +544,23 @@ export const useWordUpGameLoop = (
          const oppId =
             activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {
+            const { data: mainProf } = await supabase
+               .from("profiles")
+               .select("username, avatar_url")
+               .eq("id", oppId)
+               .single();
             const { data: oppProf } = await supabase
                .from("wordup_profiles")
                .select("*")
                .eq("id", oppId)
                .single();
-            if (oppProf) setOpponentStats(oppProf);
+            if (oppProf) {
+               setOpponentStats({
+                  ...oppProf,
+                  username: mainProf?.username || "Opponent",
+                  avatar_url: mainProf?.avatar_url || null
+               });
+            }
          } else if (match.is_bot_match) {
             setOpponentStats({
                rating:
