@@ -53,7 +53,9 @@ export const useWordUpGameLoop = (
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
 
    const [maxTime, setMaxTime] = useState(10);
-   const [rematchState, setRematchState] = useState<"idle" | "sent" | "received" | "expired">("idle");
+   const [rematchState, setRematchState] = useState<
+      "idle" | "sent" | "received" | "expired"
+   >("idle");
    const [rematchCountdown, setRematchCountdown] = useState(10);
    const [showRematchButton, setShowRematchButton] = useState(true);
 
@@ -74,10 +76,15 @@ export const useWordUpGameLoop = (
    const roleRef = useRef(role);
    const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
    const onRematchAcceptedRef = useRef(onRematchAccepted);
+   const rematchStateRef = useRef(rematchState);
 
    useEffect(() => {
       onRematchAcceptedRef.current = onRematchAccepted;
    }, [onRematchAccepted]);
+
+   useEffect(() => {
+      rematchStateRef.current = rematchState;
+   }, [rematchState]);
 
    useEffect(() => {
       currentIdxRef.current = currentIdx;
@@ -98,6 +105,20 @@ export const useWordUpGameLoop = (
       roleRef.current = role;
    }, [role]);
 
+   useEffect(() => {
+      if (!matchId) {
+         if (matchChannelRef.current) {
+            console.log(
+               "[WordUp Logs] Cleaning up match channel because matchId is null",
+            );
+            supabase.removeChannel(matchChannelRef.current);
+            matchChannelRef.current = null;
+         }
+         // eslint-disable-next-line react-hooks/set-state-in-effect
+         setRematchState("idle");
+      }
+   }, [matchId]);
+
    const stopRoundTimer = useCallback(() => {
       if (timerRef.current) {
          clearInterval(timerRef.current);
@@ -117,36 +138,44 @@ export const useWordUpGameLoop = (
       stopBotTimer();
    }, [stopRoundTimer, stopBotTimer]);
 
-   const endGame = useCallback(async (match: any) => {
-      try {
-         console.log("[WordUp Logs] endGame: Pushing final consolidated match state to DB...");
-         // Final atomic push of all answers and scores
-         await fetchWithRetry(
-            async () => {
-               const { error } = await supabase
-                  .from("wordup_matches")
-                  .update({
-                     status: "completed",
-                     p1_answers: match.p1_answers,
-                     p2_answers: match.p2_answers,
-                     p1_score: match.p1_score,
-                     p2_score: match.p2_score,
-                     p1_answered: true,
-                     p2_answered: true,
-                     completed_at: new Date().toISOString(),
-                  })
-                  .eq("id", match.id);
-               if (error) throw error;
-            },
-            3,
-            1000,
-         );
-         console.log("[WordUp Logs] Final sync successful.");
-      } catch (e) {
-         console.error("[WordUp Logs] Failed to finalize match in DB:", e);
-         triggerToast("Failed to save final results. Check connection.", 5000);
-      }
-   }, [triggerToast]);
+   const endGame = useCallback(
+      async (match: any) => {
+         try {
+            console.log(
+               "[WordUp Logs] endGame: Pushing final consolidated match state to DB...",
+            );
+            // Final atomic push of all answers and scores
+            await fetchWithRetry(
+               async () => {
+                  const { error } = await supabase
+                     .from("wordup_matches")
+                     .update({
+                        status: "completed",
+                        p1_answers: match.p1_answers,
+                        p2_answers: match.p2_answers,
+                        p1_score: match.p1_score,
+                        p2_score: match.p2_score,
+                        p1_answered: true,
+                        p2_answered: true,
+                        completed_at: new Date().toISOString(),
+                     })
+                     .eq("id", match.id);
+                  if (error) throw error;
+               },
+               3,
+               1000,
+            );
+            console.log("[WordUp Logs] Final sync successful.");
+         } catch (e) {
+            console.error("[WordUp Logs] Failed to finalize match in DB:", e);
+            triggerToast(
+               "Failed to save final results. Check connection.",
+               5000,
+            );
+         }
+      },
+      [triggerToast],
+   );
 
    const advanceRound = useCallback(
       async (_mId: string, nextIdx: number) => {
@@ -220,7 +249,9 @@ export const useWordUpGameLoop = (
 
          if (currentIdxRef.current === 6) {
             points = points * 2;
-            console.log(`[WordUp Logs] Final round points doubled! New points: ${points}`);
+            console.log(
+               `[WordUp Logs] Final round points doubled! New points: ${points}`,
+            );
          }
 
          if (choice !== "") {
@@ -255,13 +286,20 @@ export const useWordUpGameLoop = (
 
                if (currentIdxRef.current === 6) {
                   botPoints = botPoints * 2;
-                  console.log(`[WordUp Logs] Bot double points in final round: ${botPoints}`);
+                  console.log(
+                     `[WordUp Logs] Bot double points in final round: ${botPoints}`,
+                  );
                }
 
                let botChoice = q?.answer;
                if (!botAction?.correct && q?.choices) {
-                  const wrongChoices = q.choices.filter((c: string) => c !== q.answer);
-                  botChoice = wrongChoices[Math.floor(Math.random() * wrongChoices.length)] || "WRONG";
+                  const wrongChoices = q.choices.filter(
+                     (c: string) => c !== q.answer,
+                  );
+                  botChoice =
+                     wrongChoices[
+                        Math.floor(Math.random() * wrongChoices.length)
+                     ] || "WRONG";
                }
 
                const p1Answers = [...(latestMatch.p1_answers || [])];
@@ -327,12 +365,7 @@ export const useWordUpGameLoop = (
             isSubmittingAnswerRef.current = false;
          }
       },
-      [
-         matchId,
-         stopRoundTimer,
-         setSelectedAnswer,
-         selectedAnswer,
-      ],
+      [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer],
    );
 
    const startQuestionRound = useCallback(
@@ -424,41 +457,62 @@ export const useWordUpGameLoop = (
    const handleMatchUpdate = useCallback(
       (newMatch: any) => {
          const currentMatch = matchDataRef.current;
-         
+
          // 1. Robust state merging: Only accept updates that represent progress or same state
          // If Postgres update is older than local state (e.g. local has more answers), merge them.
          const mergedMatch = { ...currentMatch, ...newMatch };
 
          if (currentMatch) {
             // Ensure we don't lose answers that we already know about locally
-            if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
+            if (
+               (currentMatch.p1_answers?.length || 0) >
+               (newMatch.p1_answers?.length || 0)
+            ) {
                mergedMatch.p1_answers = currentMatch.p1_answers;
                mergedMatch.p1_score = currentMatch.p1_score;
                mergedMatch.p1_answered = currentMatch.p1_answered;
             }
-            if ((currentMatch.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)) {
+            if (
+               (currentMatch.p2_answers?.length || 0) >
+               (newMatch.p2_answers?.length || 0)
+            ) {
                mergedMatch.p2_answers = currentMatch.p2_answers;
                mergedMatch.p2_score = currentMatch.p2_score;
                mergedMatch.p2_answered = currentMatch.p2_answered;
             }
             // Keep the highest question index
-            mergedMatch.current_question_index = Math.max(currentMatch.current_question_index || 0, newMatch.current_question_index || 0);
-            
+            mergedMatch.current_question_index = Math.max(
+               currentMatch.current_question_index || 0,
+               newMatch.current_question_index || 0,
+            );
+
             // If local status is already active/completed, don't let it go back to countdown
-            if (currentMatch.status === "active" && newMatch.status === "countdown") {
+            if (
+               currentMatch.status === "active" &&
+               newMatch.status === "countdown"
+            ) {
                mergedMatch.status = "active";
             }
          }
 
-         console.log(`[WordUp Logs] handleMatchUpdate: Merged state index: ${mergedMatch.current_question_index}, status: ${mergedMatch.status}`);
+         console.log(
+            `[WordUp Logs] handleMatchUpdate: Merged state index: ${mergedMatch.current_question_index}, status: ${mergedMatch.status}`,
+         );
          setMatchData(mergedMatch);
 
-         const bothAnswered = mergedMatch.p1_answered && mergedMatch.p2_answered;
+         const bothAnswered =
+            mergedMatch.p1_answered && mergedMatch.p2_answered;
 
-         if (bothAnswered && !revealAnswersRef.current && !isRevealingRef.current) {
+         if (
+            bothAnswered &&
+            !revealAnswersRef.current &&
+            !isRevealingRef.current
+         ) {
             isRevealingRef.current = true;
-            console.log("[WordUp Logs] Both players acted. Revealing answers...");
-            
+            console.log(
+               "[WordUp Logs] Both players acted. Revealing answers...",
+            );
+
             stopRoundTimer();
             stopBotTimer();
             setRevealAnswers(true);
@@ -468,34 +522,47 @@ export const useWordUpGameLoop = (
                triggerToast("⚡ FINAL ROUND: DOUBLE POINTS! ⚡", 3000);
             }
 
-            setTimeout(() => {
-               isRevealingRef.current = false;
-               if (nextIdx >= 7) {
-                  console.log("[WordUp Logs] Reached end of 7 rounds. Ending match...");
-                  endGame(mergedMatch);
-               } else if (roleRef.current === "player2" || mergedMatch.is_bot_match) {
-                  console.log(`[WordUp Logs] Triggering advance to index ${nextIdx}...`);
-                  advanceRound(mergedMatch.id, nextIdx);
-               }
-            }, nextIdx === 6 ? 3200 : 1800);
+            setTimeout(
+               () => {
+                  isRevealingRef.current = false;
+                  if (nextIdx >= 7) {
+                     console.log(
+                        "[WordUp Logs] Reached end of 7 rounds. Ending match...",
+                     );
+                     endGame(mergedMatch);
+                  } else if (
+                     roleRef.current === "player2" ||
+                     mergedMatch.is_bot_match
+                  ) {
+                     console.log(
+                        `[WordUp Logs] Triggering advance to index ${nextIdx}...`,
+                     );
+                     advanceRound(mergedMatch.id, nextIdx);
+                  }
+               },
+               nextIdx === 6 ? 3200 : 1800,
+            );
          }
 
          if (
             mergedMatch.current_question_index !== currentIdxRef.current &&
-            (mergedMatch.status === "active" || mergedMatch.status === "countdown")
+            (mergedMatch.status === "active" ||
+               mergedMatch.status === "countdown")
          ) {
-            console.log(`[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${mergedMatch.current_question_index}`);
+            console.log(
+               `[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${mergedMatch.current_question_index}`,
+            );
             startQuestionRound(mergedMatch, mergedMatch.current_question_index);
          }
 
-          if (mergedMatch.status === "completed") {
-             console.log("[WordUp Logs] Match marked as completed.");
-             setShowRematchButton(true);
-             setTimeout(() => {
-                setShowRematchButton(false);
-             }, 120000);
-             onGameOver(mergedMatch);
-          }
+         if (mergedMatch.status === "completed") {
+            console.log("[WordUp Logs] Match marked as completed.");
+            setShowRematchButton(true);
+            setTimeout(() => {
+               setShowRematchButton(false);
+            }, 120000);
+            onGameOver(mergedMatch);
+         }
       },
       [
          endGame,
@@ -508,6 +575,66 @@ export const useWordUpGameLoop = (
          setRevealAnswers,
          triggerToast,
       ],
+   );
+   const acceptRematch = useCallback(
+      async (
+         onMatchFoundCallback: (
+            newMatchId: string,
+            role: "player1" | "player2",
+         ) => void,
+      ) => {
+         const match = matchDataRef.current;
+         if (!match || !matchChannelRef.current) return;
+
+         if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+
+         try {
+            console.log(
+               "[WordUp Logs] Accepting rematch, generating new game...",
+            );
+            const rawQuestions = generateWordUpQuestions(match.category);
+            const secretKey = generateSecretKey();
+            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+            // Create new match row
+            const { data: newMatch, error } = await supabase
+               .from("wordup_matches")
+               .insert({
+                  category: match.category,
+                  player1_id: match.player1_id,
+                  player2_id: match.player2_id,
+                  questions: encryptedStr,
+                  encryption_key: secretKey,
+                  status: "countdown",
+                  question_started_at: new Date(getSyncedNow()).toISOString(),
+               })
+               .select()
+               .single();
+
+            if (error || !newMatch)
+               throw error || new Error("Failed to create rematch");
+
+            console.log(
+               "[WordUp Logs] Rematch created successfully, ID:",
+               newMatch.id,
+            );
+
+            // Broadcast the new match ID
+            matchChannelRef.current.send({
+               type: "broadcast",
+               event: "rematch_accepted",
+               payload: { newMatchId: newMatch.id },
+            });
+
+            // Transition self
+            const myRole = roleRef.current || "player1";
+            onMatchFoundCallback(newMatch.id, myRole);
+         } catch (e) {
+            console.error("[WordUp Logs] Failed to accept rematch:", e);
+            triggerToast("Failed to initiate rematch.", 4000);
+         }
+      },
+      [getSyncedNow, triggerToast],
    );
 
    useEffect(() => {
@@ -524,6 +651,32 @@ export const useWordUpGameLoop = (
 
          if (error || !match) {
             console.error("Error loading match:", error);
+            return null;
+         }
+
+         const matchTime = match.created_at
+            ? new Date(match.created_at).getTime()
+            : 0;
+         const nowTime = new Date().getTime();
+         const isExpired =
+            match.status !== "completed" && nowTime - matchTime > 5 * 60 * 1000;
+
+         if (isExpired) {
+            console.log(
+               "[WordUp Logs] Match is older than 5 minutes. Expiring match in database...",
+            );
+            await supabase
+               .from("wordup_matches")
+               .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString(),
+               })
+               .eq("id", mId);
+            triggerToast(
+               "This match invitation has expired (older than 5 minutes).",
+               5000,
+            );
+            useWordUpStore.getState().resetGame();
             return null;
          }
 
@@ -558,7 +711,7 @@ export const useWordUpGameLoop = (
                setOpponentStats({
                   ...oppProf,
                   username: mainProf?.username || "Opponent",
-                  avatar_url: mainProf?.avatar_url || null
+                  avatar_url: mainProf?.avatar_url || null,
                });
             }
          } else if (match.is_bot_match) {
@@ -639,19 +792,63 @@ export const useWordUpGameLoop = (
                console.log("[WordUp Logs] Broadcast: game_active");
                const currentMatch = matchDataRef.current;
                if (!currentMatch) return;
-               handleMatchUpdateRef.current({ ...currentMatch, status: "active" });
+               handleMatchUpdateRef.current({
+                  ...currentMatch,
+                  status: "active",
+               });
             })
             .on("broadcast", { event: "rematch_request" }, () => {
                console.log("[WordUp Logs] Broadcast: rematch_request received");
+
+               const currentView = useWordUpStore.getState().view;
+               if (currentView !== "gameover") {
+                  console.log(
+                     "[WordUp Logs] Rematch request received but view is not gameover. Ignoring.",
+                  );
+                  return;
+               }
+
+               if (rematchStateRef.current === "sent") {
+                  console.log(
+                     "[WordUp Logs] Simultaneous rematch requests! Resolving race condition...",
+                  );
+                  const latestMatch = matchDataRef.current;
+                  if (latestMatch) {
+                     const myId =
+                        activeRole === "player1"
+                           ? latestMatch.player1_id
+                           : latestMatch.player2_id;
+                     const oppId =
+                        activeRole === "player1"
+                           ? latestMatch.player2_id
+                           : latestMatch.player1_id;
+                     if (myId && oppId) {
+                        if (myId < oppId) {
+                           console.log(
+                              "[WordUp Logs] I have the lower ID. Automatically accepting and hosting rematch.",
+                           );
+                           acceptRematch(onRematchAcceptedRef.current);
+                        } else {
+                           console.log(
+                              "[WordUp Logs] I have the higher ID. Waiting for opponent to host and send rematch_accepted.",
+                           );
+                        }
+                     }
+                  }
+                  return;
+               }
+
                setRematchState("received");
                setRematchCountdown(10);
-               
-               if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+
+               if (rematchTimerRef.current)
+                  clearInterval(rematchTimerRef.current);
                let count = 10;
                rematchTimerRef.current = window.setInterval(() => {
                   count--;
                   if (count <= 0) {
-                     if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+                     if (rematchTimerRef.current)
+                        clearInterval(rematchTimerRef.current);
                      setRematchState("expired");
                   } else {
                      setRematchCountdown(count);
@@ -659,8 +856,24 @@ export const useWordUpGameLoop = (
                }, 1000);
             })
             .on("broadcast", { event: "rematch_accepted" }, ({ payload }) => {
-               console.log("[WordUp Logs] Broadcast: rematch_accepted received, new match ID:", payload.newMatchId);
-               if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+               console.log(
+                  "[WordUp Logs] Broadcast: rematch_accepted received, new match ID:",
+                  payload.newMatchId,
+               );
+               if (rematchTimerRef.current)
+                  clearInterval(rematchTimerRef.current);
+
+               const currentView = useWordUpStore.getState().view;
+               if (
+                  currentView !== "gameover" ||
+                  rematchStateRef.current === "expired"
+               ) {
+                  console.log(
+                     "[WordUp Logs] Rematch accepted received but view is not gameover or rematch is expired. Ignoring.",
+                  );
+                  return;
+               }
+
                setRematchState("idle");
                const myRole = roleRef.current || "player1";
                onRematchAcceptedRef.current?.(payload.newMatchId, myRole);
@@ -670,38 +883,56 @@ export const useWordUpGameLoop = (
          matchChannelRef.current = chan;
          return match;
       },
-      [setMatchData, setQuestions, setOpponentStats],
+      [
+         setMatchData,
+         setQuestions,
+         setOpponentStats,
+         triggerToast,
+         acceptRematch,
+      ],
    );
 
    // Timer expiry watchdog implementation
    useEffect(() => {
-       if (timeLeft === 0 && !revealAnswers && matchData?.status === "active") {
-           const watchdog = setTimeout(() => {
-               const current = matchDataRef.current;
-               if (current && !revealAnswersRef.current) {
-                   console.log("[WordUp Logs] Watchdog: Round timer expired and opponent silent. Forcing progression...");
-                   // Force opponent to have "answered" with whatever they have (or empty)
-                   const forcedState = { ...current };
-                   if (!forcedState.p1_answered) {
-                       forcedState.p1_answered = true;
-                       forcedState.p1_answers = [...(forcedState.p1_answers || [])];
-                       // Add missed entry if missing
-                       if (forcedState.p1_answers.length <= currentIdxRef.current) {
-                           forcedState.p1_answers.push({ question_idx: currentIdxRef.current, correct: false, time_taken: maxTime, points: 0 });
-                       }
-                   }
-                   if (!forcedState.p2_answered) {
-                       forcedState.p2_answered = true;
-                       forcedState.p2_answers = [...(forcedState.p2_answers || [])];
-                       if (forcedState.p2_answers.length <= currentIdxRef.current) {
-                           forcedState.p2_answers.push({ question_idx: currentIdxRef.current, correct: false, time_taken: maxTime, points: 0 });
-                       }
-                   }
-                   handleMatchUpdate(forcedState);
+      if (timeLeft === 0 && !revealAnswers && matchData?.status === "active") {
+         const watchdog = setTimeout(() => {
+            const current = matchDataRef.current;
+            if (current && !revealAnswersRef.current) {
+               console.log(
+                  "[WordUp Logs] Watchdog: Round timer expired and opponent silent. Forcing progression...",
+               );
+               // Force opponent to have "answered" with whatever they have (or empty)
+               const forcedState = { ...current };
+               if (!forcedState.p1_answered) {
+                  forcedState.p1_answered = true;
+                  forcedState.p1_answers = [...(forcedState.p1_answers || [])];
+                  // Add missed entry if missing
+                  if (forcedState.p1_answers.length <= currentIdxRef.current) {
+                     forcedState.p1_answers.push({
+                        question_idx: currentIdxRef.current,
+                        correct: false,
+                        time_taken: maxTime,
+                        points: 0,
+                     });
+                  }
                }
-           }, 1500); // 1.5s grace period after timer hits 0
-           return () => clearTimeout(watchdog);
-       }
+               if (!forcedState.p2_answered) {
+                  forcedState.p2_answered = true;
+                  forcedState.p2_answers = [...(forcedState.p2_answers || [])];
+                  if (forcedState.p2_answers.length <= currentIdxRef.current) {
+                     forcedState.p2_answers.push({
+                        question_idx: currentIdxRef.current,
+                        correct: false,
+                        time_taken: maxTime,
+                        points: 0,
+                     });
+                  }
+               }
+               handleMatchUpdate(forcedState);
+            }
+         }, 1500); // 1.5s grace period after timer hits 0
+         return () => clearTimeout(watchdog);
+      }
    }, [timeLeft, revealAnswers, matchData?.status, handleMatchUpdate, maxTime]);
 
    const sendRematch = useCallback(() => {
@@ -730,56 +961,6 @@ export const useWordUpGameLoop = (
          }
       }, 1000);
    }, []);
-
-   const acceptRematch = useCallback(
-      async (onMatchFoundCallback: (newMatchId: string, role: "player1" | "player2") => void) => {
-         const match = matchDataRef.current;
-         if (!match || !matchChannelRef.current) return;
-
-         if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
-
-         try {
-            console.log("[WordUp Logs] Accepting rematch, generating new game...");
-            const rawQuestions = generateWordUpQuestions(match.category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-            // Create new match row
-            const { data: newMatch, error } = await supabase
-               .from("wordup_matches")
-               .insert({
-                  category: match.category,
-                  player1_id: match.player1_id,
-                  player2_id: match.player2_id,
-                  questions: encryptedStr,
-                  encryption_key: secretKey,
-                  status: "countdown",
-                  question_started_at: new Date(getSyncedNow()).toISOString(),
-               })
-               .select()
-               .single();
-
-            if (error || !newMatch) throw error || new Error("Failed to create rematch");
-
-            console.log("[WordUp Logs] Rematch created successfully, ID:", newMatch.id);
-
-            // Broadcast the new match ID
-            matchChannelRef.current.send({
-               type: "broadcast",
-               event: "rematch_accepted",
-               payload: { newMatchId: newMatch.id },
-            });
-
-            // Transition self
-            const myRole = roleRef.current || "player1";
-            onMatchFoundCallback(newMatch.id, myRole);
-         } catch (e) {
-            console.error("[WordUp Logs] Failed to accept rematch:", e);
-            triggerToast("Failed to initiate rematch.", 4000);
-         }
-      },
-      [getSyncedNow, triggerToast],
-   );
 
    useEffect(() => {
       return () => {
