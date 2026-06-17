@@ -88,6 +88,7 @@ export const WordUpView = () => {
       matchData,
       opponentStats,
       timeLeft,
+      maxTime,
       selectedAnswer,
       revealAnswers,
       handleAnswerSelect,
@@ -186,6 +187,7 @@ export const WordUpView = () => {
                   matchData={matchData}
                   opponentStats={opponentStats}
                   timeLeft={timeLeft}
+                  maxTime={maxTime}
                   selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers}
                   handleAnswerSelect={handleAnswerSelect}
