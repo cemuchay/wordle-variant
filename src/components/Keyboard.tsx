@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import type { LetterStatus } from '../types/game';
-import { Delete } from 'lucide-react';
+import { Delete, CornerDownLeft } from 'lucide-react';
+import { useIsResponsive } from '../hooks/useResponsive';
 
 const ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -17,6 +18,7 @@ interface KeyProps {
 }
 
 const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) => {
+  const { isSuperTiny } = useIsResponsive(); // Detect responsive state
   const isWide = char === 'ENTER' || char === 'DELETE';
 
   const getStyle = () => {
@@ -30,7 +32,8 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
 
   const isChallenge = gameplayType === 'challenge' || compact;
 
-  const dynamicClass = isChallenge
+
+  let dynamicClass = isChallenge
     ? `${isWide
       ? 'px-1 text-[8px] sm:text-[9px] min-w-[34px] max-[340px]:min-w-[30px] sm:min-w-[52px]'
       : 'flex-1 min-w-[28px] max-[340px]:min-w-[22px] sm:min-w-[32px]'
@@ -39,6 +42,10 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
       ? 'px-2.5 max-[340px]:px-1 text-[10px] sm:text-xs min-w-[55px] max-[340px]:min-w-[42px] sm:min-w-[65px]'
       : 'flex-1 min-w-[28px] max-[340px]:min-w-[22px] sm:min-w-[32px]'
     } h-13 max-[340px]:h-10 sm:h-12 text-sm max-[340px]:text-xs sm:text-base`;
+
+  if (isSuperTiny) {
+    dynamicClass = `flex-1 min-w-[22px] h-8 text-sm sm:text-[8px]`
+  }
 
   return (
     <button
@@ -55,7 +62,7 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
         onClick(char);
       }}
     >
-      {char === 'DELETE' ? <Delete size={18} /> : char}
+      {char === 'DELETE' ? <Delete size={18} /> : (char === "ENTER" && isSuperTiny && !isChallenge) ? <CornerDownLeft size={18} /> : char}
     </button>
   );
 });
@@ -81,7 +88,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
   const isChallenge = gameplayType === 'challenge' || compact;
 
   return (
-    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-4'}`}>
+    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-2 sm:pb-4'}`}>
       {ROWS.map((row, i) => (
         <div key={i} className={`flex justify-center ${isChallenge ? 'mb-1.5 gap-1.5 sm:gap-2' : 'mb-1.5 gap-1.5 sm:gap-2'}`}>
           {row.map((key) => (

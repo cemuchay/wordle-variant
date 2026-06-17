@@ -1192,7 +1192,7 @@ export const calculateSkillIndex = ({
    );
    const baseScore = won
       ? Math.floor(
-           ((MAX_ATTEMPTS - currentAttempts + 1) / MAX_ATTEMPTS) *
+           ((maxAttempts - currentAttempts + 1) / maxAttempts) *
               SCORING.BASE_SCORE_MAX,
         )
       : 0;

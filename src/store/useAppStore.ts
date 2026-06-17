@@ -50,7 +50,7 @@ export interface ChallengePreset {
 
 interface AppState {
    // UI State
-   toast: { show: boolean; message: string; duration?: number };
+   toast: { show: boolean; message: string; duration?: number; isLarge?: boolean };
    isChallengeOpen: boolean;
    isNotificationsOpen: boolean;
    isChatOpen: boolean;
@@ -77,13 +77,15 @@ interface AppState {
    pendingChallengeUserId: string | null;
    previewImage: string | null;
    challengePresets: ChallengePreset[];
+   isPWAInstalled: boolean;
 
    // Actions
-   triggerToast: (message: string, duration?: number) => void;
+   triggerToast: (message: string, duration?: number, isLarge?: boolean) => void;
    setToast: (toast: {
       show: boolean;
       message: string;
       duration?: number;
+      isLarge?: boolean;
    }) => void;
    setChallengeOpen: (val: boolean) => void;
    setNotificationsOpen: (val: boolean) => void;
@@ -113,9 +115,10 @@ interface AppState {
    setPreviewImage: (url: string | null) => void;
    addChallengePreset: (preset: ChallengePreset) => void;
    removeChallengePreset: (id: string) => void;
-}
+   setIsPWAInstalled: (val: boolean) => void;
+   }
 
-export const useAppStore = create<AppState>()(
+   export const useAppStore = create<AppState>()(
    persist(
       (set) => ({
          // Initial State
@@ -151,10 +154,11 @@ export const useAppStore = create<AppState>()(
          pendingChallengeUserId: null,
          previewImage: null,
          challengePresets: [],
+         isPWAInstalled: false,
 
          // Actions
-         triggerToast: (message, duration = 3000) =>
-            set({ toast: { show: true, message, duration } }),
+         triggerToast: (message, duration = 3000, isLarge = false) =>
+            set({ toast: { show: true, message, duration, isLarge } }),
          setToast: (toast) => set({ toast }),
          setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),
          setNotificationsOpen: (isNotificationsOpen) =>
@@ -256,6 +260,8 @@ export const useAppStore = create<AppState>()(
                   (p) => p.id !== id,
                ),
             })),
+         setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
+
       }),
       {
          name: "variant-app-storage",

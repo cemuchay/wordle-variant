@@ -184,7 +184,7 @@ export const DynamicIslandStatus = () => {
     // Dynamically calculate pill width based on current call status
     const getPillWidth = () => {
         if (isExpanded) return 'min(95vw, 340px)';
-        if (toast.show) return 'min(90vw, 300px)'; // Toasts get a larger pill
+        if (toast.show) return toast.isLarge ? 'min(95vw, 400px)' : 'min(90vw, 300px)'; // Toasts get a larger pill
         if (activeCall) {
             if (activeCall.status === 'ringing') return '240px';
             if (activeCall.status === 'calling') return '180px';
@@ -214,7 +214,9 @@ export const DynamicIslandStatus = () => {
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
                     width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : '32px',
+                    height: isExpanded ? 'min(75vh, 480px)' : toast.show && toast.isLarge ? 'auto' : '32px',
+                    minHeight: toast.show && toast.isLarge ? '48px' : '32px',
+                    padding: toast.show && toast.isLarge ? '8px 12px' : '0'
                 }}
                 transition={{
                     layout: {
@@ -255,10 +257,10 @@ export const DynamicIslandStatus = () => {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    className="flex items-center gap-2 w-full px-1"
+                                    className={`flex items-center gap-2 w-full px-1 ${toast.isLarge ? 'flex-col sm:flex-row text-center sm:text-left' : ''}`}
                                 >
-                                    <BellRing size={12} className="text-emerald-400 shrink-0 animate-bounce" />
-                                    <span className="text-[10px] font-bold text-white truncate text-center flex-1">
+                                    <BellRing size={toast.isLarge ? 14 : 12} className="text-emerald-400 shrink-0 animate-bounce" />
+                                    <span className={`text-[10px] font-bold text-white flex-1 ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
                                         {toast.message}
                                     </span>
                                 </motion.div>

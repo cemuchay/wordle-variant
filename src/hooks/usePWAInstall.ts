@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
+import { useAppStore } from "../store/useAppStore";
 
 export interface BeforeInstallPromptEvent extends Event {
    readonly platforms: string[];
@@ -11,6 +12,7 @@ export interface BeforeInstallPromptEvent extends Event {
 }
 
 export function usePWAInstall() {
+   const setIsPWAInstalled = useAppStore((s) => s.setIsPWAInstalled);
    const [deferredPrompt, setDeferredPrompt] =
       useState<BeforeInstallPromptEvent | null>(null);
    const [isIOS, setIsIOS] = useState(false);
@@ -28,6 +30,7 @@ export function usePWAInstall() {
 
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsStandalone(checkStandalone);
+      setIsPWAInstalled(checkStandalone);
 
       // 2. Check iOS
       const checkIOS =
@@ -53,6 +56,8 @@ export function usePWAInstall() {
       // 5. Track native app installation finished
       const handleAppInstalled = () => {
          setIsInstalling(false);
+         setIsStandalone(true);
+         setIsPWAInstalled(true);
       };
 
       // 6. Track background Service Worker installation state
@@ -80,7 +85,7 @@ export function usePWAInstall() {
          );
          window.removeEventListener("appinstalled", handleAppInstalled);
       };
-   }, []);
+   }, [setIsPWAInstalled]);
 
    const handleInstall = async () => {
       if (!deferredPrompt) return;

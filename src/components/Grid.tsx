@@ -2,6 +2,8 @@ import React, { memo, useState, useEffect } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 import returnAnimationTime from '../utils/returnAnimationTime';
+import { useAppStore } from '../store/useAppStore';
+import { useIsResponsive } from '../hooks/useResponsive';
 
 interface CellProps {
   letter: string;
@@ -72,28 +74,10 @@ const TILE_SIZES = [
 
 
 
-// A simple custom hook to check for responsive breakpoints
-const useIsResponsive = () => {
-  const [state, setState] = useState({
-    isDesktop: window.innerWidth >= 640,
-    isSmall: window.innerWidth <= 375
-  });
-
-  useEffect(() => {
-    const handleResize = () => setState({
-      isDesktop: window.innerWidth >= 640,
-      isSmall: window.innerWidth <= 375
-    });
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return state;
-};
-
 const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
-  const { isDesktop, isSmall } = useIsResponsive(); // Detect responsive state
+  const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
+  const isPWA = useAppStore(s => s.isPWAInstalled)
 
   // 1. Get the current size profile based on word length
   const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
@@ -102,9 +86,31 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   const dimensions = isDesktop ? sizeConfig.desktop : (isSmall ? sizeConfig.small : sizeConfig.mobile);
 
   // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
-  const scale = isChallenge ? 0.85 : 1;
-  const finalWidth = dimensions.w * scale;
-  const finalHeight = dimensions.h * scale;
+  let scale: {
+    h: number,
+    w: number
+  } = isChallenge ? { h: 0.85, w: 0.85 } : { h: 1, w: 1 };
+
+  if (isPWA && !isDesktop) {
+    scale = isChallenge ? { h: 1, w: 1 } : { h: 1.3, w: 1.3 }
+    if (isChallenge && wordLength > 9) {
+      scale = { h: 0.85, w: 0.85 }
+    }
+
+    if (!isChallenge && wordLength > 6) {
+      scale = { h: 1.2, w: 1.2 }
+    }
+  } else if (!isPWA && !isDesktop) {
+
+    if (!isChallenge) {
+      scale = { h: 1.1, w: 1.1 }
+    }
+  }
+  if (isSuperTiny) {
+    scale = { h: 0.7, w: 0.7 }
+  }
+  const finalWidth = dimensions.w * scale.w;
+  const finalHeight = dimensions.h * scale.h;
 
   const tileClass = `
     flex items-center justify-center 
@@ -177,7 +183,6 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       }, returnAnimationTime(wordLength));
       return () => clearTimeout(timer);
     } else if (guesses.length < revealedRowsCount) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedRowsCount(guesses.length);
     }
   }, [guesses.length, revealedRowsCount, wordLength]);
@@ -309,65 +314,89 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
             const isWinningRow = isWon && i === guesses.length - 1 && !isCurrentRevealing;
 
             return (
-              <div key={`row-past-${i}`} className={`flex justify-center ${rowGapClass}`}>
-                {guess.map((res, j) => (
-                  <Cell
-                    key={`past-${i}-${j}`}
-                    letter={res.letter}
-                    status={res.status}
-                    isRevealing={isRevealing}
-                    revealIndex={j}
-                    isWinner={isWinningRow}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                ))}
+              <div key={`row-past-${i}`} className="flex items-center gap-2">
+                {maxAttempts > 6 && (
+                  <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                    #{i + 1}
+                  </div>
+                )}
+                <div className={`flex justify-center ${rowGapClass}`}>
+                  {guess.map((res, j) => (
+                    <Cell
+                      key={`past-${i}-${j}`}
+                      letter={res.letter}
+                      status={res.status}
+                      isRevealing={isRevealing}
+                      revealIndex={j}
+                      isWinner={isWinningRow}
+                      compact={compact}
+                      gameplayType={gameplayType}
+                      wordLength={wordLength}
+                    />
+                  ))}
+                </div>
               </div>
             );
           })}
 
           {/* Current Guess Row */}
           {guesses.length < maxAttempts && revealingRowIndex === null && (
-            <div ref={currentRowRef} className={`flex justify-center ${rowGapClass}`}>
-              {Array.from({ length: wordLength }).map((_, i) => {
-                const isHinted = hintRecord?.index === i;
-                const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+            <div ref={currentRowRef} className="flex items-center gap-2">
+              {maxAttempts > 6 && (
+                <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                  #{guesses.length + 1}
+                </div>
+              )}
+              <div className={`flex justify-center ${rowGapClass}`}>
+                {Array.from({ length: wordLength }).map((_, i) => {
+                  const isHinted = hintRecord?.index === i;
+                  const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
-                return (
-                  <Cell
-                    key={`current-${i}`}
-                    letter={letter}
-                    isPop={!!currentGuess[i]}
-                    isShake={isShake}
-                    isHinted={isHinted}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                );
-              })}
+                  return (
+                    <Cell
+                      key={`current-${i}`}
+                      letter={letter}
+                      isPop={!!currentGuess[i]}
+                      isShake={isShake}
+                      isHinted={isHinted}
+                      compact={compact}
+                      gameplayType={gameplayType}
+                      wordLength={wordLength}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {/* Empty Rows */}
-          {Array.from({ length: empties }).map((_, i) => (
-            <div key={`row-empty-${i}`} className={`flex justify-center ${rowGapClass}`}>
-              {Array.from({ length: wordLength }).map((_, j) => {
-                const isHinted = hintRecord?.index === j;
-                return (
-                  <Cell
-                    key={`empty-${i}-${j}`}
-                    letter={isHinted ? hintRecord?.letter : ''}
-                    isHinted={isHinted}
-                    compact={compact}
-                    gameplayType={gameplayType}
-                    wordLength={wordLength}
-                  />
-                );
-              })}
-            </div>
-          ))}
+          {Array.from({ length: empties }).map((_, i) => {
+            const rowIndex = guesses.length + (revealingRowIndex !== null ? 0 : 1) + i;
+            return (
+              <div key={`row-empty-${i}`} className="flex items-center gap-2">
+                {maxAttempts > 6 && (
+                  <div className="w-6 text-[9px] font-black text-white/20 text-right shrink-0">
+                    #{rowIndex + 1}
+                  </div>
+                )}
+                <div className={`flex justify-center ${rowGapClass}`}>
+                  {Array.from({ length: wordLength }).map((_, j) => {
+                    const isHinted = hintRecord?.index === j;
+                    return (
+                      <Cell
+                        key={`empty-${i}-${j}`}
+                        letter={isHinted ? hintRecord?.letter : ''}
+                        isHinted={isHinted}
+                        compact={compact}
+                        gameplayType={gameplayType}
+                        wordLength={wordLength}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
