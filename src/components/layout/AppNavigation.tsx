@@ -1,8 +1,8 @@
-import { Gamepad2, Trophy, BarChart2, HelpCircle, MessageSquare } from 'lucide-react';
+import { Gamepad2, Trophy, BarChart2, Swords, MessageSquare } from 'lucide-react';
 
 interface AppNavigationProps {
-    activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'info';
-    onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'info') => void;
+    activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup';
+    onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup') => void;
     challengeUnreadCount: number;
     chatUnreadCount: number;
 }
@@ -37,9 +37,9 @@ export const AppNavigation = ({
             badge: challengeUnreadCount,
         },
         {
-            id: 'info' as const,
-            label: 'Rules',
-            icon: HelpCircle,
+            id: 'wordup' as const,
+            label: 'WordUp',
+            icon: Swords,
         }
     ];
 

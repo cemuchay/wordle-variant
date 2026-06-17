@@ -35,7 +35,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
-const InfoModal = safeLazy(() => import("./components/InfoModal").then(m => ({ default: m.InfoModal })));
+const WordUpView = safeLazy(() => import("./components/wordup/WordUpView").then(m => ({ default: m.WordUpView })));
 
 const fadeVariants = {
   initial: {
@@ -144,6 +144,7 @@ export default function App() {
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isWordUpOpen, setIsWordUpOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [isWeeklyWrappedOpen, setIsWeeklyWrappedOpen] = useState(false);
@@ -368,6 +369,7 @@ export default function App() {
     isStatsOpen ||
     isSettingsOpen ||
     isInfoOpen ||
+    isWordUpOpen ||
     isNotificationsOpen ||
     isAuthOpen ||
     !!viewedProfileId,
@@ -450,14 +452,14 @@ export default function App() {
       ? "challenges"
       : isStatsOpen
         ? "leaderboard"
-        : isInfoOpen
-          ? "info"
+        : isWordUpOpen
+          ? "wordup"
           : "play";
 
 
 
   const handleNavigation = (
-    item: "play" | "chat" | "leaderboard" | "challenges" | "info",
+    item: "play" | "chat" | "leaderboard" | "challenges" | "wordup",
   ) => {
     if (item === activeNavigationItem) return;
 
@@ -469,7 +471,8 @@ export default function App() {
     setIsChatOpen(item === "chat");
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
-    setIsInfoOpen(item === "info");
+    setIsWordUpOpen(item === "wordup");
+    setIsInfoOpen(false);
     if (item === "leaderboard") {
       setStatsActiveTab("leaderboard");
     }
@@ -540,6 +543,7 @@ export default function App() {
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenInfo={() => setIsInfoOpen(true)}
             onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
             onHint={actions.handleHint}
             onReset={() => window.location.reload()}
@@ -662,17 +666,14 @@ export default function App() {
               </div>
             )}
 
-            {activeNavigationItem === "info" && (
+            {activeNavigationItem === "wordup" && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
-                  <InfoModal
-                    isOpen={true}
-                    inline={true}
-                    onClose={() => setIsInfoOpen(false)}
-                  />
+                  <WordUpView />
                 </Suspense>
               </div>
             )}
+
           </motion.div>
         </AnimatePresence>
       </div>

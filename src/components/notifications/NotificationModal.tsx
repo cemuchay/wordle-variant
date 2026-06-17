@@ -3,6 +3,7 @@ import { X, Bell, Trash2, BellOff, Mail, MailOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
+import { useAppStore } from '../../store/useAppStore';
 import { Z_INDEX, ANIMATION_DURATION } from '../../constants/ui';
 import { type AppNotification } from '../../types/notifications';
 
@@ -89,7 +90,7 @@ const NotificationItem = memo(({
 });
 
 export const NotificationModal = memo(() => {
-    const { profile, isNotificationsOpen, setIsNotificationsOpen, setIsChallengeOpen } = useApp();
+    const { profile, isNotificationsOpen, setIsNotificationsOpen, setIsChallengeOpen, setIsChatOpen } = useApp();
     const { notifications, unreadCount, markAsRead, markAsUnread, markAllAsRead, deleteNotification, isLoading } = useNotifications(profile?.id, { enableRealtime: false });
 
     const [sessionNewIds, setSessionNewIds] = useState<Set<string>>(new Set());
@@ -132,8 +133,23 @@ export const NotificationModal = memo(() => {
         } else if (n.type === 'LEADERBOARD_OVERTAKEN') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
+        } else if (n.type === 'DM_MESSAGE' || n.type === 'CHAT_MENTION') {
+            const groupId = n.data?.group_id;
+            const groupType = n.data?.group_type;
+            const senderId = n.data?.sender_id;
+            
+            const { setPendingChatGroupId, setPendingDMUserId } = useAppStore.getState();
+            
+            if ((n.type === 'DM_MESSAGE' || groupType === 'dm') && senderId) {
+                setPendingDMUserId(senderId);
+            } else if (groupId) {
+                setPendingChatGroupId(groupId);
+            }
+            
+            setIsChatOpen(true);
+            setIsNotificationsOpen(false);
         }
-    }, [markAsRead, setIsChallengeOpen, setIsNotificationsOpen]);
+    }, [markAsRead, setIsChallengeOpen, setIsNotificationsOpen, setIsChatOpen]);
 
     const sortedNotifications = useMemo(() => {
         return [...notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -214,7 +230,9 @@ export const NotificationModal = memo(() => {
                                 const isInteractive = n.type === 'CHALLENGE_INVITE' || 
                                                      n.type === 'CHALLENGE_COMPLETED' || 
                                                      n.type === 'MARATHON_GAME_COMPLETED' || 
-                                                     n.type === 'LEADERBOARD_OVERTAKEN';
+                                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
+                                                     n.type === 'DM_MESSAGE' ||
+                                                     n.type === 'CHAT_MENTION';
                                 const isSessionNew = sessionNewIds.has(n.id);
                                 return (
                                     <NotificationItem 
