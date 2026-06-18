@@ -11,6 +11,7 @@ import {
    encryptQuestions,
 } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { safeSessionStorage } from "../../../../utils/storage";
 
 export const getQuestionDuration = (type: string): number => {
    switch (type) {
@@ -169,6 +170,7 @@ export const useWordUpGameLoop = (
                1000,
             );
             console.log("[WordUp Logs] Final sync successful.");
+            safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
          } catch (e) {
             console.error("[WordUp Logs] Failed to finalize match in DB:", e);
             triggerToast(
@@ -503,17 +505,19 @@ export const useWordUpGameLoop = (
          );
          setMatchData(mergedMatch);
 
-         const bothAnswered =
-            mergedMatch.p1_answered && mergedMatch.p2_answered;
+         const isAsync = mergedMatch.status === "waiting";
+         const isP1 = roleRef.current === "player1";
+         const myAnsweredThisRound = isP1 ? mergedMatch.p1_answered : mergedMatch.p2_answered;
+         const bothAnswered = mergedMatch.p1_answered && mergedMatch.p2_answered;
 
-         if (
-            bothAnswered &&
-            !revealAnswersRef.current &&
-            !isRevealingRef.current
-         ) {
+         const shouldReveal = isAsync
+            ? (myAnsweredThisRound && !revealAnswersRef.current && !isRevealingRef.current)
+            : (bothAnswered && !revealAnswersRef.current && !isRevealingRef.current);
+
+         if (shouldReveal) {
             isRevealingRef.current = true;
             console.log(
-               "[WordUp Logs] Both players acted. Revealing answers...",
+               `[WordUp Logs] Revealing answers (Async: ${isAsync})...`
             );
 
             stopRoundTimer();
@@ -526,17 +530,45 @@ export const useWordUpGameLoop = (
             }
 
             setTimeout(
-               () => {
+               async () => {
                   isRevealingRef.current = false;
                   if (nextIdx >= 7) {
                      console.log(
                         "[WordUp Logs] Reached end of 7 rounds. Ending match...",
                      );
-                     endGame(mergedMatch);
-                  } else if (
-                     roleRef.current === "player2" ||
-                     mergedMatch.is_bot_match
-                  ) {
+                     if (isAsync) {
+                        // Check if opponent already played all 7 rounds
+                        const oppAnswers = isP1 ? mergedMatch.p2_answers : mergedMatch.p1_answers;
+                        const oppCompleted = oppAnswers && oppAnswers.length === 7;
+
+                        if (oppCompleted) {
+                           // Both have now played! Finalize match as completed
+                           endGame(mergedMatch);
+                        } else {
+                           // Opponent hasn't played yet. Save our progress in database and exit.
+                           try {
+                              await supabase
+                                 .from("wordup_matches")
+                                 .update({
+                                    p1_answers: mergedMatch.p1_answers,
+                                    p2_answers: mergedMatch.p2_answers,
+                                    p1_score: mergedMatch.p1_score,
+                                    p2_score: mergedMatch.p2_score,
+                                    p1_answered: isP1 ? true : mergedMatch.p1_answered,
+                                    p2_answered: !isP1 ? true : mergedMatch.p2_answered,
+                                 })
+                                 .eq("id", mergedMatch.id);
+                              triggerToast("Turn submitted! Waiting for opponent.", 5000);
+                           } catch (err) {
+                              console.error("Failed to save async turn:", err);
+                              triggerToast("Failed to save progress.", 4000);
+                           }
+                           useWordUpStore.getState().resetGame();
+                        }
+                     } else {
+                        endGame(mergedMatch);
+                     }
+                  } else {
                      console.log(
                         `[WordUp Logs] Triggering advance to index ${nextIdx}...`,
                      );
@@ -550,7 +582,8 @@ export const useWordUpGameLoop = (
          if (
             mergedMatch.current_question_index !== currentIdxRef.current &&
             (mergedMatch.status === "active" ||
-               mergedMatch.status === "countdown")
+               mergedMatch.status === "countdown" ||
+               mergedMatch.status === "waiting")
          ) {
             console.log(
                `[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${mergedMatch.current_question_index}`,
@@ -560,6 +593,7 @@ export const useWordUpGameLoop = (
 
          if (mergedMatch.status === "completed") {
             console.log("[WordUp Logs] Match marked as completed.");
+            safeSessionStorage.setItem("wordup_completed_" + mergedMatch.id, "true");
             setShowRematchButton(true);
             setTimeout(() => {
                setShowRematchButton(false);
@@ -654,6 +688,14 @@ export const useWordUpGameLoop = (
 
          if (error || !match) {
             console.error("Error loading match:", error);
+            return null;
+         }
+
+         if (match.status === "completed" || safeSessionStorage.getItem("wordup_completed_" + mId) === "true") {
+            console.log(`[WordUp Logs] Match ${mId} is already completed. Aborting launch.`);
+            safeSessionStorage.setItem("wordup_completed_" + mId, "true");
+            triggerToast("This match has already been completed.", 4000);
+            useWordUpStore.getState().resetGame();
             return null;
          }
 
@@ -881,6 +923,10 @@ export const useWordUpGameLoop = (
                const myRole = roleRef.current || "player1";
                onRematchAcceptedRef.current?.(payload.newMatchId, myRole);
             })
+            .on("broadcast", { event: "quick_chat" }, ({ payload }) => {
+               console.log("[WordUp Logs] Broadcast: quick_chat", payload);
+               window.dispatchEvent(new CustomEvent("wordup-quick-chat", { detail: payload }));
+            })
             .subscribe();
 
          matchChannelRef.current = chan;
@@ -965,6 +1011,18 @@ export const useWordUpGameLoop = (
       }, 1000);
    }, []);
 
+   const sendQuickChat = useCallback((text: string) => {
+      if (!matchChannelRef.current) return;
+      matchChannelRef.current.send({
+         type: "broadcast",
+         event: "quick_chat",
+         payload: { text, senderRole: roleRef.current }
+      });
+      window.dispatchEvent(new CustomEvent("wordup-quick-chat", {
+         detail: { text, senderRole: roleRef.current }
+      }));
+   }, []);
+
    useEffect(() => {
       return () => {
          cleanUpIntervals();
@@ -995,5 +1053,6 @@ export const useWordUpGameLoop = (
       showRematchButton,
       sendRematch,
       acceptRematch,
+      sendQuickChat,
    };
 };

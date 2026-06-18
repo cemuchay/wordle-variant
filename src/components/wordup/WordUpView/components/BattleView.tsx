@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
 
@@ -15,7 +15,17 @@ interface BattleViewProps {
    handleAnswerSelect: (choice: string) => void;
    role: "player1" | "player2" | null;
    playerProfile: any | null;
+   sendQuickChat: (text: string) => void;
 }
+
+const PREFILLED_MESSAGES = [
+   "Good job! 👏",
+   "You go see! 👀",
+   "Wow! 🤯",
+   "Nice! 🔥",
+   "Oops 😅",
+   "Close one! ⚡"
+];
 
 export const BattleView = ({
    questions,
@@ -28,10 +38,12 @@ export const BattleView = ({
    revealAnswers,
    handleAnswerSelect,
    role,
-   playerProfile
+   playerProfile,
+   sendQuickChat
 }: BattleViewProps) => {
    const [triggerConfetti, setTriggerConfetti] = useState(false);
    const [particles, setParticles] = useState<any[]>([]);
+   const [activeBubbles, setActiveBubbles] = useState<any[]>([]);
 
    useEffect(() => {
       setTriggerConfetti(false);
@@ -67,6 +79,29 @@ export const BattleView = ({
          setParticles([]);
       }
    }, [triggerConfetti]);
+
+   // Listen to in-game chat events
+   useEffect(() => {
+      const handleChat = (e: Event) => {
+         const detail = (e as CustomEvent)?.detail;
+         if (detail) {
+            const id = Math.random().toString();
+            const newBubble = {
+               id,
+               text: detail.text,
+               senderRole: detail.senderRole,
+               x: detail.senderRole === "player1" ? 15 + Math.random() * 30 : 55 + Math.random() * 30,
+               y: 70 + Math.random() * 15
+            };
+            setActiveBubbles((prev) => [...prev, newBubble]);
+            setTimeout(() => {
+               setActiveBubbles((prev) => prev.filter((b) => b.id !== id));
+            }, 2500);
+         }
+      };
+      window.addEventListener("wordup-quick-chat", handleChat);
+      return () => window.removeEventListener("wordup-quick-chat", handleChat);
+   }, []);
 
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
@@ -121,8 +156,27 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full py-2 relative"
+         className="flex flex-col flex-1 justify-between h-full py-2 relative overflow-hidden"
       >
+         {/* Floating Chat Bubbles */}
+         <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
+            <AnimatePresence>
+               {activeBubbles.map((bubble) => (
+                  <motion.div
+                     key={bubble.id}
+                     initial={{ opacity: 0, y: `${bubble.y}%`, scale: 0.8 }}
+                     animate={{ opacity: 1, y: `${bubble.y - 40}%`, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.9 }}
+                     transition={{ duration: 2.2, ease: "easeOut" }}
+                     style={{ left: `${bubble.x}%` }}
+                     className="absolute -translate-x-1/2 bg-slate-900/90 text-white border border-white/20 px-3 py-1.5 rounded-2xl shadow-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                     <span>{bubble.text}</span>
+                  </motion.div>
+               ))}
+            </AnimatePresence>
+         </div>
+
          {/* Players Panel */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
@@ -205,80 +259,94 @@ export const BattleView = ({
                   const isCorrect = choice === activeQuestion.answer;
                   const isOppSelected = revealAnswers && oppChoice === choice;
 
-                   let btnClass = "p-4 rounded-2xl border text-center font-black uppercase tracking-wider text-xs flex items-center justify-between min-h-[56px] relative overflow-hidden";
-                   if (selectedAnswer === null) {
-                      btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
-                   } else {
-                      btnClass += " cursor-default";
-                      if (isCorrect) {
-                         btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
-                      } else if (isSelected) {
-                         btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
-                      } else {
-                         btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
-                      }
-                   }
+                  let btnClass = "p-4 rounded-2xl border text-center font-black uppercase tracking-wider text-xs flex items-center justify-between min-h-[56px] relative overflow-hidden";
+                  if (selectedAnswer === null) {
+                     btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                  } else {
+                     btnClass += " cursor-default";
+                     if (isCorrect) {
+                        btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
+                     } else if (isSelected) {
+                        btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
+                     } else {
+                        btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
+                     }
+                  }
 
-                   if (isOppSelected) {
-                      btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
-                   }
+                  if (isOppSelected) {
+                     btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                  }
 
-                   let buttonAnimate: any = {};
-                   let buttonTransition: any = {};
+                  let buttonAnimate: any = {};
+                  let buttonTransition: any = {};
 
-                   if (selectedAnswer !== null) {
-                      if (isSelected && isCorrect) {
-                         buttonAnimate = {
-                            scale: [1, 1.15, 0.95, 1.05, 1],
-                            rotate: [0, -3, 3, -2, 2, 0],
-                            boxShadow: [
-                               "0 0 0px rgba(106,170,100,0)",
-                               "0 0 45px rgba(106,170,100,0.95)",
-                               "0 0 20px rgba(106,170,100,0.5)",
-                               "0 0 0px rgba(106,170,100,0)"
-                            ]
-                         };
-                         buttonTransition = { duration: 0.65, ease: "easeInOut" };
-                      } else if (isSelected && !isCorrect) {
-                         buttonAnimate = {
-                            x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
-                            scale: [1, 0.95, 1.02, 1],
-                            boxShadow: [
-                               "0 0 0px rgba(239,68,68,0)",
-                               "0 0 35px rgba(239,68,68,0.95)",
-                               "0 0 10px rgba(239,68,68,0.4)",
-                               "0 0 0px rgba(239,68,68,0)"
-                            ]
-                         };
-                         buttonTransition = { duration: 0.5, ease: "linear" };
-                      }
-                   }
+                  if (selectedAnswer !== null) {
+                     if (isSelected && isCorrect) {
+                        buttonAnimate = {
+                           scale: [1, 1.15, 0.95, 1.05, 1],
+                           rotate: [0, -3, 3, -2, 2, 0],
+                           boxShadow: [
+                              "0 0 0px rgba(106,170,100,0)",
+                              "0 0 45px rgba(106,170,100,0.95)",
+                              "0 0 20px rgba(106,170,100,0.5)",
+                              "0 0 0px rgba(106,170,100,0)"
+                           ]
+                        };
+                        buttonTransition = { duration: 0.65, ease: "easeInOut" };
+                     } else if (isSelected && !isCorrect) {
+                        buttonAnimate = {
+                           x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
+                           scale: [1, 0.95, 1.02, 1],
+                           boxShadow: [
+                              "0 0 0px rgba(239,68,68,0)",
+                              "0 0 35px rgba(239,68,68,0.95)",
+                              "0 0 10px rgba(239,68,68,0.4)",
+                              "0 0 0px rgba(239,68,68,0)"
+                           ]
+                        };
+                        buttonTransition = { duration: 0.5, ease: "linear" };
+                     }
+                  }
 
-                   return (
-                      <motion.button
-                         key={choice}
-                         disabled={selectedAnswer !== null || revealAnswers}
-                         onClick={() => onChoiceSelect(choice)}
-                         animate={buttonAnimate}
-                         transition={buttonTransition}
-                         className={btnClass}
-                      >
-                         <span className="flex-1 text-center pr-8">{choice}</span>
+                  return (
+                     <motion.button
+                        key={choice}
+                        disabled={selectedAnswer !== null || revealAnswers}
+                        onClick={() => onChoiceSelect(choice)}
+                        animate={buttonAnimate}
+                        transition={buttonTransition}
+                        className={btnClass}
+                     >
+                        <span className="flex-1 text-center pr-8">{choice}</span>
 
-                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
-                            {isSelected && (
-                               <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
-                            )}
-                            {isOppSelected && (
-                               <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
-                                  {opponentName.slice(0, 5)}
-                               </span>
-                            )}
-                         </div>
-                      </motion.button>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
+                           {isSelected && (
+                              <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                           )}
+                           {isOppSelected && (
+                              <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 {opponentName.slice(0, 5)}
+                              </span>
+                           )}
+                        </div>
+                     </motion.button>
                   );
                })}
             </div>
+         </div>
+
+         {/* Prefilled Quick Chat Row */}
+         <div className="flex gap-2 overflow-x-auto py-2.5 px-2.5 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full">
+            <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1.5">Chat:</span>
+            {PREFILLED_MESSAGES.map((msg) => (
+               <button
+                  key={msg}
+                  onClick={() => sendQuickChat(msg)}
+                  className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
+               >
+                  {msg}
+               </button>
+            ))}
          </div>
 
          {/* Celebratory Confetti Splash */}

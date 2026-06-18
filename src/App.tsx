@@ -438,6 +438,94 @@ export default function App() {
     }, 4000);
   };
 
+  const [incomingInviteTimeLeft, setIncomingInviteTimeLeft] = useState(15);
+  const [opponentLaterInvite, setOpponentLaterInvite] = useState<{ matchId: string; opponentName: string } | null>(null);
+
+  const handleIncomingInviteLater = async () => {
+    const invite = incomingWordUpInvite;
+    if (!invite) return;
+    setIncomingWordUpInvite(null);
+    try {
+      const rawQuestions = generateWordUpQuestions(invite.category);
+      const secretKey = generateSecretKey();
+      const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+      // Create match in status "waiting"
+      const { data: newMatch, error } = await supabase
+        .from("wordup_matches")
+        .insert({
+          category: invite.category,
+          player1_id: invite.senderId,
+          player2_id: user?.id,
+          questions: encryptedStr,
+          encryption_key: secretKey,
+          status: "waiting",
+          p1_answered: false,
+          p2_answered: false
+        })
+        .select()
+        .single();
+
+      if (error || !newMatch) throw error || new Error("Failed to create match");
+
+      // App notification for B (the current user)
+      await supabase.from("notifications").insert({
+        user_id: user?.id,
+        type: "CHALLENGE_INVITE",
+        title: "Pending WordUp Battle",
+        message: `${invite.senderName} challenged you to a WordUp Battle!`,
+        data: { mode: "wordup", matchId: newMatch.id },
+        is_read: false
+      });
+
+      // Broadcast to player 1 (A)
+      const laterChannel = supabase.channel(`user_signals_${invite.senderId}`);
+      laterChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          laterChannel.send({
+            type: 'broadcast',
+            event: 'wordup_invite_later',
+            payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+          });
+          setTimeout(() => supabase.removeChannel(laterChannel), 1000);
+        }
+      });
+      triggerToast("Challenge saved as pending.", 3000);
+    } catch (e) {
+      console.error("Failed to save challenge as pending:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (!incomingWordUpInvite) return;
+    setIncomingInviteTimeLeft(15);
+    const interval = setInterval(() => {
+      setIncomingInviteTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleIncomingInviteLater();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [incomingWordUpInvite]);
+
+  useEffect(() => {
+    const handleInviteLater = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail) {
+        setOpponentLaterInvite({
+          matchId: detail.matchId,
+          opponentName: detail.senderName
+        });
+      }
+    };
+    window.addEventListener("wordup-invite-later", handleInviteLater);
+    return () => window.removeEventListener("wordup-invite-later", handleInviteLater);
+  }, []);
+
   const isPageAdmin = window.location.pathname === "/admin";
 
   if (isPageAdmin) {
@@ -547,6 +635,7 @@ export default function App() {
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSearch={() => setIsSettingsOpen(true)}
             onOpenInfo={() => setIsInfoOpen(true)}
             onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
             onHint={actions.handleHint}
@@ -643,13 +732,13 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <StatsModal
-                    isOpen={true}
-                    inline={true}
-                    stats={stats}
-                    onClose={() => setIsStatsOpen(false)}
-                    user={user as AppUser}
-                    isGameOver={state.isGameOver}
-                    initialTab={statsActiveTab}
+                     isOpen={true}
+                     inline={true}
+                     stats={stats}
+                     onClose={() => setIsStatsOpen(false)}
+                     user={user as AppUser}
+                     isGameOver={state.isGameOver}
+                     initialTab={statsActiveTab}
                   />
                 </Suspense>
               </div>
@@ -659,12 +748,12 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
-                    isOpen={true}
-                    inline={true}
-                    onClose={() => setIsChallengeOpen(false)}
-                    user={user as AppUser}
-                    onChallengeCreated={handleChallengeCreated}
-                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                     isOpen={true}
+                     inline={true}
+                     onClose={() => setIsChallengeOpen(false)}
+                     user={user as AppUser}
+                     onChallengeCreated={handleChallengeCreated}
+                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                   />
                 </Suspense>
               </div>
@@ -685,9 +774,9 @@ export default function App() {
       <ModalsManager
         modals={{
           isSettingsOpen,
-          isInfoOpen: false,
-          isStatsOpen: false,
-          isChallengeOpen: false,
+          isInfoOpen,
+          isStatsOpen,
+          isChallengeOpen,
           isNotificationsOpen: showNotifications,
           isAuthOpen,
           isGameOverOpen: state.isGameOverModalOpen,
@@ -774,7 +863,10 @@ export default function App() {
             <p className="text-xs text-gray-400">
               <strong className="text-white">{incomingWordUpInvite.senderName}</strong> has challenged you to a rapid match in category <strong className="text-correct">{incomingWordUpInvite.category.replace('_', ' ')}</strong>!
             </p>
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+              Auto-pending in {incomingInviteTimeLeft} seconds...
+            </p>
+            <div className="grid grid-cols-3 gap-2 pt-2">
               <button
                 onClick={async () => {
                   const invite = incomingWordUpInvite;
@@ -827,9 +919,15 @@ export default function App() {
                     triggerToast("Failed to start match.", 4000);
                   }
                 }}
-                className="bg-correct hover:bg-correct/90 text-black text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
               >
                 Accept
+              </button>
+              <button
+                onClick={handleIncomingInviteLater}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Later
               </button>
               <button
                 onClick={() => {
@@ -849,9 +947,48 @@ export default function App() {
                     }
                   });
                 }}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
               >
                 Decline
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {opponentLaterInvite && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4"
+          >
+            <div className="inline-flex p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 mx-auto">
+              <Swords size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-wider text-white">Play Later</h3>
+            <p className="text-xs text-gray-400">
+              <strong className="text-white">{opponentLaterInvite.opponentName}</strong> wants to play later. The match is saved under your pending queue!
+            </p>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => {
+                  const matchId = opponentLaterInvite.matchId;
+                  setOpponentLaterInvite(null);
+                  useWordUpStore.getState().setMatchId(matchId);
+                  useWordUpStore.getState().setRole("player1");
+                  handleNavigation("wordup");
+                }}
+                className="bg-correct hover:bg-correct/90 text-black text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Play Mine Now
+              </button>
+              <button
+                onClick={() => setOpponentLaterInvite(null)}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Wait
               </button>
             </div>
           </motion.div>

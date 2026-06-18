@@ -9,6 +9,7 @@ import { useWordUpMatchmaking } from "./hooks/useWordUpMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
+import { Swords } from "lucide-react";
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -20,8 +21,21 @@ import { ConnectionOverlay } from "./components/ConnectionOverlay";
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
 export const WordUpView = () => {
-   const { user } = useAuth();
-   const { triggerToast, realtimeStatus, onlineUsers, profile } = useApp();
+   const { user: authUser } = useAuth();
+   const { triggerToast, realtimeStatus, onlineUsers, profile, allProfiles } = useApp();
+
+   const [guestUser, setGuestUser] = useState<any>(() => {
+      const id = localStorage.getItem('wordle_anon_id');
+      const username = localStorage.getItem('wordle_anon_username');
+      if (id && username) {
+         return { id, username, user_metadata: { full_name: username } };
+      }
+      return null;
+   });
+
+   const effectiveUser = authUser || guestUser;
+   const [showGuestInput, setShowGuestInput] = useState(false);
+   const [nicknameInput, setNicknameInput] = useState("");
 
    const view = useWordUpStore((s) => s.view);
    const setView = useWordUpStore((s) => s.setView);
@@ -36,7 +50,7 @@ export const WordUpView = () => {
    const [countdownText, setCountdownText] = useState("3");
 
    const { getSyncedNow } = useServerTime();
-   const { userStats, getRankColor, updateStats } = useWordUpProfile(user);
+   const { userStats, getRankColor, updateStats } = useWordUpProfile(effectiveUser);
 
    const [soundEnabled, setSoundEnabled] = useState(wordupAudio.isEnabled());
 
@@ -61,7 +75,7 @@ export const WordUpView = () => {
       if (view === "gameover") return;
       setView("gameover");
 
-      if (!user) return;
+      if (!effectiveUser) return;
       const isP1 = role === "player1";
       const myScore = isP1 ? match.p1_score : match.p2_score;
       const oppScore = isP1 ? match.p2_score : match.p1_score;
@@ -80,7 +94,7 @@ export const WordUpView = () => {
       } catch (err) {
          triggerToast("Rating update delayed. Syncing in background...", 4000);
       }
-   }, [user, view, updateStats, triggerToast, role]);
+   }, [effectiveUser, view, updateStats, triggerToast, role]);
 
    const {
       questions,
@@ -99,7 +113,8 @@ export const WordUpView = () => {
       rematchCountdown,
       showRematchButton,
       sendRematch,
-      acceptRematch
+      acceptRematch,
+      sendQuickChat
    } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver, (newMId, newRole) => {
       // eslint-disable-next-line react-hooks/immutability
       onMatchFound(newMId, newRole);
@@ -123,8 +138,8 @@ export const WordUpView = () => {
              clearInterval(interval);
              setView("battle");
 
-             // Set match status to active in database
-             if (role === "player2" || match.is_bot_match) {
+             // Set match status to active in database (only for real-time matches)
+             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
                 supabase
                    .from("wordup_matches")
                    .update({ status: "active" })
@@ -172,7 +187,7 @@ export const WordUpView = () => {
       countdownSecs,
       startMatchmaking,
       cancelMatchmaking
-   } = useWordUpMatchmaking(user, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
+   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
 
    useEffect(() => {
       return () => {
@@ -184,6 +199,89 @@ export const WordUpView = () => {
       await cancelMatchmaking();
       setView("menu");
    }, [cancelMatchmaking]);
+
+   if (!effectiveUser) {
+      return (
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
+            <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
+               <Swords size={32} />
+            </div>
+            <div className="space-y-2">
+               <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles</h2>
+               <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  Log in to save stats permanently, or enter a nickname to play as a guest!
+               </p>
+            </div>
+
+            {!showGuestInput ? (
+               <div className="grid grid-cols-1 gap-3 w-full max-w-xs">
+                  <button
+                     onClick={() => {
+                        window.dispatchEvent(new CustomEvent("open-auth-modal"));
+                     }}
+                     className="bg-correct text-black py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                     Log In / Sign Up
+                  </button>
+                  <button
+                     onClick={() => setShowGuestInput(true)}
+                     className="bg-white/10 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-white/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-white/5"
+                  >
+                     Play as Guest
+                  </button>
+               </div>
+            ) : (
+               <div className="space-y-3 w-full max-w-xs">
+                  <input
+                     type="text"
+                     maxLength={15}
+                     placeholder="Enter nickname..."
+                     value={nicknameInput}
+                     onChange={(e) =>
+                        setNicknameInput(
+                           e.target.value.replace(/[^A-Za-z0-9_]/g, ""),
+                        )
+                     }
+                     className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                     <button
+                        onClick={() => setShowGuestInput(false)}
+                        className="bg-white/5 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                     >
+                        Back
+                     </button>
+                     <button
+                        onClick={async () => {
+                           const name = nicknameInput.trim();
+                           if (name.length < 3) {
+                              triggerToast("Nickname must be at least 3 characters.", 3000);
+                              return;
+                           }
+                           const anonId = crypto.randomUUID();
+                           localStorage.setItem('wordle_anon_id', anonId);
+                           localStorage.setItem('wordle_anon_username', name);
+
+                           // Upsert guest profile in DB
+                           await supabase.from('guest_profiles').upsert({
+                              id: anonId,
+                              username: name,
+                              avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
+                           });
+
+                           setGuestUser({ id: anonId, username: name, user_metadata: { full_name: name } });
+                           triggerToast("Guest profile created! Welcome.", 3000);
+                        }}
+                        className="bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
+                     >
+                        Play
+                     </button>
+                  </div>
+               </div>
+            )}
+         </div>
+      );
+   }
 
    return (
       <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide p-4 relative" style={{ minHeight: "100%" }}>
@@ -201,7 +299,8 @@ export const WordUpView = () => {
                   soundEnabled={soundEnabled}
                   onToggleSound={handleToggleSound}
                   onlineUsers={onlineUsers}
-                  currentUser={user}
+                  allProfiles={allProfiles}
+                  currentUser={effectiveUser}
                />
             )}
 
@@ -230,6 +329,7 @@ export const WordUpView = () => {
                   handleAnswerSelect={handleAnswerSelect}
                   role={role}
                   playerProfile={profile}
+                  sendQuickChat={sendQuickChat}
                />
             )}
 

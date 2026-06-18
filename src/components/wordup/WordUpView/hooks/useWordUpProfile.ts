@@ -14,9 +14,28 @@ export const useWordUpProfile = (user: any) => {
                .from("wordup_profiles")
                .select("*")
                .eq("id", user.id)
-               .single();
+               .maybeSingle();
             if (error) throw error;
-            return data;
+            
+            if (data) {
+               return data;
+            } else {
+               const defaultProfile = {
+                  id: user.id,
+                  rating: 1000,
+                  xp: 0,
+                  games_played: 0,
+                  games_won: 0,
+                  games_lost: 0,
+                  games_tied: 0,
+                  rank_name: "Silver"
+               };
+               const { error: insertError } = await supabase
+                  .from("wordup_profiles")
+                  .insert(defaultProfile);
+               if (insertError) throw insertError;
+               return defaultProfile;
+            }
          }, 3, 1500);
 
          if (data) {
@@ -49,9 +68,27 @@ export const useWordUpProfile = (user: any) => {
                .from("wordup_profiles")
                .select("*")
                .eq("id", user.id)
-               .single();
+               .maybeSingle();
             if (error) throw error;
-            return data;
+            if (data) {
+               return data;
+            } else {
+               const defaultProfile = {
+                  id: user.id,
+                  rating: 1000,
+                  xp: 0,
+                  games_played: 0,
+                  games_won: 0,
+                  games_lost: 0,
+                  games_tied: 0,
+                  rank_name: "Silver"
+               };
+               const { error: insertError } = await supabase
+                  .from("wordup_profiles")
+                  .insert(defaultProfile);
+               if (insertError) throw insertError;
+               return defaultProfile;
+            }
          }, 3, 1000);
 
          if (currentProf) {
@@ -59,10 +96,10 @@ export const useWordUpProfile = (user: any) => {
             const newXp = currentProf.xp + xpReward;
 
             let rank = "Bronze";
-            if (newXp > 3000) rank = "Master";
-            else if (newXp > 1800) rank = "Diamond";
-            else if (newXp > 1000) rank = "Gold";
-            else if (newXp > 400) rank = "Silver";
+            if (newRating >= 1800) rank = "Master";
+            else if (newRating >= 1500) rank = "Diamond";
+            else if (newRating >= 1200) rank = "Gold";
+            else if (newRating >= 1000) rank = "Silver";
 
             await fetchWithRetry(async () => {
                const { error } = await supabase

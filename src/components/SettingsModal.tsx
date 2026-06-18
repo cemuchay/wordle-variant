@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +7,8 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { useAppStore } from '../store/useAppStore';
+import { useAdminStatus } from '../hooks/useAdminStatus';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -22,13 +24,16 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
+    const [navOrder, setNavOrder] = useState<string[]>(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     const [receiveEmails, setReceiveEmails] = useState(true);
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
     const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const { isStandalone, handleInstall, isInstalling, isIOS } = usePWAInstall();
     const [showIOSInstallInstructions, setShowIOSInstallInstructions] = useState(false);
+    const { isAdmin } = useAdminStatus(profile?.id);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -48,6 +53,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     useEffect(() => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
+        setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     }, [preferences]);
 
     useEffect(() => {
@@ -168,20 +174,39 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
+    const moveNavItem = (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...navOrder];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+
+        const [moved] = newOrder.splice(index, 1);
+        newOrder.splice(targetIndex, 0, moved);
+        setNavOrder(newOrder);
+    };
+
     const handleSave = async () => {
         setLoading(true);
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                preferences: {
-                    ...profile.preferences,
-                    allowRoasts: allowRoasts,
-                    compactMode: compactMode,
-                }
-            })
-            .eq('id', profile.id);
+
+        const newPreferences = {
+            ...(profile?.preferences || preferences),
+            allowRoasts,
+            compactMode,
+            navOrder,
+        };
+
+        // Update store directly for immediate effect and anonymous support
+        useAppStore.getState().setPreferences(newPreferences);
+
+        let success = true;
 
         if (profile?.id) {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    preferences: newPreferences
+                })
+                .eq('id', profile.id);
+
             await supabase
                 .from('email_preferences')
                 .upsert({
@@ -189,17 +214,52 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     receive_emails: receiveEmails,
                     updated_at: new Date().toISOString(),
                 });
+
+            if (error) {
+                success = false;
+                console.error("[Settings] Failed to sync preferences to Supabase:", error);
+            } else {
+                await refreshProfile();
+            }
         }
 
-        if (!error) {
-            await refreshProfile();
-            triggerToast('Preferences Updated')
+        if (success) {
+            triggerToast(profile?.id ? 'Preferences Updated' : 'Preferences Saved Locally');
+            onClose();
+        } else {
+            triggerToast('Saved locally, but cloud sync failed.');
             onClose();
         }
+        
         setLoading(false);
     };
 
+    const navItemLabels: Record<string, string> = {
+        play: 'Play',
+        chat: 'Chat',
+        leaderboard: 'Leaderboard',
+        challenges: 'Challenges',
+        wordup: 'WordUp'
+    };
+
+    const matchesSearch = (text: string, description?: string) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return text.toLowerCase().includes(query) || (description?.toLowerCase().includes(query) ?? false);
+    };
+
     if (!isOpen) return null;
+
+    const showSecurity = matchesSearch('Security & Identity') || matchesSearch('Email', userEmail);
+    const showGameplay = matchesSearch('Gameplay Experience') || matchesSearch('Sassy Roasts') || matchesSearch('Compact Mode');
+    const showEmail = matchesSearch('Email Notifications') || matchesSearch('Updates & Reminders');
+    const showPush = matchesSearch('Push Notifications') || matchesSearch('Live Push Updates');
+    const showApp = !isStandalone && (matchesSearch('Application') || matchesSearch('Install Variant'));
+    const showNav = matchesSearch('Navigation Layout') || navOrder.some(id => matchesSearch(navItemLabels[id]));
+    const showDiagnostics = matchesSearch('Diagnostics') || matchesSearch('Session Logs') || matchesSearch('Purge Cache');
+    const showLegal = matchesSearch('Legal & Policies') || matchesSearch('Privacy') || matchesSearch('Terms') || matchesSearch('Data Deletion');
+
+    const hasResults = showSecurity || showGameplay || showEmail || showPush || showApp || showNav || showDiagnostics || showLegal;
 
     return (
         <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
@@ -213,165 +273,221 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-900 bg-gray-900/20 shrink-0">
-                    <h2 className="text-lg font-black text-white tracking-tight">Settings</h2>
-                    <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white">
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                    {/* Security & Identity (Private Data) */}
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                            <ShieldCheck size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Security & Identity
-                            </label>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between px-4 py-3 bg-gray-900/40 border border-gray-800/50 rounded-xl">
-                                <span className="text-xs text-gray-400 truncate max-w-50">
-                                    {userEmail || 'Fetching...'}
-                                </span>
-                                <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
-                                    PRIVATE
-                                </span>
-                            </div>
-                            <p className="text-[10px] text-gray-600 px-1 italic">
-                                Your email is used for recovery and is never shared publicly.
-                            </p>
-                        </div>
-                    </section>
-
-                    {/* Gameplay Preferences */}
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <MessageSquareQuote size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Gameplay Experience
-                            </label>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                <div className="flex-1 pr-4">
-                                    <p className="text-sm font-bold text-gray-100">Sassy Roasts</p>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                        The app will roast you based on your game score.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setAllowRoasts(!allowRoasts)}
-                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${allowRoasts ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                        }`}
+                <div className="flex flex-col border-b border-gray-900 bg-gray-900/20 shrink-0">
+                    <div className="flex items-center justify-between p-4 pb-2">
+                        <h2 className="text-lg font-black text-white tracking-tight">Settings</h2>
+                        <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    
+                    {/* Search Bar */}
+                    <div className="px-4 pb-4">
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-400 transition-colors" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Search settings..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-gray-900/50 border border-gray-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
                                 >
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
-                                        }`} />
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                <div className="flex-1 pr-4">
-                                    <p className="text-sm font-bold text-gray-100">Compact Mode</p>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                        Reduce spacing in the game grid for smaller screens.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setCompactMode(!compactMode)}
-                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${compactMode ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                        }`}
-                                >
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${compactMode ? 'left-7' : 'left-1'
-                                        }`} />
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Email Notifications Preferences */}
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Mail size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Email Notifications
-                            </label>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                            <div className="flex-1 pr-4">
-                                <p className="text-sm font-bold text-gray-100">Updates & Reminders</p>
-                                <p className="text-[11px] text-gray-500 leading-relaxed">
-                                    Receive streak reminders, inactivity nudges, and weekly leaderboard reports.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setReceiveEmails(!receiveEmails)}
-                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${receiveEmails ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
-                                    }`}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${receiveEmails ? 'left-7' : 'left-1'
-                                    }`} />
-                            </button>
-                        </div>
-                    </section>
-
-                    {/* Push Notifications Preferences */}
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Bell size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Push Notifications
-                            </label>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                            <div className="flex-1 pr-4">
-                                <div className="flex items-center gap-2">
-                                    <p className="text-sm font-bold text-gray-100">Live Push Updates</p>
-                                    {pushSupported && (
-                                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
-                                            pushPermission === 'granted' && pushEnabled
-                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                                : pushPermission === 'denied'
-                                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                                        }`}>
-                                            {pushPermission === 'granted' && pushEnabled 
-                                                ? 'Active' 
-                                                : pushPermission === 'denied' 
-                                                    ? 'Blocked' 
-                                                    : 'Not Active'}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
-                                    {!pushSupported 
-                                        ? 'Not supported by this browser/device.' 
-                                        : 'Get instant notifications for challenges, chat messages, and leaderboard news.'}
-                                </p>
-                            </div>
-                            {pushSupported && (
-                                <button
-                                    onClick={handlePushToggle}
-                                    className={`w-12 h-6 rounded-full transition-all duration-300 relative ${
-                                        pushEnabled && pushPermission === 'granted'
-                                            ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
-                                            : 'bg-gray-800'
-                                    }`}
-                                >
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${
-                                        pushEnabled && pushPermission === 'granted' ? 'left-7' : 'left-1'
-                                    }`} />
+                                    <X size={12} />
                                 </button>
                             )}
                         </div>
-                    </section>
+                    </div>
+                </div>
+
+                <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+                    {!hasResults && (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="w-12 h-12 bg-gray-900 rounded-full flex items-center justify-center mb-4 border border-gray-800">
+                                <Search size={20} className="text-gray-600" />
+                            </div>
+                            <p className="text-sm font-bold text-gray-300">No settings found</p>
+                            <p className="text-xs text-gray-600 mt-1">Try a different search term</p>
+                            <button 
+                                onClick={() => setSearchQuery('')}
+                                className="mt-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors"
+                            >
+                                Clear Search
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Security & Identity (Private Data) */}
+                    {showSecurity && (
+                        <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <ShieldCheck size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Security & Identity
+                                </label>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center justify-between px-4 py-3 bg-gray-900/40 border border-gray-800/50 rounded-xl">
+                                    <span className="text-xs text-gray-400 truncate max-w-50">
+                                        {userEmail || 'Fetching...'}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                                        PRIVATE
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-gray-600 px-1 italic">
+                                    Your email is used for recovery and is never shared publicly.
+                                </p>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Gameplay Preferences */}
+                    {showGameplay && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <MessageSquareQuote size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Gameplay Experience
+                                </label>
+                            </div>
+
+                            <div className="space-y-3">
+                                {matchesSearch('Sassy Roasts') && (
+                                    <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-gray-100">Sassy Roasts</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                The app will roast you based on your game score.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setAllowRoasts(!allowRoasts)}
+                                            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${allowRoasts ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                                }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${allowRoasts ? 'left-7' : 'left-1'
+                                                }`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {matchesSearch('Compact Mode') && (
+                                    <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-gray-100">Compact Mode</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                Reduce spacing in the game grid for smaller screens.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setCompactMode(!compactMode)}
+                                            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${compactMode ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                                }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${compactMode ? 'left-7' : 'left-1'
+                                                }`} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Email Notifications Preferences */}
+                    {showEmail && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Mail size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Email Notifications
+                                </label>
+                            </div>
+
+                            {matchesSearch('Updates & Reminders') && (
+                                <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                    <div className="flex-1 pr-4">
+                                        <p className="text-sm font-bold text-gray-100">Updates & Reminders</p>
+                                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                                            Receive streak reminders, inactivity nudges, and weekly leaderboard reports.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setReceiveEmails(!receiveEmails)}
+                                        className={`w-12 h-6 rounded-full transition-all duration-300 relative ${receiveEmails ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                            }`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${receiveEmails ? 'left-7' : 'left-1'
+                                            }`} />
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    {/* Push Notifications Preferences */}
+                    {showPush && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Bell size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Push Notifications
+                                </label>
+                            </div>
+
+                            {matchesSearch('Live Push Updates') && (
+                                <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                    <div className="flex-1 pr-4">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-bold text-gray-100">Live Push Updates</p>
+                                            {pushSupported && (
+                                                <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                                                    pushPermission === 'granted' && pushEnabled
+                                                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                        : pushPermission === 'denied'
+                                                            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                            : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                }`}>
+                                                    {pushPermission === 'granted' && pushEnabled 
+                                                        ? 'Active' 
+                                                        : pushPermission === 'denied' 
+                                                            ? 'Blocked' 
+                                                            : 'Not Active'}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                                            {!pushSupported 
+                                                ? 'Not supported by this browser/device.' 
+                                                : 'Get instant notifications for challenges, chat messages, and leaderboard news.'}
+                                        </p>
+                                    </div>
+                                    {pushSupported && (
+                                        <button
+                                            onClick={handlePushToggle}
+                                            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${
+                                                pushEnabled && pushPermission === 'granted'
+                                                    ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
+                                                    : 'bg-gray-800'
+                                            }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${
+                                                pushEnabled && pushPermission === 'granted' ? 'left-7' : 'left-1'
+                                            }`} />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </section>
+                    )}
 
                     {/* App Installation (PWA) */}
-                    {!isStandalone && (
-                        <section className="space-y-4">
+                    {showApp && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="flex items-center gap-2 mb-1">
                                 <Download size={14} className="text-indigo-400" />
                                 <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
@@ -424,87 +540,170 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                         </section>
                     )}
 
+                    {/* Navigation Layout */}
+                    {showNav && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Layout size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Navigation Layout
+                                </label>
+                            </div>
+
+                            <div className="space-y-2">
+                                {navOrder.map((id, index) => {
+                                    if (!matchesSearch(navItemLabels[id])) return null;
+                                    return (
+                                        <div key={id} className="flex items-center justify-between p-3 bg-gray-900/40 border border-gray-800 rounded-xl">
+                                            <span className="text-sm font-bold text-gray-200">
+                                                {navItemLabels[id]}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => moveNavItem(index, 'up')}
+                                                    disabled={index === 0}
+                                                    className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
+                                                >
+                                                    <ChevronUp size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => moveNavItem(index, 'down')}
+                                                    disabled={index === navOrder.length - 1}
+                                                    className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
+                                                >
+                                                    <ChevronDown size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[10px] text-gray-600 px-1 italic">
+                                Customize the order of your bottom navigation tabs.
+                            </p>
+                        </section>
+                    )}
+
+                    {/* Admin Portal (Only for Admins) */}
+                    {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield')) && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Shield size={14} className="text-correct" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Management
+                                </label>
+                            </div>
+
+                            <a
+                                href="/admin"
+                                className="flex items-center justify-between p-4 bg-correct/5 border border-correct/20 rounded-xl hover:bg-correct/10 transition-all group"
+                            >
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-correct">Admin Vetting Portal</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Access word vetting, user management, and system overrides.
+                                    </p>
+                                </div>
+                                <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
+                            </a>
+                        </section>
+                    )}
+
                     {/* Debugging & Diagnostics */}
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Terminal size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Diagnostics
-                            </label>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                <div className="flex-1 pr-4">
-                                    <p className="text-sm font-bold text-gray-100">Session Logs</p>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                        Send diagnostic logs to admin to help us debug issues.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={async () => {
-                                        setSendingLogs(true);
-                                        await logger.sendLogsToAdmin();
-                                        setSendingLogs(false);
-                                        triggerToast('Logs Sent to Admin');
-                                    }}
-                                    disabled={sendingLogs}
-                                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
-                                >
-                                    {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
-                                </button>
+                    {showDiagnostics && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Terminal size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Diagnostics
+                                </label>
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
-                                <div className="flex-1 pr-4">
-                                    <p className="text-sm font-bold text-gray-100">Purge Cache</p>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                        Clears all local application cache and reloads the page.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={handlePurgeCache}
-                                    className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/40 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all"
-                                >
-                                    PURGE & RELOAD
-                                </button>
+                            <div className="flex flex-col gap-3">
+                                {matchesSearch('Session Logs') && (
+                                    <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-gray-100">Session Logs</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                Send diagnostic logs to admin to help us debug issues.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                setSendingLogs(true);
+                                                await logger.sendLogsToAdmin();
+                                                setSendingLogs(false);
+                                                triggerToast('Logs Sent to Admin');
+                                            }}
+                                            disabled={sendingLogs}
+                                            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[10px] font-black text-gray-300 uppercase tracking-widest rounded-lg border border-white/5 transition-all disabled:opacity-50"
+                                        >
+                                            {sendingLogs ? 'SENDING...' : 'SEND TO ADMIN'}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {matchesSearch('Purge Cache') && (
+                                    <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-gray-100">Purge Cache</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                Clears all local application cache and reloads the page.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handlePurgeCache}
+                                            className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/40 text-[10px] font-black text-red-400 uppercase tracking-widest rounded-lg border border-red-500/20 transition-all"
+                                        >
+                                            PURGE & RELOAD
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    </section>
+                        </section>
+                    )}
 
                     {/* Legal & Policies */}
-                    <section className="space-y-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            <FileText size={14} className="text-indigo-400" />
-                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                Legal & Policies
-                            </label>
-                        </div>
+                    {showLegal && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <FileText size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Legal & Policies
+                                </label>
+                            </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            <a
-                                href="/privacy.html"
-                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                            >
-                                <span className="text-[10px] font-bold text-gray-200">Privacy</span>
-                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Policy</span>
-                            </a>
-                            <a
-                                href="/tos.html"
-                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                            >
-                                <span className="text-[10px] font-bold text-gray-200">Terms</span>
-                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">of Service</span>
-                            </a>
-                            <a
-                                href="/deletion.html"
-                                className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
-                            >
-                                <span className="text-[10px] font-bold text-gray-200">Data</span>
-                                <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Deletion</span>
-                            </a>
-                        </div>
-                    </section>
+                            <div className="grid grid-cols-3 gap-2">
+                                {matchesSearch('Privacy') && (
+                                    <a
+                                        href="/privacy.html"
+                                        className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                                    >
+                                        <span className="text-[10px] font-bold text-gray-200">Privacy</span>
+                                        <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Policy</span>
+                                    </a>
+                                )}
+                                {matchesSearch('Terms') && (
+                                    <a
+                                        href="/tos.html"
+                                        className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                                    >
+                                        <span className="text-[10px] font-bold text-gray-200">Terms</span>
+                                        <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">of Service</span>
+                                    </a>
+                                )}
+                                {matchesSearch('Data Deletion') && (
+                                    <a
+                                        href="/deletion.html"
+                                        className="flex flex-col items-center justify-center p-3 bg-gray-900/40 border border-gray-800 rounded-xl hover:border-gray-750 hover:bg-gray-905/60 transition-all text-center"
+                                    >
+                                        <span className="text-[10px] font-bold text-gray-200">Data</span>
+                                        <span className="text-[8px] text-gray-500 uppercase tracking-wider mt-0.5">Deletion</span>
+                                    </a>
+                                )}
+                            </div>
+                        </section>
+                    )}
                 </div>
 
                 {/* Action Area */}

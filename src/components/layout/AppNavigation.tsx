@@ -1,4 +1,5 @@
 import { Gamepad2, Trophy, BarChart2, Swords, MessageSquare } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 interface AppNavigationProps {
     activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup';
@@ -13,7 +14,9 @@ export const AppNavigation = ({
     challengeUnreadCount,
     chatUnreadCount
 }: AppNavigationProps) => {
-    const navItems = [
+    const { preferences } = useApp();
+
+    const allItems = [
         {
             id: 'play' as const,
             label: 'Play',
@@ -42,6 +45,11 @@ export const AppNavigation = ({
             icon: Swords,
         }
     ];
+
+    // Reorder items based on preferences
+    const navItems = preferences.navOrder 
+        ? [...preferences.navOrder].map(id => allItems.find(item => item.id === id)).filter(Boolean) as typeof allItems
+        : allItems;
 
     return (
         <nav className="w-full z-140 bg-dark border-t border-white/10 px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0)+6px)] sm:self-center sm:mb-2 sm:rounded-2xl sm:border sm:border-white/10 sm:max-w-lg sm:px-6 sm:py-2 sm:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-300">

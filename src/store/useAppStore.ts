@@ -9,12 +9,14 @@ interface UserPreferences {
    allowRoasts: boolean;
    theme: "dark" | "light";
    compactMode: boolean;
+   navOrder: string[];
 }
 
 const defaultPreferences: UserPreferences = {
    allowRoasts: true,
    theme: "dark",
    compactMode: false,
+   navOrder: ["play", "chat", "leaderboard", "challenges", "wordup"],
 };
 
 const INITIAL_STATS: GameStats = {
