@@ -82,16 +82,24 @@ export const GameOverView = ({
                   </button>
                )}
                {rematchState === "sent" && (
-                  <div className="w-full bg-white/5 border border-white/10 text-gray-400 font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest animate-pulse">
-                     ⏳ Waiting for Opponent ({rematchCountdown}s)
+                  <div className="w-full bg-white/5 border border-white/10 text-gray-400 font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest animate-pulse relative overflow-hidden">
+                     <span className="flex items-center gap-2">⏳ Waiting for Opponent ({rematchCountdown}s)</span>
+                     <div 
+                        className="absolute bottom-0 left-0 h-1 bg-pink-500/40 transition-all duration-1000 ease-linear"
+                        style={{ width: `${(rematchCountdown / 20) * 100}%` }}
+                     />
                   </div>
                )}
                {rematchState === "received" && (
                   <button
                      onClick={acceptRematch}
-                     className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer animate-bounce hover:scale-102 active:scale-98 transition-all"
+                     className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest shadow-lg cursor-pointer animate-bounce hover:scale-102 active:scale-98 transition-all relative overflow-hidden"
                   >
-                     🔥 Accept Rematch! ({rematchCountdown}s)
+                     <span className="flex items-center gap-2">🔥 Accept Rematch! ({rematchCountdown}s)</span>
+                     <div 
+                        className="absolute bottom-0 left-0 h-1 bg-black/20 transition-all duration-1000 ease-linear"
+                        style={{ width: `${(rematchCountdown / 20) * 100}%` }}
+                     />
                   </button>
                )}
                {rematchState === "expired" && (

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
@@ -29,6 +30,44 @@ export const BattleView = ({
    role,
    playerProfile
 }: BattleViewProps) => {
+   const [triggerConfetti, setTriggerConfetti] = useState(false);
+   const [particles, setParticles] = useState<any[]>([]);
+
+   useEffect(() => {
+      setTriggerConfetti(false);
+   }, [currentIdx]);
+
+   useEffect(() => {
+      if (triggerConfetti) {
+         const COLORS = ["#4ade80", "#2ec871", "#facc15", "#38bdf8", "#ec4899", "#a855f7"];
+         const SHAPES = ["circle", "square", "triangle"];
+         const newParticles = Array.from({ length: 30 }).map((_, i) => {
+            const angle = (i / 30) * 360 + (Math.random() * 20 - 10);
+            const distance = 90 + Math.random() * 140;
+            const rad = (angle * Math.PI) / 180;
+            const targetX = Math.cos(rad) * distance;
+            const targetY = Math.sin(rad) * distance;
+            const size = 6 + Math.random() * 12;
+            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const rotation = Math.random() * 360;
+            const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+
+            return {
+               id: i,
+               targetX,
+               targetY,
+               size,
+               color,
+               rotation,
+               shape
+            };
+         });
+         setParticles(newParticles);
+      } else {
+         setParticles([]);
+      }
+   }, [triggerConfetti]);
+
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
 
@@ -71,11 +110,18 @@ export const BattleView = ({
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoice = oppAnswers?.[currentIdx]?.choice;
 
+   const onChoiceSelect = (choice: string) => {
+      handleAnswerSelect(choice);
+      if (choice === activeQuestion.answer) {
+         setTriggerConfetti(true);
+      }
+   };
+
    return (
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full py-2"
+         className="flex flex-col flex-1 justify-between h-full py-2 relative"
       >
          {/* Players Panel */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
@@ -159,46 +205,112 @@ export const BattleView = ({
                   const isCorrect = choice === activeQuestion.answer;
                   const isOppSelected = revealAnswers && oppChoice === choice;
 
-                  let btnClass = "bg-white/5 border-white/10 text-white hover:bg-white/10";
-                  if (selectedAnswer !== null) {
-                     if (isCorrect) {
-                        btnClass = "bg-correct/20 border-correct text-correct font-black";
-                     } else if (isSelected) {
-                        btnClass = "bg-red-500/20 border-red-500 text-red-500 font-bold";
-                     } else {
-                        btnClass = "bg-white/5 border-white/10 text-gray-500 opacity-60";
-                     }
-                  }
+                   let btnClass = "p-4 rounded-2xl border text-center font-black uppercase tracking-wider text-xs flex items-center justify-between min-h-[56px] relative overflow-hidden";
+                   if (selectedAnswer === null) {
+                      btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                   } else {
+                      btnClass += " cursor-default";
+                      if (isCorrect) {
+                         btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
+                      } else if (isSelected) {
+                         btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
+                      } else {
+                         btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
+                      }
+                   }
 
-                  if (isOppSelected) {
-                     btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
-                  }
+                   if (isOppSelected) {
+                      btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                   }
 
-                  return (
-                     <button
-                        key={choice}
-                        disabled={selectedAnswer !== null || revealAnswers}
-                        onClick={() => handleAnswerSelect(choice)}
-                        className={`p-4 rounded-2xl border text-center font-black uppercase tracking-wider transition-all active:scale-95 text-xs flex items-center justify-between min-h-[56px] relative ${selectedAnswer === null ? "cursor-pointer" : "cursor-default"
-                           } ${btnClass}`}
-                     >
-                        <span className="flex-1 text-center pr-8">{choice}</span>
+                   let buttonAnimate: any = {};
+                   let buttonTransition: any = {};
 
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
-                           {isSelected && (
-                              <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
-                           )}
-                           {isOppSelected && (
-                              <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
-                                 {opponentName.slice(0, 5)}
-                              </span>
-                           )}
-                        </div>
-                     </button>
+                   if (selectedAnswer !== null) {
+                      if (isSelected && isCorrect) {
+                         buttonAnimate = {
+                            scale: [1, 1.15, 0.95, 1.05, 1],
+                            rotate: [0, -3, 3, -2, 2, 0],
+                            boxShadow: [
+                               "0 0 0px rgba(106,170,100,0)",
+                               "0 0 45px rgba(106,170,100,0.95)",
+                               "0 0 20px rgba(106,170,100,0.5)",
+                               "0 0 0px rgba(106,170,100,0)"
+                            ]
+                         };
+                         buttonTransition = { duration: 0.65, ease: "easeInOut" };
+                      } else if (isSelected && !isCorrect) {
+                         buttonAnimate = {
+                            x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
+                            scale: [1, 0.95, 1.02, 1],
+                            boxShadow: [
+                               "0 0 0px rgba(239,68,68,0)",
+                               "0 0 35px rgba(239,68,68,0.95)",
+                               "0 0 10px rgba(239,68,68,0.4)",
+                               "0 0 0px rgba(239,68,68,0)"
+                            ]
+                         };
+                         buttonTransition = { duration: 0.5, ease: "linear" };
+                      }
+                   }
+
+                   return (
+                      <motion.button
+                         key={choice}
+                         disabled={selectedAnswer !== null || revealAnswers}
+                         onClick={() => onChoiceSelect(choice)}
+                         animate={buttonAnimate}
+                         transition={buttonTransition}
+                         className={btnClass}
+                      >
+                         <span className="flex-1 text-center pr-8">{choice}</span>
+
+                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
+                            {isSelected && (
+                               <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                            )}
+                            {isOppSelected && (
+                               <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                  {opponentName.slice(0, 5)}
+                               </span>
+                            )}
+                         </div>
+                      </motion.button>
                   );
                })}
             </div>
          </div>
+
+         {/* Celebratory Confetti Splash */}
+         {triggerConfetti && (
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-50">
+               {particles.map((p) => (
+                  <motion.div
+                     key={p.id}
+                     initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
+                     animate={{
+                        x: p.targetX,
+                        y: p.targetY,
+                        scale: [0, 1.2, 0.8, 0],
+                        opacity: [1, 1, 0.8, 0],
+                        rotate: p.rotation + 360
+                     }}
+                     transition={{
+                        duration: 0.8 + Math.random() * 0.4,
+                        ease: "easeOut"
+                     }}
+                     style={{
+                        position: "absolute",
+                        width: p.size,
+                        height: p.size,
+                        backgroundColor: p.color,
+                        borderRadius: p.shape === "circle" ? "50%" : p.shape === "triangle" ? "0" : "2px",
+                        clipPath: p.shape === "triangle" ? "polygon(50% 0%, 0% 100%, 100% 100%)" : undefined
+                     }}
+                  />
+               ))}
+            </div>
+         )}
       </motion.div>
    );
 };

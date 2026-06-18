@@ -11,7 +11,9 @@ export interface WordUpQuestion {
       | "definition"
       | "anagram"
       | "anagram_scrambled"
-      | "pattern";
+      | "pattern"
+      | "math"
+      | "odd_one_out";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
@@ -399,6 +401,329 @@ const mutateToFakeWord = (word: string, validSet: Set<string>): string => {
 // -------------------------------------------------------------
 // 5. Main Question Generator Engine
 // -------------------------------------------------------------
+const getDiffCount = (a: string, b: string): number => {
+   let diff = 0;
+   const len = Math.max(a.length, b.length);
+   for (let i = 0; i < len; i++) {
+      if (a[i] !== b[i]) {
+         diff++;
+      }
+   }
+   return diff;
+};
+
+const isValidFake = (correct: string, fake: string): boolean => {
+   if (correct.length > 4) {
+      return getDiffCount(correct, fake) >= 2;
+   }
+   return correct !== fake;
+};
+
+const rand = (min: number, max: number) =>
+   Math.floor(Math.random() * (max - min + 1)) + min;
+
+const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+
+function smartFakeAnswers(correct: number) {
+   const candidates = [
+      correct - 1,
+      correct + 1,
+      correct - 2,
+      correct + 2,
+      correct - 5,
+      correct + 5,
+      correct - 10,
+      correct + 10,
+      Math.floor(correct * 0.9),
+      Math.ceil(correct * 1.1),
+   ].filter((x) => x >= 0 && x !== correct);
+
+   return shuffle([...new Set(candidates)]).slice(0, 3);
+}
+
+interface MathQuestion {
+   question: string;
+   answer: number;
+   fakeAnswers: number[];
+}
+
+interface MathTemplate {
+   generate: () => MathQuestion;
+}
+
+const MATH_TEMPLATES: MathTemplate[] = [
+   {
+      generate: () => {
+         const a = rand(10, 99);
+         const b = rand(10, 99);
+
+         return {
+            question: `${a} + ${b}`,
+            answer: a + b,
+            fakeAnswers: smartFakeAnswers(a + b),
+         };
+      },
+   },
+   {
+      generate: () => {
+         const a = rand(20, 100);
+         const b = rand(5, 20);
+
+         return {
+            question: `${a} - ${b}`,
+            answer: a - b,
+            fakeAnswers: smartFakeAnswers(a - b),
+         };
+      },
+   },
+   {
+      generate: () => {
+         const a = rand(2, 15);
+         const b = rand(2, 15);
+
+         return {
+            question: `${a} × ${b}`,
+            answer: a * b,
+            fakeAnswers: smartFakeAnswers(a * b),
+         };
+      },
+   },
+   {
+      generate: () => {
+         const b = rand(2, 12);
+         const answer = rand(2, 20);
+         const a = b * answer;
+
+         return {
+            question: `${a} ÷ ${b}`,
+            answer,
+            fakeAnswers: smartFakeAnswers(answer),
+         };
+      },
+   },
+];
+
+const MATH_DEFINITIONS = [
+   { question: "What is 25% of 80?", answer: 20 },
+   { question: "Half of 96 is", answer: 48 },
+   { question: "Double 37", answer: 74 },
+   { question: "Three quarters of 40", answer: 30 },
+   { question: "One DOZEN equals", answer: 12 },
+   { question: "One SCORE equals", answer: 20 },
+   { question: "The square of 12 is", answer: 144 },
+   { question: "The cube of 4 is", answer: 64 },
+   { question: "The square root of 81 is", answer: 9 },
+   { question: "10² equals", answer: 100 },
+   { question: "2³ equals", answer: 8 },
+   { question: "The next prime number after 17 is", answer: 19 },
+   { question: "The Roman numeral X represents", answer: 10 },
+   { question: "The Roman numeral L represents", answer: 50 },
+   { question: "A century contains", answer: 100 },
+   { question: "A decade contains", answer: 10 },
+   { question: "One million has how many zeros?", answer: 6 },
+   { question: "One billion has how many zeros?", answer: 9 },
+   { question: "360 divided by 12 equals", answer: 30 },
+   { question: "15 × 15 equals", answer: 225 },
+   { question: "7² equals", answer: 49 },
+];
+
+export const generateMathQuestion = (): WordUpQuestion => {
+   const useDefinition = Math.random() > 0.5;
+   if (useDefinition) {
+      const def =
+         MATH_DEFINITIONS[Math.floor(Math.random() * MATH_DEFINITIONS.length)];
+      const fakes = smartFakeAnswers(def.answer);
+      const choicesSet = new Set<string>();
+      choicesSet.add(String(def.answer));
+      fakes.forEach((f) => choicesSet.add(String(f)));
+      while (choicesSet.size < 4) {
+         choicesSet.add(String(def.answer + rand(-5, 5)));
+      }
+      const choices = shuffle(Array.from(choicesSet));
+      return {
+         type: "math",
+         prompt: def.question,
+         choices,
+         answer: String(def.answer),
+      };
+   } else {
+      const template =
+         MATH_TEMPLATES[Math.floor(Math.random() * MATH_TEMPLATES.length)];
+      const q = template.generate();
+      const choicesSet = new Set<string>();
+      choicesSet.add(String(q.answer));
+      q.fakeAnswers.forEach((f) => choicesSet.add(String(f)));
+      while (choicesSet.size < 4) {
+         choicesSet.add(String(q.answer + rand(-5, 5)));
+      }
+      const choices = shuffle(Array.from(choicesSet));
+      return {
+         type: "math",
+         prompt: q.question,
+         choices,
+         answer: String(q.answer),
+      };
+   }
+};
+
+export const generateOddOneOutQuestion = (
+   allowedLengths: number[],
+): WordUpQuestion => {
+   const length =
+      allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const { official, valid } = getWordLists(length);
+
+   const randomWord = (lists: { official: string[] }) =>
+      lists.official[Math.floor(Math.random() * lists.official.length)];
+
+   // 0: All valid words except (1 fake)
+   // 1: All valid L-letter words except (1 fake or 1 real other length)
+   // 2: Which is a valid word (1 real, 3 fakes)
+   // 3: Which is a valid L-letter word (1 real, 3 fakes/real other lengths)
+   const subType = rand(0, 3);
+
+   if (subType === 0) {
+      const choicesSet = new Set<string>();
+      while (choicesSet.size < 3) {
+         choicesSet.add(randomWord({ official }));
+      }
+
+      let fake = "";
+      let attempts = 0;
+      while (attempts < 50) {
+         const baseWord = randomWord({ official });
+         const candidate = mutateToFakeWord(baseWord, valid);
+         if (!choicesSet.has(candidate)) {
+            fake = candidate;
+            break;
+         }
+         attempts++;
+      }
+      if (!fake) fake = "WURD";
+
+      choicesSet.add(fake);
+      const choices = shuffle(Array.from(choicesSet));
+
+      return {
+         type: "odd_one_out",
+         prompt: "ALL OF THESE ARE VALID WORDS EXCEPT:",
+         choices,
+         answer: fake,
+      };
+   } else if (subType === 1) {
+      const choicesSet = new Set<string>();
+      while (choicesSet.size < 3) {
+         choicesSet.add(randomWord({ official }));
+      }
+
+      let wrongOption = "";
+      const useDifferentLength = Math.random() > 0.5;
+      if (useDifferentLength) {
+         const allOtherLengths = [3, 4, 5, 6, 7, 8, 9, 10].filter(
+            (len) => len !== length,
+         );
+         const diffLen =
+            allOtherLengths[Math.floor(Math.random() * allOtherLengths.length)];
+         const diffList = getWordLists(diffLen);
+         wrongOption =
+            diffList.official[
+               Math.floor(Math.random() * diffList.official.length)
+            ];
+      } else {
+         let attempts = 0;
+         while (attempts < 50) {
+            const baseWord = randomWord({ official });
+            const candidate = mutateToFakeWord(baseWord, valid);
+            if (!choicesSet.has(candidate)) {
+               wrongOption = candidate;
+               break;
+            }
+            attempts++;
+         }
+         if (!wrongOption) wrongOption = "Z" + "Z".repeat(length - 1);
+      }
+
+      choicesSet.add(wrongOption);
+      const choices = shuffle(Array.from(choicesSet));
+
+      return {
+         type: "odd_one_out",
+         prompt: `ALL OF THESE ARE VALID ${length}-LETTER WORDS EXCEPT:`,
+         choices,
+         answer: wrongOption,
+      };
+   } else if (subType === 2) {
+      const realWord = randomWord({ official });
+      const choicesSet = new Set<string>();
+      choicesSet.add(realWord);
+
+      let attempts = 0;
+      while (choicesSet.size < 4 && attempts < 100) {
+         const baseWord = randomWord({ official });
+         const fakeCandidate = mutateToFakeWord(baseWord, valid);
+         choicesSet.add(fakeCandidate);
+         attempts++;
+      }
+      while (choicesSet.size < 4) {
+         choicesSet.add("X" + "X".repeat(length - 1) + choicesSet.size);
+      }
+
+      const choices = shuffle(Array.from(choicesSet));
+
+      return {
+         type: "odd_one_out",
+         prompt: "WHICH OF THE FOLLOWING IS A VALID WORD?",
+         choices,
+         answer: realWord,
+      };
+   } else {
+      const realWord = randomWord({ official });
+      const choicesSet = new Set<string>();
+      choicesSet.add(realWord);
+
+      const useDifferentLength = Math.random() > 0.5;
+      if (useDifferentLength) {
+         let attempts = 0;
+         while (choicesSet.size < 4 && attempts < 100) {
+            const allOtherLengths = [3, 4, 5, 6, 7, 8, 9, 10].filter(
+               (len) => len !== length,
+            );
+            const diffLen =
+               allOtherLengths[
+                  Math.floor(Math.random() * allOtherLengths.length)
+               ];
+            const diffList = getWordLists(diffLen);
+            const diffWord =
+               diffList.official[
+                  Math.floor(Math.random() * diffList.official.length)
+               ];
+            choicesSet.add(diffWord);
+            attempts++;
+         }
+      } else {
+         let attempts = 0;
+         while (choicesSet.size < 4 && attempts < 100) {
+            const baseWord = randomWord({ official });
+            const fakeCandidate = mutateToFakeWord(baseWord, valid);
+            choicesSet.add(fakeCandidate);
+            attempts++;
+         }
+      }
+      while (choicesSet.size < 4) {
+         choicesSet.add("Q" + "Q".repeat(length - 1) + choicesSet.size);
+      }
+
+      const choices = shuffle(Array.from(choicesSet));
+
+      return {
+         type: "odd_one_out",
+         prompt: `WHICH OF THE FOLLOWING IS A VALID ${length}-LETTER WORD?`,
+         choices,
+         answer: realWord,
+      };
+   }
+};
+
 export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    // Determine word lengths to sample based on matchmaking category
    let allowedLengths = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -408,9 +733,25 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    else if (category === "6_letters") allowedLengths = [6];
    else if (category === "7_plus") allowedLengths = [7, 8, 9, 10];
    else if (category === "mixed" || category === "quick_match")
-      allowedLengths = [4, 5, 6, 7];
+      allowedLengths = [3, 4, 5, 6, 7, 8, 9, 10];
 
    const questions: WordUpQuestion[] = [];
+
+   const pickWeightedLength = (allowed: number[]): number => {
+      // 3, 8, 9, 10 highly favored (weight 3.5), other lengths get weight 0.8
+      const weights = allowed.map((l) =>
+         [3, 8, 9, 10].includes(l) ? 3.5 : 0.8,
+      );
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      let rand = Math.random() * totalWeight;
+      for (let i = 0; i < allowed.length; i++) {
+         if (rand < weights[i]) {
+            return allowed[i];
+         }
+         rand -= weights[i];
+      }
+      return allowed[Math.floor(Math.random() * allowed.length)];
+   };
 
    const getTypeByWeight = (): WordUpQuestion["type"] => {
       const typeWeights: { type: WordUpQuestion["type"]; weight: number }[] = [
@@ -422,6 +763,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "missing_letter", weight: 1.0 },
          { type: "reverse_wordle", weight: 1.0 },
          { type: "definition", weight: 1.0 },
+         { type: "math", weight: 0.8 },
+         { type: "odd_one_out", weight: 0.8 },
       ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
@@ -440,10 +783,11 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    for (let i = 0; i < 7; i++) {
       // Pick type
       const type = getTypeByWeight();
-      const length =
-         type === "anagram"
-            ? [3, 4, 5, 6, 7, 8, 9, 10][Math.floor(Math.random() * 8)]
-            : allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+      const length = pickWeightedLength(
+         type === "anagram" || type === "anagram_scrambled"
+            ? [3, 4, 5, 6, 7, 8, 9, 10]
+            : allowedLengths,
+      );
       const { official, valid } = getWordLists(length);
 
       const randomWord = () =>
@@ -622,34 +966,56 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
          // 1. Add another scramble of the word itself (e.g. RHEAT)
          let attempts = 0;
-         while (choices.size < 2 && attempts < 20) {
+         while (choices.size < 2 && attempts < 50) {
             const extraScramble = scrambleWord(word);
-            if (extraScramble !== word && extraScramble !== scrambled) {
+            if (
+               extraScramble !== word &&
+               extraScramble !== scrambled &&
+               isValidFake(scrambled, extraScramble)
+            ) {
                choices.add(extraScramble);
             }
             attempts++;
          }
 
-         // 2. Add scrambles of the word with 1 letter replaced (e.g. RHEAY)
+         // 2. Add scrambles of the word with letter(s) replaced (e.g. RHEAY)
          attempts = 0;
-         while (choices.size < 4 && attempts < 50) {
+         while (choices.size < 4 && attempts < 100) {
             const chars = word.split("");
-            const replaceIdx = Math.floor(Math.random() * chars.length);
-            let replacement = chars[replaceIdx];
-            while (replacement === chars[replaceIdx]) {
-               replacement = String.fromCharCode(
-                  65 + Math.floor(Math.random() * 26),
-               );
+            // If word is larger than 4 characters, replace 2 random characters to ensure we differ by at least 2 letters easily.
+            // Otherwise replace 1.
+            const numReplacements = word.length > 4 ? 2 : 1;
+            const replacedIndices = new Set<number>();
+            for (let r = 0; r < numReplacements; r++) {
+               let replaceIdx = Math.floor(Math.random() * chars.length);
+               while (replacedIndices.has(replaceIdx)) {
+                  replaceIdx = Math.floor(Math.random() * chars.length);
+               }
+               replacedIndices.add(replaceIdx);
+               let replacement = chars[replaceIdx];
+               while (replacement === chars[replaceIdx]) {
+                  replacement = String.fromCharCode(
+                     65 + Math.floor(Math.random() * 26),
+                  );
+               }
+               chars[replaceIdx] = replacement;
             }
-            chars[replaceIdx] = replacement;
             const mutatedScramble = scrambleWord(chars.join(""));
-            choices.add(mutatedScramble);
+            if (isValidFake(scrambled, mutatedScramble)) {
+               choices.add(mutatedScramble);
+            }
             attempts++;
          }
 
          // Fallback
-         while (choices.size < 4) {
-            choices.add(scrambleWord(word) + "X");
+         let fallbackAttempts = 0;
+         while (choices.size < 4 && fallbackAttempts < 50) {
+            const fallbackChoice =
+               scrambleWord(word) + (word.length > 4 ? "XY" : "X");
+            if (isValidFake(scrambled, fallbackChoice)) {
+               choices.add(fallbackChoice);
+            }
+            fallbackAttempts++;
          }
 
          questions.push({
@@ -658,7 +1024,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: scrambled,
          });
-      } else {
+      } else if (type === "pattern") {
          // type === "pattern"
          const word = randomWord();
          const patternsList = [
@@ -712,6 +1078,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             choices: ["True", "False"],
             answer: answerBool ? "True" : "False",
          });
+      } else if (type === "math") {
+         questions.push(generateMathQuestion());
+      } else if (type === "odd_one_out") {
+         questions.push(generateOddOneOutQuestion(allowedLengths));
       }
    }
 
