@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 import { Award } from "lucide-react";
+import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 
 interface GameOverViewProps {
    matchData: any;
@@ -24,6 +26,8 @@ export const GameOverView = ({
 }: GameOverViewProps) => {
    if (!matchData) return null;
 
+   const questions = useWordUpStore((s) => s.questions);
+
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
    const oppScore = isP1 ? matchData.p2_score : matchData.p1_score;
@@ -31,6 +35,10 @@ export const GameOverView = ({
 
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
+
+   const opponentName = matchData.is_bot_match
+      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
+      : "Opponent";
 
    return (
       <motion.div
@@ -54,7 +62,7 @@ export const GameOverView = ({
             </div>
             <div className="border-l border-white/10">
                <p className="text-[10px] text-gray-500 font-black uppercase">
-                  {matchData.is_bot_match ? "Bot Opponent" : "Opponent"}
+                  {opponentName}
                </p>
                <p className="text-2xl font-black text-white">{oppScore} pts</p>
             </div>
@@ -113,10 +121,57 @@ export const GameOverView = ({
          {/* Play Again / Lobby */}
          <button
             onClick={() => setView("menu")}
-            className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all"
+            className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
          >
             Play Again
          </button>
+
+         {/* Round Breakdown */}
+         {questions && questions.length > 0 && (
+            <div className="space-y-4 bg-white/5 border border-white/10 rounded-2xl p-4 mt-2">
+               <h3 className="text-xs font-black uppercase text-gray-400 tracking-wider border-b border-white/10 pb-2 text-left">
+                  Round Breakdown
+               </h3>
+               <div className="divide-y divide-white/5">
+                  {questions.map((q, idx) => {
+                     const p1Ans = matchData.p1_answers?.find((a: any) => a.question_idx === idx);
+                     const p2Ans = matchData.p2_answers?.find((a: any) => a.question_idx === idx);
+                     
+                     const myAns = isP1 ? p1Ans : p2Ans;
+                     const oppAns = isP1 ? p2Ans : p1Ans;
+
+                     return (
+                        <div key={idx} className="py-3 first:pt-0 last:pb-0 space-y-2 text-left">
+                           <div className="flex justify-between items-baseline">
+                              <span className="text-[10px] font-black text-correct uppercase">Round {idx + 1}</span>
+                              <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
+                           </div>
+                           <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
+                           <p className="text-[10px] text-gray-400">
+                              Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
+                           </p>
+                           <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
+                              <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
+                                 <p className="font-black text-gray-500 uppercase">You</p>
+                                 <p className="font-bold text-white truncate">
+                                    Played: <span className={myAns?.correct ? "text-correct" : "text-red-400"}>{myAns?.choice || "No Answer"}</span>
+                                 </p>
+                                 <p className="text-gray-400 font-black">+{myAns?.points || 0} pts ({myAns?.time_taken || 0}s)</p>
+                              </div>
+                              <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
+                                 <p className="font-black text-gray-500 uppercase">{opponentName}</p>
+                                 <p className="font-bold text-white truncate">
+                                    Played: <span className={oppAns?.correct ? "text-correct" : "text-red-400"}>{oppAns?.choice || "No Answer"}</span>
+                                 </p>
+                                 <p className="text-gray-400 font-black">+{oppAns?.points || 0} pts ({oppAns?.time_taken || 0}s)</p>
+                              </div>
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+         )}
       </motion.div>
    );
 };

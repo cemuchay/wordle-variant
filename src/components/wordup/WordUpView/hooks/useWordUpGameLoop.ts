@@ -11,6 +11,7 @@ import {
    encryptQuestions,
 } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { safeSessionStorage } from "../../../../utils/storage";
 
 export const getQuestionDuration = (type: string): number => {
    switch (type) {
@@ -169,6 +170,7 @@ export const useWordUpGameLoop = (
                1000,
             );
             console.log("[WordUp Logs] Final sync successful.");
+            safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
          } catch (e) {
             console.error("[WordUp Logs] Failed to finalize match in DB:", e);
             triggerToast(
@@ -560,6 +562,7 @@ export const useWordUpGameLoop = (
 
          if (mergedMatch.status === "completed") {
             console.log("[WordUp Logs] Match marked as completed.");
+            safeSessionStorage.setItem("wordup_completed_" + mergedMatch.id, "true");
             setShowRematchButton(true);
             setTimeout(() => {
                setShowRematchButton(false);
@@ -654,6 +657,14 @@ export const useWordUpGameLoop = (
 
          if (error || !match) {
             console.error("Error loading match:", error);
+            return null;
+         }
+
+         if (match.status === "completed" || safeSessionStorage.getItem("wordup_completed_" + mId) === "true") {
+            console.log(`[WordUp Logs] Match ${mId} is already completed. Aborting launch.`);
+            safeSessionStorage.setItem("wordup_completed_" + mId, "true");
+            triggerToast("This match has already been completed.", 4000);
+            useWordUpStore.getState().resetGame();
             return null;
          }
 

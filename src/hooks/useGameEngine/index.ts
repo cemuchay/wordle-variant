@@ -58,8 +58,9 @@ export const useGameEngine = (date: string) => {
       const handleRehydrate = () => {
          setIsHydrated(false);
       };
-      window.addEventListener('app-visibility-visible', handleRehydrate);
-      return () => window.removeEventListener('app-visibility-visible', handleRehydrate);
+      window.addEventListener("app-visibility-visible", handleRehydrate);
+      return () =>
+         window.removeEventListener("app-visibility-visible", handleRehydrate);
    }, []);
 
    useEffect(() => {
