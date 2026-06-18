@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +7,7 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { useAppStore } from '../store/useAppStore';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -22,6 +23,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
+    const [navOrder, setNavOrder] = useState<string[]>(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     const [receiveEmails, setReceiveEmails] = useState(true);
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
@@ -48,6 +50,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     useEffect(() => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
+        setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     }, [preferences]);
 
     useEffect(() => {
@@ -168,20 +171,39 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
+    const moveNavItem = (index: number, direction: 'up' | 'down') => {
+        const newOrder = [...navOrder];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+
+        const [moved] = newOrder.splice(index, 1);
+        newOrder.splice(targetIndex, 0, moved);
+        setNavOrder(newOrder);
+    };
+
     const handleSave = async () => {
         setLoading(true);
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                preferences: {
-                    ...profile.preferences,
-                    allowRoasts: allowRoasts,
-                    compactMode: compactMode,
-                }
-            })
-            .eq('id', profile.id);
+
+        const newPreferences = {
+            ...(profile?.preferences || preferences),
+            allowRoasts,
+            compactMode,
+            navOrder,
+        };
+
+        // Update store directly for immediate effect and anonymous support
+        useAppStore.getState().setPreferences(newPreferences);
+
+        let success = true;
 
         if (profile?.id) {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    preferences: newPreferences
+                })
+                .eq('id', profile.id);
+
             await supabase
                 .from('email_preferences')
                 .upsert({
@@ -189,14 +211,32 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                     receive_emails: receiveEmails,
                     updated_at: new Date().toISOString(),
                 });
+
+            if (error) {
+                success = false;
+                console.error("[Settings] Failed to sync preferences to Supabase:", error);
+            } else {
+                await refreshProfile();
+            }
         }
 
-        if (!error) {
-            await refreshProfile();
-            triggerToast('Preferences Updated')
+        if (success) {
+            triggerToast(profile?.id ? 'Preferences Updated' : 'Preferences Saved Locally');
+            onClose();
+        } else {
+            triggerToast('Saved locally, but cloud sync failed.');
             onClose();
         }
+        
         setLoading(false);
+    };
+
+    const navItemLabels: Record<string, string> = {
+        play: 'Play',
+        chat: 'Chat',
+        leaderboard: 'Leaderboard',
+        challenges: 'Challenges',
+        wordup: 'WordUp'
     };
 
     if (!isOpen) return null;
@@ -423,6 +463,45 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             </div>
                         </section>
                     )}
+
+                    {/* Navigation Layout */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Layout size={14} className="text-indigo-400" />
+                            <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                Navigation Layout
+                            </label>
+                        </div>
+
+                        <div className="space-y-2">
+                            {navOrder.map((id, index) => (
+                                <div key={id} className="flex items-center justify-between p-3 bg-gray-900/40 border border-gray-800 rounded-xl">
+                                    <span className="text-sm font-bold text-gray-200">
+                                        {navItemLabels[id]}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => moveNavItem(index, 'up')}
+                                            disabled={index === 0}
+                                            className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
+                                        >
+                                            <ChevronUp size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => moveNavItem(index, 'down')}
+                                            disabled={index === navOrder.length - 1}
+                                            className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
+                                        >
+                                            <ChevronDown size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-gray-600 px-1 italic">
+                            Customize the order of your bottom navigation tabs.
+                        </p>
+                    </section>
 
                     {/* Debugging & Diagnostics */}
                     <section className="space-y-4">

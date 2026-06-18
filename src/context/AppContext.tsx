@@ -170,6 +170,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { data: profile, isLoading: isProfileLoading } = useProfile(user?.id);
     const { data: challengeStatus } = useChallengeStatus(user?.id);
 
+    const refreshProfile = useCallback(async () => {
+        if (user?.id) {
+            await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+        }
+    }, [user?.id, queryClient]);
+
     // 4. Presence
     const { onlineUsers, allProfiles } = useGlobalPresence(
         user?.id,
@@ -432,6 +438,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .on('broadcast', { event: 'wordup_invite_accepted' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-accepted', { detail: payload }));
             })
+            .on('broadcast', { event: 'wordup_invite_later' }, ({ payload }) => {
+                window.dispatchEvent(new CustomEvent('wordup-invite-later', { detail: payload }));
+            })
             .subscribe();
 
         signalingChannelRef.current = channel;
@@ -684,7 +693,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         profile,
         preferences,
         loading: isProfileLoading,
-        refreshProfile: async () => { },
+        refreshProfile,
         toast,
         triggerToast,
         setToast,
@@ -719,7 +728,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         incomingWordUpInvite,
         setIncomingWordUpInvite
     }), [
-        profile, preferences, isProfileLoading, toast, triggerToast,
+        profile, preferences, isProfileLoading, refreshProfile, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
         setChallengeUnreadCount, serverDateResponse?.formatted, isLoadingDate,
         setIsLoadingDate, stats, setStats, activeCall,

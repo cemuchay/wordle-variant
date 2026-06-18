@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, Play, Volume2, VolumeX, HelpCircle, ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
@@ -5,6 +6,7 @@ import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -14,9 +16,7 @@ interface LobbyViewProps {
    getRankColor: (rankName: string) => string;
    soundEnabled: boolean;
    onToggleSound: () => void;
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    onlineUsers: any[];
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    currentUser: any;
 }
 
@@ -34,6 +34,13 @@ export const LobbyView = ({
    const [showHelp, setShowHelp] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const timeoutRef = useRef<number | null>(null);
+
+   // New states for tabs and challenge matching
+   const [activeTab, setActiveTab] = useState<"play" | "pending" | "history">("play");
+   const [pendingMatches, setPendingMatches] = useState<any[]>([]);
+   const [historyMatches, setHistoryMatches] = useState<any[]>([]);
+   const [isLoadingData, setIsLoadingData] = useState(false);
+   const [incomingOfflineOrTimeout, setIncomingOfflineOrTimeout] = useState<{ targetUser: any; type: "offline" | "timeout" } | null>(null);
 
    useEffect(() => {
       const handleRejected = (e: Event) => {
@@ -91,10 +98,140 @@ export const LobbyView = ({
       };
    }, []);
 
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   // Fetch data when activeTab changes
+   useEffect(() => {
+      if (activeTab === "pending") {
+         fetchPendingMatches();
+      } else if (activeTab === "history") {
+         fetchHistory();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [activeTab]);
+
+   const fetchPendingMatches = async () => {
+      if (!currentUser) return;
+      setIsLoadingData(true);
+      try {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select(`
+               *,
+               player1:player1_id (username, avatar_url),
+               player2:player2_id (username, avatar_url)
+            `)
+            .eq("status", "waiting")
+            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+            .order("created_at", { ascending: false });
+
+         if (error) throw error;
+
+         const now = new Date();
+         const activePending: any[] = [];
+
+         for (const m of (data || [])) {
+            const createdAt = new Date(m.created_at);
+            const diffHrs = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+
+            if (diffHrs >= 24) {
+               // Auto-resolve matches older than 24 hours
+               await supabase
+                  .from("wordup_matches")
+                  .update({
+                     status: "completed",
+                     p1_answered: true,
+                     p2_answered: true,
+                     completed_at: now.toISOString()
+                  })
+                  .eq("id", m.id);
+            } else {
+               activePending.push(m);
+            }
+         }
+
+         setPendingMatches(activePending);
+      } catch (e) {
+         console.error("Failed to fetch pending matches:", e);
+      } finally {
+         setIsLoadingData(false);
+      }
+   };
+
+   const fetchHistory = async () => {
+      if (!currentUser) return;
+      setIsLoadingData(true);
+      try {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select(`
+               *,
+               player1:player1_id (username, avatar_url),
+               player2:player2_id (username, avatar_url)
+            `)
+            .eq("status", "completed")
+            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+            .order("completed_at", { ascending: false })
+            .limit(15);
+
+         if (error) throw error;
+         setHistoryMatches(data || []);
+      } catch (e) {
+         console.error("Failed to fetch history:", e);
+      } finally {
+         setIsLoadingData(false);
+      }
+   };
+
+   const createPendingMatchAndNotification = async (targetUser: any) => {
+      try {
+         const rawQuestions = generateWordUpQuestions(category);
+         const secretKey = generateSecretKey();
+         const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+         // Create match in status "waiting"
+         const { data: newMatch, error } = await supabase
+            .from("wordup_matches")
+            .insert({
+               category: category,
+               player1_id: currentUser.id,
+               player2_id: targetUser.id,
+               questions: encryptedStr,
+               encryption_key: secretKey,
+               status: "waiting",
+               p1_answered: false,
+               p2_answered: false
+            })
+            .select()
+            .single();
+
+         if (error || !newMatch) throw error || new Error("Failed to create match");
+
+         // App notification for target user
+         await supabase.from("notifications").insert({
+            user_id: targetUser.id,
+            type: "CHALLENGE_INVITE",
+            title: "New WordUp Challenge",
+            message: `${currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Someone"} challenged you to WordUp!`,
+            data: { mode: "wordup", matchId: newMatch.id },
+            is_read: false
+         });
+
+         return newMatch.id;
+      } catch (e) {
+         console.error("Failed to create pending match/notification:", e);
+         return null;
+      }
+   };
+
    const handleSendInvite = (targetUser: any) => {
       if (!currentUser) {
          window.dispatchEvent(new CustomEvent("open-auth-modal"));
+         return;
+      }
+
+      // Check if targetUser is online
+      const isOnline = onlineUsers && onlineUsers.some((u) => u.id === targetUser.id);
+      if (!isOnline) {
+         setIncomingOfflineOrTimeout({ targetUser, type: "offline" });
          return;
       }
 
@@ -123,13 +260,17 @@ export const LobbyView = ({
       timeoutRef.current = window.setTimeout(() => {
          setOutgoingInvite((prev) => {
             if (prev) {
-               window.dispatchEvent(new CustomEvent("MascoChanged", {
-                  detail: { mascotFace: "(•_•)", mascotLabel: `Invitation to ${prev.targetUsername} timed out.` }
-               }));
+               setIncomingOfflineOrTimeout({ targetUser, type: "timeout" });
             }
             return null;
          });
       }, 15000);
+   };
+
+   const handlePlayMyTurn = (match: any) => {
+      const role = match.player1_id === currentUser.id ? "player1" : "player2";
+      useWordUpStore.getState().setMatchId(match.id);
+      useWordUpStore.getState().setRole(role);
    };
 
    return (
@@ -157,91 +298,236 @@ export const LobbyView = ({
             </p>
          </div>
 
-         {userStats && (
-            <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-               <div>
-                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>
-                  <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
-               </div>
-               <div>
-                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rank</p>
-                  <p className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
-                     {userStats.rank_name}
-                  </p>
-               </div>
-               <div>
-                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Wins/Losses</p>
-                  <p className="text-lg font-black text-correct">
-                     {userStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
-                  </p>
-               </div>
-            </div>
-         )}
+         {/* Segmented Tab Bar */}
+         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+            {(["play", "pending", "history"] as const).map((tab) => (
+               <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${
+                     activeTab === tab
+                        ? "bg-correct text-black shadow-md font-black"
+                        : "text-gray-400 hover:text-white"
+                  }`}
+               >
+                  {tab === "play" ? "Play" : tab === "pending" ? `Pending (${pendingMatches.length})` : "History"}
+               </button>
+            ))}
+         </div>
 
-         <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Select Category</p>
-            <div className="grid grid-cols-1 gap-2">
-               {CATEGORIES.map((cat) => (
-                  <button
-                     key={cat.id}
-                     onClick={() => setCategory(cat.id)}
-                     className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${category === cat.id
-                        ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                        }`}
-                  >
-                     <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
-                        <p className="text-xs font-black uppercase tracking-wider text-white">{cat.name}</p>
+         <AnimatePresence mode="wait">
+            {activeTab === "play" && (
+               <motion.div
+                  key="play-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+               >
+                  {userStats && (
+                     <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                        <div>
+                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>
+                           <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
+                        </div>
+                        <div>
+                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rank</p>
+                           <p className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
+                              {userStats.rank_name}
+                           </p>
+                        </div>
+                        <div>
+                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Wins/Losses</p>
+                           <p className="text-lg font-black text-correct">
+                              {userStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
+                           </p>
+                        </div>
                      </div>
-                     <p className="text-[9px] text-gray-500 mt-1">{cat.desc}</p>
-                  </button>
-               ))}
-            </div>
-         </div>
+                  )}
 
-         <button
-            onClick={startMatchmaking}
-            className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
-         >
-            <Play size={16} fill="black" /> Search Opponent
-         </button>
-
-         {/* Direct Invite Online Players Section */}
-         <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Invite Online Players</p>
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-               {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 ? (
-                  <div className="space-y-2 max-h-[160px] overflow-y-auto scrollbar-hide">
-                     {onlineUsers
-                        .filter((u) => u.id !== currentUser?.id)
-                        .map((opp) => (
-                           <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
-                              <div className="flex items-center gap-2 min-w-0">
-                                 <img
-                                    src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
-                                    alt={opp.username}
-                                    className="w-7 h-7 rounded-full border border-white/10 shrink-0"
-                                 />
-                                 <span className="text-xs font-black text-white truncate max-w-[120px]">{opp.username}</span>
-                                 <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse shrink-0" />
+                  <div className="space-y-3">
+                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Select Category</p>
+                     <div className="grid grid-cols-1 gap-2">
+                        {CATEGORIES.map((cat) => (
+                           <button
+                              key={cat.id}
+                              onClick={() => setCategory(cat.id)}
+                              className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${category === cat.id
+                                 ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                 : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
+                                 }`}
+                           >
+                              <div className="flex items-center gap-2">
+                                 <span className={`w-2 h-2 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
+                                 <p className="text-xs font-black uppercase tracking-wider text-white">{cat.name}</p>
                               </div>
-                              <button
-                                 onClick={() => handleSendInvite(opp)}
-                                 disabled={outgoingInvite !== null}
-                                 className="flex items-center gap-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black border border-correct/20 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                              >
-                                 <Send size={10} />
-                                 Invite
-                              </button>
-                           </div>
+                              <p className="text-[9px] text-gray-500 mt-1">{cat.desc}</p>
+                           </button>
                         ))}
+                     </div>
                   </div>
-               ) : (
-                  <p className="text-[10px] text-gray-500 text-center py-2">No other players online right now.</p>
-               )}
-            </div>
-         </div>
+
+                  <button
+                     onClick={startMatchmaking}
+                     className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
+                  >
+                     <Play size={16} fill="black" /> Search Opponent
+                  </button>
+
+                  <div className="space-y-3">
+                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Invite Online Players</p>
+                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 ? (
+                           <div className="space-y-2 max-h-[160px] overflow-y-auto scrollbar-hide">
+                              {onlineUsers
+                                 .filter((u) => u.id !== currentUser?.id)
+                                 .map((opp) => (
+                                    <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
+                                       <div className="flex items-center gap-2 min-w-0">
+                                          <img
+                                             src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
+                                             alt={opp.username}
+                                             className="w-7 h-7 rounded-full border border-white/10 shrink-0"
+                                          />
+                                          <span className="text-xs font-black text-white truncate max-w-[120px]">{opp.username}</span>
+                                          <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse shrink-0" />
+                                       </div>
+                                       <button
+                                          onClick={() => handleSendInvite(opp)}
+                                          disabled={outgoingInvite !== null}
+                                          className="flex items-center gap-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black border border-correct/20 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                                       >
+                                          <Send size={10} />
+                                          Invite
+                                       </button>
+                                    </div>
+                                 ))}
+                           </div>
+                        ) : (
+                           <p className="text-[10px] text-gray-500 text-center py-2">No other players online right now.</p>
+                        )}
+                     </div>
+                  </div>
+               </motion.div>
+            )}
+
+            {activeTab === "pending" && (
+               <motion.div
+                  key="pending-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-3 min-h-[200px]"
+               >
+                  {isLoadingData ? (
+                     <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 text-correct animate-spin" />
+                     </div>
+                  ) : pendingMatches.length > 0 ? (
+                     <div className="space-y-2.5">
+                        {pendingMatches.map((match) => {
+                           const isP1 = match.player1_id === currentUser?.id;
+                           const oppProfile = isP1 ? match.player2 : match.player1;
+                           const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
+                           const oppName = oppProfile?.username || "Opponent";
+                           const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
+
+                           const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
+
+                           return (
+                              <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
+                                 <div className="flex items-center gap-3 min-w-0">
+                                    <img src={oppAvatar} alt={oppName} className="w-9 h-9 rounded-full border border-white/10 shrink-0" />
+                                    <div className="min-w-0">
+                                       <p className="text-xs font-black text-white truncate">{oppName}</p>
+                                       <p className="text-[9px] text-gray-500 uppercase font-bold mt-0.5">{match.category.replace('_', ' ')} • {hoursLeft}h left</p>
+                                    </div>
+                                 </div>
+                                 {hasPlayed ? (
+                                    <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl">
+                                       Waiting
+                                    </span>
+                                 ) : (
+                                    <button
+                                       onClick={() => handlePlayMyTurn(match)}
+                                       className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                                    >
+                                       Play Turn
+                                    </button>
+                                 )}
+                              </div>
+                           );
+                        })}
+                     </div>
+                  ) : (
+                     <div className="text-center py-12 text-gray-500 space-y-2">
+                        <Swords size={24} className="mx-auto text-gray-600 animate-pulse" />
+                        <p className="text-[10px] uppercase font-black tracking-wider">No pending challenges</p>
+                     </div>
+                  )}
+               </motion.div>
+            )}
+
+            {activeTab === "history" && (
+               <motion.div
+                  key="history-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-3 min-h-[200px]"
+               >
+                  {isLoadingData ? (
+                     <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 text-correct animate-spin" />
+                     </div>
+                  ) : historyMatches.length > 0 ? (
+                     <div className="space-y-2">
+                        {historyMatches.map((match) => {
+                           const isP1 = match.player1_id === currentUser?.id;
+                           const oppProfile = isP1 ? match.player2 : match.player1;
+                           const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
+                           const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
+                           const oppName = oppProfile?.username || "Opponent";
+
+                           let outcome = "DRAW";
+                           let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
+                           if (myScore > oppScore) {
+                              outcome = "WIN";
+                              outcomeColor = "text-correct bg-correct/10 border-correct/20";
+                           } else if (oppScore > myScore) {
+                              outcome = "LOSS";
+                              outcomeColor = "text-red-400 bg-red-500/10 border-red-500/20";
+                           }
+
+                           const dateStr = new Date(match.completed_at || match.created_at).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric'
+                           });
+
+                           return (
+                              <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+                                 <div className="min-w-0">
+                                    <p className="font-black text-white truncate">vs {oppName}</p>
+                                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">{match.category.replace('_', ' ')} • {dateStr}</p>
+                                 </div>
+                                 <div className="flex items-center gap-3 shrink-0">
+                                    <span className="font-bold text-white text-[11px]">{myScore} - {oppScore}</span>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border ${outcomeColor}`}>
+                                       {outcome}
+                                    </span>
+                                 </div>
+                              </div>
+                           );
+                        })}
+                     </div>
+                  ) : (
+                     <div className="text-center py-12 text-gray-500">
+                        <p className="text-[10px] uppercase font-black tracking-wider">No completed matches</p>
+                     </div>
+                  )}
+               </motion.div>
+            )}
+         </AnimatePresence>
 
          {outgoingInvite && (
             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -262,6 +548,56 @@ export const LobbyView = ({
                   >
                      Cancel Challenge
                   </button>
+               </div>
+            </div>
+         )}
+
+         {/* Offline / Timeout popup choice modal */}
+         {incomingOfflineOrTimeout && (
+            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+               <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4 flex flex-col items-center">
+                  <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400">
+                     <Swords size={24} />
+                  </div>
+                  <div>
+                     <h3 className="text-sm font-black uppercase tracking-wider text-white">
+                        {incomingOfflineOrTimeout.type === "offline" ? "Player Offline" : "No Response"}
+                     </h3>
+                     <p className="text-[10px] text-gray-400 mt-1">
+                        {incomingOfflineOrTimeout.type === "offline" 
+                           ? `<strong className="text-white">${incomingOfflineOrTimeout.targetUser.username}</strong> is offline.`
+                           : `<strong className="text-white">${incomingOfflineOrTimeout.targetUser.username}</strong> did not respond within 15 seconds.`
+                        } This game will be automatically pending.
+                     </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                     <button
+                        onClick={async () => {
+                           const target = incomingOfflineOrTimeout.targetUser;
+                           const mId = await createPendingMatchAndNotification(target);
+                           setIncomingOfflineOrTimeout(null);
+                           if (mId) {
+                              useWordUpStore.getState().setMatchId(mId);
+                              useWordUpStore.getState().setRole("player1");
+                           }
+                        }}
+                        className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                     >
+                        Play Mine Now
+                     </button>
+                     <button
+                        onClick={async () => {
+                           const target = incomingOfflineOrTimeout.targetUser;
+                           await createPendingMatchAndNotification(target);
+                           setIncomingOfflineOrTimeout(null);
+                           fetchPendingMatches();
+                           setActiveTab("pending");
+                        }}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                     >
+                        Wait
+                     </button>
+                  </div>
                </div>
             </div>
          )}
