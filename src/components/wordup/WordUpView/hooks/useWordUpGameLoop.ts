@@ -556,17 +556,20 @@ export const useWordUpGameLoop = (
                               await wordupNetworkGate.enqueue(
                                  'put',
                                  'submit async turn answers and score',
-                                 () => supabase
-                                    .from("wordup_matches")
-                                    .update({
-                                       p1_answers: mergedMatch.p1_answers,
-                                       p2_answers: mergedMatch.p2_answers,
-                                       p1_score: mergedMatch.p1_score,
-                                       p2_score: mergedMatch.p2_score,
-                                       p1_answered: isP1 ? true : mergedMatch.p1_answered,
-                                       p2_answered: !isP1 ? true : mergedMatch.p2_answered,
-                                    })
-                                    .eq("id", mergedMatch.id),
+                                 async () => {
+                                    const { error } = await supabase
+                                       .from("wordup_matches")
+                                       .update({
+                                          p1_answers: mergedMatch.p1_answers,
+                                          p2_answers: mergedMatch.p2_answers,
+                                          p1_score: mergedMatch.p1_score,
+                                          p2_score: mergedMatch.p2_score,
+                                          p1_answered: isP1 ? true : mergedMatch.p1_answered,
+                                          p2_answered: !isP1 ? true : mergedMatch.p2_answered,
+                                       })
+                                       .eq("id", mergedMatch.id);
+                                    if (error) throw error;
+                                 },
                                  true // blocking operation
                               );
                               triggerToast("Turn submitted! Waiting for opponent.", 5000);
