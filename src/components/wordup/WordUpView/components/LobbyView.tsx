@@ -17,6 +17,7 @@ interface LobbyViewProps {
    soundEnabled: boolean;
    onToggleSound: () => void;
    onlineUsers: any[];
+   allProfiles: any[];
    currentUser: any;
 }
 
@@ -29,6 +30,7 @@ export const LobbyView = ({
    soundEnabled,
    onToggleSound,
    onlineUsers,
+   allProfiles,
    currentUser
 }: LobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
@@ -375,37 +377,67 @@ export const LobbyView = ({
                   </button>
 
                   <div className="space-y-3">
-                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Invite Online Players</p>
+                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 
+                           ? "Invite Online Players" 
+                           : "Challenge Players"}
+                     </p>
                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 ? (
-                           <div className="space-y-2 max-h-[160px] overflow-y-auto scrollbar-hide">
-                              {onlineUsers
+                        {(() => {
+                           const otherOnline = (onlineUsers || []).filter((u) => u.id !== currentUser?.id);
+                           const displayUsers = otherOnline.length > 0 
+                              ? otherOnline 
+                              : (allProfiles || [])
                                  .filter((u) => u.id !== currentUser?.id)
-                                 .map((opp) => (
-                                    <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
-                                       <div className="flex items-center gap-2 min-w-0">
-                                          <img
-                                             src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
-                                             alt={opp.username}
-                                             className="w-7 h-7 rounded-full border border-white/10 shrink-0"
-                                          />
-                                          <span className="text-xs font-black text-white truncate max-w-[120px]">{opp.username}</span>
-                                          <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse shrink-0" />
-                                       </div>
-                                       <button
-                                          onClick={() => handleSendInvite(opp)}
-                                          disabled={outgoingInvite !== null}
-                                          className="flex items-center gap-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black border border-correct/20 text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                                       >
-                                          <Send size={10} />
-                                          Invite
-                                       </button>
-                                    </div>
-                                 ))}
-                           </div>
-                        ) : (
-                           <p className="text-[10px] text-gray-500 text-center py-2">No other players online right now.</p>
-                        )}
+                                 .sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime())
+                                 .slice(0, 10);
+
+                           if (displayUsers.length > 0) {
+                              return (
+                                 <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-hide">
+                                    {displayUsers.map((opp) => {
+                                       const isOnline = otherOnline.some(u => u.id === opp.id);
+                                       return (
+                                          <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
+                                             <div className="flex items-center gap-2 min-w-0">
+                                                <img
+                                                   src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
+                                                   alt={opp.username}
+                                                   className="w-7 h-7 rounded-full border border-white/10 shrink-0"
+                                                />
+                                                <div className="flex flex-col min-w-0">
+                                                   <div className="flex items-center gap-1.5 min-w-0">
+                                                      <span className="text-xs font-black text-white truncate">{opp.username}</span>
+                                                      {isOnline && <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse shrink-0" />}
+                                                   </div>
+                                                   {!isOnline && opp.last_seen_at && (
+                                                      <span className="text-[8px] text-gray-500 font-bold uppercase truncate">
+                                                         Seen {new Date(opp.last_seen_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                      </span>
+                                                   )}
+                                                </div>
+                                             </div>
+                                             <button
+                                                onClick={() => handleSendInvite(opp)}
+                                                disabled={outgoingInvite !== null}
+                                                className={`flex items-center gap-1.5 border text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
+                                                   isOnline 
+                                                      ? "bg-correct/10 hover:bg-correct text-correct hover:text-black border-correct/20" 
+                                                      : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"
+                                                }`}
+                                             >
+                                                {isOnline ? <Send size={10} /> : <Swords size={10} />}
+                                                {isOnline ? "Invite" : "Challenge"}
+                                             </button>
+                                          </div>
+                                       );
+                                    })}
+                                 </div>
+                              );
+                           }
+
+                           return <p className="text-[10px] text-gray-500 text-center py-2">No other players found.</p>;
+                        })()}
                      </div>
                   </div>
                </motion.div>

@@ -22,7 +22,7 @@ import { useWordUpStore } from "../../../store/useWordUpStore";
 
 export const WordUpView = () => {
    const { user: authUser } = useAuth();
-   const { triggerToast, realtimeStatus, onlineUsers, profile } = useApp();
+   const { triggerToast, realtimeStatus, onlineUsers, profile, allProfiles } = useApp();
 
    const [guestUser, setGuestUser] = useState<any>(() => {
       const id = localStorage.getItem('wordle_anon_id');
@@ -299,6 +299,7 @@ export const WordUpView = () => {
                   soundEnabled={soundEnabled}
                   onToggleSound={handleToggleSound}
                   onlineUsers={onlineUsers}
+                  allProfiles={allProfiles}
                   currentUser={effectiveUser}
                />
             )}
