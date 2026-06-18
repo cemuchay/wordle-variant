@@ -542,6 +542,7 @@ export const useWordUpGameLoop = (
                      console.log(
                         "[WordUp Logs] Reached end of 7 rounds. Ending match...",
                      );
+                     useWordUpStore.getState().setView("loading");
                      if (isAsync) {
                         // Check if opponent already played all 7 rounds
                         const oppAnswers = isP1 ? mergedMatch.p2_answers : mergedMatch.p1_answers;
@@ -737,7 +738,9 @@ export const useWordUpGameLoop = (
             : 0;
          const nowTime = new Date().getTime();
          const isExpired =
-            match.status !== "completed" && nowTime - matchTime > 5 * 60 * 1000;
+            match.status !== "completed" &&
+            match.status !== "waiting" &&
+            nowTime - matchTime > 5 * 60 * 1000;
 
          if (isExpired) {
             console.log(

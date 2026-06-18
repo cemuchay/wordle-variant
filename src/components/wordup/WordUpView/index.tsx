@@ -11,11 +11,14 @@ import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
 import { Swords } from "lucide-react";
 
+import { decryptQuestions } from "../../../utils/wordupQuestionGenerator";
+
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
 import { CountdownView } from "./components/CountdownView";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
+import { LoadingView } from "./components/LoadingView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
 
 import { useWordUpStore } from "../../../store/useWordUpStore";
@@ -46,6 +49,8 @@ export const WordUpView = () => {
    const role = useWordUpStore((s) => s.role);
    const setRole = useWordUpStore((s) => s.setRole);
    const resetGame = useWordUpStore((s) => s.resetGame);
+   const setMatchData = useWordUpStore((s) => s.setMatchData);
+   const setQuestions = useWordUpStore((s) => s.setQuestions);
 
    const [countdownText, setCountdownText] = useState("3");
 
@@ -163,11 +168,14 @@ export const WordUpView = () => {
        launchedMatchIdRef.current = mId;
        setMatchId(mId);
        setRole(mRole);
+       setView("loading");
        const match = await loadAndSubscribeMatch(mId, mRole);
        if (match) {
           wordupAudio.playMatchStart();
           setView("countdown");
           startCountdown(match);
+       } else {
+          setView("menu");
        }
     }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
 
@@ -196,10 +204,27 @@ export const WordUpView = () => {
        };
     }, [cancelMatchmaking, resetGame]);
 
-   const handleCancelMatchmaking = useCallback(async () => {
-      await cancelMatchmaking();
-      setView("menu");
-   }, [cancelMatchmaking]);
+    const handleCancelMatchmaking = useCallback(async () => {
+       await cancelMatchmaking();
+       setView("menu");
+    }, [cancelMatchmaking]);
+
+    const handleSelectHistoryMatch = useCallback((match: any) => {
+       if (!effectiveUser) return;
+       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+       setRole(myRole);
+       setMatchData(match);
+
+       if (match.questions && match.encryption_key) {
+          try {
+             const dec = decryptQuestions(match.questions, match.encryption_key);
+             setQuestions(dec);
+          } catch (e) {
+             console.error("Failed to decrypt history match questions:", e);
+          }
+       }
+       setView("gameover");
+    }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
 
    if (!effectiveUser) {
       return (
@@ -302,6 +327,7 @@ export const WordUpView = () => {
                   onlineUsers={onlineUsers}
                   allProfiles={allProfiles}
                   currentUser={effectiveUser}
+                  onSelectHistoryMatch={handleSelectHistoryMatch}
                />
             )}
 
@@ -315,6 +341,10 @@ export const WordUpView = () => {
 
             {view === "countdown" && (
                <CountdownView countdownText={countdownText} />
+            )}
+
+            {view === "loading" && (
+               <LoadingView />
             )}
 
             {view === "battle" && (

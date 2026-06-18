@@ -4,7 +4,7 @@ import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../components/wordup/WordUpView/types";
 
 interface WordUpState {
-   view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover";
+   view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading";
    category: string;
    matchId: string | null;
    role: "player1" | "player2" | null;
@@ -18,7 +18,7 @@ interface WordUpState {
    revealAnswers: boolean;
 
    // Actions
-   setView: (view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover") => void;
+   setView: (view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading") => void;
    setCategory: (category: string) => void;
    setMatchId: (matchId: string | null) => void;
    setRole: (role: "player1" | "player2" | null) => void;
