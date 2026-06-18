@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ import { logger } from '../lib/logger';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushService';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useAppStore } from '../store/useAppStore';
+import { useAdminStatus } from '../hooks/useAdminStatus';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -32,6 +33,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
     const { isStandalone, handleInstall, isInstalling, isIOS } = usePWAInstall();
     const [showIOSInstallInstructions, setShowIOSInstallInstructions] = useState(false);
+    const { isAdmin } = useAdminStatus(profile?.id);
 
     const handleSignOut = async () => {
         const confirmed = await ask({
@@ -579,6 +581,31 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             <p className="text-[10px] text-gray-600 px-1 italic">
                                 Customize the order of your bottom navigation tabs.
                             </p>
+                        </section>
+                    )}
+
+                    {/* Admin Portal (Only for Admins) */}
+                    {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield')) && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Shield size={14} className="text-correct" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Management
+                                </label>
+                            </div>
+
+                            <a
+                                href="/admin"
+                                className="flex items-center justify-between p-4 bg-correct/5 border border-correct/20 rounded-xl hover:bg-correct/10 transition-all group"
+                            >
+                                <div className="flex-1 pr-4">
+                                    <p className="text-sm font-bold text-correct">Admin Vetting Portal</p>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Access word vetting, user management, and system overrides.
+                                    </p>
+                                </div>
+                                <Shield size={20} className="text-correct opacity-40 group-hover:opacity-100 transition-opacity" />
+                            </a>
                         </section>
                     )}
 

@@ -635,6 +635,7 @@ export default function App() {
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSearch={() => setIsSettingsOpen(true)}
             onOpenInfo={() => setIsInfoOpen(true)}
             onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
             onHint={actions.handleHint}
@@ -773,9 +774,9 @@ export default function App() {
       <ModalsManager
         modals={{
           isSettingsOpen,
-          isInfoOpen: false,
-          isStatsOpen: false,
-          isChallengeOpen: false,
+          isInfoOpen,
+          isStatsOpen,
+          isChallengeOpen,
           isNotificationsOpen: showNotifications,
           isAuthOpen,
           isGameOverOpen: state.isGameOverModalOpen,
