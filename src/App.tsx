@@ -119,40 +119,29 @@ export default function App() {
     }
   }, [myChallenges, setChallengeUnreadCount]);
 
-  // UI State
-  const [isStatsOpen, setIsStatsOpen] = useState(false);
-
-  // PWA Height Fix: Global listener to reset viewport height when leaving modals (especially Chat)
-  useEffect(() => {
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
-    if (!isPWA) return;
-
-    // Reset height whenever chat, conversation, or notifications modal is closed
-    if (!isChatOpen && !isChatConversationOpen && !isNotificationsOpen) {
-      const resetHeight = () => {
-        document.documentElement.style.height = '100dvh';
-        document.body.style.height = '100dvh';
-        // Force a layout recalculation
-        window.scrollTo(0, 0);
-      };
-
-      resetHeight();
-      // Small delay for mobile browsers to settle after keyboard dismissal
-      const timer = setTimeout(resetHeight, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isChatOpen, isChatConversationOpen, isNotificationsOpen]);
-
-  const [statsActiveTab, setStatsActiveTab] = useState<"stats" | "leaderboard">(
-    "leaderboard",
-  );
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isInfoOpen, setIsInfoOpen] = useState(false);
-  const [isWordUpOpen, setIsWordUpOpen] = useState(false);
+  // UI State from Global Persisted Store
+  const isStatsOpen = useAppStore(s => s.isStatsOpen);
+  const setIsStatsOpen = useAppStore(s => s.setStatsOpen);
+  const statsActiveTab = useAppStore(s => s.statsActiveTab);
+  const setStatsActiveTab = useAppStore(s => s.setStatsActiveTab);
+  
+  const isSettingsOpen = useAppStore(s => s.isSettingsOpen);
+  const setIsSettingsOpen = useAppStore(s => s.setSettingsOpen);
+  
+  const isInfoOpen = useAppStore(s => s.isInfoOpen);
+  const setIsInfoOpen = useAppStore(s => s.setInfoOpen);
+  
+  const isWordUpOpen = useAppStore(s => s.isWordUpOpen);
+  const setIsWordUpOpen = useAppStore(s => s.setWordUpOpen);
+  
+  const isWeeklyWrappedOpen = useAppStore(s => s.isWeeklyWrappedOpen);
+  const setIsWeeklyWrappedOpen = useAppStore(s => s.setWeeklyWrappedOpen);
+  
+  const showNotifications = useAppStore(s => s.showNotifications);
+  const setShowNotifications = useAppStore(s => s.setShowNotifications);
+  
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
-  const [isWeeklyWrappedOpen, setIsWeeklyWrappedOpen] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [navLoading] = useState<{ active: boolean; message: string }>({
     active: false,
     message: "",
@@ -498,6 +487,7 @@ export default function App() {
 
   useEffect(() => {
     if (!incomingWordUpInvite) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIncomingInviteTimeLeft(15);
     const interval = setInterval(() => {
       setIncomingInviteTimeLeft((prev) => {
@@ -510,6 +500,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingWordUpInvite]);
 
   useEffect(() => {

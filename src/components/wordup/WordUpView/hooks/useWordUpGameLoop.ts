@@ -12,6 +12,7 @@ import {
 } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage } from "../../../../utils/storage";
+import { wordupNetworkGate } from "../services/wordupNetworkGate";
 
 export const getQuestionDuration = (type: string): number => {
    switch (type) {
@@ -149,25 +150,30 @@ export const useWordUpGameLoop = (
                "[WordUp Logs] endGame: Pushing final consolidated match state to DB...",
             );
             // Final atomic push of all answers and scores
-            await fetchWithRetry(
-               async () => {
-                  const { error } = await supabase
-                     .from("wordup_matches")
-                     .update({
-                        status: "completed",
-                        p1_answers: match.p1_answers,
-                        p2_answers: match.p2_answers,
-                        p1_score: match.p1_score,
-                        p2_score: match.p2_score,
-                        p1_answered: true,
-                        p2_answered: true,
-                        completed_at: new Date().toISOString(),
-                     })
-                     .eq("id", match.id);
-                  if (error) throw error;
-               },
-               3,
-               1000,
+            await wordupNetworkGate.enqueue(
+               'put',
+               'finalize match scores and completed status',
+               () => fetchWithRetry(
+                  async () => {
+                     const { error } = await supabase
+                        .from("wordup_matches")
+                        .update({
+                           status: "completed",
+                           p1_answers: match.p1_answers,
+                           p2_answers: match.p2_answers,
+                           p1_score: match.p1_score,
+                           p2_score: match.p2_score,
+                           p1_answered: true,
+                           p2_answered: true,
+                           completed_at: new Date().toISOString(),
+                        })
+                        .eq("id", match.id);
+                     if (error) throw error;
+                  },
+                  3,
+                  1000,
+               ),
+               true // blocking operation
             );
             console.log("[WordUp Logs] Final sync successful.");
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
@@ -547,17 +553,25 @@ export const useWordUpGameLoop = (
                         } else {
                            // Opponent hasn't played yet. Save our progress in database and exit.
                            try {
-                              await supabase
-                                 .from("wordup_matches")
-                                 .update({
-                                    p1_answers: mergedMatch.p1_answers,
-                                    p2_answers: mergedMatch.p2_answers,
-                                    p1_score: mergedMatch.p1_score,
-                                    p2_score: mergedMatch.p2_score,
-                                    p1_answered: isP1 ? true : mergedMatch.p1_answered,
-                                    p2_answered: !isP1 ? true : mergedMatch.p2_answered,
-                                 })
-                                 .eq("id", mergedMatch.id);
+                              await wordupNetworkGate.enqueue(
+                                 'put',
+                                 'submit async turn answers and score',
+                                 async () => {
+                                    const { error } = await supabase
+                                       .from("wordup_matches")
+                                       .update({
+                                          p1_answers: mergedMatch.p1_answers,
+                                          p2_answers: mergedMatch.p2_answers,
+                                          p1_score: mergedMatch.p1_score,
+                                          p2_score: mergedMatch.p2_score,
+                                          p1_answered: isP1 ? true : mergedMatch.p1_answered,
+                                          p2_answered: !isP1 ? true : mergedMatch.p2_answered,
+                                       })
+                                       .eq("id", mergedMatch.id);
+                                    if (error) throw error;
+                                 },
+                                 true // blocking operation
+                              );
                               triggerToast("Turn submitted! Waiting for opponent.", 5000);
                            } catch (err) {
                               console.error("Failed to save async turn:", err);
@@ -613,6 +627,7 @@ export const useWordUpGameLoop = (
          triggerToast,
       ],
    );
+
    const acceptRematch = useCallback(
       async (
          onMatchFoundCallback: (
@@ -633,23 +648,32 @@ export const useWordUpGameLoop = (
             const secretKey = generateSecretKey();
             const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
-            // Create new match row
-            const { data: newMatch, error } = await supabase
-               .from("wordup_matches")
-               .insert({
-                  category: match.category,
-                  player1_id: match.player1_id,
-                  player2_id: match.player2_id,
-                  questions: encryptedStr,
-                  encryption_key: secretKey,
-                  status: "countdown",
-                  question_started_at: new Date(getSyncedNow()).toISOString(),
-               })
-               .select()
-               .single();
+            // Create new match row via network gate
+            const newMatch = await wordupNetworkGate.enqueue(
+               "post",
+               "create rematch match row",
+               async () => {
+                  const { data, error } = await supabase
+                     .from("wordup_matches")
+                     .insert({
+                        category: match.category,
+                        player1_id: match.player1_id,
+                        player2_id: match.player2_id,
+                        questions: encryptedStr,
+                        encryption_key: secretKey,
+                        status: "countdown",
+                        question_started_at: new Date(getSyncedNow()).toISOString(),
+                     })
+                     .select()
+                     .single();
+                  if (error) throw error;
+                  return data;
+               },
+               true // blocking
+            );
 
-            if (error || !newMatch)
-               throw error || new Error("Failed to create rematch");
+            if (!newMatch)
+               throw new Error("Failed to create rematch");
 
             console.log(
                "[WordUp Logs] Rematch created successfully, ID:",
@@ -680,13 +704,22 @@ export const useWordUpGameLoop = (
 
    const loadAndSubscribeMatch = useCallback(
       async (mId: string, activeRole: "player1" | "player2") => {
-         const { data: match, error } = await supabase
-            .from("wordup_matches")
-            .select("*")
-            .eq("id", mId)
-            .single();
-
-         if (error || !match) {
+         let match;
+         try {
+            match = await wordupNetworkGate.enqueue(
+               "get",
+               `load match details for ID ${mId}`,
+               async () => {
+                  const { data, error } = await supabase
+                     .from("wordup_matches")
+                     .select("*")
+                     .eq("id", mId)
+                     .single();
+                  if (error) throw error;
+                  return data;
+               }
+            );
+         } catch (error) {
             console.error("Error loading match:", error);
             return null;
          }
@@ -710,13 +743,21 @@ export const useWordUpGameLoop = (
             console.log(
                "[WordUp Logs] Match is older than 5 minutes. Expiring match in database...",
             );
-            await supabase
-               .from("wordup_matches")
-               .update({
-                  status: "completed",
-                  completed_at: new Date().toISOString(),
-               })
-               .eq("id", mId);
+            await wordupNetworkGate.enqueue(
+               "put",
+               `expire match ID ${mId}`,
+               async () => {
+                  const { error } = await supabase
+                     .from("wordup_matches")
+                     .update({
+                        status: "completed",
+                        completed_at: new Date().toISOString(),
+                     })
+                     .eq("id", mId);
+                  if (error) throw error;
+               },
+               true
+            );
             triggerToast(
                "This match invitation has expired (older than 5 minutes).",
                5000,
@@ -742,16 +783,40 @@ export const useWordUpGameLoop = (
          const oppId =
             activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {
-            const { data: mainProf } = await supabase
-               .from("profiles")
-               .select("username, avatar_url")
-               .eq("id", oppId)
-               .single();
-            const { data: oppProf } = await supabase
-               .from("wordup_profiles")
-               .select("*")
-               .eq("id", oppId)
-               .single();
+            const mainProf = await wordupNetworkGate.enqueue(
+               "get",
+               `load main profile for opponent ${oppId}`,
+               async () => {
+                  const { data, error } = await supabase
+                     .from("profiles")
+                     .select("username, avatar_url")
+                     .eq("id", oppId)
+                     .single();
+                  if (error) throw error;
+                  return data;
+               }
+            ).catch(e => {
+               console.warn("Failed to load main profile for opponent:", e);
+               return null;
+            });
+
+            const oppProf = await wordupNetworkGate.enqueue(
+               "get",
+               `load wordup profile for opponent ${oppId}`,
+               async () => {
+                  const { data, error } = await supabase
+                     .from("wordup_profiles")
+                     .select("*")
+                     .eq("id", oppId)
+                     .single();
+                  if (error) throw error;
+                  return data;
+               }
+            ).catch(e => {
+               console.warn("Failed to load wordup profile for opponent:", e);
+               return null;
+            });
+
             if (oppProf) {
                setOpponentStats({
                   ...oppProf,

@@ -7,6 +7,7 @@ import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { useApp } from "../../../../context/AppContext";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -33,6 +34,7 @@ export const LobbyView = ({
    allProfiles,
    currentUser
 }: LobbyViewProps) => {
+   const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const timeoutRef = useRef<number | null>(null);
@@ -100,15 +102,67 @@ export const LobbyView = ({
       };
    }, []);
 
-   // Fetch data when activeTab changes
-   useEffect(() => {
-      if (activeTab === "pending") {
-         fetchPendingMatches();
-      } else if (activeTab === "history") {
-         fetchHistory();
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [activeTab]);
+    // Fetch data when activeTab changes or currentUser updates
+    useEffect(() => {
+       if (activeTab === "history") {
+          fetchHistory();
+       } else if (activeTab === "pending") {
+          fetchPendingMatches();
+       }
+    }, [activeTab, currentUser?.id]);
+
+    // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
+    useEffect(() => {
+        if (currentUser?.id) {
+            fetchPendingMatches();
+        }
+    }, [currentUser?.id]);
+
+    // Realtime listener for pending matches updates
+    useEffect(() => {
+       if (!currentUser?.id) return;
+
+       const channelName = `wordup_matches_lobby_${currentUser.id}`;
+       const existingChannel = supabase
+          .getChannels()
+          .find((c) => (c as any).topic === `realtime:${channelName}`);
+       if (existingChannel) {
+          supabase.removeChannel(existingChannel);
+       }
+
+       const channel = supabase
+          .channel(channelName)
+          .on(
+             "postgres_changes",
+             {
+                event: "*",
+                schema: "public",
+                table: "wordup_matches",
+                filter: `player1_id=eq.${currentUser.id}`
+             },
+             () => {
+                fetchPendingMatches();
+             }
+          )
+          .on(
+             "postgres_changes",
+             {
+                event: "*",
+                schema: "public",
+                table: "wordup_matches",
+                filter: `player2_id=eq.${currentUser.id}`
+             },
+             () => {
+                fetchPendingMatches();
+             }
+          )
+          .subscribe();
+
+       return () => {
+          supabase.removeChannel(channel);
+       };
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.id]);
 
    const fetchPendingMatches = async () => {
       if (!currentUser) return;
@@ -184,6 +238,10 @@ export const LobbyView = ({
    };
 
    const createPendingMatchAndNotification = async (targetUser: any) => {
+      if (!currentUser?.id || !targetUser?.id || currentUser.id === targetUser.id) {
+         console.error("Invalid IDs or challenging self");
+         return null;
+      }
       try {
          const rawQuestions = generateWordUpQuestions(category);
          const secretKey = generateSecretKey();
@@ -207,16 +265,6 @@ export const LobbyView = ({
 
          if (error || !newMatch) throw error || new Error("Failed to create match");
 
-         // App notification for target user
-         await supabase.from("notifications").insert({
-            user_id: targetUser.id,
-            type: "CHALLENGE_INVITE",
-            title: "New WordUp Challenge",
-            message: `${currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Someone"} challenged you to WordUp!`,
-            data: { mode: "wordup", matchId: newMatch.id },
-            is_read: false
-         });
-
          return newMatch.id;
       } catch (e) {
          console.error("Failed to create pending match/notification:", e);
@@ -227,6 +275,10 @@ export const LobbyView = ({
    const handleSendInvite = (targetUser: any) => {
       if (!currentUser) {
          window.dispatchEvent(new CustomEvent("open-auth-modal"));
+         return;
+      }
+      if (targetUser.id === currentUser.id) {
+         triggerToast("You cannot challenge yourself!", 3000);
          return;
       }
 

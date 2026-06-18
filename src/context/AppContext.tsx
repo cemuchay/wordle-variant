@@ -580,8 +580,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 const shouldRefresh = wasDisconnectedRef.current || timeHidden > 30 * 60 * 1000;
 
                 if (shouldRefresh) {
-                    // Refresh authoritative date and trigger a global event for game engines to re-hydrate
-                    queryClient.invalidateQueries({ queryKey: ['server-date'] });
+                    // Refresh authoritative date silently and trigger a global event for game engines to re-hydrate
+                    queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });
                     window.dispatchEvent(new CustomEvent('app-visibility-visible'));
                     wasDisconnectedRef.current = false;
                 }
@@ -592,7 +592,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         const handleOnline = () => {
             syncMessages();
-            queryClient.invalidateQueries({ queryKey: ['server-date'] });
+            queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });
             window.dispatchEvent(new CustomEvent('app-visibility-visible'));
             wasDisconnectedRef.current = false;
         };

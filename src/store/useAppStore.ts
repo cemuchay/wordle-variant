@@ -57,6 +57,13 @@ interface AppState {
    isNotificationsOpen: boolean;
    isChatOpen: boolean;
    isChatConversationOpen: boolean;
+   isStatsOpen: boolean;
+   isSettingsOpen: boolean;
+   isInfoOpen: boolean;
+   isWordUpOpen: boolean;
+   isWeeklyWrappedOpen: boolean;
+   showNotifications: boolean;
+   statsActiveTab: "stats" | "leaderboard";
    isLoadingDate: boolean;
 
    // Auth-related Local State
@@ -93,6 +100,13 @@ interface AppState {
    setNotificationsOpen: (val: boolean) => void;
    setChatOpen: (val: boolean) => void;
    setChatConversationOpen: (val: boolean) => void;
+   setStatsOpen: (val: boolean) => void;
+   setSettingsOpen: (val: boolean) => void;
+   setInfoOpen: (val: boolean) => void;
+   setWordUpOpen: (val: boolean) => void;
+   setWeeklyWrappedOpen: (val: boolean) => void;
+   setShowNotifications: (val: boolean) => void;
+   setStatsActiveTab: (val: "stats" | "leaderboard") => void;
    setUnreadCount: (val: number) => void;
    setChallengeUnreadCount: (val: number) => void;
    setActiveCall: (call: VoiceCallState | null) => void;
@@ -131,6 +145,13 @@ interface AppState {
          isNotificationsOpen: false,
          isChatOpen: false,
          isChatConversationOpen: false,
+         isStatsOpen: false,
+         isSettingsOpen: false,
+         isInfoOpen: false,
+         isWordUpOpen: false,
+         isWeeklyWrappedOpen: false,
+         showNotifications: false,
+         statsActiveTab: "leaderboard",
          isLoadingDate: true,
          preferences: defaultPreferences,
          stats: INITIAL_STATS,
@@ -168,6 +189,13 @@ interface AppState {
          setChatOpen: (isChatOpen) => set({ isChatOpen }),
          setChatConversationOpen: (isChatConversationOpen) =>
             set({ isChatConversationOpen }),
+         setStatsOpen: (isStatsOpen) => set({ isStatsOpen }),
+         setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
+         setInfoOpen: (isInfoOpen) => set({ isInfoOpen }),
+         setWordUpOpen: (isWordUpOpen) => set({ isWordUpOpen }),
+         setWeeklyWrappedOpen: (isWeeklyWrappedOpen) => set({ isWeeklyWrappedOpen }),
+         setShowNotifications: (showNotifications) => set({ showNotifications }),
+         setStatsActiveTab: (statsActiveTab) => set({ statsActiveTab }),
          setUnreadCount: (unreadCount) => set({ unreadCount }),
          setChallengeUnreadCount: (challengeUnreadCount) =>
             set({ challengeUnreadCount }),
@@ -276,6 +304,17 @@ interface AppState {
             readReceipts: state.readReceipts,
             joinedGroupIds: state.joinedGroupIds,
             challengePresets: state.challengePresets,
+            isChallengeOpen: state.isChallengeOpen,
+            isNotificationsOpen: state.isNotificationsOpen,
+            isChatOpen: state.isChatOpen,
+            isChatConversationOpen: state.isChatConversationOpen,
+            isStatsOpen: state.isStatsOpen,
+            isSettingsOpen: state.isSettingsOpen,
+            isInfoOpen: state.isInfoOpen,
+            isWordUpOpen: state.isWordUpOpen,
+            isWeeklyWrappedOpen: state.isWeeklyWrappedOpen,
+            showNotifications: state.showNotifications,
+            statsActiveTab: state.statsActiveTab,
          }),
       },
    ),

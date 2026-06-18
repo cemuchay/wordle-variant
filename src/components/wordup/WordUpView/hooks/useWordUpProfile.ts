@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { type ProfileStats } from "../types";
+import { wordupNetworkGate } from "../services/wordupNetworkGate";
 
 export const useWordUpProfile = (user: any) => {
    const [userStats, setUserStats] = useState<ProfileStats | null>(null);
@@ -9,34 +10,38 @@ export const useWordUpProfile = (user: any) => {
    const fetchUserProfile = useCallback(async () => {
       if (!user) return;
       try {
-         const data = await fetchWithRetry(async () => {
-            const { data, error } = await supabase
-               .from("wordup_profiles")
-               .select("*")
-               .eq("id", user.id)
-               .maybeSingle();
-            if (error) throw error;
-            
-            if (data) {
-               return data;
-            } else {
-               const defaultProfile = {
-                  id: user.id,
-                  rating: 1000,
-                  xp: 0,
-                  games_played: 0,
-                  games_won: 0,
-                  games_lost: 0,
-                  games_tied: 0,
-                  rank_name: "Silver"
-               };
-               const { error: insertError } = await supabase
+         const data = await wordupNetworkGate.enqueue(
+            'get',
+            'fetch user profile',
+            () => fetchWithRetry(async () => {
+               const { data, error } = await supabase
                   .from("wordup_profiles")
-                  .insert(defaultProfile);
-               if (insertError) throw insertError;
-               return defaultProfile;
-            }
-         }, 3, 1500);
+                  .select("*")
+                  .eq("id", user.id)
+                  .maybeSingle();
+               if (error) throw error;
+               
+               if (data) {
+                  return data;
+               } else {
+                  const defaultProfile = {
+                     id: user.id,
+                     rating: 1000,
+                     xp: 0,
+                     games_played: 0,
+                     games_won: 0,
+                     games_lost: 0,
+                     games_tied: 0,
+                     rank_name: "Silver"
+                  };
+                  const { error: insertError } = await supabase
+                     .from("wordup_profiles")
+                     .insert(defaultProfile);
+                  if (insertError) throw insertError;
+                  return defaultProfile;
+               }
+            }, 3, 1500)
+         );
 
          if (data) {
             setUserStats(data);
@@ -63,62 +68,69 @@ export const useWordUpProfile = (user: any) => {
    const updateStats = useCallback(async (eloGain: number, xpReward: number, won: boolean, tied: boolean) => {
       if (!user) return;
       try {
-         const currentProf = await fetchWithRetry(async () => {
-            const { data, error } = await supabase
-               .from("wordup_profiles")
-               .select("*")
-               .eq("id", user.id)
-               .maybeSingle();
-            if (error) throw error;
-            if (data) {
-               return data;
-            } else {
-               const defaultProfile = {
-                  id: user.id,
-                  rating: 1000,
-                  xp: 0,
-                  games_played: 0,
-                  games_won: 0,
-                  games_lost: 0,
-                  games_tied: 0,
-                  rank_name: "Silver"
-               };
-               const { error: insertError } = await supabase
-                  .from("wordup_profiles")
-                  .insert(defaultProfile);
-               if (insertError) throw insertError;
-               return defaultProfile;
-            }
-         }, 3, 1000);
+         await wordupNetworkGate.enqueue(
+            'put',
+            'update stats ELO/XP',
+            async () => {
+               const currentProf = await fetchWithRetry(async () => {
+                  const { data, error } = await supabase
+                     .from("wordup_profiles")
+                     .select("*")
+                     .eq("id", user.id)
+                     .maybeSingle();
+                  if (error) throw error;
+                  if (data) {
+                     return data;
+                  } else {
+                     const defaultProfile = {
+                        id: user.id,
+                        rating: 1000,
+                        xp: 0,
+                        games_played: 0,
+                        games_won: 0,
+                        games_lost: 0,
+                        games_tied: 0,
+                        rank_name: "Silver"
+                     };
+                     const { error: insertError } = await supabase
+                        .from("wordup_profiles")
+                        .insert(defaultProfile);
+                     if (insertError) throw insertError;
+                     return defaultProfile;
+                  }
+               }, 3, 1000);
 
-         if (currentProf) {
-            const newRating = Math.max(800, currentProf.rating + eloGain);
-            const newXp = currentProf.xp + xpReward;
+               if (currentProf) {
+                  const newRating = Math.max(800, currentProf.rating + eloGain);
+                  const newXp = currentProf.xp + xpReward;
 
-            let rank = "Bronze";
-            if (newRating >= 1800) rank = "Master";
-            else if (newRating >= 1500) rank = "Diamond";
-            else if (newRating >= 1200) rank = "Gold";
-            else if (newRating >= 1000) rank = "Silver";
+                  let rank = "Bronze";
+                  if (newRating >= 1800) rank = "Master";
+                  else if (newRating >= 1500) rank = "Diamond";
+                  else if (newRating >= 1200) rank = "Gold";
+                  else if (newRating >= 1000) rank = "Silver";
 
-            await fetchWithRetry(async () => {
-               const { error } = await supabase
-                  .from("wordup_profiles")
-                  .update({
-                     rating: newRating,
-                     xp: newXp,
-                     games_played: currentProf.games_played + 1,
-                     games_won: currentProf.games_won + (won ? 1 : 0),
-                     games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
-                     games_tied: currentProf.games_tied + (tied ? 1 : 0),
-                     rank_name: rank
-                  })
-                  .eq("id", user.id);
-               if (error) throw error;
-            }, 3, 1000);
+                  await fetchWithRetry(async () => {
+                     const { error } = await supabase
+                        .from("wordup_profiles")
+                        .update({
+                           rating: newRating,
+                           xp: newXp,
+                           games_played: currentProf.games_played + 1,
+                           games_won: currentProf.games_won + (won ? 1 : 0),
+                           games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
+                           games_tied: currentProf.games_tied + (tied ? 1 : 0),
+                           rank_name: rank
+                        })
+                        .eq("id", user.id);
+                     if (error) throw error;
+                  }, 3, 1000);
 
-            fetchUserProfile();
-         }
+                  fetchUserProfile();
+               }
+            },
+            true // blocking rating updates
+         );
       } catch (err) {
          console.error("Rating update transaction failed:", err);
          throw err;
