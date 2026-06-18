@@ -189,11 +189,12 @@ export const WordUpView = () => {
       cancelMatchmaking
    } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
 
-   useEffect(() => {
-      return () => {
-         cancelMatchmaking();
-      };
-   }, [cancelMatchmaking]);
+    useEffect(() => {
+       return () => {
+          cancelMatchmaking();
+          resetGame();
+       };
+    }, [cancelMatchmaking, resetGame]);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
