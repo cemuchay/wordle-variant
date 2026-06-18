@@ -596,10 +596,15 @@ export const LobbyView = ({
                         {incomingOfflineOrTimeout.type === "offline" ? "Player Offline" : "No Response"}
                      </h3>
                      <p className="text-[10px] text-gray-400 mt-1">
-                        {incomingOfflineOrTimeout.type === "offline" 
-                           ? `<strong className="text-white">${incomingOfflineOrTimeout.targetUser.username}</strong> is offline.`
-                           : `<strong className="text-white">${incomingOfflineOrTimeout.targetUser.username}</strong> did not respond within 15 seconds.`
-                        } This game will be automatically pending.
+                        {incomingOfflineOrTimeout.type === "offline" ? (
+                           <>
+                              <strong className="text-white">{incomingOfflineOrTimeout.targetUser.username}</strong> is offline.
+                           </>
+                        ) : (
+                           <>
+                              <strong className="text-white">{incomingOfflineOrTimeout.targetUser.username}</strong> did not respond within 15 seconds.
+                           </>
+                        )} This game will be automatically pending.
                      </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 w-full">

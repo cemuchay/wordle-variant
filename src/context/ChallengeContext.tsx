@@ -417,10 +417,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         const userId = effectiveUser?.id;
         if (!userId) return;
 
+        const channelName = `user_challenges_realtime_${userId}`;
+        const existingChannel = supabase
+            .getChannels()
+            .find((c) => (c as any).topic === `realtime:${channelName}`);
+        if (existingChannel) {
+            supabase.removeChannel(existingChannel);
+        }
+
         // Optimize performance by filtering at the database level.
         // Since we want to match user_id or guest_id, we register two separate postgres_changes filters on the same channel.
         const channel = supabase
-            .channel(`user_challenges_realtime_${userId}`)
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 {

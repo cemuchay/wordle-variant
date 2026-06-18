@@ -582,7 +582,8 @@ export const useWordUpGameLoop = (
          if (
             mergedMatch.current_question_index !== currentIdxRef.current &&
             (mergedMatch.status === "active" ||
-               mergedMatch.status === "countdown")
+               mergedMatch.status === "countdown" ||
+               mergedMatch.status === "waiting")
          ) {
             console.log(
                `[WordUp Logs] Transitioning round: ${currentIdxRef.current} -> ${mergedMatch.current_question_index}`,
