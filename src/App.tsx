@@ -122,27 +122,6 @@ export default function App() {
   // UI State
   const [isStatsOpen, setIsStatsOpen] = useState(false);
 
-  // PWA Height Fix: Global listener to reset viewport height when leaving modals (especially Chat)
-  useEffect(() => {
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
-    if (!isPWA) return;
-
-    // Reset height whenever chat, conversation, or notifications modal is closed
-    if (!isChatOpen && !isChatConversationOpen && !isNotificationsOpen) {
-      const resetHeight = () => {
-        document.documentElement.style.height = '100dvh';
-        document.body.style.height = '100dvh';
-        // Force a layout recalculation
-        window.scrollTo(0, 0);
-      };
-
-      resetHeight();
-      // Small delay for mobile browsers to settle after keyboard dismissal
-      const timer = setTimeout(resetHeight, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isChatOpen, isChatConversationOpen, isNotificationsOpen]);
-
   const [statsActiveTab, setStatsActiveTab] = useState<"stats" | "leaderboard">(
     "leaderboard",
   );
@@ -498,6 +477,7 @@ export default function App() {
 
   useEffect(() => {
     if (!incomingWordUpInvite) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIncomingInviteTimeLeft(15);
     const interval = setInterval(() => {
       setIncomingInviteTimeLeft((prev) => {
@@ -510,6 +490,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingWordUpInvite]);
 
   useEffect(() => {
@@ -732,13 +713,13 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <StatsModal
-                     isOpen={true}
-                     inline={true}
-                     stats={stats}
-                     onClose={() => setIsStatsOpen(false)}
-                     user={user as AppUser}
-                     isGameOver={state.isGameOver}
-                     initialTab={statsActiveTab}
+                    isOpen={true}
+                    inline={true}
+                    stats={stats}
+                    onClose={() => setIsStatsOpen(false)}
+                    user={user as AppUser}
+                    isGameOver={state.isGameOver}
+                    initialTab={statsActiveTab}
                   />
                 </Suspense>
               </div>
@@ -748,12 +729,12 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
-                     isOpen={true}
-                     inline={true}
-                     onClose={() => setIsChallengeOpen(false)}
-                     user={user as AppUser}
-                     onChallengeCreated={handleChallengeCreated}
-                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setIsChallengeOpen(false)}
+                    user={user as AppUser}
+                    onChallengeCreated={handleChallengeCreated}
+                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                   />
                 </Suspense>
               </div>

@@ -162,7 +162,7 @@ export const useWordUpMatchmaking = (
          if (result.status === "queued" || !result.match_id) {
             setRole("player1");
             setMatchId(null);
-            setCountdownSecs(10);
+            setCountdownSecs(6);
 
             matchmakingIntervalRef.current = window.setInterval(() => {
                const current = useWordUpStore.getState().countdownSecs;
