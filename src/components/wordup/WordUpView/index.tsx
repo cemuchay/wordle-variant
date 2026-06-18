@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../hooks/useAuth";
 import { useApp } from "../../../context/AppContext";
@@ -141,8 +141,11 @@ export const WordUpView = () => {
        }, 1000);
     }, [startQuestionRound, role]);
 
+    const launchedMatchIdRef = useRef<string | null>(null);
+
     // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
+       launchedMatchIdRef.current = mId;
        setMatchId(mId);
        setRole(mRole);
        const match = await loadAndSubscribeMatch(mId, mRole);
@@ -155,7 +158,7 @@ export const WordUpView = () => {
 
     // Reactive sync for direct invites and rematch transitions
     useEffect(() => {
-       if (matchId && role && (view === "menu" || view === "matchmaking" || view === "gameover")) {
+       if (matchId && role && matchId !== launchedMatchIdRef.current && (view === "menu" || view === "matchmaking" || view === "gameover")) {
           console.log("[WordUp Logs] Direct matchId set in store. Launching match...", matchId, role);
           onMatchFound(matchId, role);
        }

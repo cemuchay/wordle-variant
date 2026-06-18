@@ -20,7 +20,10 @@ export const getQuestionDuration = (type: string): number => {
          return 8;
       case "definition":
       case "anagram":
+      case "anagram_scrambled":
       case "pattern":
+      case "math":
+      case "odd_one_out":
          return 12;
       case "reverse_wordle":
          return 15;
@@ -839,11 +842,11 @@ export const useWordUpGameLoop = (
                }
 
                setRematchState("received");
-               setRematchCountdown(10);
+               setRematchCountdown(20);
 
                if (rematchTimerRef.current)
                   clearInterval(rematchTimerRef.current);
-               let count = 10;
+               let count = 20;
                rematchTimerRef.current = window.setInterval(() => {
                   count--;
                   if (count <= 0) {
@@ -941,7 +944,7 @@ export const useWordUpGameLoop = (
 
       console.log("[WordUp Logs] Sending rematch request to peer...");
       setRematchState("sent");
-      setRematchCountdown(10);
+      setRematchCountdown(20);
 
       matchChannelRef.current.send({
          type: "broadcast",
@@ -950,7 +953,7 @@ export const useWordUpGameLoop = (
       });
 
       if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
-      let count = 10;
+      let count = 20;
       rematchTimerRef.current = window.setInterval(() => {
          count--;
          if (count <= 0) {
