@@ -8,6 +8,7 @@ import {
    getRandomBotProfile,
 } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { wordupNetworkGate } from "../services/wordupNetworkGate";
 
 export const useWordUpMatchmaking = (
    user: any,
@@ -39,10 +40,14 @@ export const useWordUpMatchmaking = (
       cleanUpMatchmaking();
 
       try {
-         await fetchWithRetry(async () => {
-            const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
-            if (error) throw error;
-         }, 3, 1000);
+         await wordupNetworkGate.enqueue(
+            'delete',
+            'delete self from queue before bot match',
+            () => fetchWithRetry(async () => {
+               const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+               if (error) throw error;
+            }, 3, 1000)
+         );
       } catch (e) {
          console.warn("Queue purge failed, continuing:", e);
       }
@@ -53,25 +58,29 @@ export const useWordUpMatchmaking = (
       const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
       try {
-         const data = await fetchWithRetry(async () => {
-            const { data, error } = await supabase
-               .from("wordup_matches")
-               .insert({
-                  category,
-                  player1_id: user.id,
-                  player2_id: "00000000-0000-0000-0000-000000000b0b",
-                  is_bot_match: true,
-                  bot_profile: botProfile,
-                  questions: encryptedStr,
-                  encryption_key: secretKey,
-                  status: "countdown",
-                  question_started_at: new Date(getSyncedNow()).toISOString()
-               })
-               .select()
-               .single();
-            if (error) throw error;
-            return data;
-         }, 3, 1000);
+         const data = await wordupNetworkGate.enqueue(
+            'post',
+            'create bot match row',
+            () => fetchWithRetry(async () => {
+               const { data, error } = await supabase
+                  .from("wordup_matches")
+                  .insert({
+                     category,
+                     player1_id: user.id,
+                     player2_id: "00000000-0000-0000-0000-000000000b0b",
+                     is_bot_match: true,
+                     bot_profile: botProfile,
+                     questions: encryptedStr,
+                     encryption_key: secretKey,
+                     status: "countdown",
+                     question_started_at: new Date(getSyncedNow()).toISOString()
+                  })
+                  .select()
+                  .single();
+               if (error) throw error;
+               return data;
+            }, 3, 1000)
+         );
 
          if (data) {
             setMatchId(data.id);
@@ -136,14 +145,19 @@ export const useWordUpMatchmaking = (
       cleanUpMatchmaking();
 
       try {
-         const result = await fetchWithRetry(async () => {
-            const { data, error } = await supabase.rpc("join_wordup_queue", {
-               p_user_id: user.id,
-               p_category: category
-            });
-            if (error) throw error;
-            return typeof data === "string" ? JSON.parse(data) : data;
-         }, 3, 1000);
+         const result = await wordupNetworkGate.enqueue(
+            'rpc',
+            'join matchmaking queue (RPC)',
+            () => fetchWithRetry(async () => {
+               const { data, error } = await supabase.rpc("join_wordup_queue", {
+                  p_user_id: user.id,
+                  p_category: category
+               });
+               if (error) throw error;
+               return typeof data === "string" ? JSON.parse(data) : data;
+            }, 3, 1000),
+            true // blocking operation
+         );
 
          if (result.status === "queued" || !result.match_id) {
             setRole("player1");
@@ -174,18 +188,22 @@ export const useWordUpMatchmaking = (
             const secretKey = generateSecretKey();
             const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
-            await fetchWithRetry(async () => {
-               const { error: updateError } = await supabase
-                  .from("wordup_matches")
-                  .update({
-                     questions: encryptedStr,
-                     encryption_key: secretKey,
-                     status: "countdown",
-                     question_started_at: new Date(getSyncedNow()).toISOString()
-                  })
-                  .eq("id", newMatchId);
-               if (updateError) throw updateError;
-            }, 3, 1000);
+            await wordupNetworkGate.enqueue(
+               'put',
+               'update match questions and key',
+               () => fetchWithRetry(async () => {
+                  const { error: updateError } = await supabase
+                     .from("wordup_matches")
+                     .update({
+                        questions: encryptedStr,
+                        encryption_key: secretKey,
+                        status: "countdown",
+                        question_started_at: new Date(getSyncedNow()).toISOString()
+                     })
+                     .eq("id", newMatchId);
+                  if (updateError) throw updateError;
+               }, 3, 1000)
+            );
 
             onMatchFound(newMatchId, "player2");
          }
@@ -193,15 +211,23 @@ export const useWordUpMatchmaking = (
          console.error("Matchmaking startup failed:", err);
          triggerToast("Failed to join arena. Please try again.", 4000);
       }
-   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking]);
+   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking, getSyncedNow]);
 
    const cancelMatchmaking = useCallback(async () => {
       cleanUpMatchmaking();
       if (user) {
-         await fetchWithRetry(async () => {
-            const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
-            if (error) throw error;
-         }, 3, 1000);
+         try {
+            await wordupNetworkGate.enqueue(
+               'delete',
+               'cancel matchmaking queue',
+               () => fetchWithRetry(async () => {
+                  const { error } = await supabase.from("wordup_queue").delete().eq("user_id", user.id);
+                  if (error) throw error;
+               }, 3, 1000)
+            );
+         } catch (e) {
+            console.error("Failed to cancel matchmaking:", e);
+         }
       }
       if (matchmakingChannelRef.current) {
          supabase.removeChannel(matchmakingChannelRef.current);

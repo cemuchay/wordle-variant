@@ -104,17 +104,23 @@ export const LobbyView = ({
 
     // Fetch data when activeTab changes or currentUser updates
     useEffect(() => {
-       if (activeTab === "pending") {
-          fetchPendingMatches();
-       } else if (activeTab === "history") {
+       if (activeTab === "history") {
           fetchHistory();
+       } else if (activeTab === "pending") {
+          fetchPendingMatches();
        }
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, currentUser]);
+    }, [activeTab, currentUser?.id]);
+
+    // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
+    useEffect(() => {
+        if (currentUser?.id) {
+            fetchPendingMatches();
+        }
+    }, [currentUser?.id]);
 
     // Realtime listener for pending matches updates
     useEffect(() => {
-       if (!currentUser?.id || activeTab !== "pending") return;
+       if (!currentUser?.id) return;
 
        const channelName = `wordup_matches_lobby_${currentUser.id}`;
        const existingChannel = supabase
@@ -156,7 +162,7 @@ export const LobbyView = ({
           supabase.removeChannel(channel);
        };
        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser?.id, activeTab]);
+    }, [currentUser?.id]);
 
    const fetchPendingMatches = async () => {
       if (!currentUser) return;
@@ -258,16 +264,6 @@ export const LobbyView = ({
             .single();
 
          if (error || !newMatch) throw error || new Error("Failed to create match");
-
-         // App notification for target user
-         await supabase.from("notifications").insert({
-            user_id: targetUser.id,
-            type: "CHALLENGE_INVITE",
-            title: "New WordUp Challenge",
-            message: `${currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Someone"} challenged you to WordUp!`,
-            data: { mode: "wordup", matchId: newMatch.id },
-            is_read: false
-         });
 
          return newMatch.id;
       } catch (e) {
