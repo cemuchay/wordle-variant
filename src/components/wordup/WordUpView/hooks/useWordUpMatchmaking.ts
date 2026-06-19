@@ -62,19 +62,20 @@ export const useWordUpMatchmaking = (
             'post',
             'create bot match row',
             () => fetchWithRetry(async () => {
-               const { data, error } = await supabase
-                  .from("wordup_matches")
-                  .insert({
-                     category,
-                     player1_id: user.id,
-                     player2_id: "00000000-0000-0000-0000-000000000b0b",
-                     is_bot_match: true,
-                     bot_profile: botProfile,
-                     questions: encryptedStr,
-                     encryption_key: secretKey,
-                     status: "countdown",
-                     question_started_at: new Date(getSyncedNow()).toISOString()
-                  })
+                const { data, error } = await supabase
+                   .from("wordup_matches")
+                   .insert({
+                      category,
+                      player1_id: user.id,
+                      player2_id: "00000000-0000-0000-0000-000000000b0b",
+                      is_bot_match: true,
+                      bot_profile: botProfile,
+                      questions: encryptedStr,
+                      encryption_key: secretKey,
+                      status: "countdown",
+                      game_type: "live-bot",
+                      question_started_at: new Date(getSyncedNow()).toISOString()
+                   })
                   .select()
                   .single();
                if (error) throw error;
@@ -103,15 +104,16 @@ export const useWordUpMatchmaking = (
                table: "wordup_matches",
                filter: `player1_id=eq.${user?.id}`
             },
-            async (payload) => {
-               const match = payload.new;
-               if (match.status === "countdown" || match.status === "waiting") {
-                  cleanUpMatchmaking();
-                  setMatchId(match.id);
-                  setRole("player1");
-                  onMatchFound(match.id, "player1");
-               }
-            }
+             async (payload) => {
+                const match = payload.new;
+                const gameType = match.game_type || (match.is_bot_match ? "live-bot" : match.status === "waiting" ? "async" : "live");
+                if (match.status === "countdown" || (match.status === "waiting" && gameType === "live")) {
+                   cleanUpMatchmaking();
+                   setMatchId(match.id);
+                   setRole("player1");
+                   onMatchFound(match.id, "player1");
+                }
+             }
          )
          .on(
             "postgres_changes",
@@ -159,54 +161,121 @@ export const useWordUpMatchmaking = (
             true // blocking operation
          );
 
-         if (result.status === "queued" || !result.match_id) {
-            setRole("player1");
-            setMatchId(null);
-            setCountdownSecs(6);
+          if (result.status === "queued" || !result.match_id) {
+             setRole("player1");
+             setMatchId(null);
+             setCountdownSecs(6);
 
-            matchmakingIntervalRef.current = window.setInterval(() => {
-               const current = useWordUpStore.getState().countdownSecs;
-               if (current <= 1) {
-                  if (matchmakingIntervalRef.current) {
-                     clearInterval(matchmakingIntervalRef.current);
-                     matchmakingIntervalRef.current = null;
-                  }
-                  setCountdownSecs(0);
-                  triggerBotFallback();
-               } else {
-                  setCountdownSecs(current - 1);
-               }
-            }, 1000);
+             matchmakingIntervalRef.current = window.setInterval(() => {
+                const current = useWordUpStore.getState().countdownSecs;
+                if (current <= 1) {
+                   if (matchmakingIntervalRef.current) {
+                      clearInterval(matchmakingIntervalRef.current);
+                      matchmakingIntervalRef.current = null;
+                   }
+                   setCountdownSecs(0);
+                   triggerBotFallback();
+                } else {
+                   setCountdownSecs(current - 1);
+                }
+             }, 1000);
 
-            subscribeToMatchmaking();
-         } else {
-            const newMatchId = result.match_id;
-            setMatchId(newMatchId);
-            setRole("player2");
+             subscribeToMatchmaking();
+          } else {
+             const newMatchId = result.match_id;
 
-            const rawQuestions = generateWordUpQuestions(category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+             const { data: matchCheck } = await supabase
+                .from("wordup_matches")
+                .select("player1_id, player2_id, p1_answered, p2_answered, status, game_type")
+                .eq("id", newMatchId)
+                .single()
+                .catch(() => ({ data: null }));
 
-            await wordupNetworkGate.enqueue(
-               'put',
-               'update match questions and key',
-               () => fetchWithRetry(async () => {
-                  const { error: updateError } = await supabase
-                     .from("wordup_matches")
-                     .update({
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
-                        status: "countdown",
-                        question_started_at: new Date(getSyncedNow()).toISOString()
-                     })
-                     .eq("id", newMatchId);
-                  if (updateError) throw updateError;
-               }, 3, 1000)
-            );
+             if (matchCheck && (matchCheck.player1_id === user.id && matchCheck.player2_id === user.id)) {
+                console.warn("[WordUp Logs] Match would pit user against self. Aborting and re-queueing.");
+                triggerToast("Invalid match state. Re-queueing...", 3000);
+                await supabase.from("wordup_queue").upsert({
+                   user_id: user.id,
+                   category: category,
+                   joined_at: new Date().toISOString()
+                });
+                setRole("player1");
+                setMatchId(null);
+                setCountdownSecs(6);
+                matchmakingIntervalRef.current = window.setInterval(() => {
+                   const current = useWordUpStore.getState().countdownSecs;
+                   if (current <= 1) {
+                      if (matchmakingIntervalRef.current) {
+                         clearInterval(matchmakingIntervalRef.current);
+                         matchmakingIntervalRef.current = null;
+                      }
+                      setCountdownSecs(0);
+                      triggerBotFallback();
+                   } else {
+                      setCountdownSecs(current - 1);
+                   }
+                }, 1000);
+                subscribeToMatchmaking();
+                return;
+             }
 
-            onMatchFound(newMatchId, "player2");
-         }
+             if (matchCheck && matchCheck.game_type === "async" && (
+                (matchCheck.player1_id === user.id && matchCheck.p1_answered) ||
+                (matchCheck.player2_id === user.id && matchCheck.p2_answered)
+             )) {
+                console.warn("[WordUp Logs] Async match where user already played. Skipping and re-queueing.");
+                triggerToast("That match is already in progress. Re-queueing...", 3000);
+                await supabase.from("wordup_queue").upsert({
+                   user_id: user.id,
+                   category: category,
+                   joined_at: new Date().toISOString()
+                });
+                setRole("player1");
+                setMatchId(null);
+                setCountdownSecs(6);
+                matchmakingIntervalRef.current = window.setInterval(() => {
+                   const current = useWordUpStore.getState().countdownSecs;
+                   if (current <= 1) {
+                      if (matchmakingIntervalRef.current) {
+                         clearInterval(matchmakingIntervalRef.current);
+                         matchmakingIntervalRef.current = null;
+                      }
+                      setCountdownSecs(0);
+                      triggerBotFallback();
+                   } else {
+                      setCountdownSecs(current - 1);
+                   }
+                }, 1000);
+                subscribeToMatchmaking();
+                return;
+             }
+
+             setMatchId(newMatchId);
+             setRole("player2");
+
+             const rawQuestions = generateWordUpQuestions(category);
+             const secretKey = generateSecretKey();
+             const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+             await wordupNetworkGate.enqueue(
+                'put',
+                'update match questions and key',
+                () => fetchWithRetry(async () => {
+                   const { error: updateError } = await supabase
+                      .from("wordup_matches")
+                      .update({
+                         questions: encryptedStr,
+                         encryption_key: secretKey,
+                         status: "countdown",
+                         question_started_at: new Date(getSyncedNow()).toISOString()
+                      })
+                      .eq("id", newMatchId);
+                   if (updateError) throw updateError;
+                }, 3, 1000)
+             );
+
+             onMatchFound(newMatchId, "player2");
+          }
       } catch (err: any) {
          console.error("Matchmaking startup failed:", err);
          triggerToast("Failed to join arena. Please try again.", 4000);

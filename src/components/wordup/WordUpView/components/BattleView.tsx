@@ -160,7 +160,8 @@ export const BattleView = ({
    const oppStatus = isP1 ? p2Status : p1Status;
    const oppColor = isP1 ? p2Color : p1Color;
 
-   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot") : "Opponent");
+   const isBotMatch = matchData?.game_type === "live-bot" || matchData?.is_bot_match;
+   const opponentName = opponentStats?.username || (isBotMatch ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot") : "Opponent");
 
    const getAvatarUrl = (avatarUrl: string | null | undefined, seed: string) => {
       return avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;

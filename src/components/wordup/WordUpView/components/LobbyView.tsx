@@ -190,6 +190,12 @@ export const LobbyView = ({
              return;
           }
 
+          const gameType = match.game_type || (match.status === "waiting" ? "async" : "live");
+          if (gameType !== "async") {
+             fetchPendingMatches();
+             return;
+          }
+
           const isUserMatch =
              match.player1_id === currentUser?.id ||
              match.player2_id === currentUser?.id;
@@ -258,6 +264,7 @@ export const LobbyView = ({
              `)
              .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
              .in("status", ["waiting", "completed"])
+             .eq("game_type", "async")
              .order("created_at", { ascending: false });
 
           if (error) throw error;
@@ -308,17 +315,18 @@ export const LobbyView = ({
       if (!currentUser) return;
       setIsLoadingData(true);
       try {
-         const { data, error } = await supabase
-            .from("wordup_matches")
-            .select(`
-               *,
-               player1:player1_id (username, avatar_url),
-               player2:player2_id (username, avatar_url)
-            `)
-            .eq("status", "completed")
-            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-            .order("completed_at", { ascending: false })
-            .limit(15);
+          const { data, error } = await supabase
+             .from("wordup_matches")
+             .select(`
+                *,
+                player1:player1_id (username, avatar_url),
+                player2:player2_id (username, avatar_url)
+             `)
+             .eq("status", "completed")
+             .neq("game_type", "async")
+             .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+             .order("completed_at", { ascending: false })
+             .limit(15);
 
          if (error) throw error;
          setHistoryMatches(data || []);
@@ -339,19 +347,20 @@ export const LobbyView = ({
          const secretKey = generateSecretKey();
          const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
-         // Create match in status "waiting"
-         const { data: newMatch, error } = await supabase
-            .from("wordup_matches")
-            .insert({
-               category: category,
-               player1_id: currentUser.id,
-               player2_id: targetUser.id,
-               questions: encryptedStr,
-               encryption_key: secretKey,
-               status: "waiting",
-               p1_answered: false,
-               p2_answered: false
-            })
+          // Create match in status "waiting"
+          const { data: newMatch, error } = await supabase
+             .from("wordup_matches")
+             .insert({
+                category: category,
+                player1_id: currentUser.id,
+                player2_id: targetUser.id,
+                questions: encryptedStr,
+                encryption_key: secretKey,
+                status: "waiting",
+                game_type: "async",
+                p1_answered: false,
+                p2_answered: false
+             })
             .select()
             .single();
 

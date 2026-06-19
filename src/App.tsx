@@ -449,6 +449,7 @@ export default function App() {
           questions: encryptedStr,
           encryption_key: secretKey,
           status: "waiting",
+          game_type: "async",
           p1_answered: false,
           p2_answered: false
         })
@@ -873,12 +874,13 @@ export default function App() {
                       .from("wordup_matches")
                       .insert({
                         category: invite.category,
-                        player1_id: invite.senderId,
-                        player2_id: user?.id,
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
-                        status: "countdown",
-                        question_started_at: new Date().toISOString()
+                         player1_id: invite.senderId,
+                         player2_id: user?.id,
+                         questions: encryptedStr,
+                         encryption_key: secretKey,
+                         status: "countdown",
+                         game_type: "live",
+                         question_started_at: new Date().toISOString()
                       })
                       .select()
                       .single();

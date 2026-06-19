@@ -56,7 +56,8 @@ export const GameOverView = ({
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
 
-   const opponentName = matchData.is_bot_match
+   const isBotMatch = matchData.game_type === "live-bot" || matchData.is_bot_match;
+   const opponentName = isBotMatch
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
       : "Opponent";
 
@@ -99,7 +100,7 @@ export const GameOverView = ({
          </div>
 
          {/* Rematch Actions */}
-         {!matchData.is_bot_match && showRematchButton && (
+         {!isBotMatch && showRematchButton && (
             <div className="space-y-3">
                {rematchState === "idle" && (
                   <button

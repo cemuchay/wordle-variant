@@ -125,14 +125,18 @@ export const WordUpView = () => {
       onMatchFound(newMId, newRole);
    });
 
-   // Reactive sync: If matchData status changes to active externally, jump to battle
-   useEffect(() => {
-      if (matchData?.status === "active" && view === "countdown") {
-         console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
-         setView("battle");
-         startQuestionRound(matchData, matchData.current_question_index || 0);
-      }
-   }, [matchData?.status, view, setView, startQuestionRound, matchData]);
+    // Reactive sync: If matchData status changes to active externally, jump to battle
+    const matchStatusRef = useRef(matchData?.status);
+    useEffect(() => {
+       const status = matchData?.status;
+       if (status === "active" && view === "countdown" && matchStatusRef.current !== "active") {
+          matchStatusRef.current = "active";
+          console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
+          setView("battle");
+          startQuestionRound(matchData, matchData.current_question_index || 0);
+       }
+       matchStatusRef.current = status;
+    }, [matchData?.status, view]);
 
     const startCountdown = useCallback((match: any) => {
        let count = 3;
@@ -143,8 +147,9 @@ export const WordUpView = () => {
              clearInterval(interval);
              setView("battle");
 
-             // Set match status to active in database (only for real-time matches)
-             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
+               // Set match status to active in database (only for real-time matches)
+               const gameType = match.game_type || (match.is_bot_match ? "live-bot" : match.status === "waiting" ? "async" : "live");
+               if ((role === "player2" || match.is_bot_match) && gameType !== "async") {
                 supabase
                    .from("wordup_matches")
                    .update({ status: "active" })
