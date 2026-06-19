@@ -12,6 +12,7 @@ import { supabase } from "../../../lib/supabaseClient";
 import { Swords } from "lucide-react";
 
 import { decryptQuestions } from "../../../utils/wordupQuestionGenerator";
+import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -20,6 +21,7 @@ import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
 import { LoadingView } from "./components/LoadingView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
+import { DebugConsole } from "./components/DebugConsole";
 
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
@@ -196,11 +198,47 @@ export const WordUpView = () => {
       cleanUpGameLoop();
    }, [cleanUpGameLoop]);
 
-   const {
-      countdownSecs,
-      startMatchmaking,
-      cancelMatchmaking
-   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
+    const {
+       countdownSecs,
+       startMatchmaking,
+       cancelMatchmaking
+    } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
+
+    const handlePurgeAndReset = useCallback(async () => {
+        if (!effectiveUser) return;
+        try {
+           await supabase.from("wordup_queue").delete().eq("user_id", effectiveUser.id);
+           const { data: staleMatches } = await supabase
+              .from("wordup_matches")
+              .select("id, player1_id, player2_id, p1_answered, p2_answered, status")
+              .or(`player1_id.eq.${effectiveUser.id},player2_id.eq.${effectiveUser.id}`)
+              .in("status", ["waiting", "countdown"]);
+           if (staleMatches && staleMatches.length > 0) {
+              for (const m of staleMatches) {
+                 const isP1 = m.player1_id === effectiveUser.id;
+                 const hasPlayed = isP1 ? m.p1_answered : m.p2_answered;
+                 const opponentIsSelf = m.player1_id === m.player2_id;
+                 if (opponentIsSelf || hasPlayed) {
+                    await supabase.from("wordup_matches").update({
+                       status: "completed",
+                       completed_at: new Date().toISOString()
+                    }).eq("id", m.id);
+                 }
+              }
+           }
+        } catch (e) {
+           console.error("Purge error:", e);
+        }
+        for (const key of Object.keys(sessionStorage)) {
+           if (key.startsWith("wordup_")) safeSessionStorage.removeItem(key);
+        }
+        for (const key of Object.keys(localStorage)) {
+           if (key.startsWith("wordup_")) safeLocalStorage.removeItem(key);
+        }
+        resetGame();
+        cancelMatchmaking();
+        triggerToast("Local data purged and stale matches cleaned.", 4000);
+    }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
 
     useEffect(() => {
        return () => {
@@ -315,8 +353,9 @@ export const WordUpView = () => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide p-4 relative" style={{ minHeight: "100%" }}>
-         <AnimatePresence mode="wait">
+        <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide p-4 relative" style={{ minHeight: "100%" }}>
+          <DebugConsole />
+          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
                   userStats={userStats}
@@ -331,9 +370,10 @@ export const WordUpView = () => {
                   onToggleSound={handleToggleSound}
                   onlineUsers={onlineUsers}
                   allProfiles={allProfiles}
-                  currentUser={effectiveUser}
-                  onSelectHistoryMatch={handleSelectHistoryMatch}
-               />
+                   currentUser={effectiveUser}
+                   onSelectHistoryMatch={handleSelectHistoryMatch}
+                   onPurgeAndReset={handlePurgeAndReset}
+                />
             )}
 
             {view === "matchmaking" && (

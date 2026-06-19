@@ -22,6 +22,7 @@ interface LobbyViewProps {
    allProfiles: any[];
    currentUser: any;
    onSelectHistoryMatch?: (match: any) => void;
+   onPurgeAndReset?: () => void;
 }
 
 export const LobbyView = ({
@@ -35,7 +36,8 @@ export const LobbyView = ({
    onlineUsers,
    allProfiles,
    currentUser,
-   onSelectHistoryMatch
+   onSelectHistoryMatch,
+   onPurgeAndReset
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
@@ -435,19 +437,44 @@ export const LobbyView = ({
          exit={{ opacity: 0, y: -15 }}
          className="flex flex-col gap-6 flex-1 justify-center py-6"
       >
-         <div className="text-center space-y-2 relative">
-            <button
-               onClick={onToggleSound}
-               className="absolute right-0 top-0 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-               title="Toggle Sound"
-            >
-               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            </button>
+          <div className="text-center space-y-2 relative">
+              <div className="absolute right-0 top-0 flex gap-1">
+                 {onPurgeAndReset && (
+                    <button
+                       onClick={onPurgeAndReset}
+                       className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 transition-all cursor-pointer"
+                       title="Purge local state & fix stale matches"
+                    >
+                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    </button>
+                 )}
+                 <button
+                   onClick={onToggleSound}
+                   className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                   title="Toggle Sound"
+                >
+                   {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                </button>
+             </div>
 
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles</h2>
+            <h2
+               className="text-2xl font-black uppercase tracking-wider text-white select-none"
+               onClick={() => {
+                  const r = (window as any).__wordup_tapCount || 0;
+                  (window as any).__wordup_tapCount = r + 1;
+                  if ((window as any).__wordup_tapTimer) clearTimeout((window as any).__wordup_tapTimer);
+                  (window as any).__wordup_tapTimer = setTimeout(() => { (window as any).__wordup_tapCount = 0; }, 800);
+                  if ((window as any).__wordup_tapCount >= 5) {
+                     (window as any).__wordup_tapCount = 0;
+                     import("../components/DebugConsole").then((m) => m.openDebugConsole());
+                  }
+               }}
+            >
+               WordUp Battles
+            </h2>
             <p className="text-xs text-gray-400 max-w-xs mx-auto">
                Test your word speed & pattern skills in a head-to-head 7-question rapid match!
             </p>

@@ -184,12 +184,15 @@ export const useWordUpMatchmaking = (
           } else {
              const newMatchId = result.match_id;
 
-             const { data: matchCheck } = await supabase
-                .from("wordup_matches")
-                .select("player1_id, player2_id, p1_answered, p2_answered, status, game_type")
-                .eq("id", newMatchId)
-                .single()
-                .catch(() => ({ data: null }));
+             let matchCheck: any = null;
+             try {
+                const { data: md } = await supabase
+                   .from("wordup_matches")
+                   .select("player1_id, player2_id, p1_answered, p2_answered, status, game_type")
+                   .eq("id", newMatchId)
+                   .single();
+                matchCheck = md;
+             } catch (_) {}
 
              if (matchCheck && (matchCheck.player1_id === user.id && matchCheck.player2_id === user.id)) {
                 console.warn("[WordUp Logs] Match would pit user against self. Aborting and re-queueing.");
@@ -278,7 +281,14 @@ export const useWordUpMatchmaking = (
           }
       } catch (err: any) {
          console.error("Matchmaking startup failed:", err);
-         triggerToast("Failed to join arena. Please try again.", 4000);
+         try {
+            await supabase.from("wordup_queue").delete().eq("user_id", user?.id);
+         } catch (_) {}
+         const isNetworkError = !err?.code && !err?.message?.includes?.("Failed to fetch") === false || err?.message?.includes?.("fetch") || err?.message?.includes?.("NetworkError") || err?.message?.includes?.("ERR_CONNECTION");
+         const msg = isNetworkError
+            ? "Connection error: check your network or VPN."
+            : "Failed to join arena. Use the reset button below if this persists.";
+         triggerToast(msg, 6000);
       }
    }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking, getSyncedNow]);
 
