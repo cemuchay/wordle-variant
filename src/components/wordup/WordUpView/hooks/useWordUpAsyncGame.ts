@@ -233,7 +233,7 @@ export const useWordUpAsyncGame = ({
    );
 
    const startQuestionRound = useCallback(
-      (match: any, index: number) => {
+      (_match: any, index: number) => {
          if (!isActive) return;
          console.log(`[WordUp Logs] Async startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
 

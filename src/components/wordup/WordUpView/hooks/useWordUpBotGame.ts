@@ -40,6 +40,7 @@ export const useWordUpBotGame = ({
    const setSelectedAnswer = useWordUpStore((s) => s.setSelectedAnswer);
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const setRevealAnswers = useWordUpStore((s) => s.setRevealAnswers);
+   const opponentStats = useWordUpStore((s) => s.opponentStats);
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
 
    const [maxTime, setMaxTime] = useState(10);

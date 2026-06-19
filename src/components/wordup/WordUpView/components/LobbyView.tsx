@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Play, Volume2, VolumeX, HelpCircle, ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
+import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -16,8 +16,6 @@ interface LobbyViewProps {
    setCategory: (cat: string) => void;
    startMatchmaking: () => void;
    getRankColor: (rankName: string) => string;
-   soundEnabled: boolean;
-   onToggleSound: () => void;
    onlineUsers: any[];
    allProfiles: any[];
    currentUser: any;
@@ -30,8 +28,6 @@ export const LobbyView = ({
    setCategory,
    startMatchmaking,
    getRankColor,
-   soundEnabled,
-   onToggleSound,
    onlineUsers,
    allProfiles,
    currentUser,
@@ -129,7 +125,7 @@ export const LobbyView = ({
       try {
          const stored = safeLocalStorage.getItem(NOTIFIED_KEY);
          const tsStored = safeLocalStorage.getItem(NOTIFIED_TS_KEY);
-         const ids = stored ? new Set(JSON.parse(stored)) : new Set();
+         const ids = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
          const timestamps: Record<string, number> = tsStored ? JSON.parse(tsStored) : {};
          const cutoff = Date.now() - 24 * 60 * 60 * 1000;
          const cleanedIds = new Set<string>();

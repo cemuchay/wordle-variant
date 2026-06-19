@@ -40,6 +40,7 @@ export const useWordUpLiveGame = ({
    const setSelectedAnswer = useWordUpStore((s) => s.setSelectedAnswer);
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const setRevealAnswers = useWordUpStore((s) => s.setRevealAnswers);
+   const opponentStats = useWordUpStore((s) => s.opponentStats);
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
 
    const [maxTime, setMaxTime] = useState(10);
@@ -267,10 +268,10 @@ export const useWordUpLiveGame = ({
    );
 
    const startQuestionRound = useCallback(
-      (match: any, index: number) => {
+      (_match: any, index: number) => {
          if (!isActive) return;
          console.log(`[WordUp Logs] Live startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
-
+         
          currentIdxRef.current = index;
 
          cleanUpIntervals();

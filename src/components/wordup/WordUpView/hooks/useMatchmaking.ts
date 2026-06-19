@@ -5,7 +5,6 @@ import {
    generateWordUpQuestions,
    generateSecretKey,
    encryptQuestions,
-   getRandomBotProfile,
 } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -53,7 +52,6 @@ export const useWordUpMatchmaking = (
          console.warn("Queue purge failed, continuing:", e);
       }
 
-      const botProfile = getRandomBotProfile();
       const localMatchId = `bot-match-${crypto.randomUUID()}`;
        
       setMatchId(localMatchId);

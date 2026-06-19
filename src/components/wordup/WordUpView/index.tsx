@@ -398,8 +398,6 @@ export const WordUpView = () => {
                      startMatchmaking();
                   }}
                   getRankColor={getRankColor}
-                  soundEnabled={soundEnabled}
-                  onToggleSound={handleToggleSound}
                   onlineUsers={onlineUsers}
                   allProfiles={allProfiles}
                   currentUser={effectiveUser}
