@@ -723,13 +723,13 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <StatsModal
-                    isOpen={true}
-                    inline={true}
-                    stats={stats}
-                    onClose={() => setIsStatsOpen(false)}
-                    user={user as AppUser}
-                    isGameOver={state.isGameOver}
-                    initialTab={statsActiveTab}
+                     isOpen={true}
+                     inline={true}
+                     stats={stats}
+                     onClose={() => setIsStatsOpen(false)}
+                     user={user as AppUser}
+                     isGameOver={state.isGameOver}
+                     initialTab={statsActiveTab}
                   />
                 </Suspense>
               </div>
@@ -739,12 +739,12 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
-                    isOpen={true}
-                    inline={true}
-                    onClose={() => setIsChallengeOpen(false)}
-                    user={user as AppUser}
-                    onChallengeCreated={handleChallengeCreated}
-                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                     isOpen={true}
+                     inline={true}
+                     onClose={() => setIsChallengeOpen(false)}
+                     user={user as AppUser}
+                     onChallengeCreated={handleChallengeCreated}
+                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                   />
                 </Suspense>
               </div>
