@@ -741,7 +741,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
    const questions: WordUpQuestion[] = [];
 
-   const generateFallbackQuestion = (length: number, official: string[], valid: Set<string>): WordUpQuestion => {
+   const generateFallbackQuestion = (_length: number, official: string[], valid: Set<string>): WordUpQuestion => {
       const word = official[Math.floor(Math.random() * official.length)];
       const fake = mutateToFakeWord(word, valid);
       return {

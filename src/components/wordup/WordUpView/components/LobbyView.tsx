@@ -129,7 +129,7 @@ export const LobbyView = ({
         try {
             const stored = safeLocalStorage.getItem(NOTIFIED_KEY);
             const tsStored = safeLocalStorage.getItem(NOTIFIED_TS_KEY);
-            const ids = stored ? new Set(JSON.parse(stored)) : new Set();
+            const ids: Set<string> = stored ? new Set(JSON.parse(stored) as string[]) : new Set();
             const timestamps: Record<string, number> = tsStored ? JSON.parse(tsStored) : {};
             const cutoff = Date.now() - 24 * 60 * 60 * 1000;
             const cleanedIds = new Set<string>();
@@ -184,7 +184,7 @@ export const LobbyView = ({
        }
 
        const handleMatchChange = (payload: any) => {
-          const match = payload.new;
+          const match: Record<string, any> = payload.new;
           if (!match || match.status !== "completed") {
              fetchPendingMatches();
              return;

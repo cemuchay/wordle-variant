@@ -8,7 +8,7 @@ import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
 import { safeLocalStorage } from '../utils/storage';
-import { saveChallengeView, loadChallengeView, clearChallengeView } from '../utils/challengeViewPersistence';
+import { saveChallengeView, loadChallengeView } from '../utils/challengeViewPersistence';
 
 interface ChallengeContextType {
     // ... rest of interface
