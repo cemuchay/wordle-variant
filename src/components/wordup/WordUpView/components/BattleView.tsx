@@ -230,7 +230,7 @@ export const BattleView = ({
          {/* Timer Bar */}
          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
             <div
-               className={`h-full transition-all duration-75 ease-linear ${timeLeft > 3 ? "bg-correct shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
+               className={`h-full transition-all duration-100 ease-linear ${timeLeft > 3 ? "bg-correct shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
                style={{ width: `${(timeLeft / maxTime) * 100}%` }}
             />
          </div>

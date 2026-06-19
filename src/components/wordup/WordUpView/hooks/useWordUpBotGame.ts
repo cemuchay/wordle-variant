@@ -134,6 +134,8 @@ export const useWordUpBotGame = ({
                         p1_answered: true,
                         p2_answered: true,
                         completed_at: completedAt,
+                        questions: match.questions,
+                        encryption_key: match.encryption_key
                      };
                      
                      let error;
@@ -327,7 +329,7 @@ export const useWordUpBotGame = ({
             const elapsed = (now - startTime) / 1000;
             const remaining = Math.max(0, duration - elapsed);
 
-            setTimeLeft(parseFloat(remaining.toFixed(2)));
+            setTimeLeft(parseFloat(remaining.toFixed(1)));
 
             const currentSec = Math.ceil(remaining);
             if (remaining <= 3.0 && currentSec < lastTicked) {
@@ -342,7 +344,7 @@ export const useWordUpBotGame = ({
                   handleAnswerSelect("");
                }
             }
-         }, 30);
+         }, 100);
 
          if (match.is_bot_match && roleRef.current === "player1" && questionsRef.current[index]) {
             const botProf = match.bot_profile || "average";
@@ -524,6 +526,9 @@ export const useWordUpBotGame = ({
                userId = localStorage.getItem('wordle_anon_id') || "guest-player";
             }
 
+            const secretKey = generateSecretKey();
+            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
             match = {
                id: mId,
                category,
@@ -540,8 +545,8 @@ export const useWordUpBotGame = ({
                p2_score: 0,
                p1_answered: false,
                p2_answered: false,
-               questions: JSON.stringify(rawQuestions),
-               encryption_key: "local-key"
+               questions: encryptedStr,
+               encryption_key: secretKey
             };
 
             setMatchData(match);

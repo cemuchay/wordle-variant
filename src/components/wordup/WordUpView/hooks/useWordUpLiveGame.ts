@@ -294,7 +294,7 @@ export const useWordUpLiveGame = ({
             const elapsed = (now - startTime) / 1000;
             const remaining = Math.max(0, duration - elapsed);
 
-            setTimeLeft(parseFloat(remaining.toFixed(2)));
+            setTimeLeft(parseFloat(remaining.toFixed(1)));
 
             const currentSec = Math.ceil(remaining);
             if (remaining <= 3.0 && currentSec < lastTicked) {
@@ -309,7 +309,7 @@ export const useWordUpLiveGame = ({
                   handleAnswerSelect("");
                }
             }
-         }, 30);
+         }, 100);
       },
       [cleanUpIntervals, stopRoundTimer, getSyncedNow, handleAnswerSelect, setCurrentIdx, setSelectedAnswer, setRevealAnswers, setTimeLeft, selectedAnswer, isActive],
    );

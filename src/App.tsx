@@ -893,18 +893,16 @@ export default function App() {
                           type: 'broadcast',
                           event: 'wordup_invite_accepted',
                           payload: { matchId: newMatch.id }
+                        }).then(() => {
+                          // Update Zustand and navigate only after the broadcast has been sent
+                          useWordUpStore.getState().setMatchId(newMatch.id);
+                          useWordUpStore.getState().setRole("player2");
+                          handleNavigation("wordup");
                         });
                         // Remove channel after broadcast
                         setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
                       }
                     });
-
-                    // Update Zustand
-                    useWordUpStore.getState().setMatchId(newMatch.id);
-                    useWordUpStore.getState().setRole("player2");
-
-                    // Navigate to WordUp
-                    handleNavigation("wordup");
                   } catch (e) {
                     console.error("Failed to accept invite:", e);
                     triggerToast("Failed to start match.", 4000);
