@@ -50,6 +50,7 @@ export const useWordUpBotGame = ({
 
    const timerRef = useRef<number | null>(null);
    const botTimerRef = useRef<number | null>(null);
+   const roundTimeoutRef = useRef<number | null>(null);
    const botActionRef = useRef<any>(null);
    const isSubmittingAnswerRef = useRef(false);
    const isAdvancingRef = useRef(false);
@@ -102,10 +103,18 @@ export const useWordUpBotGame = ({
       }
    }, []);
 
+   const stopRoundTimeout = useCallback(() => {
+      if (roundTimeoutRef.current) {
+         clearTimeout(roundTimeoutRef.current);
+         roundTimeoutRef.current = null;
+      }
+   }, []);
+
    const cleanUpIntervals = useCallback(() => {
       stopRoundTimer();
       stopBotTimer();
-   }, [stopRoundTimer, stopBotTimer]);
+      stopRoundTimeout();
+   }, [stopRoundTimer, stopBotTimer, stopRoundTimeout]);
 
    const endGame = useCallback(
       async (match: any) => {
@@ -305,6 +314,12 @@ export const useWordUpBotGame = ({
    const startQuestionRound = useCallback(
       (match: any, index: number) => {
          if (!isActive) return;
+
+         if (currentIdxRef.current === index && timerRef.current !== null) {
+            console.log(`[WordUp Logs] Bot startQuestionRound: Round ${index + 1} is already active with a running timer. Skipping duplicate init.`);
+            return;
+         }
+
          console.log(`[WordUp Logs] Bot startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
 
          currentIdxRef.current = index;
@@ -403,9 +418,10 @@ export const useWordUpBotGame = ({
                triggerToast("⚡ FINAL ROUND: DOUBLE POINTS! ⚡", 3000);
             }
 
-            setTimeout(
+            roundTimeoutRef.current = window.setTimeout(
                async () => {
                   isRevealingRef.current = false;
+                  roundTimeoutRef.current = null;
                   if (nextIdx >= 7) {
                      useWordUpStore.getState().setView("loading");
                      endGame(mergedMatch);

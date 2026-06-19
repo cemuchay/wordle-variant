@@ -435,8 +435,8 @@ export const LobbyView = ({
                <div className="w-[84px]" />
 
                {/* Center Swords Icon */}
-               <div className="inline-flex p-3 bg-correct/10 rounded-2.5xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
-                  <Swords size={28} />
+               <div className="inline-flex p-5 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
+                  <Swords size={48} />
                </div>
 
                {/* Right side Sound & Reset controls */}

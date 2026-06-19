@@ -56,6 +56,14 @@ export const WordUpView = () => {
 
    const [countdownText, setCountdownText] = useState("3");
 
+   const countdownIntervalRef = useRef<number | null>(null);
+   const cleanUpCountdown = useCallback(() => {
+      if (countdownIntervalRef.current) {
+         clearInterval(countdownIntervalRef.current);
+         countdownIntervalRef.current = null;
+      }
+   }, []);
+
    const { getSyncedNow } = useServerTime();
    const { userStats, getRankColor, updateStats } = useWordUpProfile(effectiveUser);
 
@@ -162,40 +170,42 @@ export const WordUpView = () => {
     }, []);
 
     // Reactive sync: If matchData status changes to active externally, jump to battle
-   useEffect(() => {
-      if (matchData?.status === "active" && view === "countdown") {
-         console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
-         setView("battle");
-         startQuestionRound(matchData, matchData.current_question_index || 0);
-      }
-   }, [matchData?.status, view, setView, startQuestionRound, matchData]);
+    useEffect(() => {
+       if (matchData?.status === "active" && view === "countdown") {
+          console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
+          cleanUpCountdown();
+          setView("battle");
+          startQuestionRound(matchData, matchData.current_question_index || 0);
+       }
+    }, [matchData?.status, view, setView, startQuestionRound, matchData, cleanUpCountdown]);
 
-   const startCountdown = useCallback((match: any) => {
-      let count = 3;
-      setCountdownText("3");
-      const interval = setInterval(() => {
-         count--;
-         if (count === 0) {
-            clearInterval(interval);
-            setView("battle");
+    const startCountdown = useCallback((match: any) => {
+       cleanUpCountdown();
+       let count = 3;
+       setCountdownText("3");
+       countdownIntervalRef.current = window.setInterval(() => {
+          count--;
+          if (count === 0) {
+             cleanUpCountdown();
+             setView("battle");
 
-            // Set match status to active in database (only for real-time matches)
-            if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
-               supabase
-                  .from("wordup_matches")
-                  .update({ status: "active" })
-                  .eq("id", match.id)
-                  .then(({ error }: any) => {
-                     if (error) console.error("Failed to set match status to active:", error);
-                  });
-            }
+             // Set match status to active in database (only for real-time matches)
+             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
+                supabase
+                   .from("wordup_matches")
+                   .update({ status: "active" })
+                   .eq("id", match.id)
+                   .then(({ error }: any) => {
+                      if (error) console.error("Failed to set match status to active:", error);
+                   });
+             }
 
-            startQuestionRound(match, 0);
-         } else {
-            setCountdownText(String(count));
-         }
-      }, 1000);
-   }, [startQuestionRound, role]);
+             startQuestionRound(match, 0);
+          } else {
+             setCountdownText(String(count));
+          }
+       }, 1000);
+    }, [startQuestionRound, role, cleanUpCountdown]);
 
    const launchedMatchIdRef = useRef<string | null>(null);
 
@@ -277,10 +287,11 @@ export const WordUpView = () => {
    useEffect(() => {
       return () => {
          cancelMatchmakingRef.current();
+         cleanUpCountdown();
          resetGame();
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, []);
+   }, [cleanUpCountdown]);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
@@ -400,7 +411,7 @@ export const WordUpView = () => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-12 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
