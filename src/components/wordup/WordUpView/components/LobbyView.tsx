@@ -6,7 +6,7 @@ import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { generateWordUpQuestions, generateSecretKey, encryptQuestions, BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
 
@@ -193,7 +193,7 @@ export const LobbyView = ({
                const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
                const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
 
-               if (iPlayed && oppPlayed && !notifiedCompletedRef.current.has(m.id)) {
+                if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
                   markNotified(m.id);
                   triggerToast("Your opponent completed their turn! Check the results.", 6000);
                }
@@ -302,9 +302,9 @@ export const LobbyView = ({
          const iPlayed = isP1 ? match.p1_answered : match.p2_answered;
          const oppPlayed = isP1 ? match.p2_answered : match.p1_answered;
 
-         if (iPlayed && oppPlayed && match.status === "completed") {
-            triggerToast("Your opponent completed their turn! Check the results.", 6000);
-         }
+          if (iPlayed && oppPlayed && match.status === "completed" && !match.is_bot_match) {
+             triggerToast("Your opponent completed their turn! Check the results.", 6000);
+          }
 
          fetchPendingMatches();
       };
@@ -630,10 +630,10 @@ export const LobbyView = ({
                            const isP1 = match.player1_id === currentUser?.id;
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
-                           const oppName = oppProfile?.username || "Opponent";
-                           const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
+                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
+                            const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
 
-                           const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
+                            const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
 
                            return (
                               <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
@@ -688,9 +688,9 @@ export const LobbyView = ({
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
                            const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
-                           const oppName = oppProfile?.username || "Opponent";
+                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
 
-                           let outcome = "DRAW";
+                            let outcome = "DRAW";
                            let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
                            if (myScore > oppScore) {
                               outcome = "WIN";
