@@ -69,6 +69,7 @@ export const useWordUpMatchmaking = (
                      player1_id: user.id,
                      player2_id: "00000000-0000-0000-0000-000000000b0b",
                      is_bot_match: true,
+                     game_type: "live-bot",
                      bot_profile: botProfile,
                      questions: encryptedStr,
                      encryption_key: secretKey,
@@ -92,7 +93,7 @@ export const useWordUpMatchmaking = (
       }
    }, [user, category, getSyncedNow, cleanUpMatchmaking, onMatchFound]);
 
-   const subscribeToMatchmaking = useCallback(() => {
+     const subscribeToMatchmaking = useCallback(() => {
       const channel = supabase
          .channel(`wordup_lobby_${user?.id}`)
          .on(
@@ -135,6 +136,7 @@ export const useWordUpMatchmaking = (
 
       matchmakingChannelRef.current = channel;
    }, [user, cleanUpMatchmaking, onMatchFound]);
+ 
 
    const startMatchmaking = useCallback(async () => {
       if (!user) {
@@ -160,6 +162,7 @@ export const useWordUpMatchmaking = (
          );
 
          if (result.status === "queued" || !result.match_id) {
+            useWordUpStore.getState().setView("matchmaking");
             setRole("player1");
             setMatchId(null);
             setCountdownSecs(6);
@@ -198,6 +201,7 @@ export const useWordUpMatchmaking = (
                         questions: encryptedStr,
                         encryption_key: secretKey,
                         status: "countdown",
+                        game_type: "live",
                         question_started_at: new Date(getSyncedNow()).toISOString()
                      })
                      .eq("id", newMatchId);
@@ -209,6 +213,7 @@ export const useWordUpMatchmaking = (
          }
       } catch (err: any) {
          console.error("Matchmaking startup failed:", err);
+         useWordUpStore.getState().setView("menu");
          triggerToast("Failed to join arena. Please try again.", 4000);
       }
    }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking, getSyncedNow]);

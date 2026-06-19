@@ -105,204 +105,204 @@ export const LobbyView = ({
       };
    }, []);
 
-    // Fetch data when activeTab changes or currentUser updates
-    useEffect(() => {
-       if (activeTab === "history") {
-          fetchHistory();
-       } else if (activeTab === "pending") {
-          fetchPendingMatches();
-       }
-    }, [activeTab, currentUser?.id]);
+   // Fetch data when activeTab changes or currentUser updates
+   useEffect(() => {
+      if (activeTab === "history") {
+         fetchHistory();
+      } else if (activeTab === "pending") {
+         fetchPendingMatches();
+      }
+   }, [activeTab, currentUser?.id]);
 
-    // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
-    useEffect(() => {
-        if (currentUser?.id) {
+   // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
+   useEffect(() => {
+      if (currentUser?.id) {
+         fetchPendingMatches();
+      }
+   }, [currentUser?.id]);
+
+   // Track completed match IDs to avoid duplicate notifications
+   const NOTIFIED_KEY = 'wordup_completed_notified';
+   const NOTIFIED_TS_KEY = 'wordup_completed_notified_timestamps';
+
+   const loadNotifiedState = (): { ids: Set<string>; timestamps: Record<string, number> } => {
+      try {
+         const stored = safeLocalStorage.getItem(NOTIFIED_KEY);
+         const tsStored = safeLocalStorage.getItem(NOTIFIED_TS_KEY);
+         const ids = stored ? new Set(JSON.parse(stored)) : new Set();
+         const timestamps: Record<string, number> = tsStored ? JSON.parse(tsStored) : {};
+         const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+         const cleanedIds = new Set<string>();
+         const cleanedTimestamps: Record<string, number> = {};
+         for (const id of ids) {
+            const ts = timestamps[id];
+            if (ts && ts >= cutoff) {
+               cleanedIds.add(id);
+               cleanedTimestamps[id] = ts;
+            }
+         }
+         if (cleanedIds.size !== ids.size) {
+            safeLocalStorage.setItem(NOTIFIED_KEY, JSON.stringify([...cleanedIds]));
+            safeLocalStorage.setItem(NOTIFIED_TS_KEY, JSON.stringify(cleanedTimestamps));
+         }
+         return { ids: cleanedIds, timestamps: cleanedTimestamps };
+      } catch { return { ids: new Set(), timestamps: {} }; }
+   };
+
+   const [notifiedState, setNotifiedState] = useState(() => loadNotifiedState());
+   const notifiedCompleted = notifiedState.ids;
+   const notifiedTimestamps = notifiedState.timestamps;
+   const notifiedCompletedRef = useRef(notifiedCompleted);
+   notifiedCompletedRef.current = notifiedCompleted;
+
+   const persistNotifiedState = (ids: Set<string>, timestamps: Record<string, number>) => {
+      try {
+         safeLocalStorage.setItem(NOTIFIED_KEY, JSON.stringify([...ids]));
+         safeLocalStorage.setItem(NOTIFIED_TS_KEY, JSON.stringify(timestamps));
+      } catch { /* ignore */ }
+   };
+
+   const markNotified = (id: string) => {
+      const newIds = new Set(notifiedCompleted);
+      const newTimestamps = { ...notifiedTimestamps };
+      newIds.add(id);
+      newTimestamps[id] = Date.now();
+      setNotifiedState({ ids: newIds, timestamps: newTimestamps });
+      persistNotifiedState(newIds, newTimestamps);
+   };
+
+   // Realtime listener for pending matches updates
+   useEffect(() => {
+      if (!currentUser?.id) return;
+
+      const channelName = `wordup_matches_lobby_${currentUser.id}`;
+      const existingChannel = supabase
+         .getChannels()
+         .find((c) => (c as any).topic === `realtime:${channelName}`);
+      if (existingChannel) {
+         supabase.removeChannel(existingChannel);
+      }
+
+      const handleMatchChange = (payload: any) => {
+         const match = payload.new;
+         if (!match || match.status !== "completed") {
             fetchPendingMatches();
-        }
-    }, [currentUser?.id]);
+            return;
+         }
 
-    // Track completed match IDs to avoid duplicate notifications
-    const NOTIFIED_KEY = 'wordup_completed_notified';
-    const NOTIFIED_TS_KEY = 'wordup_completed_notified_timestamps';
+         const isUserMatch =
+            match.player1_id === currentUser?.id ||
+            match.player2_id === currentUser?.id;
+         if (!isUserMatch) {
+            fetchPendingMatches();
+            return;
+         }
 
-    const loadNotifiedState = (): { ids: Set<string>; timestamps: Record<string, number> } => {
-        try {
-            const stored = safeLocalStorage.getItem(NOTIFIED_KEY);
-            const tsStored = safeLocalStorage.getItem(NOTIFIED_TS_KEY);
-            const ids = stored ? new Set(JSON.parse(stored)) : new Set();
-            const timestamps: Record<string, number> = tsStored ? JSON.parse(tsStored) : {};
-            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-            const cleanedIds = new Set<string>();
-            const cleanedTimestamps: Record<string, number> = {};
-            for (const id of ids) {
-                const ts = timestamps[id];
-                if (ts && ts >= cutoff) {
-                    cleanedIds.add(id);
-                    cleanedTimestamps[id] = ts;
-                }
-            }
-            if (cleanedIds.size !== ids.size) {
-                safeLocalStorage.setItem(NOTIFIED_KEY, JSON.stringify([...cleanedIds]));
-                safeLocalStorage.setItem(NOTIFIED_TS_KEY, JSON.stringify(cleanedTimestamps));
-            }
-            return { ids: cleanedIds, timestamps: cleanedTimestamps };
-        } catch { return { ids: new Set(), timestamps: {} }; }
-    };
+         if (notifiedCompletedRef.current.has(match.id)) {
+            fetchPendingMatches();
+            return;
+         }
+         markNotified(match.id);
 
-    const [notifiedState, setNotifiedState] = useState(() => loadNotifiedState());
-    const notifiedCompleted = notifiedState.ids;
-    const notifiedTimestamps = notifiedState.timestamps;
-    const notifiedCompletedRef = useRef(notifiedCompleted);
-    notifiedCompletedRef.current = notifiedCompleted;
+         const isP1 = match.player1_id === currentUser?.id;
+         const iPlayed = isP1 ? match.p1_answered : match.p2_answered;
+         const oppPlayed = isP1 ? match.p2_answered : match.p1_answered;
 
-    const persistNotifiedState = (ids: Set<string>, timestamps: Record<string, number>) => {
-        try {
-            safeLocalStorage.setItem(NOTIFIED_KEY, JSON.stringify([...ids]));
-            safeLocalStorage.setItem(NOTIFIED_TS_KEY, JSON.stringify(timestamps));
-        } catch { /* ignore */ }
-    };
+         if (iPlayed && oppPlayed && match.status === "completed") {
+            triggerToast("Your opponent completed their turn! Check the results.", 6000);
+         }
 
-    const markNotified = (id: string) => {
-        const newIds = new Set(notifiedCompleted);
-        const newTimestamps = { ...notifiedTimestamps };
-        newIds.add(id);
-        newTimestamps[id] = Date.now();
-        setNotifiedState({ ids: newIds, timestamps: newTimestamps });
-        persistNotifiedState(newIds, newTimestamps);
-    };
+         fetchPendingMatches();
+      };
 
-    // Realtime listener for pending matches updates
-    useEffect(() => {
-       if (!currentUser?.id) return;
+      const channel = supabase
+         .channel(channelName)
+         .on(
+            "postgres_changes",
+            {
+               event: "*",
+               schema: "public",
+               table: "wordup_matches",
+               filter: `player1_id=eq.${currentUser.id}`
+            },
+            handleMatchChange
+         )
+         .on(
+            "postgres_changes",
+            {
+               event: "*",
+               schema: "public",
+               table: "wordup_matches",
+               filter: `player2_id=eq.${currentUser.id}`
+            },
+            handleMatchChange
+         )
+         .subscribe();
 
-       const channelName = `wordup_matches_lobby_${currentUser.id}`;
-       const existingChannel = supabase
-          .getChannels()
-          .find((c) => (c as any).topic === `realtime:${channelName}`);
-       if (existingChannel) {
-          supabase.removeChannel(existingChannel);
-       }
+      return () => {
+         supabase.removeChannel(channel);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [currentUser?.id]);
 
-       const handleMatchChange = (payload: any) => {
-          const match = payload.new;
-          if (!match || match.status !== "completed") {
-             fetchPendingMatches();
-             return;
-          }
-
-          const isUserMatch =
-             match.player1_id === currentUser?.id ||
-             match.player2_id === currentUser?.id;
-          if (!isUserMatch) {
-             fetchPendingMatches();
-             return;
-          }
-
-          if (notifiedCompletedRef.current.has(match.id)) {
-             fetchPendingMatches();
-             return;
-          }
-          markNotified(match.id);
-
-          const isP1 = match.player1_id === currentUser?.id;
-          const iPlayed = isP1 ? match.p1_answered : match.p2_answered;
-          const oppPlayed = isP1 ? match.p2_answered : match.p1_answered;
-
-          if (iPlayed && oppPlayed && match.status === "completed") {
-             triggerToast("Your opponent completed their turn! Check the results.", 6000);
-          }
-
-          fetchPendingMatches();
-       };
-
-       const channel = supabase
-          .channel(channelName)
-          .on(
-             "postgres_changes",
-             {
-                event: "*",
-                schema: "public",
-                table: "wordup_matches",
-                filter: `player1_id=eq.${currentUser.id}`
-             },
-             handleMatchChange
-          )
-          .on(
-             "postgres_changes",
-             {
-                event: "*",
-                schema: "public",
-                table: "wordup_matches",
-                filter: `player2_id=eq.${currentUser.id}`
-             },
-             handleMatchChange
-          )
-          .subscribe();
-
-       return () => {
-          supabase.removeChannel(channel);
-       };
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser?.id]);
-
-    const fetchPendingMatches = async () => {
-       if (!currentUser) return;
-       setIsLoadingData(true);
-       try {
-          const { data, error } = await supabase
-             .from("wordup_matches")
-             .select(`
+   const fetchPendingMatches = async () => {
+      if (!currentUser) return;
+      setIsLoadingData(true);
+      try {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select(`
                 *,
                 player1:player1_id (username, avatar_url),
                 player2:player2_id (username, avatar_url)
              `)
-             .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-             .in("status", ["waiting", "completed"])
-             .order("created_at", { ascending: false });
+            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+            .in("status", ["waiting", "completed"])
+            .order("created_at", { ascending: false });
 
-          if (error) throw error;
+         if (error) throw error;
 
-          const now = new Date();
-          const activePending: any[] = [];
+         const now = new Date();
+         const activePending: any[] = [];
 
-          for (const m of (data || [])) {
-             const createdAt = new Date(m.created_at);
-             const diffHrs = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+         for (const m of (data || [])) {
+            const createdAt = new Date(m.created_at);
+            const diffHrs = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
 
-             if (m.status === "completed") {
-                const isP1 = m.player1_id === currentUser.id;
-                const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
-                const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
+            if (m.status === "completed") {
+               const isP1 = m.player1_id === currentUser.id;
+               const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
+               const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
 
-                if (iPlayed && oppPlayed && !notifiedCompletedRef.current.has(m.id)) {
-                   markNotified(m.id);
-                   triggerToast("Your opponent completed their turn! Check the results.", 6000);
-                }
-                continue;
-             }
+               if (iPlayed && oppPlayed && !notifiedCompletedRef.current.has(m.id)) {
+                  markNotified(m.id);
+                  triggerToast("Your opponent completed their turn! Check the results.", 6000);
+               }
+               continue;
+            }
 
-             if (diffHrs >= 24) {
-                await supabase
-                   .from("wordup_matches")
-                   .update({
-                      status: "completed",
-                      p1_answered: true,
-                      p2_answered: true,
-                      completed_at: now.toISOString()
-                   })
-                   .eq("id", m.id);
-             } else {
-                activePending.push(m);
-             }
-          }
+            if (diffHrs >= 24) {
+               await supabase
+                  .from("wordup_matches")
+                  .update({
+                     status: "completed",
+                     p1_answered: true,
+                     p2_answered: true,
+                     completed_at: now.toISOString()
+                  })
+                  .eq("id", m.id);
+            } else {
+               activePending.push(m);
+            }
+         }
 
-          setPendingMatches(activePending);
-       } catch (e) {
-          console.error("Failed to fetch pending matches:", e);
-       } finally {
-          setIsLoadingData(false);
-       }
-    };
+         setPendingMatches(activePending);
+      } catch (e) {
+         console.error("Failed to fetch pending matches:", e);
+      } finally {
+         setIsLoadingData(false);
+      }
+   };
 
    const fetchHistory = async () => {
       if (!currentUser) return;
@@ -349,6 +349,7 @@ export const LobbyView = ({
                questions: encryptedStr,
                encryption_key: secretKey,
                status: "waiting",
+               game_type: "async",
                p1_answered: false,
                p2_answered: false
             })
@@ -438,7 +439,7 @@ export const LobbyView = ({
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles</h2>
+            <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles (Beta)</h2>
             <p className="text-xs text-gray-400 max-w-xs mx-auto">
                Test your word speed & pattern skills in a head-to-head 7-question rapid match!
             </p>
@@ -450,11 +451,10 @@ export const LobbyView = ({
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${
-                     activeTab === tab
+                  className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
                         ? "bg-correct text-black shadow-md font-black"
                         : "text-gray-400 hover:text-white"
-                  }`}
+                     }`}
                >
                   {tab === "play" ? "Play" : tab === "pending" ? `Pending (${pendingMatches.length})` : "History"}
                </button>
@@ -522,15 +522,15 @@ export const LobbyView = ({
 
                   <div className="space-y-3">
                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0 
-                           ? "Invite Online Players" 
+                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0
+                           ? "Invite Online Players"
                            : "Challenge Players"}
                      </p>
                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
                         {(() => {
                            const otherOnline = (onlineUsers || []).filter((u) => u.id !== currentUser?.id);
-                           const displayUsers = otherOnline.length > 0 
-                              ? otherOnline 
+                           const displayUsers = otherOnline.length > 0
+                              ? otherOnline
                               : (allProfiles || [])
                                  .filter((u) => u.id !== currentUser?.id)
                                  .sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime())
@@ -564,11 +564,10 @@ export const LobbyView = ({
                                              <button
                                                 onClick={() => handleSendInvite(opp)}
                                                 disabled={outgoingInvite !== null}
-                                                className={`flex items-center gap-1.5 border text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
-                                                   isOnline 
-                                                      ? "bg-correct/10 hover:bg-correct text-correct hover:text-black border-correct/20" 
+                                                className={`flex items-center gap-1.5 border text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${isOnline
+                                                      ? "bg-correct/10 hover:bg-correct text-correct hover:text-black border-correct/20"
                                                       : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"
-                                                }`}
+                                                   }`}
                                              >
                                                 {isOnline ? <Send size={10} /> : <Swords size={10} />}
                                                 {isOnline ? "Invite" : "Challenge"}

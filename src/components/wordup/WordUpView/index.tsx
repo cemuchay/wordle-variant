@@ -5,7 +5,7 @@ import { useAuth } from "../../../hooks/useAuth";
 import { useApp } from "../../../context/AppContext";
 import { useServerTime } from "./hooks/useServerTime";
 import { useWordUpProfile } from "./hooks/useWordUpProfile";
-import { useWordUpMatchmaking } from "./hooks/useWordUpMatchmaking";
+import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
@@ -20,6 +20,7 @@ import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
 import { LoadingView } from "./components/LoadingView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
+import { ConnectingView } from "./components/ConnectingView";
 
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
@@ -134,58 +135,58 @@ export const WordUpView = () => {
       }
    }, [matchData?.status, view, setView, startQuestionRound, matchData]);
 
-    const startCountdown = useCallback((match: any) => {
-       let count = 3;
-       setCountdownText("3");
-       const interval = setInterval(() => {
-          count--;
-          if (count === 0) {
-             clearInterval(interval);
-             setView("battle");
+   const startCountdown = useCallback((match: any) => {
+      let count = 3;
+      setCountdownText("3");
+      const interval = setInterval(() => {
+         count--;
+         if (count === 0) {
+            clearInterval(interval);
+            setView("battle");
 
-             // Set match status to active in database (only for real-time matches)
-             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
-                supabase
-                   .from("wordup_matches")
-                   .update({ status: "active" })
-                   .eq("id", match.id)
-                   .then(({ error }: any) => {
-                      if (error) console.error("Failed to set match status to active:", error);
-                   });
-             }
+            // Set match status to active in database (only for real-time matches)
+            if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
+               supabase
+                  .from("wordup_matches")
+                  .update({ status: "active" })
+                  .eq("id", match.id)
+                  .then(({ error }: any) => {
+                     if (error) console.error("Failed to set match status to active:", error);
+                  });
+            }
 
-             startQuestionRound(match, 0);
-          } else {
-             setCountdownText(String(count));
-          }
-       }, 1000);
-    }, [startQuestionRound, role]);
+            startQuestionRound(match, 0);
+         } else {
+            setCountdownText(String(count));
+         }
+      }, 1000);
+   }, [startQuestionRound, role]);
 
-    const launchedMatchIdRef = useRef<string | null>(null);
+   const launchedMatchIdRef = useRef<string | null>(null);
 
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
-    const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
-       launchedMatchIdRef.current = mId;
-       setMatchId(mId);
-       setRole(mRole);
-       setView("loading");
-       const match = await loadAndSubscribeMatch(mId, mRole);
-       if (match) {
-          wordupAudio.playMatchStart();
-          setView("countdown");
-          startCountdown(match);
-       } else {
-          setView("menu");
-       }
-    }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
+   // eslint-disable-next-line react-hooks/preserve-manual-memoization
+   const onMatchFound = useCallback(async (mId: string, mRole: "player1" | "player2") => {
+      launchedMatchIdRef.current = mId;
+      setMatchId(mId);
+      setRole(mRole);
+      setView("loading");
+      const match = await loadAndSubscribeMatch(mId, mRole);
+      if (match) {
+         wordupAudio.playMatchStart();
+         setView("countdown");
+         startCountdown(match);
+      } else {
+         setView("menu");
+      }
+   }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
 
-    // Reactive sync for direct invites and rematch transitions
-    useEffect(() => {
-       if (matchId && role && matchId !== launchedMatchIdRef.current && (view === "menu" || view === "matchmaking" || view === "gameover")) {
-          console.log("[WordUp Logs] Direct matchId set in store. Launching match...", matchId, role);
-          onMatchFound(matchId, role);
-       }
-    }, [matchId, role, view, onMatchFound]);
+   // Reactive sync for direct invites and rematch transitions
+   useEffect(() => {
+      if (matchId && role && matchId !== launchedMatchIdRef.current && (view === "menu" || view === "matchmaking" || view === "gameover")) {
+         console.log("[WordUp Logs] Direct matchId set in store. Launching match...", matchId, role);
+         onMatchFound(matchId, role);
+      }
+   }, [matchId, role, view, onMatchFound]);
 
    const cleanUpAll = useCallback(() => {
       cleanUpGameLoop();
@@ -197,34 +198,40 @@ export const WordUpView = () => {
       cancelMatchmaking
    } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
 
+    const cancelMatchmakingRef = useRef(cancelMatchmaking);
     useEffect(() => {
-       return () => {
-          cancelMatchmaking();
-          resetGame();
-       };
-    }, [cancelMatchmaking, resetGame]);
-
-    const handleCancelMatchmaking = useCallback(async () => {
-       await cancelMatchmaking();
-       setView("menu");
+       cancelMatchmakingRef.current = cancelMatchmaking;
     }, [cancelMatchmaking]);
 
-    const handleSelectHistoryMatch = useCallback((match: any) => {
-       if (!effectiveUser) return;
-       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-       setRole(myRole);
-       setMatchData(match);
+    useEffect(() => {
+       return () => {
+          cancelMatchmakingRef.current();
+          resetGame();
+       };
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-       if (match.questions && match.encryption_key) {
-          try {
-             const dec = decryptQuestions(match.questions, match.encryption_key);
-             setQuestions(dec);
-          } catch (e) {
-             console.error("Failed to decrypt history match questions:", e);
-          }
-       }
-       setView("gameover");
-    }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
+   const handleCancelMatchmaking = useCallback(async () => {
+      await cancelMatchmaking();
+      setView("menu");
+   }, [cancelMatchmaking]);
+
+   const handleSelectHistoryMatch = useCallback((match: any) => {
+      if (!effectiveUser) return;
+      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+      setRole(myRole);
+      setMatchData(match);
+
+      if (match.questions && match.encryption_key) {
+         try {
+            const dec = decryptQuestions(match.questions, match.encryption_key);
+            setQuestions(dec);
+         } catch (e) {
+            console.error("Failed to decrypt history match questions:", e);
+         }
+      }
+      setView("gameover");
+   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
 
    if (!effectiveUser) {
       return (
@@ -318,7 +325,7 @@ export const WordUpView = () => {
                   category={category}
                   setCategory={setCategory}
                   startMatchmaking={() => {
-                     setView("matchmaking");
+                     setView("connecting");
                      startMatchmaking();
                   }}
                   getRankColor={getRankColor}
@@ -337,6 +344,10 @@ export const WordUpView = () => {
                   cancelMatchmaking={handleCancelMatchmaking}
                   countdownSecs={countdownSecs}
                />
+            )}
+
+            {view === "connecting" && (
+               <ConnectingView />
             )}
 
             {view === "countdown" && (

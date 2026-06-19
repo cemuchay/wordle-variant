@@ -6,6 +6,7 @@ import { type ProfileStats } from "../components/wordup/WordUpView/types";
 interface WordUpState {
    view:
       | "menu"
+      | "connecting"
       | "matchmaking"
       | "countdown"
       | "battle"
@@ -27,6 +28,7 @@ interface WordUpState {
    setView: (
       view:
          | "menu"
+         | "connecting"
          | "matchmaking"
          | "countdown"
          | "battle"
