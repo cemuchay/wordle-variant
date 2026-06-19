@@ -13,7 +13,11 @@ export interface WordUpQuestion {
       | "anagram_scrambled"
       | "pattern"
       | "math"
-      | "odd_one_out";
+      | "odd_one_out"
+      | "letter_positions"
+      | "vowel_count"
+      | "unscramble"
+      | "word_ladder";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
@@ -319,14 +323,14 @@ export const calculateWordlePattern = (
    guess: string,
 ): string => {
    const len = target.length;
-   const result = new Array(len).fill("⬜");
+   const result = new Array(len).fill("-");
    const targetUsed = new Array(len).fill(false);
    const guessUsed = new Array(len).fill(false);
 
    // Green pass
    for (let i = 0; i < len; i++) {
       if (guess[i] === target[i]) {
-         result[i] = "🟩";
+         result[i] = "G";
          targetUsed[i] = true;
          guessUsed[i] = true;
       }
@@ -338,7 +342,7 @@ export const calculateWordlePattern = (
       for (let j = 0; j < len; j++) {
          if (targetUsed[j]) continue;
          if (guess[i] === target[j]) {
-            result[i] = "🟨";
+            result[i] = "Y";
             targetUsed[j] = true;
             break;
          }
@@ -737,6 +741,17 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
    const questions: WordUpQuestion[] = [];
 
+   const generateFallbackQuestion = (_length: number, official: string[], valid: Set<string>): WordUpQuestion => {
+      const word = official[Math.floor(Math.random() * official.length)];
+      const fake = mutateToFakeWord(word, valid);
+      return {
+         type: "real_fake",
+         prompt: fake,
+         choices: ["Real", "Fake"],
+         answer: "Fake",
+      };
+   };
+
    const pickWeightedLength = (allowed: number[]): number => {
       // 3, 8, 9, 10 highly favored (weight 3.5), other lengths get weight 0.8
       const weights = allowed.map((l) =>
@@ -765,6 +780,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "definition", weight: 1.0 },
          { type: "math", weight: 0.8 },
          { type: "odd_one_out", weight: 0.8 },
+         { type: "letter_positions", weight: 0.8 },
+         { type: "vowel_count", weight: 0.8 },
+         { type: "unscramble", weight: 0.8 },
+         { type: "word_ladder", weight: 0.7 },
       ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
@@ -784,9 +803,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       // Pick type
       const type = getTypeByWeight();
       const length = pickWeightedLength(
-         type === "anagram" || type === "anagram_scrambled"
-            ? [3, 4, 5, 6, 7, 8, 9, 10]
-            : allowedLengths,
+          type === "anagram" || type === "anagram_scrambled" || type === "unscramble"
+             ? [3, 4, 5, 6, 7, 8, 9, 10]
+             : allowedLengths,
       );
       const { official, valid } = getWordLists(length);
 
@@ -841,11 +860,24 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          promptChars[missingIdx] = "_";
          const promptStr = promptChars.join("");
 
+         const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+         const shuffledLetters = shuffle(letters.split("")).join("");
+
          const choices = new Set<string>();
          choices.add(correctLetter);
+         for (const candidate of shuffledLetters) {
+            if (choices.size >= 4) break;
+            if (candidate === correctLetter) continue;
+            const testWord = promptStr.replace("_", candidate);
+            if (!valid.has(testWord)) {
+               choices.add(candidate);
+            }
+         }
+
          while (choices.size < 4) {
-            const code = 65 + Math.floor(Math.random() * 26); // A-Z
-            choices.add(String.fromCharCode(code));
+            const code = 65 + Math.floor(Math.random() * 26);
+            const fallback = String.fromCharCode(code);
+            if (!choices.has(fallback)) choices.add(fallback);
          }
 
          questions.push({
@@ -855,42 +887,190 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             answer: correctLetter,
          });
       } else if (type === "reverse_wordle") {
-         // Target word
          const target = randomWord();
-         // Choose a guess word of the same length
-         let guess = randomWord();
-         let pattern = calculateWordlePattern(target, guess);
+         const guess = randomWord();
+         const pattern = calculateWordlePattern(target, guess);
 
-         // We want a pattern that is not all white or all green (to make it interesting)
+         if (pattern === "G".repeat(target.length)) {
+            // All green is trivial, skip this type
+            questions.push(generateFallbackQuestion(length, official, valid));
+         } else {
+            const variant = Math.random() > 0.5 ? "find_target" : "find_guess";
+
+            if (variant === "find_guess") {
+               // Show pattern + target, ask which guess produced it
+               const choices = new Set<string>();
+               choices.add(guess);
+               let attempts = 0;
+               while (choices.size < 4 && attempts < 100) {
+                  const dummy = randomWord();
+                  const dummyPattern = calculateWordlePattern(target, dummy);
+                  if (dummyPattern !== pattern) {
+                     choices.add(dummy);
+                  }
+                  attempts++;
+               }
+               while (choices.size < 4) {
+                  choices.add(String(choices.size + 10).repeat(target.length));
+               }
+
+               questions.push({
+                  type: "reverse_wordle",
+                  prompt: pattern,
+                  subPrompt: `Target: ${target}`,
+                  choices: shuffle(Array.from(choices)),
+                  answer: guess,
+               });
+            } else {
+               // Show pattern + guess, ask which target produced it
+               const choices = new Set<string>();
+               choices.add(target);
+               let attempts = 0;
+               while (choices.size < 4 && attempts < 100) {
+                  const dummyTarget = randomWord();
+                  const dummyPattern = calculateWordlePattern(dummyTarget, guess);
+                  if (dummyPattern !== pattern) {
+                     choices.add(dummyTarget);
+                  }
+                  attempts++;
+               }
+               while (choices.size < 4) {
+                  choices.add("AAAA" + choices.size);
+               }
+
+               questions.push({
+                  type: "reverse_wordle",
+                  prompt: pattern,
+                  subPrompt: `Guess: ${guess}`,
+                  choices: shuffle(Array.from(choices)),
+                  answer: target,
+               });
+            }
+         }
+      } else if (type === "letter_positions") {
+         const word = randomWord();
+         const idx = Math.floor(Math.random() * word.length);
+         const letter = word[idx];
+
+         const correctAnswer = String(idx + 1);
+
+         const choices = new Set<string>();
+         choices.add(correctAnswer);
+         while (choices.size < 4) {
+            const fakeIdx = Math.floor(Math.random() * word.length) + 1;
+            choices.add(String(fakeIdx));
+         }
+
+         questions.push({
+            type: "letter_positions",
+            prompt: word,
+            subPrompt: `Which position has the letter "${letter}"?`,
+            choices: shuffle(Array.from(choices)),
+            answer: correctAnswer,
+         });
+      } else if (type === "vowel_count") {
+         const word = randomWord();
+         const vowels = word.match(/[AEIOU]/g);
+         const count = vowels ? vowels.length : 0;
+
+         const choices = new Set<string>();
+         choices.add(String(count));
+         const offsets = [-2, -1, 1, 2, 3];
+         for (const offset of shuffle(offsets)) {
+            if (choices.size >= 4) break;
+            const val = count + offset;
+            if (val >= 0 && val <= word.length && !choices.has(String(val))) {
+               choices.add(String(val));
+            }
+         }
+         while (choices.size < 4) {
+            const r = Math.floor(Math.random() * (word.length + 1));
+            choices.add(String(r));
+         }
+
+         questions.push({
+            type: "vowel_count",
+            prompt: word,
+            choices: shuffle(Array.from(choices)),
+            answer: String(count),
+         });
+      } else if (type === "unscramble") {
+         const word = randomWord();
+         let scrambled = word
+            .split("")
+            .sort(() => Math.random() - 0.5)
+            .join("");
          let attempts = 0;
-         while (
-            (pattern.replace(/⬜/g, "").length === 0 ||
-               pattern.replace(/🟩/g, "").length === 0) &&
-            attempts < 10
-         ) {
-            guess = randomWord();
-            pattern = calculateWordlePattern(target, guess);
+         while ((scrambled === word || scrambled === word.split("").reverse().join("")) && attempts < 50) {
+            scrambled = word
+               .split("")
+               .sort(() => Math.random() - 0.5)
+               .join("");
             attempts++;
          }
 
          const choices = new Set<string>();
-         choices.add(guess);
+         choices.add(word);
 
-         // Add 3 incorrect guesses of the same length
-         while (choices.size < 4) {
+         const scrambleWord = (w: string) =>
+            w.split("").sort(() => Math.random() - 0.5).join("");
+
+         attempts = 0;
+         while (choices.size < 4 && attempts < 100) {
             const dummy = randomWord();
-            if (calculateWordlePattern(target, dummy) !== pattern) {
-               choices.add(dummy);
+            const ds = scrambleWord(dummy);
+            if (ds !== word && ds !== scrambled && isValidFake(scrambled, ds)) {
+               choices.add(ds);
             }
+            attempts++;
+         }
+         while (choices.size < 4) {
+            choices.add(scrambled.slice(0, -1) + "X" + choices.size);
          }
 
          questions.push({
-            type: "reverse_wordle",
-            prompt: pattern,
-            subPrompt: `Target: ${target}`,
-            choices: Array.from(choices).sort(() => Math.random() - 0.5),
-            answer: guess,
+            type: "unscramble",
+            prompt: scrambled,
+            choices: shuffle(Array.from(choices)),
+            answer: word,
          });
+      } else if (type === "word_ladder") {
+         const startWord = randomWord();
+         let ladderWord: string | null = null;
+         let attempts = 0;
+         while (!ladderWord && attempts < 200) {
+            const candidate = randomWord();
+            if (candidate !== startWord && getDiffCount(startWord, candidate) === 1) {
+               ladderWord = candidate;
+            }
+            attempts++;
+         }
+
+         if (!ladderWord) {
+            questions.push(generateFallbackQuestion(length, official, valid));
+         } else {
+            const choices = new Set<string>();
+            choices.add(ladderWord);
+            attempts = 0;
+            while (choices.size < 4 && attempts < 100) {
+               const dummy = randomWord();
+               if (dummy !== ladderWord && dummy !== startWord) {
+                  choices.add(dummy);
+               }
+               attempts++;
+            }
+            while (choices.size < 4) {
+               choices.add(startWord.slice(0, -1) + String(choices.size));
+            }
+
+            questions.push({
+               type: "word_ladder",
+               prompt: startWord,
+               subPrompt: "Which word is one letter away?",
+               choices: shuffle(Array.from(choices)),
+               answer: ladderWord,
+            });
+         }
       } else if (type === "definition") {
          // Find a word in our definition list
          const keys = Object.keys(DEFINITIONS);

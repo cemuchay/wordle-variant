@@ -4,7 +4,13 @@ import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../components/wordup/WordUpView/types";
 
 interface WordUpState {
-   view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading";
+   view:
+      | "menu"
+      | "matchmaking"
+      | "countdown"
+      | "battle"
+      | "gameover"
+      | "loading";
    category: string;
    matchId: string | null;
    role: "player1" | "player2" | null;
@@ -18,7 +24,15 @@ interface WordUpState {
    revealAnswers: boolean;
 
    // Actions
-   setView: (view: "menu" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading") => void;
+   setView: (
+      view:
+         | "menu"
+         | "matchmaking"
+         | "countdown"
+         | "battle"
+         | "gameover"
+         | "loading",
+   ) => void;
    setCategory: (category: string) => void;
    setMatchId: (matchId: string | null) => void;
    setRole: (role: "player1" | "player2" | null) => void;
@@ -42,7 +56,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    currentIdx: 0,
    matchData: null,
    opponentStats: null,
-   countdownSecs: 10,
+   countdownSecs: 6,
    timeLeft: 10.0,
    selectedAnswer: null,
    revealAnswers: false,
@@ -59,17 +73,18 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    setTimeLeft: (timeLeft) => set({ timeLeft }),
    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
-   resetGame: () => set({
-      view: "menu",
-      matchId: null,
-      role: null,
-      questions: [],
-      currentIdx: 0,
-      matchData: null,
-      opponentStats: null,
-      countdownSecs: 10,
-      timeLeft: 10.0,
-      selectedAnswer: null,
-      revealAnswers: false
-   })
+   resetGame: () =>
+      set({
+         view: "menu",
+         matchId: null,
+         role: null,
+         questions: [],
+         currentIdx: 0,
+         matchData: null,
+         opponentStats: null,
+         countdownSecs: 6,
+         timeLeft: 10.0,
+         selectedAnswer: null,
+         revealAnswers: false,
+      }),
 }));

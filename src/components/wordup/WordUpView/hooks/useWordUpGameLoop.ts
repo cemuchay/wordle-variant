@@ -19,6 +19,8 @@ export const getQuestionDuration = (type: string): number => {
       case "real_fake":
       case "length":
       case "missing_letter":
+      case "letter_positions":
+      case "vowel_count":
          return 8;
       case "definition":
       case "anagram":
@@ -28,6 +30,8 @@ export const getQuestionDuration = (type: string): number => {
       case "odd_one_out":
          return 12;
       case "reverse_wordle":
+      case "unscramble":
+      case "word_ladder":
          return 15;
       default:
          return 10;
