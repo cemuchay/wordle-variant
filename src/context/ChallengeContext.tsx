@@ -8,6 +8,7 @@ import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
 import { safeLocalStorage } from '../utils/storage';
+import { saveChallengeView, loadChallengeView, clearChallengeView } from '../utils/challengeViewPersistence';
 
 interface ChallengeContextType {
     // ... rest of interface
@@ -908,6 +909,67 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
         }
     }, [isChallengesLoading, myChallengesData, setListColumn]);
+
+    // Auto-navigate to gameplay if restored view was gameplay and game is still valid
+    const hasNavigatedToGameplay = useRef(false);
+
+    useEffect(() => {
+        const remember = useChallengeStore.getState().rememberLastView;
+        if (!remember || hasNavigatedToGameplay.current) return;
+        if (!selectedChallenge || !myParticipation) return;
+        if (isChallengesLoading || loadingParticipants) return;
+
+        const saved = loadChallengeView();
+        if (!saved || saved.type !== 'gameplay') return;
+
+        const isExpired = new Date(selectedChallenge.expires_at) < new Date();
+        const isFinished = myParticipation.status === 'completed' || myParticipation.status === 'timed_out';
+        if (isExpired || isFinished) return;
+
+        hasNavigatedToGameplay.current = true;
+        setIsPlaying(true);
+    }, [selectedChallenge, myParticipation, isChallengesLoading, loadingParticipants, setIsPlaying]);
+
+    // Restore saved view when opening the Challenge modal
+    const hasRestoredView = useRef(false);
+
+    useEffect(() => {
+        if (isChallengesLoading || hasRestoredView.current) return;
+        const remember = useChallengeStore.getState().rememberLastView;
+        if (!remember) return;
+
+        if (!initialChallengeId || initialChallengeId === "null" || initialChallengeId === "undefined") {
+            const saved = loadChallengeView();
+            if (saved && saved.challengeId) {
+                hasRestoredView.current = true;
+                setListColumn(saved.listColumn);
+                if (saved.type === 'lobby' || saved.type === 'gameplay') {
+                    handleViewChallenge(saved.challengeId);
+                }
+            }
+        }
+    }, [isChallengesLoading, initialChallengeId, handleViewChallenge, setListColumn]);
+
+    // Persist challenge view state when rememberLastView is enabled
+    useEffect(() => {
+        const remember = useChallengeStore.getState().rememberLastView;
+        if (!remember) return;
+
+        const challengeId = selectedChallenge?.id || null;
+        let type: 'list' | 'lobby' | 'gameplay' = 'list';
+        if (isPlaying) {
+            type = 'gameplay';
+        } else if (selectedChallenge) {
+            type = 'lobby';
+        }
+
+        saveChallengeView({
+            type,
+            challengeId,
+            listColumn,
+            marathonGameIndex: previewMarathonGameIndex,
+        });
+    }, [isPlaying, selectedChallenge?.id, listColumn, previewMarathonGameIndex]);
 
     // Context Value (Bridge)
     const contextValue: ChallengeContextType = useMemo(() => ({
