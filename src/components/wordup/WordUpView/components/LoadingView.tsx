@@ -17,7 +17,7 @@ export const LoadingView = ({ message = "Preparing Arena..." }: LoadingViewProps
             {/* Pulsing glow background */}
             <div className="absolute w-24 h-24 rounded-full bg-correct/10 border border-correct/20 animate-ping opacity-25" />
             <div className="absolute w-16 h-16 rounded-full bg-correct/25 blur-xl" />
-            
+
             {/* Spinning Loader */}
             <div className="relative p-6 bg-slate-900/80 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-md">
                <Loader2 size={36} className="text-correct animate-spin" />
@@ -25,16 +25,16 @@ export const LoadingView = ({ message = "Preparing Arena..." }: LoadingViewProps
          </div>
 
          <div className="space-y-2 max-w-xs">
-            <motion.h3 
+            <motion.h3
                initial={{ y: 10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ delay: 0.1 }}
                className="text-xs font-black uppercase tracking-widest text-correct flex items-center justify-center gap-1.5"
             >
                <Swords size={12} className="animate-pulse" />
-               WordUp Battles
+               WordUp Battles (beta)
             </motion.h3>
-            <motion.p 
+            <motion.p
                initial={{ y: 10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ delay: 0.2 }}
@@ -42,7 +42,7 @@ export const LoadingView = ({ message = "Preparing Arena..." }: LoadingViewProps
             >
                {message}
             </motion.p>
-            <motion.p 
+            <motion.p
                initial={{ y: 10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ delay: 0.3 }}

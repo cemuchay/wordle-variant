@@ -1,4 +1,4 @@
-import { HelpCircle, Lightbulb, RotateCcw, Search, SettingsIcon, Share } from 'lucide-react';
+import { HelpCircle, Lightbulb, RotateCcw, SettingsIcon, Share } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -31,7 +31,6 @@ const ICON_SIZE = 20;
 
 export const AppHeader = ({
     onOpenSettings,
-    onOpenSearch,
     onOpenInfo,
     onOpenWeeklyWrapped,
     onHint,
@@ -153,16 +152,6 @@ export const AppHeader = ({
                         )}
 
                         {user && <NotificationBell />}
-
-                        {onOpenSearch && (
-                            <button
-                                onClick={onOpenSearch}
-                                className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer"
-                                title="Search Settings"
-                            >
-                                <Search size={ICON_SIZE} />
-                            </button>
-                        )}
 
                         <button onClick={onOpenInfo} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer" title="Rules & How to Play">
                             <HelpCircle size={ICON_SIZE} />

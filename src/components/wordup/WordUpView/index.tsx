@@ -353,9 +353,9 @@ export const WordUpView = () => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide p-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-12 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
          {/* Global settings buttons */}
-         <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
+         <div className="absolute right-4 top-3 z-50 flex items-center gap-2">
             <button
                onClick={handleToggleSound}
                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"

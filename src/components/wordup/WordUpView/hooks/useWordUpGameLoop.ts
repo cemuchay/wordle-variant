@@ -109,6 +109,10 @@ export const useWordUpGameLoop = (
 
    const loadAndSubscribeMatch = useCallback(
       async (mId: string, activeRole: "player1" | "player2") => {
+         if (mId.startsWith("bot-match-")) {
+            return botGame.loadAndSubscribeMatch(mId, activeRole);
+         }
+
          // Quick fetch to determine match details & game type
          let match;
          try {

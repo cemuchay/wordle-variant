@@ -33,6 +33,10 @@ export const useWordUpMatchmaking = (
          clearInterval(matchmakingIntervalRef.current);
          matchmakingIntervalRef.current = null;
       }
+      if (matchmakingChannelRef.current) {
+         supabase.removeChannel(matchmakingChannelRef.current);
+         matchmakingChannelRef.current = null;
+      }
    }, [cleanUpIntervals]);
 
    const triggerBotFallback = useCallback(async () => {
@@ -60,8 +64,20 @@ export const useWordUpMatchmaking = (
    }, [user, category, cleanUpMatchmaking, onMatchFound]);
 
      const subscribeToMatchmaking = useCallback(() => {
+      if (matchmakingChannelRef.current) {
+         supabase.removeChannel(matchmakingChannelRef.current);
+         matchmakingChannelRef.current = null;
+      }
+      const topic = `wordup_lobby_${user?.id}`;
+      const existing = supabase.getChannels().find(
+         (c) => (c as any).topic === `realtime:${topic}`
+      );
+      if (existing) {
+         supabase.removeChannel(existing);
+      }
+
       const channel = supabase
-         .channel(`wordup_lobby_${user?.id}`)
+         .channel(topic)
          .on(
             "postgres_changes",
             {
