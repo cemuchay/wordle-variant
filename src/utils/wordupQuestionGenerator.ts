@@ -13,7 +13,11 @@ export interface WordUpQuestion {
       | "anagram_scrambled"
       | "pattern"
       | "math"
-      | "odd_one_out";
+      | "odd_one_out"
+      | "letter_positions"
+      | "vowel_count"
+      | "unscramble"
+      | "word_ladder";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
@@ -776,6 +780,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "definition", weight: 1.0 },
          { type: "math", weight: 0.8 },
          { type: "odd_one_out", weight: 0.8 },
+         { type: "letter_positions", weight: 0.8 },
+         { type: "vowel_count", weight: 0.8 },
+         { type: "unscramble", weight: 0.8 },
+         { type: "word_ladder", weight: 0.7 },
       ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
@@ -795,9 +803,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       // Pick type
       const type = getTypeByWeight();
       const length = pickWeightedLength(
-         type === "anagram" || type === "anagram_scrambled"
-            ? [3, 4, 5, 6, 7, 8, 9, 10]
-            : allowedLengths,
+          type === "anagram" || type === "anagram_scrambled" || type === "unscramble"
+             ? [3, 4, 5, 6, 7, 8, 9, 10]
+             : allowedLengths,
       );
       const { official, valid } = getWordLists(length);
 
@@ -938,6 +946,130 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                   answer: target,
                });
             }
+         }
+      } else if (type === "letter_positions") {
+         const word = randomWord();
+         const idx = Math.floor(Math.random() * word.length);
+         const letter = word[idx];
+
+         const correctAnswer = String(idx + 1);
+
+         const choices = new Set<string>();
+         choices.add(correctAnswer);
+         while (choices.size < 4) {
+            const fakeIdx = Math.floor(Math.random() * word.length) + 1;
+            choices.add(String(fakeIdx));
+         }
+
+         questions.push({
+            type: "letter_positions",
+            prompt: word,
+            subPrompt: `Which position has the letter "${letter}"?`,
+            choices: shuffle(Array.from(choices)),
+            answer: correctAnswer,
+         });
+      } else if (type === "vowel_count") {
+         const word = randomWord();
+         const vowels = word.match(/[AEIOU]/g);
+         const count = vowels ? vowels.length : 0;
+
+         const choices = new Set<string>();
+         choices.add(String(count));
+         const offsets = [-2, -1, 1, 2, 3];
+         for (const offset of shuffle(offsets)) {
+            if (choices.size >= 4) break;
+            const val = count + offset;
+            if (val >= 0 && val <= word.length && !choices.has(String(val))) {
+               choices.add(String(val));
+            }
+         }
+         while (choices.size < 4) {
+            const r = Math.floor(Math.random() * (word.length + 1));
+            choices.add(String(r));
+         }
+
+         questions.push({
+            type: "vowel_count",
+            prompt: word,
+            choices: shuffle(Array.from(choices)),
+            answer: String(count),
+         });
+      } else if (type === "unscramble") {
+         const word = randomWord();
+         let scrambled = word
+            .split("")
+            .sort(() => Math.random() - 0.5)
+            .join("");
+         let attempts = 0;
+         while ((scrambled === word || scrambled === word.split("").reverse().join("")) && attempts < 50) {
+            scrambled = word
+               .split("")
+               .sort(() => Math.random() - 0.5)
+               .join("");
+            attempts++;
+         }
+
+         const choices = new Set<string>();
+         choices.add(word);
+
+         const scrambleWord = (w: string) =>
+            w.split("").sort(() => Math.random() - 0.5).join("");
+
+         attempts = 0;
+         while (choices.size < 4 && attempts < 100) {
+            const dummy = randomWord();
+            const ds = scrambleWord(dummy);
+            if (ds !== word && ds !== scrambled && isValidFake(scrambled, ds)) {
+               choices.add(ds);
+            }
+            attempts++;
+         }
+         while (choices.size < 4) {
+            choices.add(scrambled.slice(0, -1) + "X" + choices.size);
+         }
+
+         questions.push({
+            type: "unscramble",
+            prompt: scrambled,
+            choices: shuffle(Array.from(choices)),
+            answer: word,
+         });
+      } else if (type === "word_ladder") {
+         const startWord = randomWord();
+         let ladderWord: string | null = null;
+         let attempts = 0;
+         while (!ladderWord && attempts < 200) {
+            const candidate = randomWord();
+            if (candidate !== startWord && getDiffCount(startWord, candidate) === 1) {
+               ladderWord = candidate;
+            }
+            attempts++;
+         }
+
+         if (!ladderWord) {
+            questions.push(generateFallbackQuestion(length, official, valid));
+         } else {
+            const choices = new Set<string>();
+            choices.add(ladderWord);
+            attempts = 0;
+            while (choices.size < 4 && attempts < 100) {
+               const dummy = randomWord();
+               if (dummy !== ladderWord && dummy !== startWord) {
+                  choices.add(dummy);
+               }
+               attempts++;
+            }
+            while (choices.size < 4) {
+               choices.add(startWord.slice(0, -1) + String(choices.size));
+            }
+
+            questions.push({
+               type: "word_ladder",
+               prompt: startWord,
+               subPrompt: "Which word is one letter away?",
+               choices: shuffle(Array.from(choices)),
+               answer: ladderWord,
+            });
          }
       } else if (type === "definition") {
          // Find a word in our definition list
