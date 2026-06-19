@@ -147,7 +147,12 @@ export const GameOverView = ({
                               <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
                            </div>
                            <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
-                           <p className="text-[10px] text-gray-400">
+                           {q.subPrompt && (
+                              <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
+                                 {q.subPrompt}
+                              </p>
+                           )}
+                           <p className="text-[10px] text-gray-400 mt-1">
                               Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
                            </p>
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
