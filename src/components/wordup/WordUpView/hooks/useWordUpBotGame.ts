@@ -65,6 +65,7 @@ export const useWordUpBotGame = ({
    const roleRef = useRef(role);
    const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
    const onRematchAcceptedRef = useRef(onRematchAccepted);
+   const handleAnswerSelectRef = useRef<any>(null);
 
    useEffect(() => {
       onRematchAcceptedRef.current = onRematchAccepted;
@@ -311,7 +312,11 @@ export const useWordUpBotGame = ({
       [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
    );
 
-   const startQuestionRound = useCallback(
+   useEffect(() => {
+      handleAnswerSelectRef.current = handleAnswerSelect;
+   }, [handleAnswerSelect]);
+
+    const startQuestionRound = useCallback(
       (match: any, index: number) => {
          if (!isActive) return;
 
@@ -355,8 +360,9 @@ export const useWordUpBotGame = ({
             if (remaining <= 0) {
                console.log(`[WordUp Logs] Bot Timer expired for round ${index + 1}`);
                stopRoundTimer();
-               if (selectedAnswer === null) {
-                  handleAnswerSelect("");
+               const latestSelected = useWordUpStore.getState().selectedAnswer;
+               if (latestSelected === null) {
+                  handleAnswerSelectRef.current("");
                }
             }
          }, 100);

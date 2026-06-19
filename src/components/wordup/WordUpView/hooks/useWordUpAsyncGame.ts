@@ -55,6 +55,7 @@ export const useWordUpAsyncGame = ({
    const timeLeftRef = useRef(timeLeft);
    const roleRef = useRef(role);
    const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
+   const handleAnswerSelectRef = useRef<any>(null);
 
    useEffect(() => {
       currentIdxRef.current = currentIdx;
@@ -241,6 +242,10 @@ export const useWordUpAsyncGame = ({
       [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
    );
 
+   useEffect(() => {
+      handleAnswerSelectRef.current = handleAnswerSelect;
+   }, [handleAnswerSelect]);
+
    const startQuestionRound = useCallback(
       (_match: any, index: number) => {
          if (!isActive) return;
@@ -285,13 +290,14 @@ export const useWordUpAsyncGame = ({
             if (remaining <= 0) {
                console.log(`[WordUp Logs] Async Timer expired for round ${index + 1}`);
                stopRoundTimer();
-               if (selectedAnswer === null) {
-                  handleAnswerSelect("");
+               const latestSelected = useWordUpStore.getState().selectedAnswer;
+               if (latestSelected === null) {
+                  handleAnswerSelectRef.current("");
                }
             }
          }, 30);
       },
-      [cleanUpIntervals, stopRoundTimer, getSyncedNow, handleAnswerSelect, setCurrentIdx, setSelectedAnswer, setRevealAnswers, setTimeLeft, selectedAnswer, isActive],
+      [cleanUpIntervals, stopRoundTimer, getSyncedNow, setCurrentIdx, setSelectedAnswer, setRevealAnswers, setTimeLeft, isActive],
    );
 
    const handleMatchUpdate = useCallback(
