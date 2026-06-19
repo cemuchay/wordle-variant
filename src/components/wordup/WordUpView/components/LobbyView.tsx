@@ -428,13 +428,7 @@ export const LobbyView = ({
          className="flex flex-col gap-6 flex-1 justify-center py-6"
       >
          <div className="text-center space-y-2 relative">
-            <button
-               onClick={onToggleSound}
-               className="absolute right-0 top-0 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-               title="Toggle Sound"
-            >
-               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            </button>
+
 
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />

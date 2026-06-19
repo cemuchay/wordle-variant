@@ -9,7 +9,7 @@ import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
-import { Swords } from "lucide-react";
+import { Swords, RotateCcw, Volume2, VolumeX } from "lucide-react";
 
 import { decryptQuestions } from "../../../utils/wordupQuestionGenerator";
 
@@ -354,6 +354,39 @@ export const WordUpView = () => {
 
    return (
       <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide p-4 relative" style={{ minHeight: "100%" }}>
+         {/* Global settings buttons */}
+         <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
+            <button
+               onClick={handleToggleSound}
+               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+               title="Toggle Sound"
+            >
+               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+            <button
+               onClick={() => {
+                  resetGame();
+                  safeLocalStorage.removeItem("wordup_active_game");
+                  try {
+                     // Safe session storage keys cleanup
+                     const keysToRemove: string[] = [];
+                     for (let i = 0; i < sessionStorage.length; i++) {
+                        const key = sessionStorage.key(i);
+                        if (key && key.startsWith("wordup_completed_")) {
+                           keysToRemove.push(key);
+                        }
+                     }
+                     keysToRemove.forEach(k => sessionStorage.removeItem(k));
+                  } catch {}
+                  triggerToast("Game state cleared successfully.", 3000);
+                  setView("menu");
+               }}
+               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
+               title="Reset Game State"
+            >
+               <RotateCcw size={16} />
+            </button>
+         </div>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
