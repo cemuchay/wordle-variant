@@ -26,6 +26,7 @@ export const useWordUpMatchmaking = (
    const setCountdownSecs = useWordUpStore((s) => s.setCountdownSecs);
    const matchmakingIntervalRef = useRef<number | null>(null);
    const matchmakingChannelRef = useRef<any>(null);
+   const isStartingRef = useRef(false);
 
    const cleanUpMatchmaking = useCallback(() => {
       cleanUpIntervals();
@@ -139,11 +140,16 @@ export const useWordUpMatchmaking = (
  
 
    const startMatchmaking = useCallback(async () => {
+      if (isStartingRef.current) {
+         console.warn("Matchmaking request already in progress, ignoring duplicate request.");
+         return;
+      }
       if (!user) {
          window.dispatchEvent(new CustomEvent("open-auth-modal"));
          return;
       }
 
+      isStartingRef.current = true;
       cleanUpMatchmaking();
 
       try {
@@ -215,6 +221,8 @@ export const useWordUpMatchmaking = (
          console.error("Matchmaking startup failed:", err);
          useWordUpStore.getState().setView("menu");
          triggerToast("Failed to join arena. Please try again.", 4000);
+      } finally {
+         isStartingRef.current = false;
       }
    }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking, getSyncedNow]);
 

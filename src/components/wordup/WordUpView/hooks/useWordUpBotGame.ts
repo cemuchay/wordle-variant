@@ -110,6 +110,7 @@ export const useWordUpBotGame = ({
       async (match: any) => {
          try {
             console.log("[WordUp Logs] Bot endGame: Pushing final consolidated match state to DB...");
+            const completedAt = new Date().toISOString();
             await wordupNetworkGate.enqueue(
                'put',
                'finalize match scores and completed status',
@@ -125,7 +126,7 @@ export const useWordUpBotGame = ({
                            p2_score: match.p2_score,
                            p1_answered: true,
                            p2_answered: true,
-                           completed_at: new Date().toISOString(),
+                           completed_at: completedAt,
                         })
                         .eq("id", match.id);
                      if (error) throw error;
@@ -137,12 +138,23 @@ export const useWordUpBotGame = ({
             );
             console.log("[WordUp Logs] Bot Final sync successful.");
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
+
+            // Update local state directly so we transition to gameover
+            const finalMatch = {
+               ...match,
+               status: "completed",
+               p1_answered: true,
+               p2_answered: true,
+               completed_at: completedAt,
+            };
+            setMatchData(finalMatch);
+            onGameOver(finalMatch);
          } catch (e) {
             console.error("[WordUp Logs] Failed to finalize match in DB:", e);
             triggerToast("Failed to save final results. Check connection.", 5000);
          }
       },
-      [triggerToast],
+      [triggerToast, setMatchData, onGameOver],
    );
 
    const advanceRound = useCallback(
