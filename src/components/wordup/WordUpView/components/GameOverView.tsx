@@ -3,6 +3,26 @@ import { Award } from "lucide-react";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 
+const PatternSquares = ({ pattern }: { pattern: string }) => {
+   const colors: Record<string, string> = {
+      G: "bg-correct",
+      Y: "bg-yellow-500",
+      "-": "bg-gray-600",
+   };
+   return (
+      <div className="inline-flex items-center gap-1">
+         {pattern.split("").map((ch, i) => (
+            <span
+               key={i}
+               className={`inline-flex items-center justify-center w-5 h-5 rounded text-[8px] font-black text-white ${colors[ch] || "bg-gray-600"}`}
+            >
+               {ch === "G" ? "G" : ch === "Y" ? "Y" : ""}
+            </span>
+         ))}
+      </div>
+   );
+};
+
 interface GameOverViewProps {
    matchData: any;
    setView: (view: "menu") => void;
@@ -146,10 +166,19 @@ export const GameOverView = ({
                               <span className="text-[10px] font-black text-correct uppercase">Round {idx + 1}</span>
                               <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
                            </div>
-                           <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
-                           <p className="text-[10px] text-gray-400">
-                              Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
-                           </p>
+                            {q.type === "reverse_wordle" ? (
+                               <div className="flex items-center gap-2">
+                                  <PatternSquares pattern={q.prompt} />
+                                  {q.subPrompt && (
+                                     <span className="text-[10px] text-gray-400 font-bold">{q.subPrompt}</span>
+                                  )}
+                               </div>
+                            ) : (
+                               <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
+                            )}
+                            <p className="text-[10px] text-gray-400">
+                               Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
+                            </p>
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
                                  <p className="font-black text-gray-500 uppercase">You</p>

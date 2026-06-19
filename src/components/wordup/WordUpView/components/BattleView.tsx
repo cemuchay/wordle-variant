@@ -27,6 +27,31 @@ const PREFILLED_MESSAGES = [
    "Close one! ⚡"
 ];
 
+const PatternSquares = ({ pattern }: { pattern: string }) => {
+   const colors: Record<string, string> = {
+      G: "bg-correct",
+      Y: "bg-yellow-500",
+      "-": "bg-gray-600",
+   };
+   const labels: Record<string, string> = {
+      G: "G",
+      Y: "Y",
+      "-": "",
+   };
+   return (
+      <div className="flex items-center justify-center gap-1.5">
+         {pattern.split("").map((ch, i) => (
+            <span
+               key={i}
+               className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-md text-[11px] font-black text-white ${colors[ch] || "bg-gray-600"}`}
+            >
+               {labels[ch] || ""}
+            </span>
+         ))}
+      </div>
+   );
+};
+
 export const BattleView = ({
    questions,
    currentIdx,
@@ -242,14 +267,25 @@ export const BattleView = ({
                   {currentIdx === 6 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
-               <h2 className="text-xl font-black tracking-tight leading-relaxed text-white">
-                  {activeQuestion.prompt}
-               </h2>
-               {activeQuestion.subPrompt && (
-                  <p className="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-lg inline-block">
-                     {activeQuestion.subPrompt}
-                  </p>
-               )}
+                {activeQuestion.type === "reverse_wordle" ? (
+                   <div className="space-y-3">
+                      <PatternSquares pattern={activeQuestion.prompt} />
+                      {activeQuestion.subPrompt && (
+                         <p className="text-xs text-gray-400 bg-white/5 px-3 py-1.5 rounded-lg inline-block font-bold">
+                            {activeQuestion.subPrompt}
+                         </p>
+                      )}
+                   </div>
+                ) : (
+                   <h2 className="text-xl font-black tracking-tight leading-relaxed text-white">
+                      {activeQuestion.prompt}
+                   </h2>
+                )}
+                {activeQuestion.type !== "reverse_wordle" && activeQuestion.subPrompt && (
+                   <p className="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-lg inline-block">
+                      {activeQuestion.subPrompt}
+                   </p>
+                )}
             </div>
 
             {/* Choices Grid */}

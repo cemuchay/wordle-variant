@@ -319,14 +319,14 @@ export const calculateWordlePattern = (
    guess: string,
 ): string => {
    const len = target.length;
-   const result = new Array(len).fill("⬜");
+   const result = new Array(len).fill("-");
    const targetUsed = new Array(len).fill(false);
    const guessUsed = new Array(len).fill(false);
 
    // Green pass
    for (let i = 0; i < len; i++) {
       if (guess[i] === target[i]) {
-         result[i] = "🟩";
+         result[i] = "G";
          targetUsed[i] = true;
          guessUsed[i] = true;
       }
@@ -338,7 +338,7 @@ export const calculateWordlePattern = (
       for (let j = 0; j < len; j++) {
          if (targetUsed[j]) continue;
          if (guess[i] === target[j]) {
-            result[i] = "🟨";
+            result[i] = "Y";
             targetUsed[j] = true;
             break;
          }
@@ -737,6 +737,17 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
    const questions: WordUpQuestion[] = [];
 
+   const generateFallbackQuestion = (length: number, official: string[], valid: Set<string>): WordUpQuestion => {
+      const word = official[Math.floor(Math.random() * official.length)];
+      const fake = mutateToFakeWord(word, valid);
+      return {
+         type: "real_fake",
+         prompt: fake,
+         choices: ["Real", "Fake"],
+         answer: "Fake",
+      };
+   };
+
    const pickWeightedLength = (allowed: number[]): number => {
       // 3, 8, 9, 10 highly favored (weight 3.5), other lengths get weight 0.8
       const weights = allowed.map((l) =>
@@ -841,11 +852,24 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          promptChars[missingIdx] = "_";
          const promptStr = promptChars.join("");
 
+         const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+         const shuffledLetters = shuffle(letters.split("")).join("");
+
          const choices = new Set<string>();
          choices.add(correctLetter);
+         for (const candidate of shuffledLetters) {
+            if (choices.size >= 4) break;
+            if (candidate === correctLetter) continue;
+            const testWord = promptStr.replace("_", candidate);
+            if (!valid.has(testWord)) {
+               choices.add(candidate);
+            }
+         }
+
          while (choices.size < 4) {
-            const code = 65 + Math.floor(Math.random() * 26); // A-Z
-            choices.add(String.fromCharCode(code));
+            const code = 65 + Math.floor(Math.random() * 26);
+            const fallback = String.fromCharCode(code);
+            if (!choices.has(fallback)) choices.add(fallback);
          }
 
          questions.push({
@@ -855,42 +879,66 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             answer: correctLetter,
          });
       } else if (type === "reverse_wordle") {
-         // Target word
          const target = randomWord();
-         // Choose a guess word of the same length
-         let guess = randomWord();
-         let pattern = calculateWordlePattern(target, guess);
+         const guess = randomWord();
+         const pattern = calculateWordlePattern(target, guess);
 
-         // We want a pattern that is not all white or all green (to make it interesting)
-         let attempts = 0;
-         while (
-            (pattern.replace(/⬜/g, "").length === 0 ||
-               pattern.replace(/🟩/g, "").length === 0) &&
-            attempts < 10
-         ) {
-            guess = randomWord();
-            pattern = calculateWordlePattern(target, guess);
-            attempts++;
-         }
+         if (pattern === "G".repeat(target.length)) {
+            // All green is trivial, skip this type
+            questions.push(generateFallbackQuestion(length, official, valid));
+         } else {
+            const variant = Math.random() > 0.5 ? "find_target" : "find_guess";
 
-         const choices = new Set<string>();
-         choices.add(guess);
+            if (variant === "find_guess") {
+               // Show pattern + target, ask which guess produced it
+               const choices = new Set<string>();
+               choices.add(guess);
+               let attempts = 0;
+               while (choices.size < 4 && attempts < 100) {
+                  const dummy = randomWord();
+                  const dummyPattern = calculateWordlePattern(target, dummy);
+                  if (dummyPattern !== pattern) {
+                     choices.add(dummy);
+                  }
+                  attempts++;
+               }
+               while (choices.size < 4) {
+                  choices.add(String(choices.size + 10).repeat(target.length));
+               }
 
-         // Add 3 incorrect guesses of the same length
-         while (choices.size < 4) {
-            const dummy = randomWord();
-            if (calculateWordlePattern(target, dummy) !== pattern) {
-               choices.add(dummy);
+               questions.push({
+                  type: "reverse_wordle",
+                  prompt: pattern,
+                  subPrompt: `Target: ${target}`,
+                  choices: shuffle(Array.from(choices)),
+                  answer: guess,
+               });
+            } else {
+               // Show pattern + guess, ask which target produced it
+               const choices = new Set<string>();
+               choices.add(target);
+               let attempts = 0;
+               while (choices.size < 4 && attempts < 100) {
+                  const dummyTarget = randomWord();
+                  const dummyPattern = calculateWordlePattern(dummyTarget, guess);
+                  if (dummyPattern !== pattern) {
+                     choices.add(dummyTarget);
+                  }
+                  attempts++;
+               }
+               while (choices.size < 4) {
+                  choices.add("AAAA" + choices.size);
+               }
+
+               questions.push({
+                  type: "reverse_wordle",
+                  prompt: pattern,
+                  subPrompt: `Guess: ${guess}`,
+                  choices: shuffle(Array.from(choices)),
+                  answer: target,
+               });
             }
          }
-
-         questions.push({
-            type: "reverse_wordle",
-            prompt: pattern,
-            subPrompt: `Target: ${target}`,
-            choices: Array.from(choices).sort(() => Math.random() - 0.5),
-            answer: guess,
-         });
       } else if (type === "definition") {
          // Find a word in our definition list
          const keys = Object.keys(DEFINITIONS);
