@@ -179,7 +179,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // 4. Presence
     const { onlineUsers, allProfiles } = useGlobalPresence(
         user?.id,
-        (activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected')) ? activeCall.channelId : null
+        (activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected')) ? activeCall.channelId : null,
+        profile
     );
 
     // Call Signaling Actions

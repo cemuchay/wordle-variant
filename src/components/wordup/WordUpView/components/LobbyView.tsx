@@ -20,6 +20,7 @@ interface LobbyViewProps {
    onlineUsers: any[];
    allProfiles: any[];
    currentUser: any;
+   onSelectHistoryMatch?: (match: any) => void;
 }
 
 export const LobbyView = ({
@@ -32,7 +33,8 @@ export const LobbyView = ({
    onToggleSound,
    onlineUsers,
    allProfiles,
-   currentUser
+   currentUser,
+   onSelectHistoryMatch
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
@@ -589,7 +591,11 @@ export const LobbyView = ({
                            });
 
                            return (
-                              <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+                              <div
+                                 key={match.id}
+                                 onClick={() => onSelectHistoryMatch?.(match)}
+                                 className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all hover:border-white/20"
+                              >
                                  <div className="min-w-0">
                                     <p className="font-black text-white truncate">vs {oppName}</p>
                                     <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">{match.category.replace('_', ' ')} • {dateStr}</p>

@@ -11,21 +11,18 @@ export interface PresenceUser {
     activeVoiceRoomId?: string | null;
 }
 
-export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId: string | null = null) => {
+export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId: string | null = null, currentUserProfile: any = null) => {
     const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
     const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
     const channelRef = useRef<any>(null);
     const queryClient = useQueryClient();
 
     const fetchProfiles = useCallback(async () => {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
         const { data } = await supabase
             .from('profiles')
             .select('id, username, avatar_url, last_seen_at')
-            .gte('last_seen_at', thirtyDaysAgo.toISOString())
-            .order('username');
+            .order('last_seen_at', { ascending: false, nullsFirst: false })
+            .limit(100);
         if (data) {
             setAllProfiles(data as PresenceUser[]);
             // Also invalidate global profile queries if they exist to keep entire app in sync
@@ -92,18 +89,27 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             .on('presence', { event: 'leave' }, handleLeave)
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('id, username, avatar_url')
-                        .eq('id', userId)
-                        .single();
+                    let profileToTrack = currentUserProfile;
 
-                    if (profile) {
+                    if (!profileToTrack) {
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('id, username, avatar_url')
+                            .eq('id', userId)
+                            .single();
+                        profileToTrack = profile;
+                    }
+
+                    if (profileToTrack) {
                         channel.track({
-                            user: profile,
+                            user: {
+                                id: profileToTrack.id,
+                                username: profileToTrack.username,
+                                avatar_url: profileToTrack.avatar_url,
+                            },
                             online_at: new Date().toISOString(),
                             activeVoiceRoomId: currentVoiceRoomId
-                        });
+                        }).catch(console.warn);
                     }
                 }
             });
@@ -116,22 +122,25 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             channelRef.current = null;
             updateLastSeen();
         };
-    }, [userId, fetchProfiles, updateLastSeen]); // Removed currentVoiceRoomId - handled by the separate tracking effect below
+    }, [userId, fetchProfiles, updateLastSeen]); // Removed currentVoiceRoomId and currentUserProfile to avoid recreating channel
 
-        // Update tracking when voice room changes
+        // Update tracking when voice room changes or currentUserProfile updates
     useEffect(() => {
-        if (channelRef.current && userId && channelRef.current.state === 'joined') {
-            const profile = allProfiles.find(p => p.id === userId);
-            
-            if (profile) {
-                channelRef.current.track({
-                    user: profile,
-                    online_at: new Date().toISOString(),
-                    activeVoiceRoomId: currentVoiceRoomId
-                });
-            }
+        if (channelRef.current && userId && currentUserProfile) {
+            // Track silently, ignore errors if not fully subscribed yet
+            channelRef.current.track({
+                user: {
+                    id: currentUserProfile.id,
+                    username: currentUserProfile.username,
+                    avatar_url: currentUserProfile.avatar_url,
+                },
+                online_at: new Date().toISOString(),
+                activeVoiceRoomId: currentVoiceRoomId
+            }).catch(() => {});
         }
-    }, [currentVoiceRoomId, userId, allProfiles]);
+    }, [currentVoiceRoomId, userId, currentUserProfile]);
 
-    return { onlineUsers, allProfiles, refreshProfiles: fetchProfiles };
+    const mergedProfiles = Array.from(new Map([...allProfiles, ...onlineUsers].map(p => [p.id, p])).values());
+
+    return { onlineUsers, allProfiles: mergedProfiles, refreshProfiles: fetchProfiles };
 };
