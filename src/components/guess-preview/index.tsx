@@ -398,9 +398,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     });
 
     const username = entry.username || entry.profiles?.username || "Player";
-    const entryUserId = entry.user_id || entry.profiles?.id;
-    const isMe = profile?.id === entryUserId;
-    const canSeeDetails = isMe || viewerHasFinished || isCreator;
+    const canSeeDetails = viewerHasFinished || isCreator;
 
     useEffect(() => {
       if (canSeeDetails) {
