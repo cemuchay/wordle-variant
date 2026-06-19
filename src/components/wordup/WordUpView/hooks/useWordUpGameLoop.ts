@@ -42,6 +42,7 @@ export const useWordUpGameLoop = (
    const selectedAnswer = useWordUpStore((s) => s.selectedAnswer);
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const opponentStats = useWordUpStore((s) => s.opponentStats);
+   const maxTime = useWordUpStore((s) => s.maxTime);
 
    // Determine the game type safely
    const gameType = matchData?.game_type
@@ -179,7 +180,7 @@ export const useWordUpGameLoop = (
       questions,
       currentIdx,
       timeLeft,
-      maxTime: gameType === "live-bot" ? botGame.maxTime : gameType === "async" ? asyncGame.maxTime : liveGame.maxTime,
+      maxTime,
       selectedAnswer,
       revealAnswers,
       opponentStats,

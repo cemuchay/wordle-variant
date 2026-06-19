@@ -1002,22 +1002,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                .join("");
          };
 
-         // 1. Add another scramble of the word itself (e.g. RHEAT)
+         // 1. Add scrambles of the word with letter(s) replaced (e.g. RHEAY)
          let attempts = 0;
-         while (choices.size < 2 && attempts < 50) {
-            const extraScramble = scrambleWord(word);
-            if (
-               extraScramble !== word &&
-               extraScramble !== scrambled &&
-               isValidFake(scrambled, extraScramble)
-            ) {
-               choices.add(extraScramble);
-            }
-            attempts++;
-         }
-
-         // 2. Add scrambles of the word with letter(s) replaced (e.g. RHEAY)
-         attempts = 0;
          while (choices.size < 4 && attempts < 100) {
             const chars = word.split("");
             // If word is larger than 4 characters, replace 2 random characters to ensure we differ by at least 2 letters easily.

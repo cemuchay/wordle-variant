@@ -42,8 +42,9 @@ export const useWordUpLiveGame = ({
    const setRevealAnswers = useWordUpStore((s) => s.setRevealAnswers);
    const opponentStats = useWordUpStore((s) => s.opponentStats);
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
+   const maxTime = useWordUpStore((s) => s.maxTime);
+   const setMaxTime = useWordUpStore((s) => s.setMaxTime);
 
-   const [maxTime, setMaxTime] = useState(10);
    const [rematchState, setRematchState] = useState<"idle" | "sent" | "received" | "expired">("idle");
    const [rematchCountdown, setRematchCountdown] = useState(10);
    const [showRematchButton, setShowRematchButton] = useState(true);
