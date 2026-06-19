@@ -152,7 +152,7 @@ export const useWordUpMatchmaking = (
             useWordUpStore.getState().setView("matchmaking");
             setRole("player1");
             setMatchId(null);
-            setCountdownSecs(6);
+            setCountdownSecs(10);
 
             matchmakingIntervalRef.current = window.setInterval(() => {
                const current = useWordUpStore.getState().countdownSecs;

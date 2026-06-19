@@ -9,7 +9,7 @@ import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useWordUpGameLoop } from "./hooks/useWordUpGameLoop";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
-import { Swords, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Swords } from "lucide-react";
 
 import { decryptQuestions } from "../../../utils/wordupQuestionGenerator";
 
@@ -21,7 +21,7 @@ import { GameOverView } from "./components/GameOverView";
 import { LoadingView } from "./components/LoadingView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
-import { safeLocalStorage } from "../../../utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
@@ -233,18 +233,54 @@ export const WordUpView = () => {
       cancelMatchmaking
    } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, cleanUpAll);
 
-    const cancelMatchmakingRef = useRef(cancelMatchmaking);
-    useEffect(() => {
-       cancelMatchmakingRef.current = cancelMatchmaking;
-    }, [cancelMatchmaking]);
+   const handlePurgeAndReset = useCallback(async () => {
+      if (!effectiveUser) return;
+      try {
+         await supabase.from("wordup_queue").delete().eq("user_id", effectiveUser.id);
+         const { data: staleMatches } = await supabase
+            .from("wordup_matches")
+            .select("id, player1_id, player2_id, p1_answered, p2_answered, status")
+            .or(`player1_id.eq.${effectiveUser.id},player2_id.eq.${effectiveUser.id}`)
+            .in("status", ["waiting", "countdown"]);
+         if (staleMatches && staleMatches.length > 0) {
+            for (const m of staleMatches) {
+               const isP1 = m.player1_id === effectiveUser.id;
+               const hasPlayed = isP1 ? m.p1_answered : m.p2_answered;
+               const opponentIsSelf = m.player1_id === m.player2_id;
+               if (opponentIsSelf || hasPlayed) {
+                  await supabase.from("wordup_matches").update({
+                     status: "completed",
+                     completed_at: new Date().toISOString()
+                  }).eq("id", m.id);
+               }
+            }
+         }
+      } catch (e) {
+         console.error("Purge error:", e);
+      }
+      for (const key of Object.keys(sessionStorage)) {
+         if (key.startsWith("wordup_")) safeSessionStorage.removeItem(key);
+      }
+      for (const key of Object.keys(localStorage)) {
+         if (key.startsWith("wordup_")) safeLocalStorage.removeItem(key);
+      }
+      resetGame();
+      cancelMatchmaking();
+      triggerToast("Local data purged and stale matches cleaned.", 4000);
+   }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
 
-    useEffect(() => {
-       return () => {
-          cancelMatchmakingRef.current();
-          resetGame();
-       };
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+   const cancelMatchmakingRef = useRef(cancelMatchmaking);
+   useEffect(() => {
+      cancelMatchmakingRef.current = cancelMatchmaking;
+   }, [cancelMatchmaking]);
+
+   useEffect(() => {
+      return () => {
+         cancelMatchmakingRef.current();
+         resetGame();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
@@ -254,6 +290,17 @@ export const WordUpView = () => {
 
    const handleSelectHistoryMatch = useCallback((match: any) => {
       if (!effectiveUser) return;
+      try {
+         const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
+         const seen = seenStr ? JSON.parse(seenStr) : [];
+         if (!seen.includes(match.id)) {
+            seen.push(match.id);
+            safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen));
+         }
+      } catch (e) {
+         console.error("[WordUp Logs] Failed to mark history match as seen:", e);
+      }
+
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
       setRole(myRole);
       setMatchData(match);
@@ -354,41 +401,6 @@ export const WordUpView = () => {
 
    return (
       <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-12 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
-         {/* Global settings buttons */}
-         {view !== "battle" && view !== "countdown" && view !== "loading" && (
-            <div className="absolute right-4 top-3 z-50 flex items-center gap-2">
-               <button
-                  onClick={handleToggleSound}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-                  title="Toggle Sound"
-               >
-                  {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-               </button>
-            <button
-               onClick={() => {
-                  resetGame();
-                  safeLocalStorage.removeItem("wordup_active_game");
-                  try {
-                     // Safe session storage keys cleanup
-                     const keysToRemove: string[] = [];
-                     for (let i = 0; i < sessionStorage.length; i++) {
-                        const key = sessionStorage.key(i);
-                        if (key && key.startsWith("wordup_completed_")) {
-                           keysToRemove.push(key);
-                        }
-                     }
-                     keysToRemove.forEach(k => sessionStorage.removeItem(k));
-                  } catch {}
-                  triggerToast("Game state cleared successfully.", 3000);
-                  setView("menu");
-               }}
-               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
-               title="Reset Game State"
-            >
-               <RotateCcw size={16} />
-            </button>
-         </div>
-         )}
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
@@ -404,6 +416,9 @@ export const WordUpView = () => {
                   allProfiles={allProfiles}
                   currentUser={effectiveUser}
                   onSelectHistoryMatch={handleSelectHistoryMatch}
+                  soundEnabled={soundEnabled}
+                  onToggleSound={handleToggleSound}
+                  onPurgeAndReset={handlePurgeAndReset}
                />
             )}
 

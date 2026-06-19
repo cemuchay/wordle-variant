@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send } from "lucide-react";
+import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send, Volume2, VolumeX, RotateCcw } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -20,6 +20,9 @@ interface LobbyViewProps {
    allProfiles: any[];
    currentUser: any;
    onSelectHistoryMatch?: (match: any) => void;
+   soundEnabled: boolean;
+   onToggleSound: () => void;
+   onPurgeAndReset: () => void;
 }
 
 export const LobbyView = ({
@@ -31,7 +34,10 @@ export const LobbyView = ({
    onlineUsers,
    allProfiles,
    currentUser,
-   onSelectHistoryMatch
+   onSelectHistoryMatch,
+   soundEnabled,
+   onToggleSound,
+   onPurgeAndReset
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
@@ -423,11 +429,33 @@ export const LobbyView = ({
          exit={{ opacity: 0, y: -15 }}
          className="flex flex-col gap-6 flex-1 justify-center py-6"
       >
-         <div className="text-center space-y-2 relative">
+         <div className="space-y-2 relative text-center">
+            <div className="flex items-center justify-between gap-4 px-2 shrink-0">
+               {/* Balanced empty spacing on left */}
+               <div className="w-[84px]" />
 
+               {/* Center Swords Icon */}
+               <div className="inline-flex p-3 bg-correct/10 rounded-2.5xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
+                  <Swords size={28} />
+               </div>
 
-            <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
-               <Swords size={32} />
+               {/* Right side Sound & Reset controls */}
+               <div className="flex items-center gap-2 w-[84px] justify-end">
+                  <button
+                     onClick={onToggleSound}
+                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                     title="Toggle Sound"
+                  >
+                     {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                  </button>
+                  <button
+                     onClick={onPurgeAndReset}
+                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
+                     title="Reset Game State"
+                  >
+                     <RotateCcw size={15} />
+                  </button>
+               </div>
             </div>
             <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles (Beta)</h2>
             <p className="text-xs text-gray-400 max-w-xs mx-auto">
@@ -669,14 +697,28 @@ export const LobbyView = ({
                               day: 'numeric'
                            });
 
+                           const seenMatchesStr = safeLocalStorage.getItem("wordup_seen_matches");
+                           let isNew = false;
+                           try {
+                              const seen = seenMatchesStr ? JSON.parse(seenMatchesStr) : [];
+                              isNew = !seen.includes(match.id);
+                           } catch {}
+
                            return (
                               <div
                                  key={match.id}
                                  onClick={() => onSelectHistoryMatch?.(match)}
-                                 className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all hover:border-white/20"
+                                 className={`hover:bg-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all ${isNew ? "bg-correct/5 border border-correct/30 shadow-[0_0_12px_rgba(46,204,113,0.1)] hover:border-correct/50" : "bg-white/5 border border-white/10 hover:border-white/20"}`}
                               >
                                  <div className="min-w-0">
-                                    <p className="font-black text-white truncate">vs {oppName}</p>
+                                    <div className="flex items-center gap-2">
+                                       <p className="font-black text-white truncate">vs {oppName}</p>
+                                       {isNew && (
+                                          <span className="text-[7.5px] font-black uppercase text-correct bg-correct/10 border border-correct/25 px-1.5 py-0.5 rounded-md tracking-wider animate-pulse">
+                                             NEW
+                                          </span>
+                                       )}
+                                    </div>
                                     <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">{match.category.replace('_', ' ')} • {dateStr}</p>
                                  </div>
                                  <div className="flex items-center gap-3 shrink-0">
