@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse } from "../../../../utils/wordupQuestionGenerator";
+import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -227,10 +227,9 @@ export const useWordUpBotGame = ({
          )
             return;
 
-         isSubmittingAnswerRef.current = true;
-         setSelectedAnswer(choice);
-         stopRoundTimer();
-         stopBotTimer();
+          isSubmittingAnswerRef.current = true;
+          setSelectedAnswer(choice);
+          stopBotTimer();
 
          const q = questionsRef.current[currentIdxRef.current];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -538,7 +537,7 @@ export const useWordUpBotGame = ({
          let match;
          if (mId.startsWith("bot-match-")) {
             const category = useWordUpStore.getState().category || "mixed";
-            const botProfile = matchDataRef.current?.bot_profile || "average";
+            const botProfile = matchDataRef.current?.bot_profile || getRandomBotProfile();
             const rawQuestions = generateWordUpQuestions(category);
             
             let userId = "guest-player";
