@@ -21,6 +21,7 @@ import { GameOverView } from "./components/GameOverView";
 import { LoadingView } from "./components/LoadingView";
 import { ConnectionOverlay } from "./components/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
+import { safeLocalStorage } from "../../../utils/storage";
 
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
@@ -124,9 +125,43 @@ export const WordUpView = () => {
    } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver, (newMId, newRole) => {
       // eslint-disable-next-line react-hooks/immutability
       onMatchFound(newMId, newRole);
-   });
+    });
 
-   // Reactive sync: If matchData status changes to active externally, jump to battle
+    // Accidental refresh recovery
+    useEffect(() => {
+       const activeGameStr = safeLocalStorage.getItem("wordup_active_game");
+       if (activeGameStr) {
+          try {
+             const activeGame = JSON.parse(activeGameStr);
+             if (activeGame && activeGame.matchId && activeGame.matchData?.status !== "completed") {
+                console.log("[WordUp Logs] Restoring active game from localStorage:", activeGame.matchId);
+                
+                const store = useWordUpStore.getState();
+                store.setMatchId(activeGame.matchId);
+                store.setRole(activeGame.role);
+                store.setCategory(activeGame.category || "mixed");
+                store.setQuestions(activeGame.questions || []);
+                store.setCurrentIdx(activeGame.currentIdx || 0);
+                store.setMatchData(activeGame.matchData);
+                store.setOpponentStats(activeGame.opponentStats);
+                store.setRevealAnswers(activeGame.revealAnswers || false);
+                store.setSelectedAnswer(activeGame.selectedAnswer || null);
+                
+                store.setView("battle");
+                
+                setTimeout(() => {
+                   loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
+                   startQuestionRound(activeGame.matchData, activeGame.currentIdx || 0);
+                }, 100);
+             }
+          } catch (err) {
+             console.error("[WordUp Logs] Failed to restore active game:", err);
+          }
+       }
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Reactive sync: If matchData status changes to active externally, jump to battle
    useEffect(() => {
       if (matchData?.status === "active" && view === "countdown") {
          console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
@@ -213,6 +248,7 @@ export const WordUpView = () => {
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
+      safeLocalStorage.removeItem("wordup_active_game");
       setView("menu");
    }, [cancelMatchmaking]);
 

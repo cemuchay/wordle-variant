@@ -54,45 +54,12 @@ export const useWordUpMatchmaking = (
       }
 
       const botProfile = getRandomBotProfile();
-      const rawQuestions = generateWordUpQuestions(category);
-      const secretKey = generateSecretKey();
-      const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-      try {
-         const data = await wordupNetworkGate.enqueue(
-            'post',
-            'create bot match row',
-            () => fetchWithRetry(async () => {
-               const { data, error } = await supabase
-                  .from("wordup_matches")
-                  .insert({
-                     category,
-                     player1_id: user.id,
-                     player2_id: "00000000-0000-0000-0000-000000000b0b",
-                     is_bot_match: true,
-                     game_type: "live-bot",
-                     bot_profile: botProfile,
-                     questions: encryptedStr,
-                     encryption_key: secretKey,
-                     status: "countdown",
-                     question_started_at: new Date(getSyncedNow()).toISOString()
-                  })
-                  .select()
-                  .single();
-               if (error) throw error;
-               return data;
-            }, 3, 1000)
-         );
-
-         if (data) {
-            setMatchId(data.id);
-            setRole("player1");
-            onMatchFound(data.id, "player1");
-         }
-      } catch (err) {
-         console.error("Bot match insertion failed:", err);
-      }
-   }, [user, category, getSyncedNow, cleanUpMatchmaking, onMatchFound]);
+      const localMatchId = `bot-match-${crypto.randomUUID()}`;
+       
+      setMatchId(localMatchId);
+      setRole("player1");
+      onMatchFound(localMatchId, "player1");
+   }, [user, category, cleanUpMatchmaking, onMatchFound]);
 
      const subscribeToMatchmaking = useCallback(() => {
       const channel = supabase

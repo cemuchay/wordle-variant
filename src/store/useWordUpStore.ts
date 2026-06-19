@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../components/wordup/WordUpView/types";
+import { safeLocalStorage } from "../utils/storage";
 
 interface WordUpState {
    view:
@@ -75,7 +76,8 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    setTimeLeft: (timeLeft) => set({ timeLeft }),
    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
-   resetGame: () =>
+   resetGame: () => {
+      safeLocalStorage.removeItem("wordup_active_game");
       set({
          view: "menu",
          matchId: null,
@@ -88,5 +90,6 @@ export const useWordUpStore = create<WordUpState>((set) => ({
          timeLeft: 10.0,
          selectedAnswer: null,
          revealAnswers: false,
-      }),
+      });
+   },
 }));

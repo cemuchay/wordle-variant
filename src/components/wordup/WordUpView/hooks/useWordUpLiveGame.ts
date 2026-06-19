@@ -5,7 +5,7 @@ import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { safeSessionStorage } from "../../../../utils/storage";
+import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 import { getQuestionDuration } from "./useWordUpGameLoop";
 
@@ -145,6 +145,7 @@ export const useWordUpLiveGame = ({
             );
             console.log("[WordUp Logs] Final sync successful.");
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
+            safeLocalStorage.removeItem("wordup_active_game");
          } catch (e) {
             console.error("[WordUp Logs] Failed to finalize match in DB:", e);
             triggerToast("Failed to save final results. Check connection.", 5000);
@@ -443,6 +444,24 @@ export const useWordUpLiveGame = ({
       },
       [getSyncedNow, triggerToast],
    );
+
+   useEffect(() => {
+      if (!isActive || !matchId || matchData?.status === "completed") {
+         return;
+      }
+      const activeState = {
+         matchId,
+         role,
+         questions,
+         currentIdx,
+         matchData,
+         opponentStats,
+         revealAnswers,
+         selectedAnswer,
+         gameType: "live"
+      };
+      safeLocalStorage.setItem("wordup_active_game", JSON.stringify(activeState));
+   }, [isActive, matchId, role, questions, currentIdx, matchData, opponentStats, revealAnswers, selectedAnswer]);
 
    useEffect(() => {
       handleMatchUpdateRef.current = handleMatchUpdate;

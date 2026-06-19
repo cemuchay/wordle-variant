@@ -5,7 +5,7 @@ import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { safeSessionStorage } from "../../../../utils/storage";
+import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 import { getQuestionDuration } from "./useWordUpGameLoop";
 
@@ -111,24 +111,43 @@ export const useWordUpBotGame = ({
          try {
             console.log("[WordUp Logs] Bot endGame: Pushing final consolidated match state to DB...");
             const completedAt = new Date().toISOString();
+            const isLocalBotMatch = match.id.startsWith("bot-match-");
+            
             await wordupNetworkGate.enqueue(
-               'put',
-               'finalize match scores and completed status',
+               isLocalBotMatch ? 'post' : 'put',
+               isLocalBotMatch ? 'create and finalize bot match row' : 'finalize match scores and completed status',
                () => fetchWithRetry(
                   async () => {
-                     const { error } = await supabase
-                        .from("wordup_matches")
-                        .update({
-                           status: "completed",
-                           p1_answers: match.p1_answers,
-                           p2_answers: match.p2_answers,
-                           p1_score: match.p1_score,
-                           p2_score: match.p2_score,
-                           p1_answered: true,
-                           p2_answered: true,
-                           completed_at: completedAt,
-                        })
-                        .eq("id", match.id);
+                     const matchPayload: any = {
+                        category: match.category,
+                        player1_id: match.player1_id,
+                        player2_id: match.player2_id,
+                        is_bot_match: true,
+                        game_type: "live-bot",
+                        bot_profile: match.bot_profile || "average",
+                        status: "completed",
+                        p1_answers: match.p1_answers,
+                        p2_answers: match.p2_answers,
+                        p1_score: match.p1_score,
+                        p2_score: match.p2_score,
+                        p1_answered: true,
+                        p2_answered: true,
+                        completed_at: completedAt,
+                     };
+                     
+                     let error;
+                     if (isLocalBotMatch) {
+                        const { error: insertError } = await supabase
+                           .from("wordup_matches")
+                           .insert(matchPayload);
+                        error = insertError;
+                     } else {
+                        const { error: updateError } = await supabase
+                           .from("wordup_matches")
+                           .update(matchPayload)
+                           .eq("id", match.id);
+                        error = updateError;
+                     }
                      if (error) throw error;
                   },
                   3,
@@ -138,6 +157,7 @@ export const useWordUpBotGame = ({
             );
             console.log("[WordUp Logs] Bot Final sync successful.");
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
+            safeLocalStorage.removeItem("wordup_active_game");
 
             // Update local state directly so we transition to gameover
             const finalMatch = {
@@ -465,39 +485,95 @@ export const useWordUpBotGame = ({
    );
 
    useEffect(() => {
+      if (!isActive || !matchId || matchData?.status === "completed") {
+         return;
+      }
+      const activeState = {
+         matchId,
+         role,
+         questions,
+         currentIdx,
+         matchData,
+         opponentStats,
+         revealAnswers,
+         selectedAnswer,
+         gameType: "live-bot"
+      };
+      safeLocalStorage.setItem("wordup_active_game", JSON.stringify(activeState));
+   }, [isActive, matchId, role, questions, currentIdx, matchData, opponentStats, revealAnswers, selectedAnswer]);
+
+   useEffect(() => {
       handleMatchUpdateRef.current = handleMatchUpdate;
    }, [handleMatchUpdate]);
 
    const loadAndSubscribeMatch = useCallback(
       async (mId: string, _activeRole: "player1" | "player2") => {
          let match;
-         try {
-            match = await wordupNetworkGate.enqueue(
-               "get",
-               `load bot match details for ID ${mId}`,
-               async () => {
-                  const { data, error } = await supabase
-                     .from("wordup_matches")
-                     .select("*")
-                     .eq("id", mId)
-                     .single();
-                  if (error) throw error;
-                  return data;
-               }
-            );
-         } catch (error) {
-            console.error("Error loading bot match:", error);
-            return null;
-         }
-
-         setMatchData(match);
-
-         if (match.questions && match.encryption_key) {
+         if (mId.startsWith("bot-match-")) {
+            const category = useWordUpStore.getState().category || "mixed";
+            const botProfile = matchDataRef.current?.bot_profile || "average";
+            const rawQuestions = generateWordUpQuestions(category);
+            
+            let userId = "guest-player";
             try {
-               const dec = decryptQuestions(match.questions, match.encryption_key);
-               setQuestions(dec);
-            } catch (e) {
-               console.error("Decrypt failed:", e);
+               const { data: { session } } = await supabase.auth.getSession();
+               userId = session?.user?.id || localStorage.getItem('wordle_anon_id') || "guest-player";
+            } catch (err) {
+               console.warn("Failed to get session, fallback to guest:", err);
+               userId = localStorage.getItem('wordle_anon_id') || "guest-player";
+            }
+
+            match = {
+               id: mId,
+               category,
+               player1_id: userId,
+               player2_id: "00000000-0000-0000-0000-000000000b0b",
+               is_bot_match: true,
+               game_type: "live-bot",
+               bot_profile: botProfile,
+               status: "countdown",
+               current_question_index: 0,
+               p1_answers: [],
+               p2_answers: [],
+               p1_score: 0,
+               p2_score: 0,
+               p1_answered: false,
+               p2_answered: false,
+               questions: JSON.stringify(rawQuestions),
+               encryption_key: "local-key"
+            };
+
+            setMatchData(match);
+            setQuestions(rawQuestions);
+         } else {
+            try {
+               match = await wordupNetworkGate.enqueue(
+                  "get",
+                  `load bot match details for ID ${mId}`,
+                  async () => {
+                     const { data, error } = await supabase
+                        .from("wordup_matches")
+                        .select("*")
+                        .eq("id", mId)
+                        .single();
+                     if (error) throw error;
+                     return data;
+                  }
+               );
+            } catch (error) {
+               console.error("Error loading bot match:", error);
+               return null;
+            }
+
+            setMatchData(match);
+
+            if (match.questions && match.encryption_key) {
+               try {
+                  const dec = decryptQuestions(match.questions, match.encryption_key);
+                  setQuestions(dec);
+               } catch (e) {
+                  console.error("Decrypt failed:", e);
+               }
             }
          }
 
