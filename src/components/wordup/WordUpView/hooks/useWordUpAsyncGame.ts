@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
@@ -39,8 +39,8 @@ export const useWordUpAsyncGame = ({
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const setRevealAnswers = useWordUpStore((s) => s.setRevealAnswers);
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
-
-   const [maxTime, setMaxTime] = useState(10);
+   const maxTime = useWordUpStore((s) => s.maxTime);
+   const setMaxTime = useWordUpStore((s) => s.setMaxTime);
 
    const timerRef = useRef<number | null>(null);
    const roundTimeoutRef = useRef<number | null>(null);

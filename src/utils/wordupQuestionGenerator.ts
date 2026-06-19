@@ -13,7 +13,11 @@ export interface WordUpQuestion {
       | "anagram_scrambled"
       | "pattern"
       | "math"
-      | "odd_one_out";
+      | "odd_one_out"
+      | "vowel_drop"
+      | "rhyme_match"
+      | "letter_count"
+      | "word_ladder";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
@@ -765,6 +769,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "definition", weight: 1.0 },
          { type: "math", weight: 0.8 },
          { type: "odd_one_out", weight: 0.8 },
+         { type: "vowel_drop", weight: 0.8 },
+         { type: "rhyme_match", weight: 0.8 },
+         { type: "letter_count", weight: 0.8 },
+         { type: "word_ladder", weight: 0.8 },
       ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
@@ -843,6 +851,20 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
          const choices = new Set<string>();
          choices.add(correctLetter);
+         
+         let attempts = 0;
+         while (choices.size < 4 && attempts < 200) {
+            attempts++;
+            const code = 65 + Math.floor(Math.random() * 26); // A-Z
+            const candidateLetter = String.fromCharCode(code);
+            
+            const candidateWord = word.substring(0, missingIdx) + candidateLetter + word.substring(missingIdx + 1);
+            if (candidateLetter !== correctLetter && valid.has(candidateWord)) {
+               continue;
+            }
+            choices.add(candidateLetter);
+         }
+         
          while (choices.size < 4) {
             const code = 65 + Math.floor(Math.random() * 26); // A-Z
             choices.add(String.fromCharCode(code));
@@ -856,18 +878,34 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          });
       } else if (type === "reverse_wordle") {
          // Target word
-         const target = randomWord();
+         let target = randomWord();
          // Choose a guess word of the same length
          let guess = randomWord();
          let pattern = calculateWordlePattern(target, guess);
 
-         // We want a pattern that is not all white or all green (to make it interesting)
+         let minColored = 1;
+         if (target.length <= 3) {
+            minColored = 1;
+         } else if (target.length <= 5) {
+            minColored = 2;
+         } else {
+            minColored = 3;
+         }
+
          let attempts = 0;
-         while (
-            (pattern.replace(/⬜/g, "").length === 0 ||
-               pattern.replace(/🟩/g, "").length === 0) &&
-            attempts < 10
-         ) {
+         while (attempts < 150) {
+            const coloredCount = (pattern.match(/🟩|🟨/g) || []).length;
+            const allGreen = (pattern.match(/🟩/g) || []).length === target.length;
+            if (coloredCount >= minColored && !allGreen) {
+               break;
+            }
+            if (attempts > 50 && attempts % 30 === 0) {
+               if (minColored > 1) {
+                  minColored--;
+               } else {
+                  target = randomWord();
+               }
+            }
             guess = randomWord();
             pattern = calculateWordlePattern(target, guess);
             attempts++;
@@ -964,22 +1002,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                .join("");
          };
 
-         // 1. Add another scramble of the word itself (e.g. RHEAT)
+         // 1. Add scrambles of the word with letter(s) replaced (e.g. RHEAY)
          let attempts = 0;
-         while (choices.size < 2 && attempts < 50) {
-            const extraScramble = scrambleWord(word);
-            if (
-               extraScramble !== word &&
-               extraScramble !== scrambled &&
-               isValidFake(scrambled, extraScramble)
-            ) {
-               choices.add(extraScramble);
-            }
-            attempts++;
-         }
-
-         // 2. Add scrambles of the word with letter(s) replaced (e.g. RHEAY)
-         attempts = 0;
          while (choices.size < 4 && attempts < 100) {
             const chars = word.split("");
             // If word is larger than 4 characters, replace 2 random characters to ensure we differ by at least 2 letters easily.
@@ -1027,6 +1051,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       } else if (type === "pattern") {
          // type === "pattern"
          const word = randomWord();
+         const wordLetters = Array.from(new Set(word.split("")));
+         const randomChar = wordLetters[Math.floor(Math.random() * wordLetters.length)];
+         const firstOccurIdx = word.indexOf(randomChar) + 1; // 1-based index
+
          const patternsList = [
             { query: "Contains 'PH'?", test: (w: string) => w.includes("PH") },
             {
@@ -1065,6 +1093,14 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                query: "Contains the letter 'X', 'Z', or 'Q'?",
                test: (w: string) => /[XZQ]/.test(w),
             },
+            {
+               query: `First occurrence of '${randomChar}' is at position ${firstOccurIdx}?`,
+               test: (w: string) => w.indexOf(randomChar) + 1 === firstOccurIdx,
+            },
+            {
+               query: `First occurrence of '${randomChar}' is at position ${firstOccurIdx === 1 ? 2 : firstOccurIdx - 1}?`,
+               test: (w: string) => w.indexOf(randomChar) + 1 === (firstOccurIdx === 1 ? 2 : firstOccurIdx - 1),
+            }
          ];
 
          const p =
@@ -1082,6 +1118,172 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          questions.push(generateMathQuestion());
       } else if (type === "odd_one_out") {
          questions.push(generateOddOneOutQuestion(allowedLengths));
+      } else if (type === "vowel_drop") {
+         const word = randomWord();
+         const prompt = word.replace(/[AEIOU]/g, "_");
+         const choices = new Set<string>();
+         choices.add(word);
+
+         let attempts = 0;
+         while (choices.size < 4 && attempts < 100) {
+            attempts++;
+            const dummy = randomWord();
+            if (dummy.length === word.length) {
+               choices.add(dummy);
+            }
+         }
+         while (choices.size < 4) {
+            choices.add(randomWord());
+         }
+
+         questions.push({
+            type: "vowel_drop",
+            prompt,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5),
+            answer: word,
+         });
+      } else if (type === "rhyme_match") {
+         const word = randomWord();
+         const suffixLen = word.length >= 5 ? 3 : 2;
+         const suffix = word.substring(word.length - suffixLen);
+
+         const rhymingWords = official.filter(
+            (w) => w.endsWith(suffix) && w !== word
+         );
+
+         let rhymingWord = "";
+         if (rhymingWords.length > 0) {
+            rhymingWord = rhymingWords[Math.floor(Math.random() * rhymingWords.length)];
+         } else {
+            const allWords: string[] = [];
+            for (let len = 3; len <= 8; len++) {
+               allWords.push(...getWordLists(len).official);
+            }
+            const fallbackRhymes = allWords.filter(
+               (w) => w.endsWith(suffix) && w !== word
+            );
+            if (fallbackRhymes.length > 0) {
+               rhymingWord = fallbackRhymes[Math.floor(Math.random() * fallbackRhymes.length)];
+            }
+         }
+
+         let currentWord = word;
+         let currentRhymingWord = rhymingWord;
+         let attempts = 0;
+         while (!currentRhymingWord && attempts < 50) {
+            attempts++;
+            currentWord = randomWord();
+            const currSuffixLen = currentWord.length >= 5 ? 3 : 2;
+            const currSuffix = currentWord.substring(currentWord.length - currSuffixLen);
+            const currRhymes = official.filter((w) => w.endsWith(currSuffix) && w !== currentWord);
+            if (currRhymes.length > 0) {
+               currentRhymingWord = currRhymes[Math.floor(Math.random() * currRhymes.length)];
+            }
+         }
+
+         if (!currentRhymingWord) {
+            currentWord = "BAKE";
+            currentRhymingWord = "LAKE";
+         }
+
+         const choices = new Set<string>();
+         choices.add(currentRhymingWord);
+
+         let decoyAttempts = 0;
+         const currentSuffix = currentWord.substring(currentWord.length - (currentWord.length >= 5 ? 3 : 2));
+         while (choices.size < 4 && decoyAttempts < 100) {
+            decoyAttempts++;
+            const dummy = randomWord();
+            if (!dummy.endsWith(currentSuffix)) {
+               choices.add(dummy);
+            }
+         }
+         while (choices.size < 4) {
+            choices.add(randomWord());
+         }
+
+         questions.push({
+            type: "rhyme_match",
+            prompt: `Which word rhymes with ${currentWord}?`,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5),
+            answer: currentRhymingWord,
+         });
+      } else if (type === "letter_count") {
+         const word = randomWord();
+         const isVowelCount = Math.random() > 0.5;
+         let count = 0;
+         let prompt = "";
+         if (isVowelCount) {
+            count = (word.match(/[AEIOU]/g) || []).length;
+            prompt = `How many vowels are in the word ${word}?`;
+         } else {
+            count = (word.match(/[BCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+            prompt = `How many consonants are in the word ${word}?`;
+         }
+
+         const choices = new Set<string>();
+         choices.add(String(count));
+
+         let countAttempts = 0;
+         while (choices.size < 4 && countAttempts < 50) {
+            countAttempts++;
+            const offset = Math.floor(Math.random() * 5) - 2;
+            const val = count + offset;
+            if (val >= 0 && val <= word.length) {
+               choices.add(String(val));
+            }
+         }
+         while (choices.size < 4) {
+            const val = count + choices.size;
+            choices.add(String(val));
+         }
+
+         questions.push({
+            type: "letter_count",
+            prompt,
+            choices: Array.from(choices).sort((a, b) => Number(a) - Number(b)),
+            answer: String(count),
+         });
+      } else if (type === "word_ladder") {
+         let word = randomWord();
+         const candidates = official.filter((w) => w.length === word.length && getDiffCount(word, w) === 1);
+
+         let attempts = 0;
+         let currentWord = word;
+         let currentCandidates = candidates;
+         while (currentCandidates.length === 0 && attempts < 50) {
+            attempts++;
+            currentWord = randomWord();
+            currentCandidates = official.filter((w) => w.length === currentWord.length && getDiffCount(currentWord, w) === 1);
+         }
+
+         if (currentCandidates.length === 0) {
+            currentWord = "CAT";
+            currentCandidates = ["BAT", "HAT", "RAT", "MAT", "COT", "CAN", "CAB"];
+         }
+
+         const correctWord = currentCandidates[Math.floor(Math.random() * currentCandidates.length)];
+         const choices = new Set<string>();
+         choices.add(correctWord);
+
+         let decoyAttempts = 0;
+         while (choices.size < 4 && decoyAttempts < 150) {
+            decoyAttempts++;
+            const dummy = randomWord();
+            if (dummy.length === currentWord.length && getDiffCount(currentWord, dummy) >= 2) {
+               choices.add(dummy);
+            }
+         }
+         while (choices.size < 4) {
+            choices.add(randomWord());
+         }
+
+         questions.push({
+            type: "word_ladder",
+            prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5),
+            answer: correctWord,
+         });
       }
    }
 

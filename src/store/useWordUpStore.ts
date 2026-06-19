@@ -22,6 +22,7 @@ interface WordUpState {
    opponentStats: ProfileStats | null;
    countdownSecs: number;
    timeLeft: number;
+   maxTime: number;
    selectedAnswer: string | null;
    revealAnswers: boolean;
 
@@ -45,6 +46,7 @@ interface WordUpState {
    setOpponentStats: (stats: ProfileStats | null) => void;
    setCountdownSecs: (secs: number) => void;
    setTimeLeft: (time: number) => void;
+   setMaxTime: (time: number) => void;
    setSelectedAnswer: (ans: string | null) => void;
    setRevealAnswers: (reveal: boolean) => void;
    resetGame: () => void;
@@ -61,6 +63,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    opponentStats: null,
    countdownSecs: 6,
    timeLeft: 10.0,
+   maxTime: 10.0,
    selectedAnswer: null,
    revealAnswers: false,
 
@@ -74,6 +77,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    setOpponentStats: (opponentStats) => set({ opponentStats }),
    setCountdownSecs: (countdownSecs) => set({ countdownSecs }),
    setTimeLeft: (timeLeft) => set({ timeLeft }),
+   setMaxTime: (maxTime) => set({ maxTime }),
    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
    resetGame: () => {
@@ -88,6 +92,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
          opponentStats: null,
          countdownSecs: 6,
          timeLeft: 10.0,
+         maxTime: 10.0,
          selectedAnswer: null,
          revealAnswers: false,
       });

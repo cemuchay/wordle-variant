@@ -42,8 +42,9 @@ export const useWordUpBotGame = ({
    const setRevealAnswers = useWordUpStore((s) => s.setRevealAnswers);
    const opponentStats = useWordUpStore((s) => s.opponentStats);
    const setOpponentStats = useWordUpStore((s) => s.setOpponentStats);
+   const maxTime = useWordUpStore((s) => s.maxTime);
+   const setMaxTime = useWordUpStore((s) => s.setMaxTime);
 
-   const [maxTime, setMaxTime] = useState(10);
    const [rematchState, setRematchState] = useState<"idle" | "sent" | "received" | "expired">("idle");
    const [rematchCountdown, setRematchCountdown] = useState(10);
    const [showRematchButton, setShowRematchButton] = useState(true);
@@ -229,6 +230,7 @@ export const useWordUpBotGame = ({
          isSubmittingAnswerRef.current = true;
          setSelectedAnswer(choice);
          stopRoundTimer();
+         stopBotTimer();
 
          const q = questionsRef.current[currentIdxRef.current];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -375,7 +377,7 @@ export const useWordUpBotGame = ({
             botActionRef.current = { ...botAction, time_taken: botTime };
 
             botTimerRef.current = window.setTimeout(async () => {
-               setMatchData({ ...matchDataRef.current, p2_answered: true });
+               handleMatchUpdateRef.current({ p2_answered: true });
             }, botTime * 1000);
          }
       },
