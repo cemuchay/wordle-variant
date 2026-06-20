@@ -1211,6 +1211,15 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
 };
 
 export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
+   const specificTypes: WordUpQuestion["type"][] = [
+      "real_fake", "length", "missing_letter", "reverse_wordle", "definition",
+      "anagram", "anagram_scrambled", "pattern", "math", "odd_one_out",
+      "vowel_drop", "rhyme_match", "letter_count", "word_ladder",
+      "synonym_match", "word_chain", "letter_shift", "compound_break",
+      "word_within", "cryptogram", "category_sort", "letter_add_remove"
+   ];
+   const isSpecificType = specificTypes.includes(category as any);
+
    // Determine word lengths to sample based on matchmaking category
    let allowedLengths = [3, 4, 5, 6, 7, 8, 9, 10];
    if (category === "3_letters") allowedLengths = [3];
@@ -1240,6 +1249,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    };
 
    const getTypeByWeight = (): WordUpQuestion["type"] => {
+      if (isSpecificType) {
+         return category as WordUpQuestion["type"];
+      }
       const typeWeights: { type: WordUpQuestion["type"]; weight: number }[] = [
          { type: "anagram", weight: 0.6 },
          { type: "anagram_scrambled", weight: 0.6 },

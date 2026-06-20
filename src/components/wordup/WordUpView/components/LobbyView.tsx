@@ -41,6 +41,7 @@ export const LobbyView = ({
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
+   const [showAllCategories, setShowAllCategories] = useState(() => category !== "mixed");
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const timeoutRef = useRef<number | null>(null);
 
@@ -519,8 +520,10 @@ export const LobbyView = ({
 
                   <div className="space-y-3">
                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Select Category</p>
+                     
+                     {/* General/Mixed Category */}
                      <div className="grid grid-cols-1 gap-2">
-                        {CATEGORIES.map((cat) => (
+                        {CATEGORIES.filter(c => c.type === "general").map((cat) => (
                            <button
                               key={cat.id}
                               onClick={() => setCategory(cat.id)}
@@ -537,6 +540,77 @@ export const LobbyView = ({
                            </button>
                         ))}
                      </div>
+
+                     {/* Expand Toggle */}
+                     <button
+                        onClick={() => setShowAllCategories(!showAllCategories)}
+                        className="flex items-center justify-center gap-1.5 w-full py-2.5 text-[10px] font-black uppercase tracking-wider text-correct bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all cursor-pointer"
+                     >
+                        {showAllCategories ? (
+                           <>Hide Categories <ChevronUp size={12} /></>
+                        ) : (
+                           <>See More Categories <ChevronDown size={12} /></>
+                        )}
+                     </button>
+
+                     {/* Hidden Expanded Sections */}
+                     <AnimatePresence>
+                        {showAllCategories && (
+                           <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="space-y-4 overflow-hidden pt-1"
+                           >
+                              {/* Word Length Categories */}
+                              <div className="space-y-2">
+                                 <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Word Length Modes</p>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    {CATEGORIES.filter(c => c.type === "length").map((cat) => (
+                                       <button
+                                          key={cat.id}
+                                          onClick={() => setCategory(cat.id)}
+                                          className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${category === cat.id
+                                             ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                             : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
+                                             }`}
+                                       >
+                                          <div className="flex items-center gap-1.5">
+                                             <span className={`w-1.5 h-1.5 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
+                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                          </div>
+                                          <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
+                                       </button>
+                                    ))}
+                                 </div>
+                              </div>
+
+                              {/* Game Type Categories */}
+                              <div className="space-y-2">
+                                 <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Game Type Modes</p>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    {CATEGORIES.filter(c => c.type === "game_type").map((cat) => (
+                                       <button
+                                          key={cat.id}
+                                          onClick={() => setCategory(cat.id)}
+                                          className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${category === cat.id
+                                             ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                             : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
+                                             }`}
+                                       >
+                                          <div className="flex items-center gap-1.5">
+                                             <span className={`w-1.5 h-1.5 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
+                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                          </div>
+                                          <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
+                                       </button>
+                                    ))}
+                                 </div>
+                              </div>
+                           </motion.div>
+                        )}
+                     </AnimatePresence>
                   </div>
 
                   <button
