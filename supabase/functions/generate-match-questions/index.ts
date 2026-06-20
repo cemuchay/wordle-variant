@@ -72,68 +72,110 @@ function smartFakeAnswers(correct: number, rng: () => number): number[] {
 
 const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id"]);
 
+// Score metadata keys by how many unique values they have across entities.
+// Higher score = more distinctive = better for questions.
+function scoreKeys(allEntities: any[]): Map<string, { key: string; uniqueCount: number; totalCount: number }> {
+   const keyValues = new Map<string, Set<string>>();
+   const keyTotal = new Map<string, number>();
+
+   for (const e of allEntities) {
+      if (!e?.metadata) continue;
+      for (const k of Object.keys(e.metadata)) {
+         if (SKIP_KEYS.has(k)) continue;
+         const v = String(e.metadata[k] ?? "");
+         if (!v) continue;
+         if (!keyValues.has(k)) keyValues.set(k, new Set());
+         keyValues.get(k)!.add(v);
+         keyTotal.set(k, (keyTotal.get(k) || 0) + 1);
+      }
+   }
+
+   const result = new Map<string, { key: string; uniqueCount: number; totalCount: number }>();
+   for (const [key, values] of keyValues) {
+      result.set(key, { key, uniqueCount: values.size, totalCount: keyTotal.get(key) || 0 });
+   }
+   return result;
+}
+
+// Pick the best key: prefer keys where unique count = total count (every entity has a unique value)
+function pickBestKey(scores: Map<string, { key: string; uniqueCount: number; totalCount: number }>, rng: () => number): string | null {
+   const candidates = Array.from(scores.values());
+   if (candidates.length === 0) return null;
+
+   // Sort: most unique first (unique/total ratio), break ties by total count
+   candidates.sort((a, b) => {
+      const ratioA = a.uniqueCount / a.totalCount;
+      const ratioB = b.uniqueCount / b.totalCount;
+      if (ratioB !== ratioA) return ratioB - ratioA;
+      return b.totalCount - a.totalCount;
+   });
+
+   // Pick from top half to add variety
+   const topN = Math.max(1, Math.ceil(candidates.length / 2));
+   return candidates[Math.floor(rng() * topN)].key;
+}
+
 function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
-   const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
 
-   if (metaKeys.length === 0) {
-      // Fallback: pure label-based question using other entities as distractors
+   if (!entity || allEntities.length < 2) {
+      return {
+         type: "definition",
+         prompt: `Identify: ${label}`,
+         choices: [label, "Unknown", "None", "All"],
+         answer: label,
+      };
+   }
+
+   // Score keys and pick the best one
+   const scores = scoreKeys(allEntities);
+   const key = pickBestKey(scores, rng);
+
+   if (!key) {
+      // Fallback: pure label matching
       const distractors = seededShuffle(
          allEntities.filter((e) => e.label !== label).map((e) => e.label),
          rng,
       ).slice(0, 3);
       const choices = seededShuffle([label, ...distractors], rng);
-      return {
-         type: "definition",
-         prompt: `Which of the following is "${label}"?`,
-         choices,
-         answer: label,
-      };
+      return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label };
    }
 
-   // Pick a random metadata key to ask about
-   const key = metaKeys[Math.floor(rng() * metaKeys.length)];
    const correctValue = String(meta[key] ?? "");
 
-   // Collect other entities' values for the same key (as distractors)
-   const allValues = allEntities
+   // Find entities with a DIFFERENT value for this key (for forward question distractors)
+   const otherValues = allEntities
       .filter((e) => e.id !== entity?.id)
       .map((e) => String(e.metadata?.[key] ?? ""))
       .filter((v) => v && v !== correctValue);
+   const uniqueOtherValues = [...new Set(otherValues)].sort(() => rng() - 0.5).slice(0, 3);
 
-   const uniqueDistractors = [...new Set(allValues)].sort(() => rng() - 0.5).slice(0, 3);
+   // Find entities whose value for this key DIFFERS from the correct entity's value (for reverse distractors)
+   const entitiesWithDifferentValue = allEntities
+      .filter((e) => e.id !== entity?.id && String(e.metadata?.[key] ?? "") !== correctValue)
+      .map((e) => e.label)
+      .filter((l) => l);
 
    const useReverse = Math.floor(rng() * 2) === 0;
 
-   if (useReverse && uniqueDistractors.length >= 3) {
-      // Reverse question: [value] is the [key] of which [label]?
-      const choices = seededShuffle([label, ...allEntities
-         .filter((e) => e.label !== label)
-         .map((e) => e.label)
-         .filter((l) => l)
-         .sort(() => rng() - 0.5)
-         .slice(0, 3)], rng);
+   if (useReverse && entitiesWithDifferentValue.length >= 3) {
+      // Reverse: "[value]" is the [key] of which option?
+      // All distractor labels must have a DIFFERENT [key] value
+      const choices = seededShuffle([label, ...seededShuffle(entitiesWithDifferentValue, rng).slice(0, 3)], rng);
       return {
          type: "definition",
          prompt: `"${correctValue}" is the ${key.replace(/_/g, " ")} of which option?`,
          choices,
          answer: label,
-         subPrompt: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
       };
    }
 
-   // Forward question: what is the [key] of [label]?
-   const distractors = uniqueDistractors.length >= 3
-      ? uniqueDistractors
-      : allEntities
-         .filter((e) => e.id !== entity?.id)
-         .map((e) => String(e.metadata?.[key] ?? ""))
-         .filter((v) => v && v !== correctValue)
-         .concat(["Unknown", "None", "All"])
-         .sort(() => rng() - 0.5)
-         .slice(0, 3);
+   // Forward: what is the [key] of [label]?
+   const distractors = uniqueOtherValues.length >= 3
+      ? uniqueOtherValues
+      : otherValues.concat(["Unknown", "None", "All"]).sort(() => rng() - 0.5).slice(0, 3);
 
    const choices = seededShuffle([correctValue, ...distractors], rng);
    return {
@@ -141,7 +183,6 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
       prompt: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
       choices,
       answer: correctValue,
-      subPrompt: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
    };
  }
 
@@ -239,7 +280,6 @@ serve(async (req) => {
          }
 
          const entityList: any[] = entities || [];
-         console.log(`[generate-match-questions] Fetched ${entityList.length} entities for category "${category}":`, entityList.map((e: any) => e.label).join(", "));
 
          if (entityList.length === 0) {
             // No entities found → fallback to algorithmic
@@ -249,14 +289,10 @@ serve(async (req) => {
          } else {
             for (let i = 0; i < 7; i++) {
                const entity = entityList[i % entityList.length];
-               console.log(`[generate-match-questions] Round ${i}: entity="${entity?.label}" seed="${seed}-${i}"`);
                questions.push(generateQuestion(`${seed}-${i}`, entity, entityList));
             }
          }
       }
-
-      // Log generated questions for debugging
-      console.log("[generate-match-questions] Generated questions:", JSON.stringify(questions.map((q: any) => ({ question: q.question, answer: q.answer }))));
 
       // Encrypt and persist
       const plaintext = JSON.stringify(questions);

@@ -107,9 +107,6 @@ export const BattleView = ({
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
 
-   // Log question data at start and when round changes
-   console.log(`[WordUp BattleView] Round ${currentIdx + 1}/7 — total questions:`, questions.length, "current:", activeQuestion.prompt, "choices:", activeQuestion.choices, "answer:", activeQuestion.answer);
-
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
    const isP1 = role === "player1";

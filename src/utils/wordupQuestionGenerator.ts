@@ -64,7 +64,6 @@ export async function decryptAESGCM(
 export async function decryptMatchQuestions(
    match: { encrypted_questions?: string; questions?: string; encryption_key: string },
 ): Promise<WordUpQuestion[]> {
-   let result: WordUpQuestion[];
    const key = match.encryption_key;
    if (!key) throw new Error("No encryption key found on match");
 
@@ -72,26 +71,18 @@ export async function decryptMatchQuestions(
    if (match.encrypted_questions) {
       try {
          const plain = await decryptAESGCM(match.encrypted_questions, key);
-         result = JSON.parse(plain);
-         console.log("[WordUp Decrypt] AES-GCM from encrypted_questions. Questions:", result.map((q, i) => `#${i}: "${q.prompt}"`).join(" | "));
-         return result;
+         return JSON.parse(plain);
       } catch (e) {
          console.warn("AES-GCM on encrypted_questions failed:", e);
       }
    }
 
-   // Try AES-GCM on the standard questions column first (edge function writes AES-GCM here)
    if (match.questions) {
       try {
          const plain = await decryptAESGCM(match.questions, key);
-         result = JSON.parse(plain);
-         console.log("[WordUp Decrypt] AES-GCM from questions. Questions:", result.map((q, i) => `#${i}: "${q.prompt}"`).join(" | "));
-         return result;
+         return JSON.parse(plain);
       } catch {
-         // Not AES-GCM, try XOR (legacy format)
-         result = decryptQuestions(match.questions, key);
-         console.log("[WordUp Decrypt] XOR decrypted. Questions:", result.map((q, i) => `#${i}: "${q.prompt}"`).join(" | "));
-         return result;
+         return decryptQuestions(match.questions, key);
       }
    }
 
