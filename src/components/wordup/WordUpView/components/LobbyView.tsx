@@ -12,6 +12,7 @@ import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
 import { CategorySelectModal } from "./CategorySelectModal";
 import { RankingView } from "./RankingView";
+import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -597,9 +598,10 @@ export const LobbyView = ({
                                        return (
                                           <div key={opp.id} className="flex items-center justify-between bg-white/5 p-2.5 rounded-xl border border-white/5 animate-in fade-in duration-200">
                                              <div className="flex items-center gap-2 min-w-0">
-                                                <img
-                                                   src={opp.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${opp.username}`}
-                                                   alt={opp.username}
+                                                <ProtectedAvatar
+                                                   userId={opp.id}
+                                                   src={opp.avatar_url}
+                                                   username={opp.username}
                                                    className="w-7 h-7 rounded-full border border-white/10 shrink-0"
                                                 />
                                                 <div className="flex flex-col min-w-0">
@@ -668,16 +670,20 @@ export const LobbyView = ({
                         {pendingMatches.map((match) => {
                            const isP1 = match.player1_id === currentUser?.id;
                            const oppProfile = isP1 ? match.player2 : match.player1;
-                           const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
+                            const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
                             const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
-                            const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
 
                             const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
 
                            return (
                               <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
                                  <div className="flex items-center gap-3 min-w-0">
-                                    <img src={oppAvatar} alt={oppName} className="w-9 h-9 rounded-full border border-white/10 shrink-0" />
+                                    <ProtectedAvatar
+                                        userId={match.is_bot_match ? undefined : (isP1 ? match.player2_id : match.player1_id)}
+                                        src={match.is_bot_match ? undefined : oppProfile?.avatar_url}
+                                        username={oppName}
+                                        className="w-9 h-9 rounded-full border border-white/10 shrink-0"
+                                     />
                                     <div className="min-w-0">
                                        <p className="text-xs font-black text-white truncate">{oppName}</p>
                                        <p className="text-[9px] text-gray-500 uppercase font-bold mt-0.5">{match.category.replace('_', ' ')} • {hoursLeft}h left</p>

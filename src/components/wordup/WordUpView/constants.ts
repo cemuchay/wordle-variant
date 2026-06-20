@@ -7,36 +7,36 @@ export const CATEGORIES = [
    },
 
    // Length-based categories
-   {
-      id: "3_letters",
-      name: "3-Letter Words",
-      desc: "Short & fast-paced challenges",
-      type: "length",
-   },
-   {
-      id: "4_letters",
-      name: "4-Letter Words",
-      desc: "Standard patterns",
-      type: "length",
-   },
-   {
-      id: "5_letters",
-      name: "5-Letter Words",
-      desc: "Perfect for Wordle masters",
-      type: "length",
-   },
-   {
-      id: "6_letters",
-      name: "6-Letter Words",
-      desc: "Advanced length patterns",
-      type: "length",
-   },
-   {
-      id: "7_plus",
-      name: "7+ Letters (Diamond)",
-      desc: "Long and complex vocabulary",
-      type: "length",
-   },
+   // {
+   //    id: "3_letters",
+   //    name: "3-Letter Words",
+   //    desc: "Short & fast-paced challenges",
+   //    type: "length",
+   // },
+   // {
+   //    id: "4_letters",
+   //    name: "4-Letter Words",
+   //    desc: "Standard patterns",
+   //    type: "length",
+   // },
+   // {
+   //    id: "5_letters",
+   //    name: "5-Letter Words",
+   //    desc: "Perfect for Wordle masters",
+   //    type: "length",
+   // },
+   // {
+   //    id: "6_letters",
+   //    name: "6-Letter Words",
+   //    desc: "Advanced length patterns",
+   //    type: "length",
+   // },
+   // {
+   //    id: "7_plus",
+   //    name: "7+ Letters (Diamond)",
+   //    desc: "Long and complex vocabulary",
+   //    type: "length",
+   // },
 
    // Game-type specific categories
    {

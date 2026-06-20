@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
+import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
 interface BattleViewProps {
    questions: WordUpQuestion[];
@@ -140,10 +141,6 @@ export const BattleView = ({
 
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot") : "Opponent");
 
-   const getAvatarUrl = (avatarUrl: string | null | undefined, seed: string) => {
-      return avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
-   };
-
    // Resolve opponent choice
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoice = oppAnswers?.[currentIdx]?.choice;
@@ -183,10 +180,11 @@ export const BattleView = ({
          {/* Players Panel */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-               <img
-                  src={getAvatarUrl(playerProfile?.avatar_url, playerProfile?.username || "You")}
-                  alt="You"
-                  className="w-8 h-8 rounded-full border border-correct/30 object-cover shrink-0"
+               <ProtectedAvatar
+                  userId={playerProfile?.id || undefined}
+                  src={playerProfile?.avatar_url || undefined}
+                  username={playerProfile?.username || "You"}
+                  className="w-8 h-8 rounded-full border border-correct/30 shrink-0"
                />
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
@@ -200,10 +198,11 @@ export const BattleView = ({
                   </p>
                   <p className="text-sm font-black text-white">{oppScore} pts</p>
                </div>
-               <img
-                  src={getAvatarUrl(opponentStats?.avatar_url, opponentName)}
-                  alt={opponentName}
-                  className="w-8 h-8 rounded-full border border-pink-500/30 object-cover shrink-0"
+               <ProtectedAvatar
+                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  username={opponentName}
+                  className="w-8 h-8 rounded-full border border-pink-500/30 shrink-0"
                />
             </div>
          </div>

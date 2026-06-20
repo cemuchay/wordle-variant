@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Trophy, Medal } from "lucide-react";
 import { supabase } from "../../../../lib/supabaseClient";
+import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
 import { type ProfileStats } from "../types";
 
@@ -165,9 +166,10 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
                         </div>
 
                         {/* Avatar */}
-                        <img
-                           src={entry.profiles?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${entry.id}`}
-                           alt="Avatar"
+                        <ProtectedAvatar
+                           userId={entry.id}
+                           src={entry.profiles?.avatar_url}
+                           username={entry.profiles?.username || "Player"}
                            className="w-7 h-7 rounded-full border border-white/10 shrink-0"
                         />
 
@@ -216,9 +218,10 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
                      </div>
 
                      {/* Avatar */}
-                     <img
-                        src={currentUser?.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.id}`}
-                        alt="Avatar"
+                     <ProtectedAvatar
+                        userId={currentUser?.id}
+                        src={currentUser?.user_metadata?.avatar_url}
+                        username={currentUser?.user_metadata?.full_name || "You"}
                         className="w-7 h-7 rounded-full border border-correct/30 shrink-0"
                      />
 

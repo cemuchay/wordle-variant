@@ -72,47 +72,65 @@ function smartFakeAnswers(correct: number, rng: () => number): number[] {
 
 const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id"]);
 
-// Score metadata keys by how many unique values they have across entities.
-// Higher score = more distinctive = better for questions.
-function scoreKeys(allEntities: any[]): Map<string, { key: string; uniqueCount: number; totalCount: number }> {
-   const keyValues = new Map<string, Set<string>>();
-   const keyTotal = new Map<string, number>();
-
-   for (const e of allEntities) {
-      if (!e?.metadata) continue;
-      for (const k of Object.keys(e.metadata)) {
-         if (SKIP_KEYS.has(k)) continue;
-         const v = String(e.metadata[k] ?? "");
-         if (!v) continue;
-         if (!keyValues.has(k)) keyValues.set(k, new Set());
-         keyValues.get(k)!.add(v);
-         keyTotal.set(k, (keyTotal.get(k) || 0) + 1);
-      }
-   }
-
-   const result = new Map<string, { key: string; uniqueCount: number; totalCount: number }>();
-   for (const [key, values] of keyValues) {
-      result.set(key, { key, uniqueCount: values.size, totalCount: keyTotal.get(key) || 0 });
-   }
-   return result;
+function isNumeric(str: string): boolean {
+   const cleanStr = str.replace(/[$,%\s]/g, "").replace(/,/g, "");
+   if (!cleanStr) return false;
+   return !isNaN(Number(cleanStr));
 }
 
-// Pick the best key: prefer keys where unique count = total count (every entity has a unique value)
-function pickBestKey(scores: Map<string, { key: string; uniqueCount: number; totalCount: number }>, rng: () => number): string | null {
-   const candidates = Array.from(scores.values());
-   if (candidates.length === 0) return null;
+function getNumericDistractors(correctValueStr: string, rng: () => number): string[] {
+   const cleanStr = correctValueStr.replace(/[$,%\s]/g, "").replace(/,/g, "");
+   const correct = parseFloat(cleanStr);
+   if (isNaN(correct)) return [];
 
-   // Sort: most unique first (unique/total ratio), break ties by total count
-   candidates.sort((a, b) => {
-      const ratioA = a.uniqueCount / a.totalCount;
-      const ratioB = b.uniqueCount / b.totalCount;
-      if (ratioB !== ratioA) return ratioB - ratioA;
-      return b.totalCount - a.totalCount;
-   });
+   const hasPercent = correctValueStr.includes("%");
+   const hasDollar = correctValueStr.includes("$");
+   const formatVal = (val: number) => {
+      let s = String(val);
+      if (hasPercent) s += "%";
+      if (hasDollar) s = "$" + s;
+      return s;
+   };
 
-   // Pick from top half to add variety
-   const topN = Math.max(1, Math.ceil(candidates.length / 2));
-   return candidates[Math.floor(rng() * topN)].key;
+   // Detect if it is likely a year (integer in [1000, 2100], and no dollar/percent symbol)
+   const isYear = Number.isInteger(correct) && correct >= 1000 && correct <= 2100 && !hasPercent && !hasDollar;
+
+   const candidates: number[] = [];
+   if (isYear) {
+      const offsets = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 10, -10, 15, -15, 20, -20, 25, -25];
+      for (const offset of offsets) {
+         candidates.push(correct + offset);
+      }
+   } else {
+      const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(correct) || 1)));
+      const offsets = [
+         magnitude, -magnitude,
+         magnitude * 0.5, -magnitude * 0.5,
+         magnitude * 0.2, -magnitude * 0.2,
+         magnitude * 0.1, -magnitude * 0.1,
+         magnitude * 0.05, -magnitude * 0.05,
+      ];
+      for (const offset of offsets) {
+         candidates.push(correct + offset);
+         candidates.push(correct - offset);
+      }
+      candidates.push(correct * 0.9);
+      candidates.push(correct * 1.1);
+      candidates.push(correct * 0.8);
+      candidates.push(correct * 1.2);
+   }
+
+   const uniqueCandidates = [...new Set(candidates)]
+      .map((x) => {
+         if (Number.isInteger(correct)) {
+            return Math.round(x);
+         }
+         return parseFloat(x.toFixed(2));
+      })
+      .filter((x) => x !== correct && x >= 0)
+      .map(formatVal);
+
+   return seededShuffle(uniqueCandidates, rng);
 }
 
 function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
@@ -130,10 +148,9 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
       };
    }
 
-   const scores = scoreKeys(allEntities);
-   const key = pickBestKey(scores, rng);
-
-   if (!key) {
+   // Localized Key Selection & Peer Filtering
+   const availableKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
+   if (availableKeys.length === 0) {
       const distractors = seededShuffle(
          allEntities.filter((e) => e.label !== label).map((e) => e.label), rng,
       ).slice(0, 3);
@@ -141,34 +158,85 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
       return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label };
    }
 
-   const correctValue = String(meta[key] ?? "");
-   const keyLabel = key.replace(/_/g, " ");
+   const shuffledKeys = seededShuffle(availableKeys, rng);
+   let chosenKey = "";
+   let validDistractorPool: any[] = [];
 
-   // Shared helpers
-   const otherValues = allEntities
-      .filter((e) => e.id !== entity?.id)
-      .map((e) => String(e.metadata?.[key] ?? ""))
-      .filter((v) => v && v !== correctValue);
-   const uniqueOtherValues = [...new Set(otherValues)];
+   // Find a key shared by at least 3 other entities
+   for (const key of shuffledKeys) {
+      const peers = allEntities.filter(
+         (e) => e.id !== entity.id && e.metadata?.[key] !== undefined && String(e.metadata[key]).trim() !== ""
+      );
+      if (peers.length >= 3) {
+         chosenKey = key;
+         validDistractorPool = peers;
+         break;
+      }
+   }
 
-   const entitiesWithDifferentValue = allEntities
-      .filter((e) => e.id !== entity?.id && String(e.metadata?.[key] ?? "") !== correctValue)
+   // Fallback: Relax constraint to first available key and use any peer
+   if (!chosenKey) {
+      chosenKey = availableKeys[0];
+      validDistractorPool = allEntities.filter((e) => e.id !== entity.id);
+   }
+
+   const correctValue = String(meta[chosenKey] ?? "");
+   const keyLabel = chosenKey.replace(/_/g, " ");
+
+   // Determine if we should generate numeric distractors
+   const isNum = isNumeric(correctValue);
+   let distractors: string[] = [];
+
+   if (isNum) {
+      distractors = getNumericDistractors(correctValue, rng).slice(0, 3);
+   }
+
+   // If not numeric, or we couldn't generate at least 3 numeric distractors, get from peers
+   if (distractors.length < 3) {
+      const otherValues = validDistractorPool
+         .map((e) => String(e.metadata?.[chosenKey] ?? ""))
+         .filter((v) => v && v !== correctValue);
+      const uniqueOtherValues = [...new Set(otherValues)];
+      
+      const peerDistractors = seededShuffle(uniqueOtherValues, rng);
+      for (const dist of peerDistractors) {
+         if (!distractors.includes(dist)) {
+            distractors.push(dist);
+         }
+         if (distractors.length >= 3) break;
+      }
+
+      // If still not enough, pad with otherValues (including non-unique) or general fallback
+      if (distractors.length < 3) {
+         const nonUniquePeers = seededShuffle(otherValues, rng);
+         for (const dist of nonUniquePeers) {
+            if (!distractors.includes(dist)) {
+               distractors.push(dist);
+            }
+            if (distractors.length >= 3) break;
+         }
+      }
+
+      // Final fallback padding
+      while (distractors.length < 3) {
+         distractors.push(`Alternative ${label} Metric`);
+      }
+   }
+
+   const entitiesWithDifferentValue = validDistractorPool
+      .filter((e) => String(e.metadata?.[chosenKey] ?? "") !== correctValue)
       .map((e) => e.label)
       .filter((l) => l);
 
-   // Pick a question variant based on data availability + rng
    const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
    const variant = Math.floor(rng() * 6); // 0-5
 
    // ── Variant 0: Forward ──────────────────────────────────
-   if (variant === 0 || uniqueOtherValues.length < 1) {
-      const distractors = uniqueOtherValues.length >= 3
-         ? seededShuffle(uniqueOtherValues, rng).slice(0, 3)
-         : seededShuffle(otherValues.concat(["Unknown", "None", "All"]), rng).slice(0, 3);
+   if (variant === 0 || distractors.length < 1) {
       return {
          type: "definition",
          prompt: `What is the ${keyLabel} of ${label}?`,
-         choices: seededShuffle([correctValue, ...distractors], rng),
+         choices: seededShuffle([correctValue, ...distractors.slice(0, 3)], rng),
          answer: correctValue,
       };
    }
@@ -184,11 +252,11 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    }
 
    // ── Variant 2: Odd one out ─────────────────────────────
-   if (variant === 2 && uniqueOtherValues.length >= 1) {
+   if (variant === 2 && distractors.length >= 1) {
       const valueCounts = new Map<string, { count: number; labels: string[] }>();
       for (const e of allEntities) {
          if (e.id === entity?.id) continue;
-         const v = String(e.metadata?.[key] ?? "");
+         const v = String(e.metadata?.[chosenKey] ?? "");
          if (!v) continue;
          if (!valueCounts.has(v)) valueCounts.set(v, { count: 0, labels: [] });
          const entry = valueCounts.get(v)!;
@@ -211,9 +279,9 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    }
 
    // ── Variant 3: True/False ─────────────────────────────
-   if (variant === 3 && uniqueOtherValues.length >= 1) {
+   if (variant === 3 && distractors.length >= 1) {
       const isTrue = Math.floor(rng() * 2) === 0;
-      const displayedValue = isTrue ? correctValue : seededShuffle(uniqueOtherValues, rng)[0];
+      const displayedValue = isTrue ? correctValue : distractors[0];
       return {
          type: "definition",
          prompt: `True or false: ${label} has ${keyLabel} "${displayedValue}".`,
@@ -223,7 +291,6 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    }
 
    // ── Variant 4: Multi-clue (What am I?) ────────────────
-   // Show 2-3 metadata clues, player identifies the entity
    if (variant === 4 && metaKeys.length >= 2 && entitiesWithDifferentValue.length >= 3) {
       const clueKeys = seededShuffle(metaKeys, rng).slice(0, Math.min(3, metaKeys.length));
       const clues = clueKeys.map((k: string) => {
@@ -239,23 +306,21 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    }
 
    // ── Variant 5: Correct the error ──────────────────────
-   // Statement with a wrong value; pick the correct one
-   if (variant === 5 && uniqueOtherValues.length >= 3) {
-      const wrongValue = seededShuffle(uniqueOtherValues, rng)[0];
+   if (variant === 5 && distractors.length >= 3) {
+      const wrongValue = distractors[0];
       return {
          type: "definition",
          prompt: `Fix the error: ${label} has ${keyLabel} "${wrongValue}". What is the correct ${keyLabel}?`,
-         choices: seededShuffle([correctValue, ...seededShuffle(uniqueOtherValues, rng).slice(0, 3)], rng),
+         choices: seededShuffle([correctValue, ...distractors.slice(0, 3)], rng),
          answer: correctValue,
       };
    }
 
    // Fallback: forward
-   const distractors = seededShuffle(uniqueOtherValues.concat(["Unknown", "None", "All"]), rng).slice(0, 3);
    return {
       type: "definition",
       prompt: `What is the ${keyLabel} of ${label}?`,
-      choices: seededShuffle([correctValue, ...distractors], rng),
+      choices: seededShuffle([correctValue, ...distractors.slice(0, 3)], rng),
       answer: correctValue,
    };
  }

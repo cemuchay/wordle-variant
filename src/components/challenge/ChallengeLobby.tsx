@@ -19,6 +19,7 @@ import { useChallengeContext } from "../../context/ChallengeContext";
 import { formatTime } from "./lib";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useApp } from "../../context/AppContext";
+import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ConfirmationModal } from "../ConfirmationModal";
 import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 import { ChallengeChat } from "./ChallengeChat";
@@ -152,17 +153,12 @@ const ParticipantItem = memo(function ParticipantItem({
             }
           }}
         >
-          {p.profiles?.avatar_url ? (
-            <img
-              src={p.profiles.avatar_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-[10px] font-black uppercase">
-              {p.profiles?.username?.substring(0, 2) || "??"}
-            </div>
-          )}
+          <ProtectedAvatar
+            userId={p.user_id || undefined}
+            src={p.profiles?.avatar_url || undefined}
+            username={p.profiles?.username || undefined}
+            className="w-full h-full shrink-0"
+          />
         </div>
         <div>
           <p

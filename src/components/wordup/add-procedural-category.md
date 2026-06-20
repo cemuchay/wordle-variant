@@ -25,9 +25,9 @@ INSERT INTO wordup_entities (type, label, metadata, difficulty, tags) VALUES
 
 ### Rules for metadata keys
 
-- All entities in a category should share the **same metadata keys** so distractors work correctly
-- Prefer keys where **most entities have unique values** — the generator automatically picks the most distinctive key (highest unique-value ratio)
-- Common/shared keys (like `continent` where many entities share `"Europe"`) work but produce harder reverse questions — the generator validates that distractor options don't also match the queried value
+- Entities in the same category can have **different/non-uniform metadata keys** (varying schemas). The engine dynamically infers the appropriate key per target entity at runtime.
+- For any key to be queried, at least **3 other entities** in the retrieved pool must share that key (to generate valid distractors from the peer pool).
+- If the correct answer of a selected metadata key is a **numeric or year value** (e.g., key contains "year", "date", "pop" or value is numeric), the engine automatically generates **mathematically sensible distractors** (+/- 1, 2, 5, 10, or relative percentage bounds) and true/false values, ensuring challenging game choices.
 
 ### Example: 3 entities for `my_category`
 
@@ -67,12 +67,11 @@ When a match starts with `my_category`:
 
 1. Edge function fetches all entities with `type = 'my_category'` (up to 14)
 2. For each of 7 rounds, picks `entity[i % entityList.length]`
-3. `scoreKeys()` scans all entities' metadata — finds `color` and `shape` keys, counts unique values
-4. `pickBestKey()` picks the most distinctive key (e.g. `color` if all 3 values differ)
-5. `generateQuestion()` creates the question:
-   - Low difficulty (1-2): *"What is the color of Alpha?"* → `"Red"`
-   - High difficulty (4-5): *`"Red"` is the color of which option?* → `"Alpha"`
-   - Distractors are sampled from other entities' same metadata key, validated to not match the correct answer
+3. The engine extracts the metadata keys available for the target entity, shuffles them, and searches for a key shared by at least 3 peers.
+4. If a shared key is found, that key is selected for the round. Otherwise, it falls back to the first available key.
+5. If the correct answer is numeric or a year, the engine generates mathematically sensible distractors. Otherwise, it samples distractors from other peer entities sharing that key.
+6. Generates a randomized question variant (Forward, Reverse, Odd One Out, True/False, Multi-clue, Correct the Error).
+   - True/False (Variant 3) and Correct the Error (Variant 5) use the generated distractors (e.g., mathematically sensible false values for numeric/year keys).
 
 ---
 

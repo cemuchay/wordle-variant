@@ -35,6 +35,160 @@ interface CategorySelectModalProps {
    startMatchmaking: () => void;
 }
 
+const CATEGORY_STYLE_MAP: Record<string, { emoji: string; gradient: string; glow: string; border: string }> = {
+   mixed: {
+      emoji: "🎲",
+      gradient: "from-emerald-950/40 via-teal-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(52,211,153,0.15)]",
+      border: "border-emerald-500/50 text-emerald-400"
+   },
+   vowel_drop: {
+      emoji: "🅰️",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   anagram_scrambled: {
+      emoji: "🔀",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   reverse_wordle: {
+      emoji: "🔄",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   missing_letter: {
+      emoji: "🧩",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   word_ladder: {
+      emoji: "🪜",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   rhyme_match: {
+      emoji: "🎵",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   letter_count: {
+      emoji: "🔢",
+      gradient: "from-purple-950/40 via-indigo-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(168,85,247,0.15)]",
+      border: "border-purple-500/50 text-purple-400"
+   },
+   capitals_clash: {
+      emoji: "🌍",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   currency_exchange: {
+      emoji: "💸",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   flag_bearer: {
+      emoji: "🚩",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   mental_math_blitz: {
+      emoji: "🧮",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   sequence_solver: {
+      emoji: "📈",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   element_arena: {
+      emoji: "🧪",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   animal_kingdom: {
+      emoji: "🦁",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   cosmic_frontier: {
+      emoji: "🚀",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   cinephile_trivia: {
+      emoji: "🎬",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   history_milestones: {
+      emoji: "🏛️",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   naija_music: {
+      emoji: "🎧",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   naija_celebs: {
+      emoji: "🇳🇬",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   unn_lions: {
+      emoji: "🦁",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   nysc_trivia: {
+      emoji: "🪖",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   us_tech_trivia: {
+      emoji: "💻",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   },
+   elon_musk: {
+      emoji: "🚘",
+      gradient: "from-cyan-950/40 via-blue-950/30 to-slate-950/40",
+      glow: "shadow-[0_0_20px_rgba(6,182,212,0.15)]",
+      border: "border-cyan-500/50 text-cyan-400"
+   }
+};
+
+const DEFAULT_STYLE = {
+   emoji: "💡",
+   gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40",
+   glow: "shadow-[0_0_15px_rgba(255,255,255,0.05)]",
+   border: "border-white/20 text-gray-300"
+};
+
 export const CategorySelectModal = ({
    isOpen,
    onClose,
@@ -120,7 +274,7 @@ export const CategorySelectModal = ({
             </div>
 
             {/* Scrollable List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0 scrollbar-hide">
                {/* Recents (only when not searching) */}
                {!searchQuery && recentCats.length > 0 && (
                   <div className="space-y-2">
@@ -156,22 +310,31 @@ export const CategorySelectModal = ({
                      <div className="grid grid-cols-1 gap-2">
                         {generalCats.map((cat) => {
                            const isSel = category === cat.id;
+                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            return (
-                              <button
+                              <motion.button
                                  key={cat.id}
+                                 whileHover={{ scale: 1.02 }}
                                  onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
-                                       ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
                                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
                                  }`}
                               >
-                                 <div className="flex items-center gap-2">
-                                    <span className={`w-2 h-2 rounded-full ${isSel ? "bg-correct animate-pulse" : "bg-gray-600"}`} />
-                                    <p className="text-xs font-black uppercase tracking-wider text-white">{cat.name}</p>
+                                 <div className="flex items-center gap-3 w-full">
+                                    <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-lg shrink-0 shadow-inner">
+                                       {style.emoji}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <div className="flex items-center gap-1.5">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct animate-pulse" : "bg-gray-600"}`} />
+                                          <p className="text-xs font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                       </div>
+                                       <p className="text-[9px] text-gray-400 mt-0.5">{cat.desc}</p>
+                                    </div>
                                  </div>
-                                 <p className="text-[9px] text-gray-500 mt-1">{cat.desc}</p>
-                              </button>
+                              </motion.button>
                            );
                         })}
                      </div>
@@ -185,22 +348,31 @@ export const CategorySelectModal = ({
                      <div className="grid grid-cols-2 gap-2">
                         {lengthCats.map((cat) => {
                            const isSel = category === cat.id;
+                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            return (
-                              <button
+                              <motion.button
                                  key={cat.id}
+                                 whileHover={{ scale: 1.02 }}
                                  onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
-                                       ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
                                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
                                  }`}
                               >
-                                 <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct" : "bg-gray-600"}`} />
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                 <div className="flex items-center gap-2.5 w-full">
+                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                       {style.emoji}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <div className="flex items-center gap-1.5">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct" : "bg-gray-600"}`} />
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                       </div>
+                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
+                                    </div>
                                  </div>
-                                 <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                              </button>
+                              </motion.button>
                            );
                         })}
                      </div>
@@ -214,22 +386,31 @@ export const CategorySelectModal = ({
                      <div className="grid grid-cols-2 gap-2">
                         {gameTypeCats.map((cat) => {
                            const isSel = category === cat.id;
+                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            return (
-                              <button
+                              <motion.button
                                  key={cat.id}
+                                 whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
-                                       ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
                                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
                                  }`}
                               >
-                                 <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct" : "bg-gray-600"}`} />
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                 <div className="flex items-center gap-2.5 w-full">
+                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                       {style.emoji}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <div className="flex items-center gap-1.5">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct animate-pulse" : "bg-gray-600"}`} />
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                       </div>
+                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>
+                                    </div>
                                  </div>
-                                 <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                              </button>
+                              </motion.button>
                            );
                         })}
                      </div>
@@ -243,22 +424,31 @@ export const CategorySelectModal = ({
                      <div className="grid grid-cols-2 gap-2">
                         {proceduralCats.map((cat) => {
                            const isSel = category === cat.id;
+                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            return (
-                              <button
+                              <motion.button
                                  key={cat.id}
+                                 whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
-                                       ? "bg-cyan-500/10 border-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
                                        : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
                                  }`}
                               >
-                                 <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-cyan-400 animate-pulse" : "bg-gray-600"}`} />
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                 <div className="flex items-center gap-2.5 w-full">
+                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                       {style.emoji}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <div className="flex items-center gap-1.5">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-cyan-400 animate-pulse" : "bg-gray-600"}`} />
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                       </div>
+                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>
+                                    </div>
                                  </div>
-                                 <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                              </button>
+                              </motion.button>
                            );
                         })}
                      </div>
