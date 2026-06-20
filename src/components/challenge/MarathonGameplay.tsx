@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Clock, Lock, Play } from 'lucide-react';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 import { RegularGameplay } from './RegularGameplay';
@@ -279,6 +279,41 @@ export const MarathonGameplay = memo(function MarathonGameplay({
 
     // Sub-filtering tabs state (All, Unplayed, Played)
     const [subFilter, setSubFilter] = useState<'all' | 'unplayed' | 'played'>('all');
+
+    const hasInitializedTabRef = useRef(false);
+
+    useEffect(() => {
+        if (!challenge.is_bot_marathon || marathonGames.length === 0 || hasInitializedTabRef.current) return;
+
+        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+        
+        for (let d = 1; d <= currentDay; d++) {
+            const dayGamesRangeStart = (d - 1) * baseSequenceLength;
+            const dayGamesRangeEnd = Math.min(marathonGames.length, d * baseSequenceLength);
+            
+            let hasUnfinished = false;
+            for (let idx = dayGamesRangeStart; idx < dayGamesRangeEnd; idx++) {
+                const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+                const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
+                const isCompleted = prog?.status === 'completed';
+                const isFailed = prog?.attempts >= effectiveMaxAttempts && !isCompleted;
+                const isFinished = isCompleted || isFailed || prog?.status === 'timed_out';
+                
+                if (!isFinished) {
+                    hasUnfinished = true;
+                    break;
+                }
+            }
+            if (hasUnfinished) {
+                setActiveDayTab(d);
+                hasInitializedTabRef.current = true;
+                return;
+            }
+        }
+        
+        setActiveDayTab(currentDay);
+        hasInitializedTabRef.current = true;
+    }, [challenge.is_bot_marathon, marathonGames, participation.marathon_progress, numDays, currentDay, challenge.is_shapeshifter]);
 
     // Compute basic statuses sequentially to build an enhanced list of games
     const gamesWithMetadata = useMemo(() => {
