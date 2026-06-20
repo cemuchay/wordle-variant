@@ -5,6 +5,7 @@ import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuest
 import { type ProfileStats } from "../types";
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
+import { CATEGORIES } from "../constants";
 
 interface MatchData {
    p1_score?: number;
@@ -17,6 +18,7 @@ interface MatchData {
    bot_profile?: string;
    player1_id?: string;
    player2_id?: string;
+   category?: string;
 }
 
 interface PlayerProfile {
@@ -149,6 +151,8 @@ export const BattleView = ({
 
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
 
+   const categoryName = CATEGORIES.find((c) => c.id === matchData?.category)?.name || matchData?.category?.replace(/_/g, " ") || "";
+
    // Resolve opponent choice
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoice = oppAnswers?.[currentIdx]?.choice;
@@ -184,6 +188,12 @@ export const BattleView = ({
          setParticles(newParticles);
       }
    };
+
+   const promptLen = activeQuestion.prompt.length;
+   const promptSizeClass = promptLen > 80 ? "text-sm sm:text-base" : promptLen > 50 ? "text-base sm:text-lg" : "text-lg sm:text-xl";
+
+   const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
+   const choiceSizeClass = maxChoiceLen > 25 ? "text-[8px] sm:text-[10px]" : maxChoiceLen > 15 ? "text-[10px] sm:text-xs" : "text-xs";
 
    return (
       <motion.div
@@ -249,6 +259,9 @@ export const BattleView = ({
                </span>
             </div>
             <div className="flex flex-col items-center">
+               {categoryName && (
+                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider mb-0.5">{categoryName}</span>
+               )}
                <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
                {currentIdx === 6 && (
                   <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ DOUBLE POINTS</span>
@@ -302,7 +315,7 @@ export const BattleView = ({
                   {currentIdx === 6 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
-               <h2 className="text-xl font-black tracking-tight leading-relaxed text-white">
+               <h2 className={`${promptSizeClass} font-black tracking-tight leading-relaxed text-white`}>
                   {activeQuestion.prompt}
                </h2>
                {activeQuestion.subPrompt && (
@@ -337,7 +350,7 @@ export const BattleView = ({
                   const isCorrect = choice === activeQuestion.answer;
                   const isOppSelected = revealAnswers && oppChoice === choice;
 
-                  let btnClass = "p-4 rounded-2xl border text-center font-black uppercase tracking-wider text-xs flex items-center justify-between min-h-[56px] relative overflow-hidden";
+                  let btnClass = `p-4 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[56px] relative overflow-hidden`;
                   if (selectedAnswer === null) {
                      btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
                   } else {
