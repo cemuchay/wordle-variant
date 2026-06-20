@@ -933,6 +933,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Restore saved view when opening the Challenge modal
     const hasRestoredView = useRef(false);
+    const pendingPreviewIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (isChallengesLoading || hasRestoredView.current) return;
@@ -944,12 +945,34 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             if (saved && saved.challengeId) {
                 hasRestoredView.current = true;
                 setListColumn(saved.listColumn);
+                setSearchQuery(saved.searchQuery || '');
+                setStatusFilter(saved.statusFilter || 'ALL');
+                setModeFilter(saved.modeFilter || 'ALL');
+                setLengthFilter(saved.lengthFilter !== undefined ? saved.lengthFilter : 'ALL');
+                setActiveTab(saved.activeTab || 'my');
+                if (saved.previewParticipantId) {
+                    pendingPreviewIdRef.current = saved.previewParticipantId;
+                }
                 if (saved.type === 'lobby' || saved.type === 'gameplay') {
                     handleViewChallenge(saved.challengeId);
                 }
             }
         }
-    }, [isChallengesLoading, initialChallengeId, handleViewChallenge, setListColumn]);
+    }, [isChallengesLoading, initialChallengeId, handleViewChallenge, setListColumn, setSearchQuery, setStatusFilter, setModeFilter, setLengthFilter, setActiveTab]);
+
+    // Restore preview participant once participants are loaded
+    useEffect(() => {
+        if (!pendingPreviewIdRef.current || !participants || participants.length === 0) return;
+        const remember = useAppStore.getState().preferences.rememberLastView;
+        if (!remember) return;
+        const found = participants.find(
+            (p: any) => p.id === pendingPreviewIdRef.current || p.user_id === pendingPreviewIdRef.current
+        );
+        if (found) {
+            pendingPreviewIdRef.current = null;
+            setPreviewParticipant(found);
+        }
+    }, [participants, setPreviewParticipant]);
 
     // Persist challenge view state when rememberLastView is enabled
     useEffect(() => {
@@ -969,8 +992,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             challengeId,
             listColumn,
             marathonGameIndex: previewMarathonGameIndex,
+            previewParticipantId: previewParticipant?.id || previewParticipant?.user_id || null,
+            previewMarathonGameIndex: previewMarathonGameIndex,
+            searchQuery,
+            statusFilter,
+            modeFilter,
+            lengthFilter,
+            activeTab,
         });
-    }, [isPlaying, selectedChallenge?.id, listColumn, previewMarathonGameIndex]);
+    }, [isPlaying, selectedChallenge?.id, listColumn, previewMarathonGameIndex, previewParticipant?.id, previewParticipant?.user_id, searchQuery, statusFilter, modeFilter, lengthFilter, activeTab]);
 
     // Context Value (Bridge)
     const contextValue: ChallengeContextType = useMemo(() => ({

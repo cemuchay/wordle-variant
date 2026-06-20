@@ -317,6 +317,8 @@ interface AppState {
             isWeeklyWrappedOpen: state.isWeeklyWrappedOpen,
             showNotifications: state.showNotifications,
             statsActiveTab: state.statsActiveTab,
+            pendingDMUserId: state.pendingDMUserId,
+            pendingChatGroupId: state.pendingChatGroupId,
          }),
       },
    ),

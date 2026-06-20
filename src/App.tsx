@@ -211,6 +211,8 @@ export default function App() {
       appState.setWordUpOpen(false);
       appState.setWeeklyWrappedOpen(false);
       appState.setShowNotifications(false);
+      appState.setPendingDMUserId(null);
+      appState.setPendingChatGroupId(null);
     }
   }, []);
 

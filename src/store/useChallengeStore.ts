@@ -8,6 +8,13 @@ export interface SavedChallengeView {
     challengeId: string | null;
     listColumn: 'active' | 'played' | 'expired' | 'open';
     marathonGameIndex: number | null;
+    previewParticipantId: string | null;
+    previewMarathonGameIndex: number | null;
+    searchQuery: string;
+    statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
+    modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
+    lengthFilter: 'ALL' | number;
+    activeTab: 'my' | 'create' | 'join';
 }
 
 interface ChallengeState {
