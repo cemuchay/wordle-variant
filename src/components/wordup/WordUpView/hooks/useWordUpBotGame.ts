@@ -342,17 +342,8 @@ export const useWordUpBotGame = ({
           const q = questionsRef.current[index];
           const duration = q ? getQuestionDuration(q.type) : 10.0;
 
-          if (index === 1) {
-             console.log("[WordUp Logs] Bot startQuestionRound: Round 2 specific manual reset triggered to prevent timer glitches.");
-             // Hard reset store values for round 2
-             setMaxTime(duration);
-             setTimeLeft(duration);
-             setSelectedAnswer(null);
-             setRevealAnswers(false);
-          } else {
-             setMaxTime(duration);
-             setTimeLeft(duration);
-          }
+          setMaxTime(duration);
+          setTimeLeft(duration);
           setCurrentIdx(index);
           setSelectedAnswer(null);
           setRevealAnswers(false);
