@@ -191,6 +191,29 @@ export default function App() {
     }
   }, []);
 
+  // Reset view settings on mount if rememberLastView is false
+  useEffect(() => {
+    const appState = useAppStore.getState();
+    const remember = appState.preferences?.rememberLastView;
+    if (!remember) {
+      const params = new URLSearchParams(window.location.search);
+      const hasChallengeParam = params.has("challenge");
+      const hasOpenParam = params.has("open") || params.has("group_id") || params.has("dm_user_id");
+      const openVal = params.get("open");
+
+      if (!hasChallengeParam) appState.setChallengeOpen(false);
+      appState.setNotificationsOpen(openVal === "notifications");
+      appState.setChatOpen(hasOpenParam && (openVal === "chat" || !!params.get("group_id") || !!params.get("dm_user_id")));
+      appState.setChatConversationOpen(false);
+      appState.setStatsOpen(openVal === "leaderboard");
+      appState.setSettingsOpen(false);
+      appState.setInfoOpen(false);
+      appState.setWordUpOpen(false);
+      appState.setWeeklyWrappedOpen(false);
+      appState.setShowNotifications(false);
+    }
+  }, []);
+
   // Auto-trigger weekly wrapped on Monday logins
   useEffect(() => {
     if (!user || !date) return;

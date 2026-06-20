@@ -9,6 +9,7 @@ import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
 import { safeLocalStorage } from '../utils/storage';
 import { saveChallengeView, loadChallengeView } from '../utils/challengeViewPersistence';
+import { useAppStore } from '../store/useAppStore';
 
 interface ChallengeContextType {
     // ... rest of interface
@@ -914,7 +915,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const hasNavigatedToGameplay = useRef(false);
 
     useEffect(() => {
-        const remember = useChallengeStore.getState().rememberLastView;
+        const remember = useAppStore.getState().preferences.rememberLastView;
         if (!remember || hasNavigatedToGameplay.current) return;
         if (!selectedChallenge || !myParticipation) return;
         if (isChallengesLoading || loadingParticipants) return;
@@ -935,7 +936,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     useEffect(() => {
         if (isChallengesLoading || hasRestoredView.current) return;
-        const remember = useChallengeStore.getState().rememberLastView;
+        const remember = useAppStore.getState().preferences.rememberLastView;
         if (!remember) return;
 
         if (!initialChallengeId || initialChallengeId === "null" || initialChallengeId === "undefined") {
@@ -952,7 +953,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     // Persist challenge view state when rememberLastView is enabled
     useEffect(() => {
-        const remember = useChallengeStore.getState().rememberLastView;
+        const remember = useAppStore.getState().preferences.rememberLastView;
         if (!remember) return;
 
         const challengeId = selectedChallenge?.id || null;

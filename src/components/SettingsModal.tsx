@@ -24,6 +24,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [userEmail, setUserEmail] = useState<string>('');
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
+    const [rememberLastView, setRememberLastView] = useState(preferences.rememberLastView || false);
     const [navOrder, setNavOrder] = useState<string[]>(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     const [receiveEmails, setReceiveEmails] = useState(true);
     const [pushSupported, setPushSupported] = useState(false);
@@ -53,6 +54,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     useEffect(() => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
+        setRememberLastView(preferences.rememberLastView || false);
         setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     }, [preferences]);
 
@@ -191,6 +193,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             ...(profile?.preferences || preferences),
             allowRoasts,
             compactMode,
+            rememberLastView,
             navOrder,
         };
 
@@ -251,7 +254,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     if (!isOpen) return null;
 
     const showSecurity = matchesSearch('Security & Identity') || matchesSearch('Email', userEmail);
-    const showGameplay = matchesSearch('Gameplay Experience') || matchesSearch('Sassy Roasts') || matchesSearch('Compact Mode');
+    const showGameplay = matchesSearch('Gameplay Experience') || matchesSearch('Sassy Roasts') || matchesSearch('Compact Mode') || matchesSearch('Remember Last View');
     const showEmail = matchesSearch('Email Notifications') || matchesSearch('Updates & Reminders');
     const showPush = matchesSearch('Push Notifications') || matchesSearch('Live Push Updates');
     const showApp = !isStandalone && (matchesSearch('Application') || matchesSearch('Install Variant'));
@@ -390,6 +393,25 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                                 }`}
                                         >
                                             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${compactMode ? 'left-7' : 'left-1'
+                                                }`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {matchesSearch('Remember Last View') && (
+                                    <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                        <div className="flex-1 pr-4">
+                                            <p className="text-sm font-bold text-gray-100">Remember Last View Settings</p>
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                Globally remember your open modals and active tab across exits/reloads.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setRememberLastView(!rememberLastView)}
+                                            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${rememberLastView ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'
+                                                }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${rememberLastView ? 'left-7' : 'left-1'
                                                 }`} />
                                         </button>
                                     </div>

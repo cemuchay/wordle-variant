@@ -9,7 +9,6 @@ import {
   Plus,
   HelpCircle,
   Loader2,
-  Settings2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type Challenge } from "../hooks/useChallenge";
@@ -21,7 +20,6 @@ import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
 import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
-import { clearChallengeView } from "../utils/challengeViewPersistence";
 
 import { useChallengeStore } from "../store/useChallengeStore";
 import { useAppStore } from "../store/useAppStore";
@@ -146,76 +144,11 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
   );
 });
 
-const ChallengeSettingsSheet = memo(({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const rememberLastView = useChallengeStore((s) => s.rememberLastView);
-  const setRememberLastView = useChallengeStore((s) => s.setRememberLastView);
-
-  const handleToggle = () => {
-    const next = !rememberLastView;
-    setRememberLastView(next);
-    if (!next) {
-      clearChallengeView();
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 15 }}
-          transition={{ duration: 0.2 }}
-          className="absolute inset-0 bg-gray-950/98 backdrop-blur-md z-60 flex flex-col"
-        >
-          <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-correct/20 p-2 rounded-xl text-correct flex items-center justify-center">
-                <Settings2 size={20} />
-              </div>
-              <h3 className="text-lg font-black uppercase tracking-tighter text-white">
-                Challenge Settings
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-hide space-y-6">
-            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-white">
-                    Remember Last View
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    When enabled, return to your exact location when reopening the Challenge modal.
-                  </p>
-                </div>
-                <button
-                  onClick={handleToggle}
-                  className={`relative w-11 h-6 rounded-full transition-all shrink-0 ${rememberLastView ? 'bg-correct' : 'bg-white/10'}`}
-                >
-                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${rememberLastView ? 'left-[22px]' : 'left-0.5'}`} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-});
-
 const AuthenticatedChallengeContent = memo(
   ({ onClose, user }: { onClose: () => void; user: any }) => {
     const [showFilters, setShowFilters] = useState(false);
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
-    const [isChallengeSettingsOpen, setIsChallengeSettingsOpen] = useState(false);
 
     const { isDynamicIslandVisible } = useApp();
     const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
@@ -392,13 +325,6 @@ const AuthenticatedChallengeContent = memo(
                 Create
               </button>
             )}
-            <button
-              onClick={() => setIsChallengeSettingsOpen(true)}
-              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
-              title="Challenge Settings"
-            >
-              <Settings2 className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
-            </button>
             <button
               onClick={() => setIsHelpOpen(true)}
               className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
@@ -862,11 +788,6 @@ const AuthenticatedChallengeContent = memo(
             isShapeshifter={selectedChallenge?.is_shapeshifter}
           />
         )}
-
-        <ChallengeSettingsSheet
-          isOpen={isChallengeSettingsOpen}
-          onClose={() => setIsChallengeSettingsOpen(false)}
-        />
       </div>
     );
   },
