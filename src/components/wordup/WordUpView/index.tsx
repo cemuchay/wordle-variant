@@ -216,7 +216,7 @@ export const WordUpView = () => {
              setView("battle");
 
              // Set match status to active in database (only for real-time matches)
-             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
+             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
                 supabase
                    .from("wordup_matches")
                    .update({ status: "active" })

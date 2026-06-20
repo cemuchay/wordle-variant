@@ -4,6 +4,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
+import { GeneratorRegistry } from "../../../../services/wordup/generatorRegistry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -479,7 +481,20 @@ export const useWordUpBotGame = ({
 
          try {
             console.log("[WordUp Logs] Bot accepting rematch, generating new bot game...");
-            const rawQuestions = generateWordUpQuestions(match.category);
+
+            let rawQuestions: any[];
+            if (isProceduralCategory(match.category)) {
+               const baseQuestions = await GeneratorRegistry.compileMatchQuestions(match.category, match.id);
+               rawQuestions = baseQuestions.map((q) => ({
+                  type: "definition",
+                  prompt: q.question,
+                  subPrompt: q.explanation,
+                  choices: q.options,
+                  answer: q.answer,
+               }));
+            } else {
+               rawQuestions = generateWordUpQuestions(match.category);
+            }
             const secretKey = generateSecretKey();
             const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
@@ -546,10 +561,23 @@ export const useWordUpBotGame = ({
    const loadAndSubscribeMatch = useCallback(
       async (mId: string, _activeRole: "player1" | "player2") => {
          let match;
-         if (mId.startsWith("bot-match-")) {
-            const category = useWordUpStore.getState().category || "mixed";
-            const botProfile = matchDataRef.current?.bot_profile || getRandomBotProfile();
-            const rawQuestions = generateWordUpQuestions(category);
+          if (mId.startsWith("bot-match-")) {
+             const category = useWordUpStore.getState().category || "mixed";
+             const botProfile = matchDataRef.current?.bot_profile || getRandomBotProfile();
+
+             let rawQuestions: any[];
+             if (isProceduralCategory(category)) {
+                const baseQuestions = await GeneratorRegistry.compileMatchQuestions(category, mId);
+                rawQuestions = baseQuestions.map((q) => ({
+                   type: "definition",
+                   prompt: q.question,
+                   subPrompt: q.explanation,
+                   choices: q.options,
+                   answer: q.answer,
+                }));
+             } else {
+                rawQuestions = generateWordUpQuestions(category);
+             }
             
             let userId = "guest-player";
             try {
