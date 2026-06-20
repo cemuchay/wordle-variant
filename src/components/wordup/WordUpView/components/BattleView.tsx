@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
+import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 
 interface BattleViewProps {
    questions: WordUpQuestion[];
@@ -105,6 +106,8 @@ export const BattleView = ({
 
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
+
+   const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -230,10 +233,10 @@ export const BattleView = ({
           {/* Timer Bar */}
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
-               <div
-                  className={`h-full transition-all duration-[50ms] ease-linear ${timeLeft > 3 ? "bg-correct shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
-                  style={{ width: `${(timeLeft / maxTime) * 100}%` }}
-               />
+                <div
+                   className={`h-full transition-[background-color,box-shadow] duration-300 ease-in-out ${timeLeft > 3 ? "bg-correct shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
+                   style={{ width: `${(timeLeft / qMaxTime) * 100}%` }}
+                />
              )}
           </div>
 

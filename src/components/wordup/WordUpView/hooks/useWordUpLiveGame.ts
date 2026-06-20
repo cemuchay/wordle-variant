@@ -95,18 +95,6 @@ export const useWordUpLiveGame = ({
       roleRef.current = role;
    }, [role]);
 
-   useEffect(() => {
-      if (!isActive) return;
-      if (!matchId) {
-         if (matchChannelRef.current) {
-            console.log("[WordUp Logs] Cleaning up match channel because matchId is null");
-            supabase.removeChannel(matchChannelRef.current);
-            matchChannelRef.current = null;
-         }
-         setRematchState("idle");
-      }
-   }, [matchId, isActive]);
-
    const stopRoundTimer = useCallback(() => {
       if (timerRef.current) {
          clearInterval(timerRef.current);
@@ -125,6 +113,24 @@ export const useWordUpLiveGame = ({
       stopRoundTimer();
       stopRoundTimeout();
    }, [stopRoundTimer, stopRoundTimeout]);
+
+   useEffect(() => {
+      if (!isActive) {
+         cleanUpIntervals();
+      }
+   }, [isActive, cleanUpIntervals]);
+
+   useEffect(() => {
+      if (!isActive) return;
+      if (!matchId) {
+         if (matchChannelRef.current) {
+            console.log("[WordUp Logs] Cleaning up match channel because matchId is null");
+            supabase.removeChannel(matchChannelRef.current);
+            matchChannelRef.current = null;
+         }
+         setRematchState("idle");
+      }
+   }, [matchId, isActive]);
 
    const endGame = useCallback(
       async (match: any) => {
@@ -311,6 +317,10 @@ export const useWordUpLiveGame = ({
           let lastTicked = Math.ceil(duration) + 1;
 
           timerRef.current = window.setInterval(() => {
+             if (!isActive) {
+                stopRoundTimer();
+                return;
+             }
              const now = getSyncedNow();
              const elapsed = (now - startTime) / 1000;
              const remaining = Math.max(0, duration - elapsed);

@@ -91,6 +91,7 @@ export const useWordUpBotGame = ({
       roleRef.current = role;
    }, [role]);
 
+
    const stopRoundTimer = useCallback(() => {
       if (timerRef.current) {
          clearInterval(timerRef.current);
@@ -117,6 +118,12 @@ export const useWordUpBotGame = ({
       stopBotTimer();
       stopRoundTimeout();
    }, [stopRoundTimer, stopBotTimer, stopRoundTimeout]);
+
+   useEffect(() => {
+      if (!isActive) {
+         cleanUpIntervals();
+      }
+   }, [isActive, cleanUpIntervals]);
 
    const endGame = useCallback(
       async (match: any) => {
@@ -335,8 +342,17 @@ export const useWordUpBotGame = ({
           const q = questionsRef.current[index];
           const duration = q ? getQuestionDuration(q.type) : 10.0;
 
-          setMaxTime(duration);
-          setTimeLeft(duration);
+          if (index === 1) {
+             console.log("[WordUp Logs] Bot startQuestionRound: Round 2 specific manual reset triggered to prevent timer glitches.");
+             // Hard reset store values for round 2
+             setMaxTime(duration);
+             setTimeLeft(duration);
+             setSelectedAnswer(null);
+             setRevealAnswers(false);
+          } else {
+             setMaxTime(duration);
+             setTimeLeft(duration);
+          }
           setCurrentIdx(index);
           setSelectedAnswer(null);
           setRevealAnswers(false);
@@ -345,12 +361,16 @@ export const useWordUpBotGame = ({
          const startTime = getSyncedNow();
          let lastTicked = Math.ceil(duration) + 1;
 
-          timerRef.current = window.setInterval(() => {
-             const now = getSyncedNow();
-             const elapsed = (now - startTime) / 1000;
-             const remaining = Math.max(0, duration - elapsed);
+           timerRef.current = window.setInterval(() => {
+              if (!isActive) {
+                 stopRoundTimer();
+                 return;
+              }
+              const now = getSyncedNow();
+              const elapsed = (now - startTime) / 1000;
+              const remaining = Math.max(0, duration - elapsed);
 
-             setTimeLeft(parseFloat(remaining.toFixed(2)));
+              setTimeLeft(parseFloat(remaining.toFixed(2)));
 
              const currentSec = Math.ceil(remaining);
              if (remaining <= 3.0 && currentSec < lastTicked) {

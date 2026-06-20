@@ -76,24 +76,30 @@ export const useWordUpAsyncGame = ({
       roleRef.current = role;
    }, [role]);
 
-   const stopRoundTimer = useCallback(() => {
-      if (timerRef.current) {
-         clearInterval(timerRef.current);
-         timerRef.current = null;
-      }
-   }, []);
+    const stopRoundTimer = useCallback(() => {
+       if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+       }
+    }, []);
 
-   const stopRoundTimeout = useCallback(() => {
-      if (roundTimeoutRef.current) {
-         clearTimeout(roundTimeoutRef.current);
-         roundTimeoutRef.current = null;
-      }
-   }, []);
+    const stopRoundTimeout = useCallback(() => {
+       if (roundTimeoutRef.current) {
+          clearTimeout(roundTimeoutRef.current);
+          roundTimeoutRef.current = null;
+       }
+    }, []);
 
-   const cleanUpIntervals = useCallback(() => {
-      stopRoundTimer();
-      stopRoundTimeout();
-   }, [stopRoundTimer, stopRoundTimeout]);
+    const cleanUpIntervals = useCallback(() => {
+       stopRoundTimer();
+       stopRoundTimeout();
+    }, [stopRoundTimer, stopRoundTimeout]);
+
+    useEffect(() => {
+       if (!isActive) {
+          cleanUpIntervals();
+       }
+    }, [isActive, cleanUpIntervals]);
 
    const endGame = useCallback(
       async (match: any) => {
@@ -275,6 +281,10 @@ export const useWordUpAsyncGame = ({
          let lastTicked = Math.ceil(duration) + 1;
 
          timerRef.current = window.setInterval(() => {
+            if (!isActive) {
+               stopRoundTimer();
+               return;
+            }
             const now = getSyncedNow();
             const elapsed = (now - startTime) / 1000;
             const remaining = Math.max(0, duration - elapsed);
