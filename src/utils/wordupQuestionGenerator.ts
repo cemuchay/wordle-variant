@@ -30,7 +30,13 @@ export interface WordUpQuestion {
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
    answer: string;
+   imageUrl?: string; // Optional URL pointing to the Supabase Storage bucket asset
 }
+
+export const getQuestionImageUrl = (path: string): string => {
+   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+   return `${supabaseUrl}/storage/v1/object/public/wordup-questions/${path}`;
+};
 
 // -------------------------------------------------------------
 // 1. Encryption / Decryption Helpers

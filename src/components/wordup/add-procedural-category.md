@@ -28,6 +28,7 @@ INSERT INTO wordup_entities (type, label, metadata, difficulty, tags) VALUES
 - Entities in the same category can have **different/non-uniform metadata keys** (varying schemas). The engine dynamically infers the appropriate key per target entity at runtime.
 - For any key to be queried, at least **3 other entities** in the retrieved pool must share that key (to generate valid distractors from the peer pool).
 - If the correct answer of a selected metadata key is a **numeric or year value** (e.g., key contains "year", "date", "pop" or value is numeric), the engine automatically generates **mathematically sensible distractors** (+/- 1, 2, 5, 10, or relative percentage bounds) and true/false values, ensuring challenging game choices.
+- **Visual Clues (Images)**: You can bind an image to an entity by adding an `"image"` key to its metadata. The value should be the filename (e.g. `"paris.webp"` or `"logo.avif"`) of the image uploaded to the `wordup-questions` Supabase Storage bucket. The engine will automatically generate the public URL and render the image clue in the client.
 
 ### Example: 3 entities for `my_category`
 
@@ -35,7 +36,7 @@ INSERT INTO wordup_entities (type, label, metadata, difficulty, tags) VALUES
 INSERT INTO wordup_entities (type, label, metadata, difficulty, tags) VALUES
 ('my_category', 'Alpha',  '{"color": "Red",   "shape": "Circle"}',  1, ARRAY['easy']),
 ('my_category', 'Beta',   '{"color": "Blue",  "shape": "Square"}',  2, ARRAY['medium']),
-('my_category', 'Gamma',  '{"color": "Green", "shape": "Triangle"}', 3, ARRAY['hard']);
+('my_category', 'Gamma',  '{"color": "Green", "shape": "Triangle", "image": "gamma_triangle.webp"}', 3, ARRAY['hard']);
 ```
 
 With 3+ entities the generator produces 7 rounds cycling through them (7 unique questions if you have at least 7 entities; fewer entities means repeats with different question variants).

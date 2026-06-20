@@ -70,7 +70,7 @@ function smartFakeAnswers(correct: number, rng: () => number): number[] {
 // To add a new category: just insert entities into wordup_entities.
 // No edge function code changes required.
 
-const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id"]);
+const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id", "image"]);
 
 function isNumeric(str: string): boolean {
    const cleanStr = str.replace(/[$,%\s]/g, "").replace(/,/g, "");
@@ -134,6 +134,16 @@ function getNumericDistractors(correctValueStr: string, rng: () => number): stri
 }
 
 function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
+   const qObj = _generateQuestion(seed, entity, allEntities);
+   const meta = entity?.metadata || {};
+   if (meta.image) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      qObj.imageUrl = `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+   }
+   return qObj;
+}
+
+function _generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
