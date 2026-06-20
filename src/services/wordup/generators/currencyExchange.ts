@@ -1,5 +1,5 @@
 import { type QuizGenerator, type BaseQuestion, type EntitySeed } from "../../../types/generators";
-import { createSeededRandom, seededShuffle } from "../seededRandom";
+import { createSeededRandom, seededShuffle, hashSeed } from "../seededRandom";
 
 const ENTITIES: EntitySeed[] = [
    { id: "1", type: "currency_exchange", label: "US Dollar", metadata: { code: "USD", symbol: "$", country: "United States" }, difficulty: 1, tags: ["major"] },
@@ -31,7 +31,7 @@ export const currencyExchangeGenerator: QuizGenerator = {
       return category === "currency_exchange";
    },
    generate(seed: string, entity?: EntitySeed): BaseQuestion {
-      const rng = createSeededRandom(seed.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+      const rng = createSeededRandom(hashSeed(seed));
       const idx = Math.floor(rng() * ENTITIES.length);
       const chosen = entity || ENTITIES[idx];
 

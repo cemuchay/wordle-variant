@@ -84,13 +84,12 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
          allEntities.filter((e) => e.label !== label).map((e) => e.label),
          rng,
       ).slice(0, 3);
-      const options = seededShuffle([label, ...distractors], rng);
+      const choices = seededShuffle([label, ...distractors], rng);
       return {
-         id: seed,
-         question: `Which of the following is "${label}"?`,
-         options,
+         type: "definition",
+         prompt: `Which of the following is "${label}"?`,
+         choices,
          answer: label,
-         metadata: { generatorId: "generic", entityId: entity?.id },
       };
    }
 
@@ -110,19 +109,18 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
 
    if (useReverse && uniqueDistractors.length >= 3) {
       // Reverse question: [value] is the [key] of which [label]?
-      const options = seededShuffle([label, ...allEntities
+      const choices = seededShuffle([label, ...allEntities
          .filter((e) => e.label !== label)
          .map((e) => e.label)
          .filter((l) => l)
          .sort(() => rng() - 0.5)
          .slice(0, 3)], rng);
       return {
-         id: seed,
-         question: `"${correctValue}" is the ${key.replace(/_/g, " ")} of which option?`,
-         options,
+         type: "definition",
+         prompt: `"${correctValue}" is the ${key.replace(/_/g, " ")} of which option?`,
+         choices,
          answer: label,
-         explanation: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
-         metadata: { generatorId: "generic", entityId: entity?.id },
+         subPrompt: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
       };
    }
 
@@ -137,53 +135,52 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
          .sort(() => rng() - 0.5)
          .slice(0, 3);
 
-   const options = seededShuffle([correctValue, ...distractors], rng);
+   const choices = seededShuffle([correctValue, ...distractors], rng);
    return {
-      id: seed,
-      question: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
-      options,
+      type: "definition",
+      prompt: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
+      choices,
       answer: correctValue,
-      explanation: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
-      metadata: { generatorId: "generic", entityId: entity?.id },
+      subPrompt: `${label} has ${key.replace(/_/g, " ")} "${correctValue}".`,
    };
-}
+ }
 
-// ── Special algorithmic generators (no entities needed) ──────
+ // ── Special algorithmic generators (no entities needed) ──────
 
-const ALGORITHMIC_CATEGORIES = new Set(["mental_math_blitz", "sequence_solver"]);
+ const ALGORITHMIC_CATEGORIES = new Set(["mental_math_blitz", "sequence_solver"]);
 
-function generateAlgorithmicQuestion(category: string, seed: string): any {
-   const rng = createSeededRandom(hashSeed(seed));
+ function generateAlgorithmicQuestion(category: string, seed: string): any {
+    const rng = createSeededRandom(hashSeed(seed));
 
-   if (category === "mental_math_blitz") {
-      const opIdx = Math.floor(rng() * 4);
-      let a: number, b: number, ans: number;
-      const ops = ["+", "-", "x", "/"];
-      if (opIdx === 0) { a = Math.floor(rng() * 90) + 10; b = Math.floor(rng() * 90) + 10; ans = a + b; }
-      else if (opIdx === 1) { a = Math.floor(rng() * 80) + 20; b = Math.floor(rng() * (a - 10)) + 10; ans = a - b; }
-      else if (opIdx === 2) { a = Math.floor(rng() * 12) + 2; b = Math.floor(rng() * 12) + 2; ans = a * b; }
-      else { b = Math.floor(rng() * 10) + 2; ans = Math.floor(rng() * 15) + 2; a = b * ans; }
-      const correct = String(ans);
-      const fakes = smartFakeAnswers(ans, rng).map(String);
-      return { id: seed, question: `${a} ${ops[opIdx]} ${b} = ?`, options: seededShuffle([correct, ...fakes].slice(0, 4), rng), answer: correct, metadata: { generatorId: "mental_math_blitz" } };
-   }
+    if (category === "mental_math_blitz") {
+       const opIdx = Math.floor(rng() * 4);
+       let a: number, b: number, ans: number;
+       const ops = ["+", "-", "x", "/"];
+       if (opIdx === 0) { a = Math.floor(rng() * 90) + 10; b = Math.floor(rng() * 90) + 10; ans = a + b; }
+       else if (opIdx === 1) { a = Math.floor(rng() * 80) + 20; b = Math.floor(rng() * (a - 10)) + 10; ans = a - b; }
+       else if (opIdx === 2) { a = Math.floor(rng() * 12) + 2; b = Math.floor(rng() * 12) + 2; ans = a * b; }
+       else { b = Math.floor(rng() * 10) + 2; ans = Math.floor(rng() * 15) + 2; a = b * ans; }
+       const correct = String(ans);
+       const fakes = smartFakeAnswers(ans, rng).map(String);
+       return { type: "math", prompt: `${a} ${ops[opIdx]} ${b} = ?`, choices: seededShuffle([correct, ...fakes].slice(0, 4), rng), answer: correct };
+    }
 
-   if (category === "sequence_solver") {
-      const patternIdx = Math.floor(rng() * 6);
-      let seq: number[], ans: number;
-      if (patternIdx === 0) { const s = Math.floor(rng() * 10) + 1; seq = [s, s + 2, s + 4, s + 6]; ans = s + 8; }
-      else if (patternIdx === 1) { const s = Math.floor(rng() * 5) + 1; seq = [s, s * 2, s * 4, s * 8]; ans = s * 16; }
-      else if (patternIdx === 2) { const s = Math.floor(rng() * 5) + 1; seq = [s, s + 3, s + 6, s + 9]; ans = s + 12; }
-      else if (patternIdx === 3) { const s = Math.floor(rng() * 5) + 1; seq = Array.from({ length: 4 }, (_, i) => (s + i) ** 2); ans = (s + 4) ** 2; }
-      else if (patternIdx === 4) { const s = Math.floor(rng() * 30) + 30; seq = [s, s - 5, s - 10, s - 15]; ans = s - 20; }
-      else { const s = Math.floor(rng() * 5) + 1; seq = [s, s + 1, s + 3, s + 6]; ans = s + 10; }
-      const correct = String(ans);
-      const fakes = smartFakeAnswers(ans, rng).map(String);
-      return { id: seed, question: `What is the next number: ${seq.join(", ")}?`, options: seededShuffle([correct, ...fakes].slice(0, 4), rng), answer: correct, metadata: { generatorId: "sequence_solver" } };
-   }
+    if (category === "sequence_solver") {
+       const patternIdx = Math.floor(rng() * 6);
+       let seq: number[], ans: number;
+       if (patternIdx === 0) { const s = Math.floor(rng() * 10) + 1; seq = [s, s + 2, s + 4, s + 6]; ans = s + 8; }
+       else if (patternIdx === 1) { const s = Math.floor(rng() * 5) + 1; seq = [s, s * 2, s * 4, s * 8]; ans = s * 16; }
+       else if (patternIdx === 2) { const s = Math.floor(rng() * 5) + 1; seq = [s, s + 3, s + 6, s + 9]; ans = s + 12; }
+       else if (patternIdx === 3) { const s = Math.floor(rng() * 5) + 1; seq = Array.from({ length: 4 }, (_, i) => (s + i) ** 2); ans = (s + 4) ** 2; }
+       else if (patternIdx === 4) { const s = Math.floor(rng() * 30) + 30; seq = [s, s - 5, s - 10, s - 15]; ans = s - 20; }
+       else { const s = Math.floor(rng() * 5) + 1; seq = [s, s + 1, s + 3, s + 6]; ans = s + 10; }
+       const correct = String(ans);
+       const fakes = smartFakeAnswers(ans, rng).map(String);
+       return { type: "math", prompt: `What is the next number: ${seq.join(", ")}?`, choices: seededShuffle([correct, ...fakes].slice(0, 4), rng), answer: correct };
+    }
 
-   throw new Error(`Unknown algorithmic category: ${category}`);
-}
+    throw new Error(`Unknown algorithmic category: ${category}`);
+ }
 
 // ── Main handler ─────────────────────────────────────────────
 
@@ -211,13 +208,13 @@ serve(async (req) => {
       // Idempotency check
       const { data: existing } = await supabaseClient
          .from("wordup_matches")
-         .select("encrypted_questions, encryption_key")
+         .select("questions, encryption_key")
          .eq("id", matchId)
          .single();
 
-      if (existing?.encrypted_questions && existing?.encryption_key) {
+      if (existing?.questions && existing?.encryption_key) {
          return new Response(
-            JSON.stringify({ matchId, encryptedQuestions: existing.encrypted_questions, encryptionKey: existing.encryption_key, cached: true }),
+            JSON.stringify({ matchId, cached: true }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
          );
       }
@@ -242,6 +239,7 @@ serve(async (req) => {
          }
 
          const entityList: any[] = entities || [];
+         console.log(`[generate-match-questions] Fetched ${entityList.length} entities for category "${category}":`, entityList.map((e: any) => e.label).join(", "));
 
          if (entityList.length === 0) {
             // No entities found → fallback to algorithmic
@@ -251,10 +249,14 @@ serve(async (req) => {
          } else {
             for (let i = 0; i < 7; i++) {
                const entity = entityList[i % entityList.length];
+               console.log(`[generate-match-questions] Round ${i}: entity="${entity?.label}" seed="${seed}-${i}"`);
                questions.push(generateQuestion(`${seed}-${i}`, entity, entityList));
             }
          }
       }
+
+      // Log generated questions for debugging
+      console.log("[generate-match-questions] Generated questions:", JSON.stringify(questions.map((q: any) => ({ question: q.question, answer: q.answer }))));
 
       // Encrypt and persist
       const plaintext = JSON.stringify(questions);
@@ -264,7 +266,7 @@ serve(async (req) => {
       const { error: updateError } = await supabaseClient
          .from("wordup_matches")
          .update({
-            encrypted_questions: encryptedQuestions,
+            questions: encryptedQuestions,
             encryption_key: encryptionKey,
             status: "countdown",
          })

@@ -1,5 +1,5 @@
 import { type QuizGenerator, type BaseQuestion, type EntitySeed } from "../../../types/generators";
-import { createSeededRandom, seededShuffle } from "../seededRandom";
+import { createSeededRandom, seededShuffle, hashSeed } from "../seededRandom";
 
 const ENTITIES: EntitySeed[] = [
    { id: "1", type: "history_milestones", label: "World War II", metadata: { year: 1939, endYear: 1945, era: "20th Century" }, difficulty: 1, tags: ["war"] },
@@ -31,7 +31,7 @@ export const historyMilestonesGenerator: QuizGenerator = {
       return category === "history_milestones";
    },
    generate(seed: string, entity?: EntitySeed): BaseQuestion {
-      const rng = createSeededRandom(seed.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+      const rng = createSeededRandom(hashSeed(seed));
       const idx = Math.floor(rng() * ENTITIES.length);
       const chosen = entity || ENTITIES[idx];
       const correct = chosen.label;

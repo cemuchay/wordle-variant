@@ -1,5 +1,5 @@
 import { type QuizGenerator, type BaseQuestion, type EntitySeed } from "../../../types/generators";
-import { createSeededRandom, seededShuffle } from "../seededRandom";
+import { createSeededRandom, seededShuffle, hashSeed } from "../seededRandom";
 
 const ENTITIES: EntitySeed[] = [
    { id: "1", type: "flag_bearer", label: "Nigeria", metadata: { colors: "Green, White, Green", stripes: 3, continent: "Africa" }, difficulty: 1, tags: ["africa"] },
@@ -31,7 +31,7 @@ export const flagBearerGenerator: QuizGenerator = {
       return category === "flag_bearer";
    },
    generate(seed: string, entity?: EntitySeed): BaseQuestion {
-      const rng = createSeededRandom(seed.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+      const rng = createSeededRandom(hashSeed(seed));
       const idx = Math.floor(rng() * ENTITIES.length);
       const chosen = entity || ENTITIES[idx];
       const correct = chosen.label;

@@ -1,5 +1,5 @@
 import { type QuizGenerator, type BaseQuestion, type EntitySeed } from "../../../types/generators";
-import { createSeededRandom, seededShuffle } from "../seededRandom";
+import { createSeededRandom, seededShuffle, hashSeed } from "../seededRandom";
 
 const ENTITIES: EntitySeed[] = [
    { id: "1", type: "capitals_clash", label: "Paris", metadata: { country: "France", continent: "Europe" }, difficulty: 1, tags: ["europe"] },
@@ -31,7 +31,7 @@ export const capitalsClashGenerator: QuizGenerator = {
       return category === "capitals_clash";
    },
    generate(seed: string, entity?: EntitySeed): BaseQuestion {
-      const rng = createSeededRandom(seed.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+      const rng = createSeededRandom(hashSeed(seed));
       const idx = Math.floor(rng() * ENTITIES.length);
       const chosen = entity || ENTITIES[idx];
       const correct = chosen.label;
