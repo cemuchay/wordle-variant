@@ -259,17 +259,17 @@ export const useWordUpAsyncGame = ({
 
          currentIdxRef.current = index;
 
-         cleanUpIntervals();
-         setCurrentIdx(index);
-         setSelectedAnswer(null);
-         setRevealAnswers(false);
+          cleanUpIntervals();
 
-         const q = questionsRef.current[index];
-         const duration = q ? getQuestionDuration(q.type) : 10.0;
+          const q = questionsRef.current[index];
+          const duration = q ? getQuestionDuration(q.type) : 10.0;
 
-         setMaxTime(duration);
-         setTimeLeft(duration);
-         isSubmittingAnswerRef.current = false;
+          setMaxTime(duration);
+          setTimeLeft(duration);
+          setCurrentIdx(index);
+          setSelectedAnswer(null);
+          setRevealAnswers(false);
+          isSubmittingAnswerRef.current = false;
 
          const startTime = getSyncedNow();
          let lastTicked = Math.ceil(duration) + 1;

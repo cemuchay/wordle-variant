@@ -809,28 +809,42 @@ export const generateOddOneOutQuestion = (
 
 const generateSynonymMatch = (): WordUpQuestion => {
    const themeKeys = Object.keys(THEME_GROUPS);
-   const theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
-   const words = THEME_GROUPS[theme];
-   const correctWord = words[Math.floor(Math.random() * words.length)];
+
+   // Pick a theme with at least 2 words
+   let theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+   let words = THEME_GROUPS[theme];
+   let attempts = 0;
+   while (words.length < 2 && attempts < 20) {
+      attempts++;
+      theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+      words = THEME_GROUPS[theme];
+   }
+
+   // Pick two DIFFERENT words from the same theme
+   const shuffled = shuffle(words);
+   const displayWord = shuffled[0];
+   const correctWord = shuffled[1];
 
    // Pick 3 distractors from other themes
    const choices = new Set<string>();
    choices.add(correctWord);
-   let attempts = 0;
-   while (choices.size < 4 && attempts < 100) {
-      attempts++;
+   let decoyAttempts = 0;
+   while (choices.size < 4 && decoyAttempts < 100) {
+      decoyAttempts++;
       const otherTheme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
       if (otherTheme === theme) continue;
       const otherWords = THEME_GROUPS[otherTheme];
       const pick = otherWords[Math.floor(Math.random() * otherWords.length)];
-      choices.add(pick);
+      if (pick !== displayWord) {
+         choices.add(pick);
+      }
    }
    while (choices.size < 4) {
       choices.add("UNKNOWN");
    }
    return {
       type: "synonym_match",
-      prompt: `Which word is related to ${correctWord}?`,
+      prompt: `Which word is related to ${displayWord}?`,
       choices: shuffle(Array.from(choices)),
       answer: correctWord,
    };
