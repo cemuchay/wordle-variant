@@ -1,7 +1,31 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { X, Search, Play } from "lucide-react";
+import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "../constants";
+import { safeLocalStorage } from "../../../../utils/storage";
+
+const RECENTS_KEY = "wordup_recent_categories";
+const MAX_RECENTS = 5;
+
+function loadRecents(): string[] {
+   try {
+      const raw = safeLocalStorage.getItem(RECENTS_KEY);
+      return raw ? JSON.parse(raw) : [];
+   } catch {
+      return [];
+   }
+}
+
+function saveRecents(ids: string[]) {
+   try {
+      safeLocalStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
+   } catch { /* ignore */ }
+}
+
+function pushRecent(ids: string[], id: string): string[] {
+   const filtered = ids.filter((i) => i !== id);
+   return [id, ...filtered].slice(0, MAX_RECENTS);
+}
 
 interface CategorySelectModalProps {
    isOpen: boolean;
@@ -19,6 +43,7 @@ export const CategorySelectModal = ({
    startMatchmaking
 }: CategorySelectModalProps) => {
    const [searchQuery, setSearchQuery] = useState("");
+   const [recents, setRecents] = useState<string[]>(() => loadRecents());
 
    if (!isOpen) return null;
 
@@ -32,7 +57,25 @@ export const CategorySelectModal = ({
    const gameTypeCats = filteredCategories.filter(c => c.type === "game_type");
    const proceduralCats = filteredCategories.filter(c => c.type === "procedural");
 
+   const recentCats = recents
+      .map((id) => CATEGORIES.find((c) => c.id === id))
+      .filter(Boolean) as typeof CATEGORIES;
+
+   const recordRecent = useCallback((id: string) => {
+      setRecents((prev) => {
+         const next = pushRecent(prev, id);
+         saveRecents(next);
+         return next;
+      });
+   }, []);
+
+   const handleCategoryClick = (id: string) => {
+      setCategory(id);
+      recordRecent(id);
+   };
+
    const handleSelectAndPlay = () => {
+      recordRecent(category);
       startMatchmaking();
       onClose();
    };
@@ -78,6 +121,34 @@ export const CategorySelectModal = ({
 
             {/* Scrollable List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scrollbar-hide">
+               {/* Recents (only when not searching) */}
+               {!searchQuery && recentCats.length > 0 && (
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1 flex items-center gap-1.5">
+                        <Clock size={11} /> Recents
+                     </p>
+                     <div className="flex flex-wrap gap-2">
+                        {recentCats.map((cat) => {
+                           const isSel = category === cat.id;
+                           return (
+                              <button
+                                 key={cat.id}
+                                 onClick={() => handleCategoryClick(cat.id)}
+                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                    isSel
+                                       ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white"
+                                 }`}
+                              >
+                                 <Clock size={10} className={isSel ? "text-amber-400" : "text-gray-600"} />
+                                 {cat.name}
+                              </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+               )}
+
                {/* Mixed / Quick Match */}
                {generalCats.length > 0 && (
                   <div className="space-y-2">
@@ -88,7 +159,7 @@ export const CategorySelectModal = ({
                            return (
                               <button
                                  key={cat.id}
-                                 onClick={() => setCategory(cat.id)}
+                                 onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
                                        ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
@@ -117,7 +188,7 @@ export const CategorySelectModal = ({
                            return (
                               <button
                                  key={cat.id}
-                                 onClick={() => setCategory(cat.id)}
+                                 onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
                                        ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
@@ -146,7 +217,7 @@ export const CategorySelectModal = ({
                            return (
                               <button
                                  key={cat.id}
-                                 onClick={() => setCategory(cat.id)}
+                                 onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
                                        ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
@@ -175,7 +246,7 @@ export const CategorySelectModal = ({
                            return (
                               <button
                                  key={cat.id}
-                                 onClick={() => setCategory(cat.id)}
+                                 onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                                     isSel
                                        ? "bg-cyan-500/10 border-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)]"

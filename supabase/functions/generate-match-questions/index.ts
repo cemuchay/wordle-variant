@@ -119,7 +119,7 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
-   const difficulty = entity?.difficulty || 3; // 1-5 scale
+   const difficulty = entity?.difficulty || 3;
 
    if (!entity || allEntities.length < 2) {
       return {
@@ -130,77 +130,132 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
       };
    }
 
-   // Score keys and pick the best one
    const scores = scoreKeys(allEntities);
    const key = pickBestKey(scores, rng);
 
    if (!key) {
       const distractors = seededShuffle(
-         allEntities.filter((e) => e.label !== label).map((e) => e.label),
-         rng,
+         allEntities.filter((e) => e.label !== label).map((e) => e.label), rng,
       ).slice(0, 3);
       const choices = seededShuffle([label, ...distractors], rng);
       return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label };
    }
 
    const correctValue = String(meta[key] ?? "");
+   const keyLabel = key.replace(/_/g, " ");
 
-   // Other entities' values for this key (forward distractors)
+   // Shared helpers
    const otherValues = allEntities
       .filter((e) => e.id !== entity?.id)
       .map((e) => String(e.metadata?.[key] ?? ""))
       .filter((v) => v && v !== correctValue);
-   const uniqueOtherValues = [...new Set(otherValues)].sort(() => rng() - 0.5).slice(0, 3);
+   const uniqueOtherValues = [...new Set(otherValues)];
 
-   // Entities with a DIFFERENT value for this key (reverse distractors)
    const entitiesWithDifferentValue = allEntities
       .filter((e) => e.id !== entity?.id && String(e.metadata?.[key] ?? "") !== correctValue)
       .map((e) => e.label)
       .filter((l) => l);
 
-   // Difficulty-based question variant selection
-   // Easy (1-2): forward only — recall a known fact
-   // Medium (3): random forward/reverse
-   // Hard (4-5): reverse only — infer from a value back to the entity
-   let useReverse: boolean;
-   if (difficulty <= 2) {
-      useReverse = false;
-   } else if (difficulty >= 4) {
-      useReverse = true;
-   } else {
-      useReverse = Math.floor(rng() * 2) === 0;
-   }
+   // Pick a question variant based on data availability + rng
+   const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
+   const variant = Math.floor(rng() * 6); // 0-5
 
-   if (useReverse && entitiesWithDifferentValue.length >= 3) {
-      const choices = seededShuffle([label, ...seededShuffle(entitiesWithDifferentValue, rng).slice(0, 3)], rng);
+   // ── Variant 0: Forward ──────────────────────────────────
+   if (variant === 0 || uniqueOtherValues.length < 1) {
+      const distractors = uniqueOtherValues.length >= 3
+         ? seededShuffle(uniqueOtherValues, rng).slice(0, 3)
+         : seededShuffle(otherValues.concat(["Unknown", "None", "All"]), rng).slice(0, 3);
       return {
          type: "definition",
-         prompt: `"${correctValue}" is the ${key.replace(/_/g, " ")} of which option?`,
-         choices,
+         prompt: `What is the ${keyLabel} of ${label}?`,
+         choices: seededShuffle([correctValue, ...distractors], rng),
+         answer: correctValue,
+      };
+   }
+
+   // ── Variant 1: Reverse ──────────────────────────────────
+   if (variant === 1 && entitiesWithDifferentValue.length >= 3) {
+      return {
+         type: "definition",
+         prompt: `"${correctValue}" is the ${keyLabel} of which option?`,
+         choices: seededShuffle([label, ...seededShuffle(entitiesWithDifferentValue, rng).slice(0, 3)], rng),
          answer: label,
       };
    }
 
-   // Forward
-   const distractors = uniqueOtherValues.length >= 3
-      ? uniqueOtherValues
-      : otherValues.concat(["Unknown", "None", "All"]).sort(() => rng() - 0.5).slice(0, 3);
+   // ── Variant 2: Odd one out ─────────────────────────────
+   if (variant === 2 && uniqueOtherValues.length >= 1) {
+      const valueCounts = new Map<string, { count: number; labels: string[] }>();
+      for (const e of allEntities) {
+         if (e.id === entity?.id) continue;
+         const v = String(e.metadata?.[key] ?? "");
+         if (!v) continue;
+         if (!valueCounts.has(v)) valueCounts.set(v, { count: 0, labels: [] });
+         const entry = valueCounts.get(v)!;
+         entry.count++;
+         entry.labels.push(e.label);
+      }
+      const shared = Array.from(valueCounts.entries())
+         .filter(([, info]) => info.count >= 3 && info.labels.length >= 3)
+         .sort(() => rng() - 0.5);
+      if (shared.length > 0) {
+         const [sharedValue, info] = shared[0];
+         return {
+            type: "definition",
+            prompt: `Which ${keyLabel} is different from the others?`,
+            choices: seededShuffle([...seededShuffle(info.labels, rng).slice(0, 3), label], rng),
+            answer: label,
+            subPrompt: `The others have ${keyLabel} "${sharedValue}".`,
+         };
+      }
+   }
 
-   const choices = seededShuffle([correctValue, ...distractors], rng);
+   // ── Variant 3: True/False ─────────────────────────────
+   if (variant === 3 && uniqueOtherValues.length >= 1) {
+      const isTrue = Math.floor(rng() * 2) === 0;
+      const displayedValue = isTrue ? correctValue : seededShuffle(uniqueOtherValues, rng)[0];
+      return {
+         type: "definition",
+         prompt: `True or false: ${label} has ${keyLabel} "${displayedValue}".`,
+         choices: ["True", "False"],
+         answer: isTrue ? "True" : "False",
+      };
+   }
+
+   // ── Variant 4: Multi-clue (What am I?) ────────────────
+   // Show 2-3 metadata clues, player identifies the entity
+   if (variant === 4 && metaKeys.length >= 2 && entitiesWithDifferentValue.length >= 3) {
+      const clueKeys = seededShuffle(metaKeys, rng).slice(0, Math.min(3, metaKeys.length));
+      const clues = clueKeys.map((k: string) => {
+         const v = String(meta[k] ?? "");
+         return `${k.replace(/_/g, " ")}: ${v}`;
+      }).join(" | ");
+      return {
+         type: "definition",
+         prompt: `${clues} — what does this describe?`,
+         choices: seededShuffle([label, ...seededShuffle(entitiesWithDifferentValue, rng).slice(0, 3)], rng),
+         answer: label,
+      };
+   }
+
+   // ── Variant 5: Correct the error ──────────────────────
+   // Statement with a wrong value; pick the correct one
+   if (variant === 5 && uniqueOtherValues.length >= 3) {
+      const wrongValue = seededShuffle(uniqueOtherValues, rng)[0];
+      return {
+         type: "definition",
+         prompt: `Fix the error: ${label} has ${keyLabel} "${wrongValue}". What is the correct ${keyLabel}?`,
+         choices: seededShuffle([correctValue, ...seededShuffle(uniqueOtherValues, rng).slice(0, 3)], rng),
+         answer: correctValue,
+      };
+   }
+
+   // Fallback: forward
+   const distractors = seededShuffle(uniqueOtherValues.concat(["Unknown", "None", "All"]), rng).slice(0, 3);
    return {
       type: "definition",
-      prompt: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
-      choices,
-      answer: correctValue,
-   };
- }
-      : otherValues.concat(["Unknown", "None", "All"]).sort(() => rng() - 0.5).slice(0, 3);
-
-   const choices = seededShuffle([correctValue, ...distractors], rng);
-   return {
-      type: "definition",
-      prompt: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
-      choices,
+      prompt: `What is the ${keyLabel} of ${label}?`,
+      choices: seededShuffle([correctValue, ...distractors], rng),
       answer: correctValue,
    };
  }
