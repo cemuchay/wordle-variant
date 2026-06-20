@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatTime } from "./lib";
 import { parseMarathonGames } from "../../utils/marathon";
+import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 
 export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
   return (
@@ -425,24 +426,13 @@ export const ChallengeItem = memo(function ChallengeItem({
               <div className="flex items-center gap-1 mb-1">
                 <div className="flex -space-x-2 overflow-hidden">
                   {opponents.slice(0, 3).map((p: any) => (
-                    <div
+                    <ProtectedAvatar
                       key={p.id}
-                      className="inline-block h-5 w-5 rounded-full ring-2 ring-black bg-white/5 overflow-hidden"
-                    >
-                      {p.profiles?.avatar_url ? (
-                        <img
-                          src={p.profiles.avatar_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-[7px] font-black uppercase text-white bg-white/10 ring-1 ring-white/20">
-                          {p.profiles?.username
-                            ?.substring(0, 2)
-                            .toUpperCase() || "??"}
-                        </div>
-                      )}
-                    </div>
+                      userId={p.user_id}
+                      src={p.profiles?.avatar_url}
+                      username={p.profiles?.username}
+                      className="inline-block h-5 w-5 rounded-full ring-2 ring-black bg-white/5 shrink-0"
+                    />
                   ))}
                 </div>
                 {opponents.length > 3 && (

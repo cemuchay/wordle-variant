@@ -54,9 +54,12 @@ export const useGameEngine = (date: string) => {
    });
 
    // Hydration & Authentication Swap Logic
+   const [rehydrateTrigger, setRehydrateTrigger] = useState(0);
+   const lastProcessedTriggerRef = useRef(0);
+
    useEffect(() => {
       const handleRehydrate = () => {
-         setIsHydrated(false);
+         setRehydrateTrigger(prev => prev + 1);
       };
       window.addEventListener("app-visibility-visible", handleRehydrate);
       return () =>
@@ -70,15 +73,22 @@ export const useGameEngine = (date: string) => {
          return;
       }
 
+      const isUserOrDateChanged = hydratedUserRef.current !== user?.id || hydratedDateRef.current !== date;
+      const isTriggeredByVisibility = rehydrateTrigger !== lastProcessedTriggerRef.current;
+      lastProcessedTriggerRef.current = rehydrateTrigger;
+
       if (
          isHydrated &&
-         hydratedUserRef.current === user?.id &&
-         hydratedDateRef.current === date
+         !isUserOrDateChanged &&
+         !isTriggeredByVisibility
       ) {
          return;
       }
 
-      setIsHydrated(false);
+      if (isUserOrDateChanged || !isHydrated) {
+         setIsHydrated(false);
+      }
+
       hydratedUserRef.current = user?.id;
       hydratedDateRef.current = date;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
@@ -239,6 +249,7 @@ export const useGameEngine = (date: string) => {
       performSync,
       loadFromCloud,
       isHydrated,
+      rehydrateTrigger,
    ]);
 
    const letterStatuses = useMemo(

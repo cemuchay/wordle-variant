@@ -5,6 +5,7 @@ import { type ChallengeMessage } from "../../hooks/useChallengeChat";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useConfirmation } from "../../hooks/useConfirmation";
 import { useAppStore } from "../../store/useAppStore";
+import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 
 interface ChallengeChatProps {
   messages: ChallengeMessage[];
@@ -263,23 +264,18 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
       >
         {/* Sender profile header inside the bubble container */}
         <div className={`flex items-center gap-1.5 mb-1.5 justify-start text-left`}>
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform"
-              alt="avatar"
-              onClick={(e) => {
-                if (msg.sender_id) {
-                  e.stopPropagation();
-                  window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.sender_id } }));
-                }
-              }}
-            />
-          ) : (
-            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[7px] font-black uppercase text-white">
-              {msg.sender_name?.substring(0, 2) || "??"}
-            </div>
-          )}
+          <ProtectedAvatar
+            userId={msg.sender_id || undefined}
+            src={avatarUrl || undefined}
+            username={msg.sender_name || undefined}
+            className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform"
+            onClick={(e) => {
+              if (msg.sender_id) {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: msg.sender_id } }));
+              }
+            }}
+          />
           <span
             className="text-[9px] font-black uppercase tracking-wider cursor-pointer hover:underline text-left"
             style={{
@@ -389,13 +385,12 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
                       return (
                         <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
                           <div className="flex items-center gap-2 min-w-0">
-                            {avatar ? (
-                              <img src={avatar} className="w-4 h-4 rounded-full shrink-0" alt="avatar" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-[7px] font-black uppercase text-white shrink-0">
-                                {username.substring(0, 2)}
-                              </div>
-                            )}
+                            <ProtectedAvatar
+                              userId={uid}
+                              src={avatar}
+                              username={username}
+                              className="w-4 h-4 rounded-full shrink-0"
+                            />
                             <span className="text-[10px] font-black text-white truncate">
                               {uid === currentUserId ? 'You' : username}
                             </span>

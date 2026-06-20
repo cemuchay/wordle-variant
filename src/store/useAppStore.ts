@@ -10,6 +10,7 @@ interface UserPreferences {
    theme: "dark" | "light";
    compactMode: boolean;
    navOrder: string[];
+   rememberLastView: boolean;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -17,6 +18,7 @@ const defaultPreferences: UserPreferences = {
    theme: "dark",
    compactMode: false,
    navOrder: ["play", "chat", "leaderboard", "challenges", "wordup"],
+   rememberLastView: false,
 };
 
 const INITIAL_STATS: GameStats = {
@@ -315,6 +317,8 @@ interface AppState {
             isWeeklyWrappedOpen: state.isWeeklyWrappedOpen,
             showNotifications: state.showNotifications,
             statsActiveTab: state.statsActiveTab,
+            pendingDMUserId: state.pendingDMUserId,
+            pendingChatGroupId: state.pendingChatGroupId,
          }),
       },
    ),

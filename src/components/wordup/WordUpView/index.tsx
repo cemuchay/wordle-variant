@@ -11,7 +11,7 @@ import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
 import { Swords } from "lucide-react";
 
-import { decryptQuestions } from "../../../utils/wordupQuestionGenerator";
+import { decryptMatchQuestions } from "../../../utils/wordupQuestionGenerator";
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -216,7 +216,7 @@ export const WordUpView = () => {
              setView("battle");
 
              // Set match status to active in database (only for real-time matches)
-             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting") {
+             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
                 supabase
                    .from("wordup_matches")
                    .update({ status: "active" })
@@ -356,7 +356,7 @@ export const WordUpView = () => {
       setView("menu");
    }, [cancelMatchmaking, setView]);
 
-   const handleSelectHistoryMatch = useCallback((match: any) => {
+   const handleSelectHistoryMatch = useCallback(async (match: any) => {
       if (!effectiveUser) return;
       try {
          const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
@@ -373,13 +373,11 @@ export const WordUpView = () => {
       setRole(myRole);
       setMatchData(match);
 
-      if (match.questions && match.encryption_key) {
-         try {
-            const dec = decryptQuestions(match.questions, match.encryption_key);
-            setQuestions(dec);
-         } catch (e) {
-            console.error("Failed to decrypt history match questions:", e);
-         }
+      try {
+         const dec = await decryptMatchQuestions(match);
+         setQuestions(dec);
+      } catch (e) {
+         console.error("Failed to decrypt history match questions:", e);
       }
       setView("gameover");
    }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);

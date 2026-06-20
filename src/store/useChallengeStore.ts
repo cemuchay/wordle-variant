@@ -8,13 +8,19 @@ export interface SavedChallengeView {
     challengeId: string | null;
     listColumn: 'active' | 'played' | 'expired' | 'open';
     marathonGameIndex: number | null;
+    previewParticipantId: string | null;
+    previewMarathonGameIndex: number | null;
+    searchQuery: string;
+    statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
+    modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
+    lengthFilter: 'ALL' | number;
+    activeTab: 'my' | 'create' | 'join';
 }
 
 interface ChallengeState {
     // UI & Navigation
     activeTab: 'my' | 'create' | 'join';
     isPlaying: boolean;
-    rememberLastView: boolean;
     joinId: string;
     previewParticipant: ChallengeParticipant | null;
     previewMarathonLength: number | null;
@@ -44,7 +50,6 @@ interface ChallengeState {
     // Actions
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
     setIsPlaying: (playing: boolean) => void;
-    setRememberLastView: (remember: boolean) => void;
     setJoinId: (id: string) => void;
     setPreviewParticipant: (p: ChallengeParticipant | null) => void;
     setPreviewMarathonLength: (l: number | null) => void;
@@ -73,7 +78,6 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     // Initial State
     activeTab: 'my',
     isPlaying: false,
-    rememberLastView: true,
     joinId: '',
     previewParticipant: null,
     previewMarathonLength: null,
@@ -97,7 +101,6 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     // Actions
     setActiveTab: (activeTab) => set({ activeTab }),
     setIsPlaying: (isPlaying) => set({ isPlaying }),
-    setRememberLastView: (rememberLastView) => set({ rememberLastView }),
     setJoinId: (joinId) => set({ joinId }),
     setPreviewParticipant: (previewParticipant) => set({ previewParticipant }),
     setPreviewMarathonLength: (previewMarathonLength) => set({ previewMarathonLength }),

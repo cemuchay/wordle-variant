@@ -14,27 +14,92 @@ export interface WordUpQuestion {
       | "pattern"
       | "math"
       | "odd_one_out"
-       | "vowel_drop"
-       | "rhyme_match"
-       | "letter_count"
-       | "word_ladder"
-       | "synonym_match"
-       | "word_chain"
-       | "letter_shift"
-       | "compound_break"
-       | "word_within"
-       | "cryptogram"
-       | "category_sort"
-       | "letter_add_remove";
+      | "vowel_drop"
+      | "rhyme_match"
+      | "letter_count"
+      | "word_ladder"
+      | "synonym_match"
+      | "word_chain"
+      | "letter_shift"
+      | "compound_break"
+      | "word_within"
+      | "cryptogram"
+      | "category_sort"
+      | "letter_add_remove";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
    answer: string;
+   imageUrl?: string; // Optional URL pointing to the Supabase Storage bucket asset
 }
 
+export const getQuestionImageUrl = (path: string): string => {
+   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+   return `${supabaseUrl}/storage/v1/object/public/wordup-questions/${path}`;
+};
+
 // -------------------------------------------------------------
-// 1. Encryption / Decryption Helpers (XOR Base64)
+// 1. Encryption / Decryption Helpers
 // -------------------------------------------------------------
+
+// AES-GCM decryption for edge function payloads
+export async function decryptAESGCM(
+   encryptedBase64: string,
+   base64Key: string,
+): Promise<string> {
+   const rawKey = Uint8Array.from(atob(base64Key), (c) => c.charCodeAt(0));
+   const key = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"],
+   );
+   const combined = Uint8Array.from(atob(encryptedBase64), (c) =>
+      c.charCodeAt(0),
+   );
+   const iv = combined.slice(0, 12);
+   const data = combined.slice(12);
+   const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      data,
+   );
+   return new TextDecoder().decode(decrypted);
+}
+
+// Unified decryption: tries AES-GCM first (edge function), falls back to XOR (legacy)
+export async function decryptMatchQuestions(match: {
+   encrypted_questions?: string;
+   questions?: string;
+   encryption_key: string;
+}): Promise<WordUpQuestion[]> {
+   const key = match.encryption_key;
+   if (!key) throw new Error("No encryption key found on match");
+
+   // Try the raw encrypted payload (if edge function wrote to a separate column)
+   if (match.encrypted_questions) {
+      try {
+         const plain = await decryptAESGCM(match.encrypted_questions, key);
+         return JSON.parse(plain);
+      } catch (e) {
+         console.warn("AES-GCM on encrypted_questions failed:", e);
+      }
+   }
+
+   if (match.questions) {
+      try {
+         const plain = await decryptAESGCM(match.questions, key);
+         return JSON.parse(plain);
+      } catch {
+         return decryptQuestions(match.questions, key);
+      }
+   }
+
+   throw new Error("No encrypted questions found on match");
+}
+
+// XOR Base64 (legacy client-side encryption)
 
 export const generateSecretKey = (): string => {
    const chars =
@@ -327,20 +392,159 @@ const DEFINITIONS: Record<string, string> = {
 // 2b. Thematic Groups (for synonym_match + category_sort)
 // -------------------------------------------------------------
 const THEME_GROUPS: Record<string, string[]> = {
-   MEDICAL: ["DOCTOR", "NURSE", "DENTIST", "CHEMIST", "HOSPITAL", "CLINIC", "PHARMACY", "AMBULANCE"],
-   EDUCATION: ["TEACHER", "STUDENT", "LECTURER", "HEADMASTER", "SCHOOL", "COLLEGE", "CLASSROOM", "CAMPUS", "LIBRARY", "NOTEBOOK"],
-   FOOD: ["BREAD", "CHEESE", "APPLE", "BANANA", "COFFEE", "CHICKEN", "BAKER", "CHEF", "WAITER", "GROCERY", "YAM", "CASSAVA", "OKRA", "PEPPER", "JOLLOF", "PLANTAIN", "MOIMOI", "AKARA", "SUYA"],
-   TRANSPORT: ["PILOT", "DRIVER", "CAPTAIN", "BICYCLE", "AIRPORT", "RUNWAY", "AIRLINE", "HIGHWAY", "BRIDGE", "TRAFFIC"],
+   MEDICAL: [
+      "DOCTOR",
+      "NURSE",
+      "DENTIST",
+      "CHEMIST",
+      "HOSPITAL",
+      "CLINIC",
+      "PHARMACY",
+      "AMBULANCE",
+   ],
+   EDUCATION: [
+      "TEACHER",
+      "STUDENT",
+      "LECTURER",
+      "HEADMASTER",
+      "SCHOOL",
+      "COLLEGE",
+      "CLASSROOM",
+      "CAMPUS",
+      "LIBRARY",
+      "NOTEBOOK",
+   ],
+   FOOD: [
+      "BREAD",
+      "CHEESE",
+      "APPLE",
+      "BANANA",
+      "COFFEE",
+      "CHICKEN",
+      "BAKER",
+      "CHEF",
+      "WAITER",
+      "GROCERY",
+      "YAM",
+      "CASSAVA",
+      "OKRA",
+      "PEPPER",
+      "JOLLOF",
+      "PLANTAIN",
+      "MOIMOI",
+      "AKARA",
+      "SUYA",
+   ],
+   TRANSPORT: [
+      "PILOT",
+      "DRIVER",
+      "CAPTAIN",
+      "BICYCLE",
+      "AIRPORT",
+      "RUNWAY",
+      "AIRLINE",
+      "HIGHWAY",
+      "BRIDGE",
+      "TRAFFIC",
+   ],
    CREATIVE: ["AUTHOR", "POET", "ARTIST", "MUSICIAN", "ACTOR", "JOURNALIST"],
    JUSTICE: ["LAWYER", "POLICE", "COURT", "JUSTICE", "CONTRACT"],
-   NATURE: ["OCEAN", "MOUNTAIN", "VOLCANO", "DESERT", "LAGOON", "SUNSHINE", "RAINFALL", "CLIMATE", "DROUGHT", "ECLIPSE", "ICEBERG"],
-   CLOTHING: ["UNIFORM", "SANDALS", "SLIPPERS", "APRON", "JACKET", "HELMET", "GLASSES", "JEWELRY"],
-   TECHNOLOGY: ["COMPUTER", "KEYBOARD", "MONITOR", "PRINTER", "INTERNET", "CAMERA", "TELEPHONE", "BATTERY", "CHARGER", "GENERATOR"],
-   FINANCE: ["BANKER", "ACCOUNTANT", "CASHIER", "BANKING", "FINANCE", "INVOICE"],
-   HOME: ["FAMILY", "COUSIN", "UNCLE", "AUNT", "GRANDMOTHER", "GRANDFATHER", "NEIGHBOR", "LANDLORD", "TENANT", "FURNITURE"],
-   BUILDING: ["SCHOOL", "HOSPITAL", "CHURCH", "MOSQUE", "LIBRARY", "AIRPORT", "FACTORY", "GARAGE", "HOSTEL", "KIOSK", "MARKET"],
+   NATURE: [
+      "OCEAN",
+      "MOUNTAIN",
+      "VOLCANO",
+      "DESERT",
+      "LAGOON",
+      "SUNSHINE",
+      "RAINFALL",
+      "CLIMATE",
+      "DROUGHT",
+      "ECLIPSE",
+      "ICEBERG",
+   ],
+   CLOTHING: [
+      "UNIFORM",
+      "SANDALS",
+      "SLIPPERS",
+      "APRON",
+      "JACKET",
+      "HELMET",
+      "GLASSES",
+      "JEWELRY",
+   ],
+   TECHNOLOGY: [
+      "COMPUTER",
+      "KEYBOARD",
+      "MONITOR",
+      "PRINTER",
+      "INTERNET",
+      "CAMERA",
+      "TELEPHONE",
+      "BATTERY",
+      "CHARGER",
+      "GENERATOR",
+   ],
+   FINANCE: [
+      "BANKER",
+      "ACCOUNTANT",
+      "CASHIER",
+      "BANKING",
+      "FINANCE",
+      "INVOICE",
+   ],
+   HOME: [
+      "FAMILY",
+      "COUSIN",
+      "UNCLE",
+      "AUNT",
+      "GRANDMOTHER",
+      "GRANDFATHER",
+      "NEIGHBOR",
+      "LANDLORD",
+      "TENANT",
+      "FURNITURE",
+   ],
+   BUILDING: [
+      "SCHOOL",
+      "HOSPITAL",
+      "CHURCH",
+      "MOSQUE",
+      "LIBRARY",
+      "AIRPORT",
+      "FACTORY",
+      "GARAGE",
+      "HOSTEL",
+      "KIOSK",
+      "MARKET",
+   ],
    SPORTS: ["FOOTBALL", "ATHLETE", "CYCLIST", "BASKET", "BALLOON"],
-   PROFESSION: ["DOCTOR", "NURSE", "TEACHER", "LAWYER", "ENGINEER", "SCIENTIST", "ARTIST", "MUSICIAN", "ACTOR", "PILOT", "CAPTAIN", "CARPENTER", "MECHANIC", "TAILOR", "BARBER", "FARMER", "BAKER", "CHEF", "JANITOR", "HUNTER", "FISHERMAN", "GARDENER", "SOLDIER", "FIREMAN", "CLERK"],
+   PROFESSION: [
+      "DOCTOR",
+      "NURSE",
+      "TEACHER",
+      "LAWYER",
+      "ENGINEER",
+      "SCIENTIST",
+      "ARTIST",
+      "MUSICIAN",
+      "ACTOR",
+      "PILOT",
+      "CAPTAIN",
+      "CARPENTER",
+      "MECHANIC",
+      "TAILOR",
+      "BARBER",
+      "FARMER",
+      "BAKER",
+      "CHEF",
+      "JANITOR",
+      "HUNTER",
+      "FISHERMAN",
+      "GARDENER",
+      "SOLDIER",
+      "FIREMAN",
+      "CLERK",
+   ],
 };
 
 // -------------------------------------------------------------
@@ -831,7 +1035,8 @@ const generateSynonymMatch = (): WordUpQuestion => {
    let decoyAttempts = 0;
    while (choices.size < 4 && decoyAttempts < 100) {
       decoyAttempts++;
-      const otherTheme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+      const otherTheme =
+         themeKeys[Math.floor(Math.random() * themeKeys.length)];
       if (otherTheme === theme) continue;
       const otherWords = THEME_GROUPS[otherTheme];
       const pick = otherWords[Math.floor(Math.random() * otherWords.length)];
@@ -851,7 +1056,8 @@ const generateSynonymMatch = (): WordUpQuestion => {
 };
 
 const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
-   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const length =
+      allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official } = getWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
    const suffix = word.substring(word.length - 2);
@@ -860,10 +1066,12 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
    const candidates: string[] = [];
    for (const len of allowedLengths) {
       const list = getWordLists(len).official;
-      candidates.push(...list.filter((w) => w.startsWith(suffix) && w !== word));
+      candidates.push(
+         ...list.filter((w) => w.startsWith(suffix) && w !== word),
+      );
    }
 
-   let correct = "";
+   let correct;
    let fallbackWord = word;
    let fallbackSuffix = suffix;
    let attempts = 0;
@@ -873,7 +1081,11 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
       fallbackSuffix = fallbackWord.substring(fallbackWord.length - 2);
       for (const len of allowedLengths) {
          const list = getWordLists(len).official;
-         candidates.push(...list.filter((w) => w.startsWith(fallbackSuffix) && w !== fallbackWord));
+         candidates.push(
+            ...list.filter(
+               (w) => w.startsWith(fallbackSuffix) && w !== fallbackWord,
+            ),
+         );
       }
    }
    if (candidates.length > 0) {
@@ -887,7 +1099,8 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
    let decoyAttempts = 0;
    while (choices.size < 4 && decoyAttempts < 100) {
       decoyAttempts++;
-      const len = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+      const len =
+         allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
       const list = getWordLists(len).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       if (!dummy.startsWith(fallbackSuffix)) {
@@ -907,7 +1120,8 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
 };
 
 const generateLetterShift = (allowedLengths: number[]): WordUpQuestion => {
-   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const length =
+      allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = getWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
    const shift = rand(1, 3);
@@ -942,7 +1156,8 @@ const generateLetterShift = (allowedLengths: number[]): WordUpQuestion => {
 };
 
 const generateCompoundBreak = (): WordUpQuestion => {
-   const entry = COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
+   const entry =
+      COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
    const [compound, partA, partB] = entry;
    const askForA = Math.random() > 0.5;
 
@@ -954,7 +1169,8 @@ const generateCompoundBreak = (): WordUpQuestion => {
    let attempts = 0;
    while (choices.size < 4 && attempts < 50) {
       attempts++;
-      const other = COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
+      const other =
+         COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
       const candidate = askForA ? other[1] : other[2];
       if (candidate !== correct) {
          choices.add(candidate);
@@ -998,7 +1214,7 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
       }
    }
 
-   let correct = "";
+   let correct;
    let fallbackWord = longWord;
    let fallbackAttempts = 0;
    while (subCandidates.length === 0 && fallbackAttempts < 20) {
@@ -1024,7 +1240,8 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
    let attempts = 0;
    while (choices.size < 4 && attempts < 100) {
       attempts++;
-      const slen = shortLengths[Math.floor(Math.random() * shortLengths.length)];
+      const slen =
+         shortLengths[Math.floor(Math.random() * shortLengths.length)];
       const list = getWordLists(slen).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       if (dummy !== correct && !fallbackWord.includes(dummy)) {
@@ -1043,7 +1260,8 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
 };
 
 const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
-   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const length =
+      allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = getWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
 
@@ -1104,7 +1322,8 @@ const generateCategorySort = (): WordUpQuestion => {
 };
 
 const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
-   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const length =
+      allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = getWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
 
@@ -1142,28 +1361,32 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
       retries++;
       // Try a different word
       const newWord = official[Math.floor(Math.random() * official.length)];
-      const newPair = useRemove ? (() => {
-         for (let i = 0; i < newWord.length; i++) {
-            const candidate = newWord.substring(0, i) + newWord.substring(i + 1);
-            if (candidate.length >= 3 && valid.has(candidate)) {
-               return { base: newWord, result: candidate };
-            }
-         }
-         return null;
-      })() : (() => {
-         const maxLen = Math.max(...allowedLengths);
-         if (newWord.length >= maxLen) return null;
-         for (let i = 0; i <= newWord.length; i++) {
-            for (let c = 65; c <= 90; c++) {
-               const letter = String.fromCharCode(c);
-               const candidate = newWord.substring(0, i) + letter + newWord.substring(i);
-               if (candidate.length <= 10 && valid.has(candidate)) {
-                  return { base: newWord, result: candidate };
-               }
-            }
-         }
-         return null;
-      })();
+      const newPair = useRemove
+         ? (() => {
+              for (let i = 0; i < newWord.length; i++) {
+                 const candidate =
+                    newWord.substring(0, i) + newWord.substring(i + 1);
+                 if (candidate.length >= 3 && valid.has(candidate)) {
+                    return { base: newWord, result: candidate };
+                 }
+              }
+              return null;
+           })()
+         : (() => {
+              const maxLen = Math.max(...allowedLengths);
+              if (newWord.length >= maxLen) return null;
+              for (let i = 0; i <= newWord.length; i++) {
+                 for (let c = 65; c <= 90; c++) {
+                    const letter = String.fromCharCode(c);
+                    const candidate =
+                       newWord.substring(0, i) + letter + newWord.substring(i);
+                    if (candidate.length <= 10 && valid.has(candidate)) {
+                       return { base: newWord, result: candidate };
+                    }
+                 }
+              }
+              return null;
+           })();
       if (newPair) pair = newPair;
    }
 
@@ -1191,7 +1414,8 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
    let attempts = 0;
    while (choices.size < 4 && attempts < 100) {
       attempts++;
-      const len = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+      const len =
+         allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
       const list = getWordLists(len).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       const diffLen = Math.abs(dummy.length - correctAnswer.length);
@@ -1212,12 +1436,30 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
 
 export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    const specificTypes: WordUpQuestion["type"][] = [
-      "real_fake", "length", "missing_letter", "reverse_wordle", "definition",
-      "anagram", "anagram_scrambled", "pattern", "math", "odd_one_out",
-      "vowel_drop", "rhyme_match", "letter_count", "word_ladder",
-      "synonym_match", "word_chain", "letter_shift", "compound_break",
-      "word_within", "cryptogram", "category_sort", "letter_add_remove"
+      "real_fake",
+      "length",
+      "missing_letter",
+      "reverse_wordle",
+      "definition",
+      "anagram",
+      "anagram_scrambled",
+      "pattern",
+      "math",
+      "odd_one_out",
+      "vowel_drop",
+      "rhyme_match",
+      "letter_count",
+      "word_ladder",
+      "synonym_match",
+      "word_chain",
+      "letter_shift",
+      "compound_break",
+      "word_within",
+      "cryptogram",
+      "category_sort",
+      "letter_add_remove",
    ];
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
    const isSpecificType = specificTypes.includes(category as any);
 
    // Determine word lengths to sample based on matchmaking category
@@ -1266,16 +1508,16 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "vowel_drop", weight: 0.8 },
          { type: "rhyme_match", weight: 0.8 },
          { type: "letter_count", weight: 0.8 },
-          { type: "word_ladder", weight: 0.8 },
-          { type: "synonym_match", weight: 0.8 },
-          { type: "word_chain", weight: 0.8 },
-          { type: "letter_shift", weight: 0.8 },
-          { type: "compound_break", weight: 0.7 },
-          { type: "word_within", weight: 0.8 },
-          { type: "cryptogram", weight: 0.7 },
-          { type: "category_sort", weight: 0.8 },
-          { type: "letter_add_remove", weight: 0.7 },
-       ];
+         { type: "word_ladder", weight: 0.8 },
+         { type: "synonym_match", weight: 0.8 },
+         { type: "word_chain", weight: 0.8 },
+         { type: "letter_shift", weight: 0.8 },
+         { type: "compound_break", weight: 0.7 },
+         { type: "word_within", weight: 0.8 },
+         { type: "cryptogram", weight: 0.7 },
+         { type: "category_sort", weight: 0.8 },
+         { type: "letter_add_remove", weight: 0.7 },
+      ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
          0,
@@ -1353,20 +1595,23 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 
          const choices = new Set<string>();
          choices.add(correctLetter);
-         
+
          let attempts = 0;
          while (choices.size < 4 && attempts < 200) {
             attempts++;
             const code = 65 + Math.floor(Math.random() * 26); // A-Z
             const candidateLetter = String.fromCharCode(code);
-            
-            const candidateWord = word.substring(0, missingIdx) + candidateLetter + word.substring(missingIdx + 1);
+
+            const candidateWord =
+               word.substring(0, missingIdx) +
+               candidateLetter +
+               word.substring(missingIdx + 1);
             if (candidateLetter !== correctLetter && valid.has(candidateWord)) {
                continue;
             }
             choices.add(candidateLetter);
          }
-         
+
          while (choices.size < 4) {
             const code = 65 + Math.floor(Math.random() * 26); // A-Z
             choices.add(String.fromCharCode(code));
@@ -1397,7 +1642,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          let attempts = 0;
          while (attempts < 150) {
             const coloredCount = (pattern.match(/🟩|🟨/g) || []).length;
-            const allGreen = (pattern.match(/🟩/g) || []).length === target.length;
+            const allGreen =
+               (pattern.match(/🟩/g) || []).length === target.length;
             if (coloredCount >= minColored && !allGreen) {
                break;
             }
@@ -1554,7 +1800,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          // type === "pattern"
          const word = randomWord();
          const wordLetters = Array.from(new Set(word.split("")));
-         const randomChar = wordLetters[Math.floor(Math.random() * wordLetters.length)];
+         const randomChar =
+            wordLetters[Math.floor(Math.random() * wordLetters.length)];
          const firstOccurIdx = word.indexOf(randomChar) + 1; // 1-based index
 
          const patternsList = [
@@ -1601,8 +1848,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             },
             {
                query: `First occurrence of '${randomChar}' is at position ${firstOccurIdx === 1 ? 2 : firstOccurIdx - 1}?`,
-               test: (w: string) => w.indexOf(randomChar) + 1 === (firstOccurIdx === 1 ? 2 : firstOccurIdx - 1),
-            }
+               test: (w: string) =>
+                  w.indexOf(randomChar) + 1 ===
+                  (firstOccurIdx === 1 ? 2 : firstOccurIdx - 1),
+            },
          ];
 
          const p =
@@ -1650,22 +1899,26 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          const suffix = word.substring(word.length - suffixLen);
 
          const rhymingWords = official.filter(
-            (w) => w.endsWith(suffix) && w !== word
+            (w) => w.endsWith(suffix) && w !== word,
          );
 
          let rhymingWord = "";
          if (rhymingWords.length > 0) {
-            rhymingWord = rhymingWords[Math.floor(Math.random() * rhymingWords.length)];
+            rhymingWord =
+               rhymingWords[Math.floor(Math.random() * rhymingWords.length)];
          } else {
             const allWords: string[] = [];
             for (let len = 3; len <= 8; len++) {
                allWords.push(...getWordLists(len).official);
             }
             const fallbackRhymes = allWords.filter(
-               (w) => w.endsWith(suffix) && w !== word
+               (w) => w.endsWith(suffix) && w !== word,
             );
             if (fallbackRhymes.length > 0) {
-               rhymingWord = fallbackRhymes[Math.floor(Math.random() * fallbackRhymes.length)];
+               rhymingWord =
+                  fallbackRhymes[
+                     Math.floor(Math.random() * fallbackRhymes.length)
+                  ];
             }
          }
 
@@ -1676,10 +1929,15 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             attempts++;
             currentWord = randomWord();
             const currSuffixLen = currentWord.length >= 5 ? 3 : 2;
-            const currSuffix = currentWord.substring(currentWord.length - currSuffixLen);
-            const currRhymes = official.filter((w) => w.endsWith(currSuffix) && w !== currentWord);
+            const currSuffix = currentWord.substring(
+               currentWord.length - currSuffixLen,
+            );
+            const currRhymes = official.filter(
+               (w) => w.endsWith(currSuffix) && w !== currentWord,
+            );
             if (currRhymes.length > 0) {
-               currentRhymingWord = currRhymes[Math.floor(Math.random() * currRhymes.length)];
+               currentRhymingWord =
+                  currRhymes[Math.floor(Math.random() * currRhymes.length)];
             }
          }
 
@@ -1692,7 +1950,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          choices.add(currentRhymingWord);
 
          let decoyAttempts = 0;
-         const currentSuffix = currentWord.substring(currentWord.length - (currentWord.length >= 5 ? 3 : 2));
+         const currentSuffix = currentWord.substring(
+            currentWord.length - (currentWord.length >= 5 ? 3 : 2),
+         );
          while (choices.size < 4 && decoyAttempts < 100) {
             decoyAttempts++;
             const dummy = randomWord();
@@ -1713,8 +1973,8 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       } else if (type === "letter_count") {
          const word = randomWord();
          const isVowelCount = Math.random() > 0.5;
-         let count = 0;
-         let prompt = "";
+         let count: number;
+         let prompt: string;
          if (isVowelCount) {
             count = (word.match(/[AEIOU]/g) || []).length;
             prompt = `How many vowels are in the word ${word}?`;
@@ -1747,8 +2007,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             answer: String(count),
          });
       } else if (type === "word_ladder") {
-         let word = randomWord();
-         const candidates = official.filter((w) => w.length === word.length && getDiffCount(word, w) === 1);
+         const word = randomWord();
+         const candidates = official.filter(
+            (w) => w.length === word.length && getDiffCount(word, w) === 1,
+         );
 
          let attempts = 0;
          let currentWord = word;
@@ -1756,15 +2018,30 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          while (currentCandidates.length === 0 && attempts < 50) {
             attempts++;
             currentWord = randomWord();
-            currentCandidates = official.filter((w) => w.length === currentWord.length && getDiffCount(currentWord, w) === 1);
+            currentCandidates = official.filter(
+               (w) =>
+                  w.length === currentWord.length &&
+                  getDiffCount(currentWord, w) === 1,
+            );
          }
 
          if (currentCandidates.length === 0) {
             currentWord = "CAT";
-            currentCandidates = ["BAT", "HAT", "RAT", "MAT", "COT", "CAN", "CAB"];
+            currentCandidates = [
+               "BAT",
+               "HAT",
+               "RAT",
+               "MAT",
+               "COT",
+               "CAN",
+               "CAB",
+            ];
          }
 
-         const correctWord = currentCandidates[Math.floor(Math.random() * currentCandidates.length)];
+         const correctWord =
+            currentCandidates[
+               Math.floor(Math.random() * currentCandidates.length)
+            ];
          const choices = new Set<string>();
          choices.add(correctWord);
 
@@ -1772,7 +2049,10 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          while (choices.size < 4 && decoyAttempts < 150) {
             decoyAttempts++;
             const dummy = randomWord();
-            if (dummy.length === currentWord.length && getDiffCount(currentWord, dummy) >= 2) {
+            if (
+               dummy.length === currentWord.length &&
+               getDiffCount(currentWord, dummy) >= 2
+            ) {
                choices.add(dummy);
             }
          }
@@ -1780,32 +2060,32 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             choices.add(randomWord());
          }
 
-          questions.push({
-             type: "word_ladder",
-             prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
-             choices: Array.from(choices).sort(() => Math.random() - 0.5),
-             answer: correctWord,
-          });
-       } else if (type === "synonym_match") {
-          questions.push(generateSynonymMatch());
-       } else if (type === "word_chain") {
-          questions.push(generateWordChain(allowedLengths));
-       } else if (type === "letter_shift") {
-          questions.push(generateLetterShift(allowedLengths));
-       } else if (type === "compound_break") {
-          questions.push(generateCompoundBreak());
-       } else if (type === "word_within") {
-          questions.push(generateWordWithin(allowedLengths));
-       } else if (type === "cryptogram") {
-          questions.push(generateCryptogram(allowedLengths));
-       } else if (type === "category_sort") {
-          questions.push(generateCategorySort());
-       } else if (type === "letter_add_remove") {
-          questions.push(generateLetterAddRemove(allowedLengths));
-       }
-    }
+         questions.push({
+            type: "word_ladder",
+            prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5),
+            answer: correctWord,
+         });
+      } else if (type === "synonym_match") {
+         questions.push(generateSynonymMatch());
+      } else if (type === "word_chain") {
+         questions.push(generateWordChain(allowedLengths));
+      } else if (type === "letter_shift") {
+         questions.push(generateLetterShift(allowedLengths));
+      } else if (type === "compound_break") {
+         questions.push(generateCompoundBreak());
+      } else if (type === "word_within") {
+         questions.push(generateWordWithin(allowedLengths));
+      } else if (type === "cryptogram") {
+         questions.push(generateCryptogram(allowedLengths));
+      } else if (type === "category_sort") {
+         questions.push(generateCategorySort());
+      } else if (type === "letter_add_remove") {
+         questions.push(generateLetterAddRemove(allowedLengths));
+      }
+   }
 
-    // Randomly shuffle choices for all generated questions to prevent fixed coherent positions
+   // Randomly shuffle choices for all generated questions to prevent fixed coherent positions
    questions.forEach((q) => {
       q.choices = [...q.choices].sort(() => Math.random() - 0.5);
    });
@@ -1825,7 +2105,7 @@ export interface BotProfile {
 
 export const BOT_PROFILES: Record<string, BotProfile> = {
    slow_thinker: {
-      name: "Sloths ",
+      name: "Sloths",
       accuracy: 0.6,
       minDelay: 6.0,
       maxDelay: 9.0,
@@ -1848,6 +2128,68 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
       accuracy: 1.0,
       minDelay: 0.5,
       maxDelay: 1.8,
+   },
+
+   // New bots
+   lagos_boy: {
+      name: "Lagos Boy",
+      accuracy: 0.78,
+      minDelay: 3.5,
+      maxDelay: 6.5,
+   },
+   jollof_brain: {
+      name: "Jollof Brain",
+      accuracy: 0.8,
+      minDelay: 3.0,
+      maxDelay: 6.0,
+   },
+   okada_rider: {
+      name: "Okada Rider",
+      accuracy: 0.82,
+      minDelay: 2.5,
+      maxDelay: 5.5,
+   },
+   naija_flash: {
+      name: "Naija Flash",
+      accuracy: 0.87,
+      minDelay: 2.0,
+      maxDelay: 4.5,
+   },
+   suya_thinker: {
+      name: "Suya Thinker",
+      accuracy: 0.74,
+      minDelay: 4.0,
+      maxDelay: 7.0,
+   },
+   pepper_soup: {
+      name: "Pepper Soup",
+      accuracy: 0.79,
+      minDelay: 3.2,
+      maxDelay: 6.2,
+   },
+   agbada_mode: {
+      name: "Agbada Mode",
+      accuracy: 0.83,
+      minDelay: 2.8,
+      maxDelay: 5.8,
+   },
+   street_king: {
+      name: "Street King",
+      accuracy: 0.81,
+      minDelay: 3.0,
+      maxDelay: 5.5,
+   },
+   ogbonge_mind: {
+      name: "Ogbonge Mind",
+      accuracy: 0.9,
+      minDelay: 1.8,
+      maxDelay: 4.0,
+   },
+   eko_flash: {
+      name: "Eko Flash",
+      accuracy: 0.86,
+      minDelay: 2.2,
+      maxDelay: 4.8,
    },
 };
 

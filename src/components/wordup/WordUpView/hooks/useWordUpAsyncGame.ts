@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -445,14 +445,12 @@ export const useWordUpAsyncGame = ({
 
          setMatchData(match);
 
-         if (match.questions && match.encryption_key) {
-            try {
-               const dec = decryptQuestions(match.questions, match.encryption_key);
-               setQuestions(dec);
-            } catch (e) {
-               console.error("Decrypt failed:", e);
-            }
-         }
+          try {
+             const dec = await decryptMatchQuestions(match);
+             setQuestions(dec);
+          } catch (e) {
+             console.error("Decrypt failed:", e);
+          }
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {

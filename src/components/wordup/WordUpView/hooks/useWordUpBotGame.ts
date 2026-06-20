@@ -3,7 +3,8 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -479,9 +480,8 @@ export const useWordUpBotGame = ({
 
          try {
             console.log("[WordUp Logs] Bot accepting rematch, generating new bot game...");
-            const rawQuestions = generateWordUpQuestions(match.category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+            const { generateMatchQuestions } = await import("../../../../services/wordup/questionService");
 
             const newMatch = await wordupNetworkGate.enqueue(
                "post",
@@ -496,10 +496,7 @@ export const useWordUpBotGame = ({
                         is_bot_match: true,
                         game_type: "live-bot",
                         bot_profile: match.bot_profile || "average",
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
                         status: "countdown",
-                        question_started_at: new Date(getSyncedNow()).toISOString(),
                      })
                      .select()
                      .single();
@@ -511,6 +508,9 @@ export const useWordUpBotGame = ({
 
             if (!newMatch) throw new Error("Failed to create bot rematch");
 
+            // Generate questions (edge function for procedural, local for legacy)
+            await generateMatchQuestions(newMatch.id, match.category);
+
             const myRole = "player1";
             onMatchFoundCallback(newMatch.id, myRole);
          } catch (e) {
@@ -518,7 +518,7 @@ export const useWordUpBotGame = ({
             triggerToast("Failed to initiate rematch.", 4000);
          }
       },
-      [getSyncedNow, triggerToast],
+      [triggerToast],
    );
 
    useEffect(() => {
@@ -549,19 +549,75 @@ export const useWordUpBotGame = ({
          if (mId.startsWith("bot-match-")) {
             const category = useWordUpStore.getState().category || "mixed";
             const botProfile = matchDataRef.current?.bot_profile || getRandomBotProfile();
+
+            // Procedural categories: create DB row + edge function for proper entities-based generation
+            if (isProceduralCategory(category)) {
+               let userId = "guest-player";
+               try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  userId = session?.user?.id || localStorage.getItem('wordle_anon_id') || "guest-player";
+               } catch (err) {
+                  console.warn("Failed to get session:", err);
+                  userId = localStorage.getItem('wordle_anon_id') || "guest-player";
+               }
+
+               const { data: newMatch, error: insertError } = await supabase
+                  .from("wordup_matches")
+                  .insert({
+                     category,
+                     player1_id: userId,
+                     player2_id: "00000000-0000-0000-0000-000000000b0b",
+                     is_bot_match: true,
+                     game_type: "live-bot",
+                     bot_profile: botProfile,
+                     status: "countdown",
+                  })
+                  .select()
+                  .single();
+
+               if (!insertError && newMatch) {
+                  const { generateMatchQuestions } = await import("../../../../services/wordup/questionService");
+                  await generateMatchQuestions(newMatch.id, category);
+
+                  const { data: loadedMatch } = await supabase
+                     .from("wordup_matches")
+                     .select("*")
+                     .eq("id", newMatch.id)
+                     .single();
+
+                  if (loadedMatch) {
+                     match = loadedMatch;
+                     setMatchData(match);
+                     try {
+                        const dec = await decryptMatchQuestions(match);
+                        setQuestions(dec);
+                     } catch (e) {
+                        console.error("Decrypt failed:", e);
+                     }
+                     setOpponentStats({
+                        rating: botProfile === "impossible" ? 2200 : botProfile === "master" ? 1800 : 1200,
+                        xp: 5000, games_played: 150, games_won: 95, games_lost: 50, games_tied: 5,
+                        rank_name: botProfile === "impossible" ? "Diamond" : "Gold",
+                     } as any);
+                     return match;
+                  }
+               }
+               console.warn("[WordUp Bot] DB bot match failed, falling back to local generation");
+            }
+
+            // Legacy / fallback path: generate entirely client-side
             const rawQuestions = generateWordUpQuestions(category);
-            
+            const secretKey = generateSecretKey();
+            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
             let userId = "guest-player";
             try {
                const { data: { session } } = await supabase.auth.getSession();
                userId = session?.user?.id || localStorage.getItem('wordle_anon_id') || "guest-player";
             } catch (err) {
-               console.warn("Failed to get session, fallback to guest:", err);
+               console.warn("Failed to get session:", err);
                userId = localStorage.getItem('wordle_anon_id') || "guest-player";
             }
-
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
             match = {
                id: mId,
@@ -573,14 +629,11 @@ export const useWordUpBotGame = ({
                bot_profile: botProfile,
                status: "countdown",
                current_question_index: 0,
-               p1_answers: [],
-               p2_answers: [],
-               p1_score: 0,
-               p2_score: 0,
-               p1_answered: false,
-               p2_answered: false,
+               p1_answers: [], p2_answers: [],
+               p1_score: 0, p2_score: 0,
+               p1_answered: false, p2_answered: false,
                questions: encryptedStr,
-               encryption_key: secretKey
+               encryption_key: secretKey,
             };
 
             setMatchData(match);
@@ -607,13 +660,11 @@ export const useWordUpBotGame = ({
 
             setMatchData(match);
 
-            if (match.questions && match.encryption_key) {
-               try {
-                  const dec = decryptQuestions(match.questions, match.encryption_key);
-                  setQuestions(dec);
-               } catch (e) {
-                  console.error("Decrypt failed:", e);
-               }
+            try {
+               const dec = await decryptMatchQuestions(match);
+               setQuestions(dec);
+            } catch (e) {
+               console.error("Decrypt failed:", e);
             }
          }
 

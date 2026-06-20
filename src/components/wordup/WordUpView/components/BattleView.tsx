@@ -1,13 +1,34 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { TargetAndTransition, Transition } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
+import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
+
+interface MatchData {
+   p1_score?: number;
+   p2_score?: number;
+   p1_answered?: boolean;
+   p2_answered?: boolean;
+   p1_answers?: { choice: string }[];
+   p2_answers?: { choice: string }[];
+   is_bot_match?: boolean;
+   bot_profile?: string;
+   player1_id?: string;
+   player2_id?: string;
+}
+
+interface PlayerProfile {
+   id?: string;
+   username?: string;
+   avatar_url?: string;
+}
 
 interface BattleViewProps {
    questions: WordUpQuestion[];
    currentIdx: number;
-   matchData: any;
+   matchData: MatchData | null;
    opponentStats: ProfileStats | null;
    timeLeft: number;
    maxTime: number;
@@ -15,7 +36,7 @@ interface BattleViewProps {
    revealAnswers: boolean;
    handleAnswerSelect: (choice: string) => void;
    role: "player1" | "player2" | null;
-   playerProfile: any | null;
+   playerProfile: PlayerProfile | null;
    sendQuickChat: (text: string) => void;
 }
 
@@ -28,12 +49,30 @@ const PREFILLED_MESSAGES = [
    "Close one! ⚡"
 ];
 
+interface Particle {
+   id: number;
+   targetX: number;
+   targetY: number;
+   size: number;
+   color: string;
+   rotation: number;
+   shape: string;
+   duration: number;
+}
+
+interface ActiveBubble {
+   id: string;
+   text: string;
+   senderRole: string;
+   x: number;
+   y: number;
+}
+
 export const BattleView = ({
    questions,
    currentIdx,
    matchData,
    opponentStats,
-   timeLeft: _timeLeft,
    maxTime,
    selectedAnswer,
    revealAnswers,
@@ -42,44 +81,14 @@ export const BattleView = ({
    playerProfile,
    sendQuickChat
 }: BattleViewProps) => {
-   const [triggerConfetti, setTriggerConfetti] = useState(false);
-   const [particles, setParticles] = useState<any[]>([]);
-   const [activeBubbles, setActiveBubbles] = useState<any[]>([]);
+   const [particles, setParticles] = useState<Particle[]>([]);
+   const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
 
-   useEffect(() => {
-      setTriggerConfetti(false);
-   }, [currentIdx]);
-
-   useEffect(() => {
-      if (triggerConfetti) {
-         const COLORS = ["#4ade80", "#2ec871", "#facc15", "#38bdf8", "#ec4899", "#a855f7"];
-         const SHAPES = ["circle", "square", "triangle"];
-         const newParticles = Array.from({ length: 30 }).map((_, i) => {
-            const angle = (i / 30) * 360 + (Math.random() * 20 - 10);
-            const distance = 90 + Math.random() * 140;
-            const rad = (angle * Math.PI) / 180;
-            const targetX = Math.cos(rad) * distance;
-            const targetY = Math.sin(rad) * distance;
-            const size = 6 + Math.random() * 12;
-            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-            const rotation = Math.random() * 360;
-            const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-
-            return {
-               id: i,
-               targetX,
-               targetY,
-               size,
-               color,
-               rotation,
-               shape
-            };
-         });
-         setParticles(newParticles);
-      } else {
-         setParticles([]);
-      }
-   }, [triggerConfetti]);
+   const [prevIdx, setPrevIdx] = useState(currentIdx);
+   if (currentIdx !== prevIdx) {
+      setPrevIdx(currentIdx);
+      setParticles([]);
+   }
 
    // Listen to in-game chat events
    useEffect(() => {
@@ -138,11 +147,7 @@ export const BattleView = ({
    const oppStatus = isP1 ? p2Status : p1Status;
    const oppColor = isP1 ? p2Color : p1Color;
 
-   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot") : "Opponent");
-
-   const getAvatarUrl = (avatarUrl: string | null | undefined, seed: string) => {
-      return avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
-   };
+   const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
 
    // Resolve opponent choice
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
@@ -151,7 +156,32 @@ export const BattleView = ({
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
       if (choice === activeQuestion.answer) {
-         setTriggerConfetti(true);
+         const COLORS = ["#4ade80", "#2ec871", "#facc15", "#38bdf8", "#ec4899", "#a855f7"];
+         const SHAPES = ["circle", "square", "triangle"];
+         const newParticles = Array.from({ length: 30 }).map((_, i) => {
+            const angle = (i / 30) * 360 + (Math.random() * 20 - 10);
+            const distance = 90 + Math.random() * 140;
+            const rad = (angle * Math.PI) / 180;
+            const targetX = Math.cos(rad) * distance;
+            const targetY = Math.sin(rad) * distance;
+            const size = 6 + Math.random() * 12;
+            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const rotation = Math.random() * 360;
+            const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            const duration = 0.8 + Math.random() * 0.4;
+
+            return {
+               id: i,
+               targetX,
+               targetY,
+               size,
+               color,
+               rotation,
+               shape,
+               duration
+            };
+         });
+         setParticles(newParticles);
       }
    };
 
@@ -183,10 +213,11 @@ export const BattleView = ({
          {/* Players Panel */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-               <img
-                  src={getAvatarUrl(playerProfile?.avatar_url, playerProfile?.username || "You")}
-                  alt="You"
-                  className="w-8 h-8 rounded-full border border-correct/30 object-cover shrink-0"
+               <ProtectedAvatar
+                  userId={playerProfile?.id || undefined}
+                  src={playerProfile?.avatar_url || undefined}
+                  username={playerProfile?.username || "You"}
+                  className="w-8 h-8 rounded-full border border-correct/30 shrink-0"
                />
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
@@ -200,10 +231,11 @@ export const BattleView = ({
                   </p>
                   <p className="text-sm font-black text-white">{oppScore} pts</p>
                </div>
-               <img
-                  src={getAvatarUrl(opponentStats?.avatar_url, opponentName)}
-                  alt={opponentName}
-                  className="w-8 h-8 rounded-full border border-pink-500/30 object-cover shrink-0"
+               <ProtectedAvatar
+                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  username={opponentName}
+                  className="w-8 h-8 rounded-full border border-pink-500/30 shrink-0"
                />
             </div>
          </div>
@@ -280,6 +312,24 @@ export const BattleView = ({
                )}
             </div>
 
+            {activeQuestion.imageUrl && (
+               <div className="w-full flex justify-center shrink-0 my-1">
+                  <motion.div
+                     initial={{ opacity: 0, scale: 0.95 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     className="w-full max-w-[280px] h-[140px] rounded-2xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1.5 shadow-inner"
+                  >
+                     <img
+                        src={activeQuestion.imageUrl}
+                        alt="Question Clue"
+                        className="max-h-full max-w-full object-contain rounded-xl select-none"
+                        loading="lazy"
+                        draggable={false}
+                     />
+                  </motion.div>
+               </div>
+            )}
+
             {/* Choices Grid */}
             <div className="grid grid-cols-2 gap-3 shrink-0">
                {activeQuestion.choices.map((choice) => {
@@ -305,8 +355,8 @@ export const BattleView = ({
                      btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
                   }
 
-                  let buttonAnimate: any = {};
-                  let buttonTransition: any = {};
+                  let buttonAnimate: TargetAndTransition | undefined = undefined;
+                  let buttonTransition: Transition | undefined = undefined;
 
                   if (selectedAnswer !== null) {
                      if (isSelected && isCorrect) {
@@ -378,7 +428,7 @@ export const BattleView = ({
          </div>
 
          {/* Celebratory Confetti Splash */}
-         {triggerConfetti && (
+         {particles.length > 0 && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-50">
                {particles.map((p) => (
                   <motion.div
@@ -392,7 +442,7 @@ export const BattleView = ({
                         rotate: p.rotation + 360
                      }}
                      transition={{
-                        duration: 0.8 + Math.random() * 0.4,
+                        duration: p.duration,
                         ease: "easeOut"
                      }}
                      style={{
