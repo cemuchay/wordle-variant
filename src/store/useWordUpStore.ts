@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../components/wordup/WordUpView/types";
-import { safeLocalStorage } from "../utils/storage";
+import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 interface WordUpState {
    view:
@@ -54,7 +54,7 @@ interface WordUpState {
 
 export const useWordUpStore = create<WordUpState>((set) => ({
    view: "menu",
-   category: "mixed",
+   category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
    role: null,
    questions: [],
@@ -68,7 +68,10 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    revealAnswers: false,
 
    setView: (view) => set({ view }),
-   setCategory: (category) => set({ category }),
+   setCategory: (category) => {
+      safeSessionStorage.setItem("wordup_selected_category", category);
+      set({ category });
+   },
    setMatchId: (matchId) => set({ matchId }),
    setRole: (role) => set({ role }),
    setQuestions: (questions) => set({ questions }),

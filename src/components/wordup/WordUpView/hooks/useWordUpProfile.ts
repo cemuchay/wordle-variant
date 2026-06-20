@@ -4,7 +4,7 @@ import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { type ProfileStats } from "../types";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 
-export const useWordUpProfile = (user: any) => {
+export const useWordUpProfile = (user: { id: string } | null) => {
    const [userStats, setUserStats] = useState<ProfileStats | null>(null);
 
    const fetchUserProfile = useCallback(async () => {
@@ -26,13 +26,13 @@ export const useWordUpProfile = (user: any) => {
                } else {
                   const defaultProfile = {
                      id: user.id,
-                     rating: 1000,
+                     rating: 600,
                      xp: 0,
                      games_played: 0,
                      games_won: 0,
                      games_lost: 0,
                      games_tied: 0,
-                     rank_name: "Silver"
+                     rank_name: "Bronze"
                   };
                   const { error: insertError } = await supabase
                      .from("wordup_profiles")
@@ -44,6 +44,36 @@ export const useWordUpProfile = (user: any) => {
          );
 
          if (data) {
+            // Check for inactivity decay (15 points for every 7 days since last update)
+            const lastUpdate = data.updated_at ? new Date(data.updated_at).getTime() : new Date().getTime();
+            const now = new Date().getTime();
+            const diffDays = Math.floor((now - lastUpdate) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 7 && data.games_played > 0) {
+               const decayWeeks = Math.floor(diffDays / 7);
+               const decayAmount = decayWeeks * 15;
+               const newRating = Math.max(600, data.rating - decayAmount);
+               
+               if (newRating !== data.rating) {
+                  console.log(`[WordUp Logs] Inactivity ELO decay triggered: -${decayAmount} Elo. Rating: ${data.rating} -> ${newRating}`);
+                  let rank = "Bronze";
+                  if (newRating >= 1700) rank = "Master";
+                  else if (newRating >= 1400) rank = "Diamond";
+                  else if (newRating >= 1100) rank = "Gold";
+                  else if (newRating >= 800) rank = "Silver";
+
+                  await supabase
+                     .from("wordup_profiles")
+                     .update({
+                        rating: newRating,
+                        rank_name: rank,
+                        updated_at: new Date().toISOString()
+                     })
+                     .eq("id", user.id);
+                  
+                  data.rating = newRating;
+                  data.rank_name = rank;
+               }
+            }
             setUserStats(data);
          }
       } catch (err) {
@@ -52,7 +82,16 @@ export const useWordUpProfile = (user: any) => {
    }, [user]);
 
    useEffect(() => {
-      fetchUserProfile();
+      let active = true;
+      const timer = setTimeout(() => {
+         if (active) {
+            fetchUserProfile();
+         }
+      }, 0);
+      return () => {
+         active = false;
+         clearTimeout(timer);
+      };
    }, [fetchUserProfile]);
 
    const getRankColor = useCallback((rankName: string) => {
@@ -84,13 +123,13 @@ export const useWordUpProfile = (user: any) => {
                   } else {
                      const defaultProfile = {
                         id: user.id,
-                        rating: 1000,
+                        rating: 600,
                         xp: 0,
                         games_played: 0,
                         games_won: 0,
                         games_lost: 0,
                         games_tied: 0,
-                        rank_name: "Silver"
+                        rank_name: "Bronze"
                      };
                      const { error: insertError } = await supabase
                         .from("wordup_profiles")
@@ -101,30 +140,31 @@ export const useWordUpProfile = (user: any) => {
                }, 3, 1000);
 
                if (currentProf) {
-                  const newRating = Math.max(800, currentProf.rating + eloGain);
+                  const newRating = Math.max(600, currentProf.rating + eloGain);
                   const newXp = currentProf.xp + xpReward;
 
                   let rank = "Bronze";
-                  if (newRating >= 1800) rank = "Master";
-                  else if (newRating >= 1500) rank = "Diamond";
-                  else if (newRating >= 1200) rank = "Gold";
-                  else if (newRating >= 1000) rank = "Silver";
+                  if (newRating >= 1700) rank = "Master";
+                  else if (newRating >= 1400) rank = "Diamond";
+                  else if (newRating >= 1100) rank = "Gold";
+                  else if (newRating >= 800) rank = "Silver";
 
                   await fetchWithRetry(async () => {
-                     const { error } = await supabase
-                        .from("wordup_profiles")
-                        .update({
-                           rating: newRating,
-                           xp: newXp,
-                           games_played: currentProf.games_played + 1,
-                           games_won: currentProf.games_won + (won ? 1 : 0),
-                           games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
-                           games_tied: currentProf.games_tied + (tied ? 1 : 0),
-                           rank_name: rank
-                        })
-                        .eq("id", user.id);
-                     if (error) throw error;
-                  }, 3, 1000);
+                      const { error } = await supabase
+                         .from("wordup_profiles")
+                         .update({
+                            rating: newRating,
+                            xp: newXp,
+                            games_played: currentProf.games_played + 1,
+                            games_won: currentProf.games_won + (won ? 1 : 0),
+                            games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
+                            games_tied: currentProf.games_tied + (tied ? 1 : 0),
+                            rank_name: rank,
+                            updated_at: new Date().toISOString()
+                         })
+                         .eq("id", user.id);
+                      if (error) throw error;
+                   }, 3, 1000);
 
                   fetchUserProfile();
                }

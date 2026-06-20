@@ -102,14 +102,40 @@ export const WordUpView = () => {
       const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
 
       const xpReward = 50 + (won ? 100 : 0) + (correctCount * 10);
-      const eloGain = won ? 18 + Math.max(0, correctCount) : tied ? 2 : -12;
+
+      // Chess ELO expectancy calculation
+      const myRating = userStats?.rating || 600;
+      let oppRating = 1000;
+      if (match?.is_bot_match) {
+         const prof = match.bot_profile || "average";
+         if (prof === "impossible") oppRating = 2200;
+         else if (prof === "master") oppRating = 1800;
+         else if (prof === "gold" || prof === "expert") oppRating = 1400;
+         else if (prof === "slow_thinker") oppRating = 800;
+         else oppRating = 1000;
+      } else {
+         const storeOppStats = useWordUpStore.getState().opponentStats;
+         if (storeOppStats?.rating) {
+            oppRating = storeOppStats.rating;
+         }
+      }
+
+      const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
+      const actual = won ? 1 : tied ? 0.5 : 0;
+      const baseEloChange = Math.round(32 * (actual - expected));
+      const accuracyBonus = won ? correctCount : 0;
+
+      let eloGain = baseEloChange + accuracyBonus;
+      // Safety bounds to prevent losing points on a win, or gaining on a loss
+      if (won && eloGain < 2) eloGain = 2;
+      if (!won && !tied && eloGain > -2) eloGain = -2;
 
       try {
          await updateStats(eloGain, xpReward, won, tied);
-      } catch (err) {
+      } catch {
          triggerToast("Rating update delayed. Syncing in background...", 4000);
       }
-   }, [effectiveUser, view, updateStats, triggerToast, role]);
+   }, [effectiveUser, view, updateStats, triggerToast, role, userStats, setView]);
 
    const {
       questions,
@@ -205,7 +231,7 @@ export const WordUpView = () => {
              setCountdownText(String(count));
           }
        }, 1000);
-    }, [startQuestionRound, role, cleanUpCountdown]);
+    }, [startQuestionRound, role, cleanUpCountdown, setView]);
 
    const launchedMatchIdRef = useRef<string | null>(null);
 
@@ -279,25 +305,56 @@ export const WordUpView = () => {
       triggerToast("Local data purged and stale matches cleaned.", 4000);
    }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
 
-   const cancelMatchmakingRef = useRef(cancelMatchmaking);
-   useEffect(() => {
-      cancelMatchmakingRef.current = cancelMatchmaking;
-   }, [cancelMatchmaking]);
+    // Safety timeout: if stuck in loading or countdown for too long, abort to lobby
+    const safetyTimerRef = useRef<number | null>(null);
+    const clearSafetyTimer = useCallback(() => {
+       if (safetyTimerRef.current) {
+          clearTimeout(safetyTimerRef.current);
+          safetyTimerRef.current = null;
+       }
+    }, []);
+    const startSafetyTimer = useCallback(() => {
+       clearSafetyTimer();
+       safetyTimerRef.current = window.setTimeout(() => {
+          console.warn("[WordUp Logs] Safety timeout triggered — game failed to start. Aborting to lobby.");
+          triggerToast("Game creation timed out. Please try again.", 4000);
+          cleanUpAll();
+          cleanUpCountdown();
+          safeLocalStorage.removeItem("wordup_active_game");
+          resetGame();
+          setView("menu");
+          clearSafetyTimer();
+       }, 15000);
+    }, [triggerToast, cleanUpAll, cleanUpCountdown, resetGame, setView, clearSafetyTimer]);
 
-   useEffect(() => {
-      return () => {
-         cancelMatchmakingRef.current();
-         cleanUpCountdown();
-         resetGame();
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [cleanUpCountdown]);
+    useEffect(() => {
+       if (view === "loading" || view === "countdown") {
+          startSafetyTimer();
+       } else {
+          clearSafetyTimer();
+       }
+    }, [view, startSafetyTimer, clearSafetyTimer]);
+
+    const cancelMatchmakingRef = useRef(cancelMatchmaking);
+    useEffect(() => {
+       cancelMatchmakingRef.current = cancelMatchmaking;
+    }, [cancelMatchmaking]);
+
+    useEffect(() => {
+       return () => {
+          cancelMatchmakingRef.current();
+          cleanUpCountdown();
+          resetGame();
+          clearSafetyTimer();
+       };
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cleanUpCountdown]);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
       safeLocalStorage.removeItem("wordup_active_game");
       setView("menu");
-   }, [cancelMatchmaking]);
+   }, [cancelMatchmaking, setView]);
 
    const handleSelectHistoryMatch = useCallback((match: any) => {
       if (!effectiveUser) return;

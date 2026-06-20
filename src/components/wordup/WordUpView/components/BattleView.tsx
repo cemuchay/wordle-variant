@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
+import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 
 interface BattleViewProps {
    questions: WordUpQuestion[];
@@ -32,7 +33,7 @@ export const BattleView = ({
    currentIdx,
    matchData,
    opponentStats,
-   timeLeft,
+   timeLeft: _timeLeft,
    maxTime,
    selectedAnswer,
    revealAnswers,
@@ -105,6 +106,8 @@ export const BattleView = ({
 
    const activeQuestion = questions[currentIdx];
    if (!activeQuestion) return null;
+
+   const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -230,10 +233,33 @@ export const BattleView = ({
           {/* Timer Bar */}
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
-               <div
-                  className={`h-full transition-all duration-[50ms] ease-linear ${timeLeft > 3 ? "bg-correct shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
-                  style={{ width: `${(timeLeft / maxTime) * 100}%` }}
-               />
+                <motion.div
+                   key={currentIdx}
+                   initial={{ width: "100%", backgroundColor: "#4ade80", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }}
+                   animate={{
+                      width: "0%",
+                      backgroundColor: ["#4ade80", "#4ade80", "#ef4444"],
+                      boxShadow: [
+                         "0 0 8px rgba(34,197,94,0.5)",
+                         "0 0 8px rgba(34,197,94,0.5)",
+                         "0 0 8px rgba(239,68,68,0.5)"
+                      ]
+                   }}
+                   transition={{
+                      width: { duration: qMaxTime, ease: "linear" },
+                      backgroundColor: {
+                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
+                         duration: qMaxTime,
+                         ease: "linear"
+                      },
+                      boxShadow: {
+                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
+                         duration: qMaxTime,
+                         ease: "linear"
+                      }
+                   }}
+                   className="h-full rounded-full"
+                />
              )}
           </div>
 
