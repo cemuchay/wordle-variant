@@ -45,18 +45,18 @@ export const CATEGORIES = [
       desc: "Test your knowledge of world capitals",
       type: "procedural",
    },
-   {
-      id: "math_algebra",
-      name: "Algebra Solver",
-      desc: "Solve equations and linear algebra challenges",
-      type: "procedural",
-   },
-   {
-      id: "math_geometry_puzzles",
-      name: "Geometry Puzzles",
-      desc: "Find areas, perimeters, and supplementary angles",
-      type: "procedural",
-   },
+   // {
+   //    id: "math_algebra",
+   //    name: "Algebra Solver",
+   //    desc: "Solve equations and linear algebra challenges",
+   //    type: "procedural",
+   // },
+   // {
+   //    id: "math_geometry_puzzles",
+   //    name: "Geometry Puzzles",
+   //    desc: "Find areas, perimeters, and supplementary angles",
+   //    type: "procedural",
+   // },
    {
       id: "english_vocabulary",
       name: "English Vocabulary",
@@ -192,28 +192,28 @@ export const CATEGORIES = [
       desc: "Guess the iconic projects and roles of Nollywood legends, skit creators, and media stars.",
       type: "procedural",
    },
-   {
-      id: "unn_lions",
-      name: "UNN Nsukka Lions",
-      desc: "Test your memory of landmarks, hostel slangs, and iconic UNN campus spots.",
-      type: "procedural",
-   },
-   {
-      id: "nysc_trivia",
-      name: "NYSC Camp Chronicles",
-      desc: "From allowee struggles to Mami Market nights and early morning bugles.",
-      type: "procedural",
-   },
+   // {
+   //    id: "unn_lions",
+   //    name: "UNN Nsukka Lions",
+   //    desc: "Test your memory of landmarks, hostel slangs, and iconic UNN campus spots.",
+   //    type: "procedural",
+   // },
+   // {
+   //    id: "nysc_trivia",
+   //    name: "NYSC Camp Chronicles",
+   //    desc: "From allowee struggles to Mami Market nights and early morning bugles.",
+   //    type: "procedural",
+   // },
    {
       id: "us_tech_trivia",
       name: "US Tech Trivia",
       desc: "Modern Silicon Valley companies, founders, and tech culture",
       type: "procedural",
    },
-   {
-      id: "elon_musk",
-      name: "Elon Musk",
-      desc: "Test your knowledge on Musk's companies, history, and ventures",
-      type: "procedural",
-   },
+   // {
+   //    id: "elon_musk",
+   //    name: "Elon Musk",
+   //    desc: "Test your knowledge on Musk's companies, history, and ventures",
+   //    type: "procedural",
+   // },
 ];

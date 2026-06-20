@@ -381,14 +381,12 @@ export const LobbyView = ({
             .select()
             .single();
 
-         if (error || !newMatch) throw error || new Error("Failed to create match");
+          if (error || !newMatch) throw error || new Error("Failed to create match");
 
-         // Generate questions (edge function for procedural, local for legacy)
-         generateMatchQuestions(newMatch.id, category).catch((e) =>
-            console.error("Failed to generate questions for pending match:", e)
-         );
+          // Generate questions — await so they're ready before caller navigates to the match
+          await generateMatchQuestions(newMatch.id, category);
 
-         return newMatch.id;
+          return newMatch.id;
       } catch (e) {
          console.error("Failed to create pending match/notification:", e);
          return null;

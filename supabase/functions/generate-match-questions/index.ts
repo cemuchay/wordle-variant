@@ -842,7 +842,6 @@ serve(async (req) => {
          .update({
             questions: encryptedQuestions,
             encryption_key: encryptionKey,
-            status: "countdown",
          })
          .eq("id", matchId);
 

@@ -180,6 +180,9 @@ export const useWordUpMatchmaking = (
                true
             );
 
+            // Set match status to countdown for PvP
+            await supabase.from("wordup_matches").update({ status: "countdown" }).eq("id", newMatchId);
+
             onMatchFound(newMatchId, "player2");
          }
       } catch (err: any) {
