@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "../constants";
@@ -61,13 +61,13 @@ export const CategorySelectModal = ({
       .map((id) => CATEGORIES.find((c) => c.id === id))
       .filter(Boolean) as typeof CATEGORIES;
 
-   const recordRecent = useCallback((id: string) => {
+   const recordRecent = (id: string) => {
       setRecents((prev) => {
          const next = pushRecent(prev, id);
          saveRecents(next);
          return next;
       });
-   }, []);
+   };
 
    const handleCategoryClick = (id: string) => {
       setCategory(id);
@@ -81,7 +81,7 @@ export const CategorySelectModal = ({
    };
 
    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
          <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
