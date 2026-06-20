@@ -119,6 +119,7 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
+   const difficulty = entity?.difficulty || 3; // 1-5 scale
 
    if (!entity || allEntities.length < 2) {
       return {
@@ -134,7 +135,6 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
    const key = pickBestKey(scores, rng);
 
    if (!key) {
-      // Fallback: pure label matching
       const distractors = seededShuffle(
          allEntities.filter((e) => e.label !== label).map((e) => e.label),
          rng,
@@ -145,24 +145,33 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
 
    const correctValue = String(meta[key] ?? "");
 
-   // Find entities with a DIFFERENT value for this key (for forward question distractors)
+   // Other entities' values for this key (forward distractors)
    const otherValues = allEntities
       .filter((e) => e.id !== entity?.id)
       .map((e) => String(e.metadata?.[key] ?? ""))
       .filter((v) => v && v !== correctValue);
    const uniqueOtherValues = [...new Set(otherValues)].sort(() => rng() - 0.5).slice(0, 3);
 
-   // Find entities whose value for this key DIFFERS from the correct entity's value (for reverse distractors)
+   // Entities with a DIFFERENT value for this key (reverse distractors)
    const entitiesWithDifferentValue = allEntities
       .filter((e) => e.id !== entity?.id && String(e.metadata?.[key] ?? "") !== correctValue)
       .map((e) => e.label)
       .filter((l) => l);
 
-   const useReverse = Math.floor(rng() * 2) === 0;
+   // Difficulty-based question variant selection
+   // Easy (1-2): forward only — recall a known fact
+   // Medium (3): random forward/reverse
+   // Hard (4-5): reverse only — infer from a value back to the entity
+   let useReverse: boolean;
+   if (difficulty <= 2) {
+      useReverse = false;
+   } else if (difficulty >= 4) {
+      useReverse = true;
+   } else {
+      useReverse = Math.floor(rng() * 2) === 0;
+   }
 
    if (useReverse && entitiesWithDifferentValue.length >= 3) {
-      // Reverse: "[value]" is the [key] of which option?
-      // All distractor labels must have a DIFFERENT [key] value
       const choices = seededShuffle([label, ...seededShuffle(entitiesWithDifferentValue, rng).slice(0, 3)], rng);
       return {
          type: "definition",
@@ -172,9 +181,19 @@ function generateQuestion(seed: string, entity: any, allEntities: any[]): any {
       };
    }
 
-   // Forward: what is the [key] of [label]?
+   // Forward
    const distractors = uniqueOtherValues.length >= 3
       ? uniqueOtherValues
+      : otherValues.concat(["Unknown", "None", "All"]).sort(() => rng() - 0.5).slice(0, 3);
+
+   const choices = seededShuffle([correctValue, ...distractors], rng);
+   return {
+      type: "definition",
+      prompt: `What is the ${key.replace(/_/g, " ")} of ${label}?`,
+      choices,
+      answer: correctValue,
+   };
+ }
       : otherValues.concat(["Unknown", "None", "All"]).sort(() => rng() - 0.5).slice(0, 3);
 
    const choices = seededShuffle([correctValue, ...distractors], rng);
