@@ -9,6 +9,8 @@ import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { generateWordUpQuestions, generateSecretKey, encryptQuestions, BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
+import { CategorySelectModal } from "./CategorySelectModal";
+import { RankingView } from "./RankingView";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -41,12 +43,12 @@ export const LobbyView = ({
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
-   const [showAllCategories, setShowAllCategories] = useState(() => category !== "mixed");
+   const [showCategoryModal, setShowCategoryModal] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const timeoutRef = useRef<number | null>(null);
 
    // New states for tabs and challenge matching
-   const [activeTab, setActiveTab] = useState<"play" | "pending" | "history">("play");
+   const [activeTab, setActiveTab] = useState<"play" | "rankings" | "pending" | "history">("play");
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);
@@ -252,18 +254,35 @@ export const LobbyView = ({
 
    // Fetch data when activeTab changes or currentUser updates
    useEffect(() => {
-      if (activeTab === "history") {
-         fetchHistory();
-      } else if (activeTab === "pending") {
-         fetchPendingMatches();
-      }
+      let active = true;
+      const timer = setTimeout(() => {
+         if (active) {
+            if (activeTab === "history") {
+               fetchHistory();
+            } else if (activeTab === "pending") {
+               fetchPendingMatches();
+            }
+         }
+      }, 0);
+      return () => {
+         active = false;
+         clearTimeout(timer);
+      };
    }, [activeTab, currentUser?.id, fetchHistory, fetchPendingMatches]);
 
    // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
    useEffect(() => {
-      if (currentUser?.id) {
-         fetchPendingMatches();
-      }
+      if (!currentUser?.id) return;
+      let active = true;
+      const timer = setTimeout(() => {
+         if (active) {
+            fetchPendingMatches();
+         }
+      }, 0);
+      return () => {
+         active = false;
+         clearTimeout(timer);
+      };
    }, [currentUser?.id, fetchPendingMatches]);
 
    // Realtime listener for pending matches updates
@@ -474,7 +493,7 @@ export const LobbyView = ({
 
          {/* Segmented Tab Bar */}
          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
-            {(["play", "pending", "history"] as const).map((tab) => (
+            {(["play", "rankings", "pending", "history"] as const).map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -483,7 +502,7 @@ export const LobbyView = ({
                         : "text-gray-400 hover:text-white"
                      }`}
                >
-                  {tab === "play" ? "Play" : tab === "pending" ? `Pending (${pendingMatches.length})` : "History"}
+                  {tab === "play" ? "Play" : tab === "rankings" ? "Rankings" : tab === "pending" ? `Pending (${pendingMatches.length})` : "History"}
                </button>
             ))}
          </div>
@@ -519,99 +538,34 @@ export const LobbyView = ({
                   )}
 
                   <div className="space-y-3">
-                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Select Category</p>
-                     
-                     {/* General/Mixed Category */}
-                     <div className="grid grid-cols-1 gap-2">
-                        {CATEGORIES.filter(c => c.type === "general").map((cat) => (
-                           <button
-                              key={cat.id}
-                              onClick={() => setCategory(cat.id)}
-                              className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${category === cat.id
-                                 ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-                                 : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                 }`}
-                           >
-                              <div className="flex items-center gap-2">
-                                 <span className={`w-2 h-2 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
-                                 <p className="text-xs font-black uppercase tracking-wider text-white">{cat.name}</p>
-                              </div>
-                              <p className="text-[9px] text-gray-500 mt-1">{cat.desc}</p>
-                           </button>
-                        ))}
-                     </div>
+                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Active Arena Category</p>
+                      {(() => {
+                         const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
+                         return (
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+                               <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-correct animate-pulse" />
+                                  <p className="text-sm font-black uppercase tracking-wider text-white">{activeCatObj.name}</p>
+                               </div>
+                               <p className="text-xs text-gray-400 leading-relaxed">{activeCatObj.desc}</p>
+                               <button
+                                  onClick={() => setShowCategoryModal(true)}
+                                  className="w-full mt-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
+                               >
+                                  Change Category / Select Modes
+                               </button>
+                            </div>
+                         );
+                      })()}
 
-                     {/* Expand Toggle */}
-                     <button
-                        onClick={() => setShowAllCategories(!showAllCategories)}
-                        className="flex items-center justify-center gap-1.5 w-full py-2.5 text-[10px] font-black uppercase tracking-wider text-correct bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all cursor-pointer"
-                     >
-                        {showAllCategories ? (
-                           <>Hide Categories <ChevronUp size={12} /></>
-                        ) : (
-                           <>See More Categories <ChevronDown size={12} /></>
-                        )}
-                     </button>
-
-                     {/* Hidden Expanded Sections */}
-                     <AnimatePresence>
-                        {showAllCategories && (
-                           <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="space-y-4 overflow-hidden pt-1"
-                           >
-                              {/* Word Length Categories */}
-                              <div className="space-y-2">
-                                 <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Word Length Modes</p>
-                                 <div className="grid grid-cols-2 gap-2">
-                                    {CATEGORIES.filter(c => c.type === "length").map((cat) => (
-                                       <button
-                                          key={cat.id}
-                                          onClick={() => setCategory(cat.id)}
-                                          className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${category === cat.id
-                                             ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-                                             : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                             }`}
-                                       >
-                                          <div className="flex items-center gap-1.5">
-                                             <span className={`w-1.5 h-1.5 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
-                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                          </div>
-                                          <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                                       </button>
-                                    ))}
-                                 </div>
-                              </div>
-
-                              {/* Game Type Categories */}
-                              <div className="space-y-2">
-                                 <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Game Type Modes</p>
-                                 <div className="grid grid-cols-2 gap-2">
-                                    {CATEGORIES.filter(c => c.type === "game_type").map((cat) => (
-                                       <button
-                                          key={cat.id}
-                                          onClick={() => setCategory(cat.id)}
-                                          className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${category === cat.id
-                                             ? "bg-correct/10 border-correct text-white shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-                                             : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                             }`}
-                                       >
-                                          <div className="flex items-center gap-1.5">
-                                             <span className={`w-1.5 h-1.5 rounded-full ${category === cat.id ? "bg-correct" : "bg-gray-600"}`} />
-                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                          </div>
-                                          <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                                       </button>
-                                    ))}
-                                 </div>
-                              </div>
-                           </motion.div>
-                        )}
-                     </AnimatePresence>
-                  </div>
+                      <CategorySelectModal
+                         isOpen={showCategoryModal}
+                         onClose={() => setShowCategoryModal(false)}
+                         category={category}
+                         setCategory={setCategory}
+                         startMatchmaking={startMatchmaking}
+                      />
+                   </div>
 
                   <button
                      onClick={startMatchmaking}
@@ -683,6 +637,18 @@ export const LobbyView = ({
                         })()}
                      </div>
                   </div>
+               </motion.div>
+            )}
+
+            {activeTab === "rankings" && (
+               <motion.div
+                  key="rankings-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-4"
+               >
+                  <RankingView currentUser={currentUser} userStats={userStats} />
                </motion.div>
             )}
 
