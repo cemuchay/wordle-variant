@@ -30,6 +30,7 @@ export const CategorySelectModal = ({
    const generalCats = filteredCategories.filter(c => c.type === "general");
    const lengthCats = filteredCategories.filter(c => c.type === "length");
    const gameTypeCats = filteredCategories.filter(c => c.type === "game_type");
+   const proceduralCats = filteredCategories.filter(c => c.type === "procedural");
 
    const handleSelectAndPlay = () => {
       startMatchmaking();
@@ -154,6 +155,35 @@ export const CategorySelectModal = ({
                               >
                                  <div className="flex items-center gap-1.5">
                                     <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct" : "bg-gray-600"}`} />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                 </div>
+                                 <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
+                              </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+               )}
+
+               {/* Knowledge Categories */}
+               {proceduralCats.length > 0 && (
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-extrabold uppercase text-cyan-400 tracking-widest pl-1">Knowledge Categories</p>
+                     <div className="grid grid-cols-2 gap-2">
+                        {proceduralCats.map((cat) => {
+                           const isSel = category === cat.id;
+                           return (
+                              <button
+                                 key={cat.id}
+                                 onClick={() => setCategory(cat.id)}
+                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                                    isSel
+                                       ? "bg-cyan-500/10 border-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
+                                 }`}
+                              >
+                                 <div className="flex items-center gap-1.5">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-cyan-400 animate-pulse" : "bg-gray-600"}`} />
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
                                  </div>
                                  <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>

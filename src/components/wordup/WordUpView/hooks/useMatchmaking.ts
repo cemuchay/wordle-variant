@@ -1,18 +1,15 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useRef, useCallback } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
-import {
-   generateWordUpQuestions,
-   generateSecretKey,
-   encryptQuestions,
-} from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
+import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 
 export const useWordUpMatchmaking = (
    user: any,
    category: string,
-   getSyncedNow: () => number,
+   _getSyncedNow: () => number,
    triggerToast: (msg: string, dur?: number) => void,
    onMatchFound: (matchId: string, role: "player1" | "player2") => void,
    cleanUpIntervals: () => void
@@ -57,20 +54,20 @@ export const useWordUpMatchmaking = (
       }
 
       const localMatchId = `bot-match-${crypto.randomUUID()}`;
-       
+
       setMatchId(localMatchId);
       setRole("player1");
       onMatchFound(localMatchId, "player1");
    }, [user, category, cleanUpMatchmaking, onMatchFound]);
 
-     const subscribeToMatchmaking = useCallback(() => {
+   const subscribeToMatchmaking = useCallback(() => {
       if (matchmakingChannelRef.current) {
          supabase.removeChannel(matchmakingChannelRef.current);
          matchmakingChannelRef.current = null;
       }
       const topic = `wordup_lobby_${user?.id}`;
       const existing = supabase.getChannels().find(
-         (c) => (c as any).topic === `realtime:${topic}`
+         (c: any) => c.topic === `realtime:${topic}`
       );
       if (existing) {
          supabase.removeChannel(existing);
@@ -87,7 +84,7 @@ export const useWordUpMatchmaking = (
                filter: `player1_id=eq.${user?.id}`
             },
             async (payload) => {
-               const match = payload.new;
+               const match = payload.new as any;
                if (match.status === "countdown" || match.status === "waiting") {
                   cleanUpMatchmaking();
                   setMatchId(match.id);
@@ -105,7 +102,7 @@ export const useWordUpMatchmaking = (
                filter: `player1_id=eq.${user?.id}`
             },
             async (payload) => {
-               const match = payload.new;
+               const match = payload.new as any;
                if (match.status === "countdown") {
                   cleanUpMatchmaking();
                   setMatchId(match.id);
@@ -118,7 +115,7 @@ export const useWordUpMatchmaking = (
 
       matchmakingChannelRef.current = channel;
    }, [user, cleanUpMatchmaking, onMatchFound]);
- 
+
 
    const startMatchmaking = useCallback(async () => {
       if (isStartingRef.current) {
@@ -145,10 +142,11 @@ export const useWordUpMatchmaking = (
                if (error) throw error;
                return typeof data === "string" ? JSON.parse(data) : data;
             }, 3, 1000),
-            true // blocking operation
+            true
          );
 
          if (result.status === "queued" || !result.match_id) {
+            // Player1: queued, waiting for opponent
             useWordUpStore.getState().setView("matchmaking");
             setRole("player1");
             setMatchId(null);
@@ -170,30 +168,16 @@ export const useWordUpMatchmaking = (
 
             subscribeToMatchmaking();
          } else {
+            // Player2: matched immediately — generate questions via edge function
             const newMatchId = result.match_id;
             setMatchId(newMatchId);
             setRole("player2");
 
-            const rawQuestions = generateWordUpQuestions(category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
             await wordupNetworkGate.enqueue(
                'put',
-               'update match questions and key',
-               () => fetchWithRetry(async () => {
-                  const { error: updateError } = await supabase
-                     .from("wordup_matches")
-                     .update({
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
-                        status: "countdown",
-                        game_type: "live",
-                        question_started_at: new Date(getSyncedNow()).toISOString()
-                     })
-                     .eq("id", newMatchId);
-                  if (updateError) throw updateError;
-               }, 3, 1000)
+               'generate match questions',
+               () => generateMatchQuestions(newMatchId, category),
+               true
             );
 
             onMatchFound(newMatchId, "player2");
@@ -205,7 +189,7 @@ export const useWordUpMatchmaking = (
       } finally {
          isStartingRef.current = false;
       }
-   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking, getSyncedNow]);
+   }, [user, category, triggerToast, triggerBotFallback, subscribeToMatchmaking, onMatchFound, cleanUpMatchmaking]);
 
    const cancelMatchmaking = useCallback(async () => {
       cleanUpMatchmaking();

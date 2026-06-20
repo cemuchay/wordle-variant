@@ -33,8 +33,52 @@ export interface WordUpQuestion {
 }
 
 // -------------------------------------------------------------
-// 1. Encryption / Decryption Helpers (XOR Base64)
+// 1. Encryption / Decryption Helpers
 // -------------------------------------------------------------
+
+// AES-GCM decryption for edge function payloads
+export async function decryptAESGCM(
+   encryptedBase64: string,
+   base64Key: string,
+): Promise<string> {
+   const rawKey = Uint8Array.from(atob(base64Key), (c) => c.charCodeAt(0));
+   const key = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"],
+   );
+   const combined = Uint8Array.from(atob(encryptedBase64), (c) => c.charCodeAt(0));
+   const iv = combined.slice(0, 12);
+   const data = combined.slice(12);
+   const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      data,
+   );
+   return new TextDecoder().decode(decrypted);
+}
+
+// Unified decryption: tries AES-GCM first (edge function), falls back to XOR (legacy)
+export async function decryptMatchQuestions(
+   match: { encrypted_questions?: string; questions?: string; encryption_key: string },
+): Promise<WordUpQuestion[]> {
+   if (match.encrypted_questions && match.encryption_key) {
+      try {
+         const plain = await decryptAESGCM(match.encrypted_questions, match.encryption_key);
+         return JSON.parse(plain);
+      } catch (e) {
+         console.warn("AES-GCM decrypt failed, trying XOR fallback:", e);
+      }
+   }
+   if (match.questions && match.encryption_key) {
+      return decryptQuestions(match.questions, match.encryption_key);
+   }
+   throw new Error("No encrypted questions found on match");
+}
+
+// XOR Base64 (legacy client-side encryption)
 
 export const generateSecretKey = (): string => {
    const chars =

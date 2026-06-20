@@ -6,7 +6,8 @@ import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { generateWordUpQuestions, generateSecretKey, encryptQuestions, BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
+import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
+import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
 import { CategorySelectModal } from "./CategorySelectModal";
@@ -365,19 +366,12 @@ export const LobbyView = ({
          return null;
       }
       try {
-         const rawQuestions = generateWordUpQuestions(category);
-         const secretKey = generateSecretKey();
-         const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-         // Create match in status "waiting"
          const { data: newMatch, error } = await supabase
             .from("wordup_matches")
             .insert({
                category: category,
                player1_id: currentUser.id,
                player2_id: targetUser.id,
-               questions: encryptedStr,
-               encryption_key: secretKey,
                status: "waiting",
                game_type: "async",
                p1_answered: false,
@@ -387,6 +381,11 @@ export const LobbyView = ({
             .single();
 
          if (error || !newMatch) throw error || new Error("Failed to create match");
+
+         // Generate questions (edge function for procedural, local for legacy)
+         generateMatchQuestions(newMatch.id, category).catch((e) =>
+            console.error("Failed to generate questions for pending match:", e)
+         );
 
          return newMatch.id;
       } catch (e) {

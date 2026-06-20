@@ -3,7 +3,8 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -432,10 +433,7 @@ export const useWordUpLiveGame = ({
          if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
 
          try {
-            console.log("[WordUp Logs] Accepting rematch, generating new game...");
-            const rawQuestions = generateWordUpQuestions(match.category);
-            const secretKey = generateSecretKey();
-            const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+            console.log("[WordUp Logs] Accepting rematch, creating new match...");
 
             const newMatch = await wordupNetworkGate.enqueue(
                "post",
@@ -447,8 +445,6 @@ export const useWordUpLiveGame = ({
                         category: match.category,
                         player1_id: match.player1_id,
                         player2_id: match.player2_id,
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
                         status: "countdown",
                         game_type: "live",
                         question_started_at: new Date(getSyncedNow()).toISOString(),
@@ -462,6 +458,9 @@ export const useWordUpLiveGame = ({
             );
 
             if (!newMatch) throw new Error("Failed to create rematch");
+
+            // Generate questions (edge function for procedural, local for legacy)
+            await generateMatchQuestions(newMatch.id, match.category);
 
             matchChannelRef.current.send({
                type: "broadcast",
@@ -557,14 +556,12 @@ export const useWordUpLiveGame = ({
 
          setMatchData(match);
 
-         if (match.questions && match.encryption_key) {
-            try {
-               const dec = decryptQuestions(match.questions, match.encryption_key);
-               setQuestions(dec);
-            } catch (e) {
-               console.error("Decrypt failed:", e);
-            }
-         }
+          try {
+             const dec = await decryptMatchQuestions(match);
+             setQuestions(dec);
+          } catch (e) {
+             console.error("Decrypt failed:", e);
+          }
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {

@@ -16,7 +16,6 @@ import NotificationPermissionPrompt from "./components/NotificationPermissionPro
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { Bell, Swords } from "lucide-react";
 import { useWordUpStore } from "./store/useWordUpStore";
-import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "./utils/wordupQuestionGenerator";
 import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
@@ -460,10 +459,6 @@ export default function App() {
     if (!invite) return;
     setIncomingWordUpInvite(null);
     try {
-      const rawQuestions = generateWordUpQuestions(invite.category);
-      const secretKey = generateSecretKey();
-      const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
       // Create match in status "waiting"
       const { data: newMatch, error } = await supabase
         .from("wordup_matches")
@@ -471,8 +466,6 @@ export default function App() {
           category: invite.category,
           player1_id: invite.senderId,
           player2_id: user?.id,
-          questions: encryptedStr,
-          encryption_key: secretKey,
           status: "waiting",
           p1_answered: false,
           p2_answered: false
@@ -481,6 +474,12 @@ export default function App() {
         .single();
 
       if (error || !newMatch) throw error || new Error("Failed to create match");
+
+      // Generate questions (edge function for procedural, local for legacy)
+      const { generateMatchQuestions } = await import("./services/wordup/questionService");
+      generateMatchQuestions(newMatch.id, invite.category).catch((e) =>
+        console.error("Failed to generate questions for invite:", e)
+      );
 
       // App notification for B (the current user)
       await supabase.from("notifications").insert({
@@ -888,20 +887,13 @@ export default function App() {
                   const invite = incomingWordUpInvite;
                   setIncomingWordUpInvite(null);
                   try {
-                    // Generate questions
-                    const rawQuestions = generateWordUpQuestions(invite.category);
-                    const secretKey = generateSecretKey();
-                    const encryptedStr = encryptQuestions(rawQuestions, secretKey);
-
-                    // Insert match
+                    // Insert match (questions generated server-side)
                     const { data: newMatch, error } = await supabase
                       .from("wordup_matches")
                       .insert({
                         category: invite.category,
                         player1_id: invite.senderId,
                         player2_id: user?.id,
-                        questions: encryptedStr,
-                        encryption_key: secretKey,
                         status: "countdown",
                         question_started_at: new Date().toISOString()
                       })
@@ -910,9 +902,12 @@ export default function App() {
 
                     if (error || !newMatch) throw error || new Error("Failed to create match");
 
-                    // Broadcast accepted
+                    // Generate questions (edge function for procedural, local for legacy)
+                    const { generateMatchQuestions } = await import("./services/wordup/questionService");
+                    await generateMatchQuestions(newMatch.id, invite.category);
+
                     const acceptChannel = supabase.channel(`user_signals_${invite.senderId}`);
-                    acceptChannel.subscribe((status) => {
+                    acceptChannel.subscribe((status: string) => {
                       if (status === 'SUBSCRIBED') {
                         acceptChannel.send({
                           type: 'broadcast',

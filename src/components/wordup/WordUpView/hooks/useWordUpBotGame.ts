@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -607,13 +607,11 @@ export const useWordUpBotGame = ({
 
             setMatchData(match);
 
-            if (match.questions && match.encryption_key) {
-               try {
-                  const dec = decryptQuestions(match.questions, match.encryption_key);
-                  setQuestions(dec);
-               } catch (e) {
-                  console.error("Decrypt failed:", e);
-               }
+            try {
+               const dec = await decryptMatchQuestions(match);
+               setQuestions(dec);
+            } catch (e) {
+               console.error("Decrypt failed:", e);
             }
          }
 
