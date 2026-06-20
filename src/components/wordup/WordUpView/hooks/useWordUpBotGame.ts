@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
-import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse } from "../../../../utils/wordupQuestionGenerator";
+import { decryptQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -227,10 +227,9 @@ export const useWordUpBotGame = ({
          )
             return;
 
-         isSubmittingAnswerRef.current = true;
-         setSelectedAnswer(choice);
-         stopRoundTimer();
-         stopBotTimer();
+          isSubmittingAnswerRef.current = true;
+          setSelectedAnswer(choice);
+          stopBotTimer();
 
          const q = questionsRef.current[currentIdxRef.current];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -329,45 +328,45 @@ export const useWordUpBotGame = ({
 
          console.log(`[WordUp Logs] Bot startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
 
-         currentIdxRef.current = index;
+          currentIdxRef.current = index;
 
-         cleanUpIntervals();
-         setCurrentIdx(index);
-         setSelectedAnswer(null);
-         setRevealAnswers(false);
+          cleanUpIntervals();
 
-         const q = questionsRef.current[index];
-         const duration = q ? getQuestionDuration(q.type) : 10.0;
+          const q = questionsRef.current[index];
+          const duration = q ? getQuestionDuration(q.type) : 10.0;
 
-         setMaxTime(duration);
-         setTimeLeft(duration);
-         isSubmittingAnswerRef.current = false;
+          setMaxTime(duration);
+          setTimeLeft(duration);
+          setCurrentIdx(index);
+          setSelectedAnswer(null);
+          setRevealAnswers(false);
+          isSubmittingAnswerRef.current = false;
 
          const startTime = getSyncedNow();
          let lastTicked = Math.ceil(duration) + 1;
 
-         timerRef.current = window.setInterval(() => {
-            const now = getSyncedNow();
-            const elapsed = (now - startTime) / 1000;
-            const remaining = Math.max(0, duration - elapsed);
+          timerRef.current = window.setInterval(() => {
+             const now = getSyncedNow();
+             const elapsed = (now - startTime) / 1000;
+             const remaining = Math.max(0, duration - elapsed);
 
-            setTimeLeft(parseFloat(remaining.toFixed(1)));
+             setTimeLeft(parseFloat(remaining.toFixed(2)));
 
-            const currentSec = Math.ceil(remaining);
-            if (remaining <= 3.0 && currentSec < lastTicked) {
-               lastTicked = currentSec;
-               wordupAudio.playTicking();
-            }
+             const currentSec = Math.ceil(remaining);
+             if (remaining <= 3.0 && currentSec < lastTicked) {
+                lastTicked = currentSec;
+                wordupAudio.playTicking();
+             }
 
-            if (remaining <= 0) {
-               console.log(`[WordUp Logs] Bot Timer expired for round ${index + 1}`);
-               stopRoundTimer();
-               const latestSelected = useWordUpStore.getState().selectedAnswer;
-               if (latestSelected === null) {
-                  handleAnswerSelectRef.current("");
-               }
-            }
-         }, 100);
+             if (remaining <= 0) {
+                console.log(`[WordUp Logs] Bot Timer expired for round ${index + 1}`);
+                stopRoundTimer();
+                const latestSelected = useWordUpStore.getState().selectedAnswer;
+                if (latestSelected === null) {
+                   handleAnswerSelectRef.current("");
+                }
+             }
+          }, 50);
 
          if (match.is_bot_match && roleRef.current === "player1" && questionsRef.current[index]) {
             const botProf = match.bot_profile || "average";
@@ -538,7 +537,7 @@ export const useWordUpBotGame = ({
          let match;
          if (mId.startsWith("bot-match-")) {
             const category = useWordUpStore.getState().category || "mixed";
-            const botProfile = matchDataRef.current?.bot_profile || "average";
+            const botProfile = matchDataRef.current?.bot_profile || getRandomBotProfile();
             const rawQuestions = generateWordUpQuestions(category);
             
             let userId = "guest-player";

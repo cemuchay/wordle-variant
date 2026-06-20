@@ -13,16 +13,25 @@ export const getQuestionDuration = (type: string): number => {
       case "missing_letter":
          return 8;
       case "definition":
-      case "anagram":
-      case "anagram_scrambled":
-      case "pattern":
-      case "math":
-      case "odd_one_out":
-         return 12;
-      case "reverse_wordle":
-         return 15;
-      default:
-         return 10;
+       case "anagram":
+       case "anagram_scrambled":
+       case "pattern":
+       case "math":
+       case "odd_one_out":
+       case "synonym_match":
+       case "word_chain":
+       case "letter_shift":
+       case "compound_break":
+       case "cryptogram":
+       case "category_sort":
+       case "letter_add_remove":
+          return 12;
+       case "reverse_wordle":
+          return 15;
+       case "word_within":
+          return 20;
+       default:
+          return 10;
    }
 };
 

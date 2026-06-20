@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send, Volume2, VolumeX, RotateCcw } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { generateWordUpQuestions, generateSecretKey, encryptQuestions, BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
 
@@ -107,22 +107,6 @@ export const LobbyView = ({
       };
    }, []);
 
-   // Fetch data when activeTab changes or currentUser updates
-   useEffect(() => {
-      if (activeTab === "history") {
-         fetchHistory();
-      } else if (activeTab === "pending") {
-         fetchPendingMatches();
-      }
-   }, [activeTab, currentUser?.id]);
-
-   // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
-   useEffect(() => {
-      if (currentUser?.id) {
-         fetchPendingMatches();
-      }
-   }, [currentUser?.id]);
-
    // Track completed match IDs to avoid duplicate notifications
    const NOTIFIED_KEY = 'wordup_completed_notified';
    const NOTIFIED_TS_KEY = 'wordup_completed_notified_timestamps';
@@ -133,7 +117,7 @@ export const LobbyView = ({
          const tsStored = safeLocalStorage.getItem(NOTIFIED_TS_KEY);
          const ids = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
          const timestamps: Record<string, number> = tsStored ? JSON.parse(tsStored) : {};
-         const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+         const cutoff = Date.now() - 48 * 60 * 60 * 1000;
          const cleanedIds = new Set<string>();
          const cleanedTimestamps: Record<string, number> = {};
          for (const id of ids) {
@@ -154,8 +138,11 @@ export const LobbyView = ({
    const [notifiedState, setNotifiedState] = useState(() => loadNotifiedState());
    const notifiedCompleted = notifiedState.ids;
    const notifiedTimestamps = notifiedState.timestamps;
+   void notifiedTimestamps;
    const notifiedCompletedRef = useRef(notifiedCompleted);
-   notifiedCompletedRef.current = notifiedCompleted;
+   useEffect(() => {
+      notifiedCompletedRef.current = notifiedCompleted;
+   }, [notifiedCompleted]);
 
    const persistNotifiedState = (ids: Set<string>, timestamps: Record<string, number>) => {
       try {
@@ -164,14 +151,119 @@ export const LobbyView = ({
       } catch { /* ignore */ }
    };
 
-   const markNotified = (id: string) => {
-      const newIds = new Set(notifiedCompleted);
-      const newTimestamps = { ...notifiedTimestamps };
-      newIds.add(id);
-      newTimestamps[id] = Date.now();
-      setNotifiedState({ ids: newIds, timestamps: newTimestamps });
-      persistNotifiedState(newIds, newTimestamps);
-   };
+   const markNotified = useCallback((id: string) => {
+      setNotifiedState((prev) => {
+         const newIds = new Set(prev.ids);
+         const newTimestamps = { ...prev.timestamps };
+         newIds.add(id);
+         newTimestamps[id] = Date.now();
+         notifiedCompletedRef.current = newIds;
+         persistNotifiedState(newIds, newTimestamps);
+         return { ids: newIds, timestamps: newTimestamps };
+      });
+   }, []);
+
+   const fetchPendingMatches = useCallback(async () => {
+      if (!currentUser) return;
+      await Promise.resolve();
+      setIsLoadingData(true);
+      try {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select(`
+                *,
+                player1:player1_id (username, avatar_url),
+                player2:player2_id (username, avatar_url)
+             `)
+            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+            .in("status", ["waiting", "completed"])
+            .order("created_at", { ascending: false });
+
+         if (error) throw error;
+
+         const now = new Date();
+         const activePending: any[] = [];
+
+         for (const m of (data || [])) {
+            const createdAt = new Date(m.created_at);
+            const diffHrs = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+
+            if (m.status === "completed") {
+               const isP1 = m.player1_id === currentUser.id;
+               const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
+               const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
+
+                if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
+                  markNotified(m.id);
+                  triggerToast("Your opponent completed their turn! Check the results.", 6000);
+               }
+               continue;
+            }
+
+            if (diffHrs >= 24) {
+               await supabase
+                  .from("wordup_matches")
+                  .update({
+                     status: "completed",
+                     p1_answered: true,
+                     p2_answered: true,
+                     completed_at: now.toISOString()
+                  })
+                  .eq("id", m.id);
+            } else {
+               activePending.push(m);
+            }
+         }
+
+         setPendingMatches(activePending);
+      } catch (e) {
+         console.error("Failed to fetch pending matches:", e);
+      } finally {
+         setIsLoadingData(false);
+      }
+   }, [currentUser, triggerToast, markNotified]);
+
+   const fetchHistory = useCallback(async () => {
+      if (!currentUser) return;
+      await Promise.resolve();
+      setIsLoadingData(true);
+      try {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select(`
+               *,
+               player1:player1_id (username, avatar_url),
+               player2:player2_id (username, avatar_url)
+            `)
+            .eq("status", "completed")
+            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+            .order("completed_at", { ascending: false })
+            .limit(15);
+
+         if (error) throw error;
+         setHistoryMatches(data || []);
+      } catch (e) {
+         console.error("Failed to fetch history:", e);
+      } finally {
+         setIsLoadingData(false);
+      }
+   }, [currentUser]);
+
+   // Fetch data when activeTab changes or currentUser updates
+   useEffect(() => {
+      if (activeTab === "history") {
+         fetchHistory();
+      } else if (activeTab === "pending") {
+         fetchPendingMatches();
+      }
+   }, [activeTab, currentUser?.id, fetchHistory, fetchPendingMatches]);
+
+   // Always fetch pending matches when currentUser is available, to pre-populate the bg queue
+   useEffect(() => {
+      if (currentUser?.id) {
+         fetchPendingMatches();
+      }
+   }, [currentUser?.id, fetchPendingMatches]);
 
    // Realtime listener for pending matches updates
    useEffect(() => {
@@ -210,9 +302,9 @@ export const LobbyView = ({
          const iPlayed = isP1 ? match.p1_answered : match.p2_answered;
          const oppPlayed = isP1 ? match.p2_answered : match.p1_answered;
 
-         if (iPlayed && oppPlayed && match.status === "completed") {
-            triggerToast("Your opponent completed their turn! Check the results.", 6000);
-         }
+          if (iPlayed && oppPlayed && match.status === "completed" && !match.is_bot_match) {
+             triggerToast("Your opponent completed their turn! Check the results.", 6000);
+          }
 
          fetchPendingMatches();
       };
@@ -246,90 +338,6 @@ export const LobbyView = ({
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [currentUser?.id]);
-
-   const fetchPendingMatches = async () => {
-      if (!currentUser) return;
-      setIsLoadingData(true);
-      try {
-         const { data, error } = await supabase
-            .from("wordup_matches")
-            .select(`
-                *,
-                player1:player1_id (username, avatar_url),
-                player2:player2_id (username, avatar_url)
-             `)
-            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-            .in("status", ["waiting", "completed"])
-            .order("created_at", { ascending: false });
-
-         if (error) throw error;
-
-         const now = new Date();
-         const activePending: any[] = [];
-
-         for (const m of (data || [])) {
-            const createdAt = new Date(m.created_at);
-            const diffHrs = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-
-            if (m.status === "completed") {
-               const isP1 = m.player1_id === currentUser.id;
-               const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
-               const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
-
-               if (iPlayed && oppPlayed && !notifiedCompletedRef.current.has(m.id)) {
-                  markNotified(m.id);
-                  triggerToast("Your opponent completed their turn! Check the results.", 6000);
-               }
-               continue;
-            }
-
-            if (diffHrs >= 24) {
-               await supabase
-                  .from("wordup_matches")
-                  .update({
-                     status: "completed",
-                     p1_answered: true,
-                     p2_answered: true,
-                     completed_at: now.toISOString()
-                  })
-                  .eq("id", m.id);
-            } else {
-               activePending.push(m);
-            }
-         }
-
-         setPendingMatches(activePending);
-      } catch (e) {
-         console.error("Failed to fetch pending matches:", e);
-      } finally {
-         setIsLoadingData(false);
-      }
-   };
-
-   const fetchHistory = async () => {
-      if (!currentUser) return;
-      setIsLoadingData(true);
-      try {
-         const { data, error } = await supabase
-            .from("wordup_matches")
-            .select(`
-               *,
-               player1:player1_id (username, avatar_url),
-               player2:player2_id (username, avatar_url)
-            `)
-            .eq("status", "completed")
-            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-            .order("completed_at", { ascending: false })
-            .limit(15);
-
-         if (error) throw error;
-         setHistoryMatches(data || []);
-      } catch (e) {
-         console.error("Failed to fetch history:", e);
-      } finally {
-         setIsLoadingData(false);
-      }
-   };
 
    const createPendingMatchAndNotification = async (targetUser: any) => {
       if (!currentUser?.id || !targetUser?.id || currentUser.id === targetUser.id) {
@@ -622,10 +630,10 @@ export const LobbyView = ({
                            const isP1 = match.player1_id === currentUser?.id;
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
-                           const oppName = oppProfile?.username || "Opponent";
-                           const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
+                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
+                            const oppAvatar = oppProfile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${oppName}`;
 
-                           const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
+                            const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
 
                            return (
                               <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
@@ -680,9 +688,9 @@ export const LobbyView = ({
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
                            const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
-                           const oppName = oppProfile?.username || "Opponent";
+                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
 
-                           let outcome = "DRAW";
+                            let outcome = "DRAW";
                            let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
                            if (myScore > oppScore) {
                               outcome = "WIN";
@@ -702,7 +710,9 @@ export const LobbyView = ({
                            try {
                               const seen = seenMatchesStr ? JSON.parse(seenMatchesStr) : [];
                               isNew = !seen.includes(match.id);
-                           } catch {}
+                           } catch {
+                              // ignore JSON parse errors
+                           }
 
                            return (
                               <div

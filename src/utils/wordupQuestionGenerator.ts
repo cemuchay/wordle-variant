@@ -14,10 +14,18 @@ export interface WordUpQuestion {
       | "pattern"
       | "math"
       | "odd_one_out"
-      | "vowel_drop"
-      | "rhyme_match"
-      | "letter_count"
-      | "word_ladder";
+       | "vowel_drop"
+       | "rhyme_match"
+       | "letter_count"
+       | "word_ladder"
+       | "synonym_match"
+       | "word_chain"
+       | "letter_shift"
+       | "compound_break"
+       | "word_within"
+       | "cryptogram"
+       | "category_sort"
+       | "letter_add_remove";
    prompt: string;
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
@@ -314,6 +322,73 @@ const DEFINITIONS: Record<string, string> = {
    JOURNEY: "An act of traveling from one place to another.",
    JUSTICE: "Fair treatment according to law.",
 };
+
+// -------------------------------------------------------------
+// 2b. Thematic Groups (for synonym_match + category_sort)
+// -------------------------------------------------------------
+const THEME_GROUPS: Record<string, string[]> = {
+   MEDICAL: ["DOCTOR", "NURSE", "DENTIST", "CHEMIST", "HOSPITAL", "CLINIC", "PHARMACY", "AMBULANCE"],
+   EDUCATION: ["TEACHER", "STUDENT", "LECTURER", "HEADMASTER", "SCHOOL", "COLLEGE", "CLASSROOM", "CAMPUS", "LIBRARY", "NOTEBOOK"],
+   FOOD: ["BREAD", "CHEESE", "APPLE", "BANANA", "COFFEE", "CHICKEN", "BAKER", "CHEF", "WAITER", "GROCERY", "YAM", "CASSAVA", "OKRA", "PEPPER", "JOLLOF", "PLANTAIN", "MOIMOI", "AKARA", "SUYA"],
+   TRANSPORT: ["PILOT", "DRIVER", "CAPTAIN", "BICYCLE", "AIRPORT", "RUNWAY", "AIRLINE", "HIGHWAY", "BRIDGE", "TRAFFIC"],
+   CREATIVE: ["AUTHOR", "POET", "ARTIST", "MUSICIAN", "ACTOR", "JOURNALIST"],
+   JUSTICE: ["LAWYER", "POLICE", "COURT", "JUSTICE", "CONTRACT"],
+   NATURE: ["OCEAN", "MOUNTAIN", "VOLCANO", "DESERT", "LAGOON", "SUNSHINE", "RAINFALL", "CLIMATE", "DROUGHT", "ECLIPSE", "ICEBERG"],
+   CLOTHING: ["UNIFORM", "SANDALS", "SLIPPERS", "APRON", "JACKET", "HELMET", "GLASSES", "JEWELRY"],
+   TECHNOLOGY: ["COMPUTER", "KEYBOARD", "MONITOR", "PRINTER", "INTERNET", "CAMERA", "TELEPHONE", "BATTERY", "CHARGER", "GENERATOR"],
+   FINANCE: ["BANKER", "ACCOUNTANT", "CASHIER", "BANKING", "FINANCE", "INVOICE"],
+   HOME: ["FAMILY", "COUSIN", "UNCLE", "AUNT", "GRANDMOTHER", "GRANDFATHER", "NEIGHBOR", "LANDLORD", "TENANT", "FURNITURE"],
+   BUILDING: ["SCHOOL", "HOSPITAL", "CHURCH", "MOSQUE", "LIBRARY", "AIRPORT", "FACTORY", "GARAGE", "HOSTEL", "KIOSK", "MARKET"],
+   SPORTS: ["FOOTBALL", "ATHLETE", "CYCLIST", "BASKET", "BALLOON"],
+   PROFESSION: ["DOCTOR", "NURSE", "TEACHER", "LAWYER", "ENGINEER", "SCIENTIST", "ARTIST", "MUSICIAN", "ACTOR", "PILOT", "CAPTAIN", "CARPENTER", "MECHANIC", "TAILOR", "BARBER", "FARMER", "BAKER", "CHEF", "JANITOR", "HUNTER", "FISHERMAN", "GARDENER", "SOLDIER", "FIREMAN", "CLERK"],
+};
+
+// -------------------------------------------------------------
+// 2c. Compound Words Database (for compound_break)
+// -------------------------------------------------------------
+const COMPOUND_PARTS: [string, string, string][] = [
+   ["NOTEBOOK", "NOTE", "BOOK"],
+   ["SUNFLOWER", "SUN", "FLOWER"],
+   ["BIRTHDAY", "BIRTH", "DAY"],
+   ["FOOTBALL", "FOOT", "BALL"],
+   ["HIGHLAND", "HIGH", "LAND"],
+   ["RAINFALL", "RAIN", "FALL"],
+   ["SUNSHINE", "SUN", "SHINE"],
+   ["CLASSROOM", "CLASS", "ROOM"],
+   ["BLACKBOARD", "BLACK", "BOARD"],
+   ["HEADMASTER", "HEAD", "MASTER"],
+   ["AIRPORT", "AIR", "PORT"],
+   ["KEYBOARD", "KEY", "BOARD"],
+   ["BACKPACK", "BACK", "PACK"],
+   ["FARMHOUSE", "FARM", "HOUSE"],
+   ["BASKETBALL", "BASKET", "BALL"],
+   ["EARTHQUAKE", "EARTH", "QUAKE"],
+   ["WORKSHOP", "WORK", "SHOP"],
+   ["PASSPORT", "PASS", "PORT"],
+   ["RAINBOW", "RAIN", "BOW"],
+   ["SAILBOAT", "SAIL", "BOAT"],
+   ["SNOWBALL", "SNOW", "BALL"],
+   ["STARFISH", "STAR", "FISH"],
+   ["SUNSET", "SUN", "SET"],
+   ["TOOTHBRUSH", "TOOTH", "BRUSH"],
+   ["WATERFALL", "WATER", "FALL"],
+   ["WATERMELON", "WATER", "MELON"],
+   ["WRISTWATCH", "WRIST", "WATCH"],
+   ["DOORSTEP", "DOOR", "STEP"],
+   ["HONEYMOON", "HONEY", "MOON"],
+   ["PANCAKE", "PAN", "CAKE"],
+   ["PINEAPPLE", "PINE", "APPLE"],
+   ["PLAYGROUND", "PLAY", "GROUND"],
+   ["POPCORN", "POP", "CORN"],
+   ["SIDEWALK", "SIDE", "WALK"],
+   ["SPACESHIP", "SPACE", "SHIP"],
+   ["LIGHTHOUSE", "LIGHT", "HOUSE"],
+   ["LAWNMOWER", "LAWN", "MOWER"],
+   ["NIGHTMARE", "NIGHT", "MARE"],
+   ["LIPSTICK", "LIP", "STICK"],
+   ["LIFEGUARD", "LIFE", "GUARD"],
+   ["UNDERWEAR", "UNDER", "WEAR"],
+];
 
 // -------------------------------------------------------------
 // 3. Wordle Pattern Calculator (for Question Type 4)
@@ -728,6 +803,413 @@ export const generateOddOneOutQuestion = (
    }
 };
 
+// -------------------------------------------------------------
+// 6. New Question Type Generators
+// -------------------------------------------------------------
+
+const generateSynonymMatch = (): WordUpQuestion => {
+   const themeKeys = Object.keys(THEME_GROUPS);
+
+   // Pick a theme with at least 2 words
+   let theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+   let words = THEME_GROUPS[theme];
+   let attempts = 0;
+   while (words.length < 2 && attempts < 20) {
+      attempts++;
+      theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+      words = THEME_GROUPS[theme];
+   }
+
+   // Pick two DIFFERENT words from the same theme
+   const shuffled = shuffle(words);
+   const displayWord = shuffled[0];
+   const correctWord = shuffled[1];
+
+   // Pick 3 distractors from other themes
+   const choices = new Set<string>();
+   choices.add(correctWord);
+   let decoyAttempts = 0;
+   while (choices.size < 4 && decoyAttempts < 100) {
+      decoyAttempts++;
+      const otherTheme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+      if (otherTheme === theme) continue;
+      const otherWords = THEME_GROUPS[otherTheme];
+      const pick = otherWords[Math.floor(Math.random() * otherWords.length)];
+      if (pick !== displayWord) {
+         choices.add(pick);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add("UNKNOWN");
+   }
+   return {
+      type: "synonym_match",
+      prompt: `Which word is related to ${displayWord}?`,
+      choices: shuffle(Array.from(choices)),
+      answer: correctWord,
+   };
+};
+
+const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
+   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const { official } = getWordLists(length);
+   const word = official[Math.floor(Math.random() * official.length)];
+   const suffix = word.substring(word.length - 2);
+
+   // Find words that start with the suffix across all lengths
+   const candidates: string[] = [];
+   for (const len of allowedLengths) {
+      const list = getWordLists(len).official;
+      candidates.push(...list.filter((w) => w.startsWith(suffix) && w !== word));
+   }
+
+   let correct = "";
+   let fallbackWord = word;
+   let fallbackSuffix = suffix;
+   let attempts = 0;
+   while (candidates.length === 0 && attempts < 30) {
+      attempts++;
+      fallbackWord = official[Math.floor(Math.random() * official.length)];
+      fallbackSuffix = fallbackWord.substring(fallbackWord.length - 2);
+      for (const len of allowedLengths) {
+         const list = getWordLists(len).official;
+         candidates.push(...list.filter((w) => w.startsWith(fallbackSuffix) && w !== fallbackWord));
+      }
+   }
+   if (candidates.length > 0) {
+      correct = candidates[Math.floor(Math.random() * candidates.length)];
+   } else {
+      correct = fallbackSuffix + "AY";
+   }
+
+   const choices = new Set<string>();
+   choices.add(correct);
+   let decoyAttempts = 0;
+   while (choices.size < 4 && decoyAttempts < 100) {
+      decoyAttempts++;
+      const len = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+      const list = getWordLists(len).official;
+      const dummy = list[Math.floor(Math.random() * list.length)];
+      if (!dummy.startsWith(fallbackSuffix)) {
+         choices.add(dummy);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add(fallbackSuffix + "AB");
+   }
+   return {
+      type: "word_chain",
+      prompt: `Which word starts with the last 2 letters of ${fallbackWord}?`,
+      subPrompt: `Last 2 letters: "${fallbackSuffix}"`,
+      choices: shuffle(Array.from(choices)),
+      answer: correct,
+   };
+};
+
+const generateLetterShift = (allowedLengths: number[]): WordUpQuestion => {
+   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const { official, valid } = getWordLists(length);
+   const word = official[Math.floor(Math.random() * official.length)];
+   const shift = rand(1, 3);
+   const shifted = word
+      .split("")
+      .map((ch) => {
+         const code = ch.charCodeAt(0) + shift;
+         return String.fromCharCode(code > 90 ? code - 26 : code);
+      })
+      .join("");
+
+   const choices = new Set<string>();
+   choices.add(word);
+   let attempts = 0;
+   while (choices.size < 4 && attempts < 100) {
+      attempts++;
+      const dummy = official[Math.floor(Math.random() * official.length)];
+      if (dummy !== word && valid.has(dummy)) {
+         choices.add(dummy);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add(official[Math.floor(Math.random() * official.length)]);
+   }
+   return {
+      type: "letter_shift",
+      prompt: `Each letter has been shifted forward by ${shift} in the alphabet. What is the original word?`,
+      subPrompt: shifted,
+      choices: shuffle(Array.from(choices)),
+      answer: word,
+   };
+};
+
+const generateCompoundBreak = (): WordUpQuestion => {
+   const entry = COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
+   const [compound, partA, partB] = entry;
+   const askForA = Math.random() > 0.5;
+
+   const correct = askForA ? partA : partB;
+   const otherPart = askForA ? partB : partA;
+
+   const choices = new Set<string>();
+   choices.add(correct);
+   let attempts = 0;
+   while (choices.size < 4 && attempts < 50) {
+      attempts++;
+      const other = COMPOUND_PARTS[Math.floor(Math.random() * COMPOUND_PARTS.length)];
+      const candidate = askForA ? other[1] : other[2];
+      if (candidate !== correct) {
+         choices.add(candidate);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add("ZERO");
+   }
+   return {
+      type: "compound_break",
+      prompt: `Which word combines with "${otherPart}" to form "${compound}"?`,
+      choices: shuffle(Array.from(choices)),
+      answer: correct,
+   };
+};
+
+const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
+   const longLengths = allowedLengths.filter((l) => l >= 7);
+   if (longLengths.length === 0) {
+      // Fallback: use 7+ if none available
+      return {
+         type: "word_within",
+         prompt: "Which word can be found inside SUNFLOWER?",
+         choices: shuffle(["SUN", "MOON", "STAR", "SKY"]),
+         answer: "SUN",
+      };
+   }
+   const longLen = longLengths[Math.floor(Math.random() * longLengths.length)];
+   const { official } = getWordLists(longLen);
+   const longWord = official[Math.floor(Math.random() * official.length)];
+
+   // Find substring words (3-5 letters) inside longWord
+   const subCandidates: string[] = [];
+   const shortLengths = allowedLengths.filter((l) => l >= 3 && l <= 5);
+   for (const slen of shortLengths) {
+      const list = getWordLists(slen).official;
+      for (const w of list) {
+         if (w.length < longWord.length && longWord.includes(w)) {
+            subCandidates.push(w);
+         }
+      }
+   }
+
+   let correct = "";
+   let fallbackWord = longWord;
+   let fallbackAttempts = 0;
+   while (subCandidates.length === 0 && fallbackAttempts < 20) {
+      fallbackAttempts++;
+      fallbackWord = official[Math.floor(Math.random() * official.length)];
+      for (const slen of shortLengths) {
+         const list = getWordLists(slen).official;
+         for (const w of list) {
+            if (w.length < fallbackWord.length && fallbackWord.includes(w)) {
+               subCandidates.push(w);
+            }
+         }
+      }
+   }
+   if (subCandidates.length > 0) {
+      correct = subCandidates[Math.floor(Math.random() * subCandidates.length)];
+   } else {
+      correct = fallbackWord.substring(0, Math.min(3, fallbackWord.length));
+   }
+
+   const choices = new Set<string>();
+   choices.add(correct);
+   let attempts = 0;
+   while (choices.size < 4 && attempts < 100) {
+      attempts++;
+      const slen = shortLengths[Math.floor(Math.random() * shortLengths.length)];
+      const list = getWordLists(slen).official;
+      const dummy = list[Math.floor(Math.random() * list.length)];
+      if (dummy !== correct && !fallbackWord.includes(dummy)) {
+         choices.add(dummy);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add("XYZ");
+   }
+   return {
+      type: "word_within",
+      prompt: `Which word can be found inside "${fallbackWord}"?`,
+      choices: shuffle(Array.from(choices)),
+      answer: correct,
+   };
+};
+
+const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
+   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const { official, valid } = getWordLists(length);
+   const word = official[Math.floor(Math.random() * official.length)];
+
+   // Build a random substitution cipher (A->X, B->Y, etc.)
+   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+   const shuffled = shuffle([...letters]);
+   const cipherMap: Record<string, string> = {};
+   for (let i = 0; i < 26; i++) {
+      cipherMap[letters[i]] = shuffled[i];
+   }
+   const encoded = word
+      .split("")
+      .map((ch) => cipherMap[ch] || ch)
+      .join("");
+
+   const choices = new Set<string>();
+   choices.add(word);
+   let attempts = 0;
+   while (choices.size < 4 && attempts < 100) {
+      attempts++;
+      const dummy = official[Math.floor(Math.random() * official.length)];
+      if (dummy !== word && valid.has(dummy)) {
+         choices.add(dummy);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add(official[Math.floor(Math.random() * official.length)]);
+   }
+   return {
+      type: "cryptogram",
+      prompt: `Decode the secret message! Each letter has been replaced with another.`,
+      subPrompt: `Coded: ${encoded}`,
+      choices: shuffle(Array.from(choices)),
+      answer: word,
+   };
+};
+
+const generateCategorySort = (): WordUpQuestion => {
+   const themeKeys = Object.keys(THEME_GROUPS);
+   // Pick two different themes
+   const mainThemeIdx = Math.floor(Math.random() * themeKeys.length);
+   let otherThemeIdx = Math.floor(Math.random() * themeKeys.length);
+   while (otherThemeIdx === mainThemeIdx) {
+      otherThemeIdx = Math.floor(Math.random() * themeKeys.length);
+   }
+   const mainTheme = themeKeys[mainThemeIdx];
+   const otherTheme = themeKeys[otherThemeIdx];
+   const mainWords = shuffle(THEME_GROUPS[mainTheme]).slice(0, 3);
+   const oddWord = shuffle(THEME_GROUPS[otherTheme])[0];
+
+   const choices = shuffle([...mainWords, oddWord]);
+   return {
+      type: "category_sort",
+      prompt: `Which word does NOT belong with the others?`,
+      choices: shuffle(Array.from(choices)),
+      answer: oddWord,
+   };
+};
+
+const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
+   const length = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+   const { official, valid } = getWordLists(length);
+   const word = official[Math.floor(Math.random() * official.length)];
+
+   // Try removing one letter to make a valid shorter word
+   const tryRemove = (): { base: string; result: string } | null => {
+      for (let i = 0; i < word.length; i++) {
+         const candidate = word.substring(0, i) + word.substring(i + 1);
+         if (candidate.length >= 3 && valid.has(candidate)) {
+            return { base: word, result: candidate };
+         }
+      }
+      return null;
+   };
+   // Try adding one letter at each position to make a valid longer word
+   const tryAdd = (): { base: string; result: string } | null => {
+      const maxLen = Math.max(...allowedLengths);
+      if (word.length >= maxLen) return null;
+      for (let i = 0; i <= word.length; i++) {
+         for (let c = 65; c <= 90; c++) {
+            const letter = String.fromCharCode(c);
+            const candidate = word.substring(0, i) + letter + word.substring(i);
+            if (candidate.length <= 10 && valid.has(candidate)) {
+               return { base: word, result: candidate };
+            }
+         }
+      }
+      return null;
+   };
+
+   const useRemove = Math.random() > 0.5;
+   let pair = useRemove ? tryRemove() : tryAdd();
+
+   let retries = 0;
+   while (!pair && retries < 30) {
+      retries++;
+      // Try a different word
+      const newWord = official[Math.floor(Math.random() * official.length)];
+      const newPair = useRemove ? (() => {
+         for (let i = 0; i < newWord.length; i++) {
+            const candidate = newWord.substring(0, i) + newWord.substring(i + 1);
+            if (candidate.length >= 3 && valid.has(candidate)) {
+               return { base: newWord, result: candidate };
+            }
+         }
+         return null;
+      })() : (() => {
+         const maxLen = Math.max(...allowedLengths);
+         if (newWord.length >= maxLen) return null;
+         for (let i = 0; i <= newWord.length; i++) {
+            for (let c = 65; c <= 90; c++) {
+               const letter = String.fromCharCode(c);
+               const candidate = newWord.substring(0, i) + letter + newWord.substring(i);
+               if (candidate.length <= 10 && valid.has(candidate)) {
+                  return { base: newWord, result: candidate };
+               }
+            }
+         }
+         return null;
+      })();
+      if (newPair) pair = newPair;
+   }
+
+   if (!pair) {
+      // Hardcoded fallback
+      pair = useRemove
+         ? { base: "BEACH", result: "BEACH" }
+         : { base: "BEACH", result: "BEACH" };
+      // Let's give a real fallback
+      if (useRemove) {
+         pair = { base: "BREAD", result: "READ" };
+      } else {
+         pair = { base: "READ", result: "BREAD" };
+      }
+   }
+
+   const isRemove = pair.base.length > pair.result.length;
+   const prompt = isRemove
+      ? `Remove one letter from "${pair.base}" to make a valid word.`
+      : `Add one letter to "${pair.base}" to make a valid word.`;
+   const correctAnswer = pair.result;
+
+   const choices = new Set<string>();
+   choices.add(correctAnswer);
+   let attempts = 0;
+   while (choices.size < 4 && attempts < 100) {
+      attempts++;
+      const len = allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
+      const list = getWordLists(len).official;
+      const dummy = list[Math.floor(Math.random() * list.length)];
+      const diffLen = Math.abs(dummy.length - correctAnswer.length);
+      if (diffLen <= 1 && !pair.base.includes(dummy)) {
+         choices.add(dummy);
+      }
+   }
+   while (choices.size < 4) {
+      choices.add(correctAnswer + "X");
+   }
+   return {
+      type: "letter_add_remove",
+      prompt,
+      choices: shuffle(Array.from(choices)),
+      answer: correctAnswer,
+   };
+};
+
 export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    // Determine word lengths to sample based on matchmaking category
    let allowedLengths = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -772,8 +1254,16 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "vowel_drop", weight: 0.8 },
          { type: "rhyme_match", weight: 0.8 },
          { type: "letter_count", weight: 0.8 },
-         { type: "word_ladder", weight: 0.8 },
-      ];
+          { type: "word_ladder", weight: 0.8 },
+          { type: "synonym_match", weight: 0.8 },
+          { type: "word_chain", weight: 0.8 },
+          { type: "letter_shift", weight: 0.8 },
+          { type: "compound_break", weight: 0.7 },
+          { type: "word_within", weight: 0.8 },
+          { type: "cryptogram", weight: 0.7 },
+          { type: "category_sort", weight: 0.8 },
+          { type: "letter_add_remove", weight: 0.7 },
+       ];
       const totalWeight = typeWeights.reduce(
          (sum, item) => sum + item.weight,
          0,
@@ -1278,16 +1768,32 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             choices.add(randomWord());
          }
 
-         questions.push({
-            type: "word_ladder",
-            prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
-            choices: Array.from(choices).sort(() => Math.random() - 0.5),
-            answer: correctWord,
-         });
-      }
-   }
+          questions.push({
+             type: "word_ladder",
+             prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
+             choices: Array.from(choices).sort(() => Math.random() - 0.5),
+             answer: correctWord,
+          });
+       } else if (type === "synonym_match") {
+          questions.push(generateSynonymMatch());
+       } else if (type === "word_chain") {
+          questions.push(generateWordChain(allowedLengths));
+       } else if (type === "letter_shift") {
+          questions.push(generateLetterShift(allowedLengths));
+       } else if (type === "compound_break") {
+          questions.push(generateCompoundBreak());
+       } else if (type === "word_within") {
+          questions.push(generateWordWithin(allowedLengths));
+       } else if (type === "cryptogram") {
+          questions.push(generateCryptogram(allowedLengths));
+       } else if (type === "category_sort") {
+          questions.push(generateCategorySort());
+       } else if (type === "letter_add_remove") {
+          questions.push(generateLetterAddRemove(allowedLengths));
+       }
+    }
 
-   // Randomly shuffle choices for all generated questions to prevent fixed coherent positions
+    // Randomly shuffle choices for all generated questions to prevent fixed coherent positions
    questions.forEach((q) => {
       q.choices = [...q.choices].sort(() => Math.random() - 0.5);
    });
@@ -1296,7 +1802,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
 };
 
 // -------------------------------------------------------------
-// 6. Bot Behavior Simulation Configurations
+// 7. Bot Behavior Simulation Configurations
 // -------------------------------------------------------------
 export interface BotProfile {
    name: string;
