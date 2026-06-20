@@ -279,19 +279,50 @@ export const WordUpView = () => {
       triggerToast("Local data purged and stale matches cleaned.", 4000);
    }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
 
-   const cancelMatchmakingRef = useRef(cancelMatchmaking);
-   useEffect(() => {
-      cancelMatchmakingRef.current = cancelMatchmaking;
-   }, [cancelMatchmaking]);
+    // Safety timeout: if stuck in loading or countdown for too long, abort to lobby
+    const safetyTimerRef = useRef<number | null>(null);
+    const clearSafetyTimer = useCallback(() => {
+       if (safetyTimerRef.current) {
+          clearTimeout(safetyTimerRef.current);
+          safetyTimerRef.current = null;
+       }
+    }, []);
+    const startSafetyTimer = useCallback(() => {
+       clearSafetyTimer();
+       safetyTimerRef.current = window.setTimeout(() => {
+          console.warn("[WordUp Logs] Safety timeout triggered — game failed to start. Aborting to lobby.");
+          triggerToast("Game creation timed out. Please try again.", 4000);
+          cleanUpAll();
+          cleanUpCountdown();
+          safeLocalStorage.removeItem("wordup_active_game");
+          resetGame();
+          setView("menu");
+          clearSafetyTimer();
+       }, 15000);
+    }, [triggerToast, cleanUpAll, cleanUpCountdown, resetGame, setView]);
 
-   useEffect(() => {
-      return () => {
-         cancelMatchmakingRef.current();
-         cleanUpCountdown();
-         resetGame();
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [cleanUpCountdown]);
+    useEffect(() => {
+       if (view === "loading" || view === "countdown") {
+          startSafetyTimer();
+       } else {
+          clearSafetyTimer();
+       }
+    }, [view, startSafetyTimer, clearSafetyTimer]);
+
+    const cancelMatchmakingRef = useRef(cancelMatchmaking);
+    useEffect(() => {
+       cancelMatchmakingRef.current = cancelMatchmaking;
+    }, [cancelMatchmaking]);
+
+    useEffect(() => {
+       return () => {
+          cancelMatchmakingRef.current();
+          cleanUpCountdown();
+          resetGame();
+          clearSafetyTimer();
+       };
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cleanUpCountdown]);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
