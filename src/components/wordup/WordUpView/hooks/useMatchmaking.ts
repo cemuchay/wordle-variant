@@ -174,12 +174,7 @@ export const useWordUpMatchmaking = (
             setMatchId(newMatchId);
             setRole("player2");
 
-            await wordupNetworkGate.enqueue(
-               'put',
-               'generate match questions',
-               () => generateMatchQuestions(newMatchId, category),
-               true
-            );
+            await generateMatchQuestions(newMatchId, category);
 
             // Set match status to countdown for PvP
             await supabase.from("wordup_matches").update({ status: "countdown" }).eq("id", newMatchId);

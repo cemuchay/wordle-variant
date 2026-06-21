@@ -928,7 +928,7 @@ export default function App() {
                         category: invite.category,
                         player1_id: invite.senderId,
                         player2_id: user?.id,
-                        status: "countdown",
+                        status: "waiting",
                         question_started_at: new Date().toISOString()
                       })
                       .select()
@@ -939,6 +939,12 @@ export default function App() {
                     // Generate questions (edge function for procedural, local for legacy)
                     const { generateMatchQuestions } = await import("./services/wordup/questionService");
                     await generateMatchQuestions(newMatch.id, invite.category);
+
+                    // Update match status to countdown once questions are successfully stored
+                    await supabase
+                      .from("wordup_matches")
+                      .update({ status: "countdown" })
+                      .eq("id", newMatch.id);
 
                     const acceptChannel = supabase.channel(`user_signals_${invite.senderId}`);
                     acceptChannel.subscribe((status: string) => {

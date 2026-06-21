@@ -159,91 +159,101 @@ export const WordUpView = () => {
       showRematchButton,
       sendRematch,
       acceptRematch,
-      sendQuickChat
-   } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver, (newMId, newRole) => {
-      // eslint-disable-next-line react-hooks/immutability
-      onMatchFound(newMId, newRole);
-    });
+       sendQuickChat,
+       matchChannelRef
+    } = useWordUpGameLoop(matchId, role, getSyncedNow, triggerToast, onGameOver, (newMId, newRole) => {
+       // eslint-disable-next-line react-hooks/immutability
+       onMatchFound(newMId, newRole);
+     });
 
-    // Accidental refresh recovery
-    useEffect(() => {
-       const activeGameStr = safeLocalStorage.getItem("wordup_active_game");
-       if (activeGameStr) {
-          try {
-             const activeGame = JSON.parse(activeGameStr);
-             if (activeGame && activeGame.matchId && activeGame.matchData?.status !== "completed") {
-                console.log("[WordUp Logs] Restoring active game from localStorage:", activeGame.matchId);
-                
-                const store = useWordUpStore.getState();
-                store.setMatchId(activeGame.matchId);
-                store.setRole(activeGame.role);
-                store.setCategory(activeGame.category || "mixed");
-                store.setQuestions(activeGame.questions || []);
-                store.setCurrentIdx(activeGame.currentIdx || 0);
-                store.setMatchData(activeGame.matchData);
-                store.setOpponentStats(activeGame.opponentStats);
-                store.setRevealAnswers(activeGame.revealAnswers || false);
-                store.setSelectedAnswer(activeGame.selectedAnswer || null);
-                
-                store.setView("battle");
-                
-                setTimeout(async () => {
-                   const match = await loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
-                   const loadedQuestions = useWordUpStore.getState().questions;
-                   if (!match || !loadedQuestions || loadedQuestions.length === 0) {
-                      console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
-                      triggerToast("Failed to restore game.", 3000);
-                      resetGame();
-                      setView("menu");
-                      return;
-                   }
-                   startQuestionRound(match, activeGame.currentIdx || 0);
-                }, 100); // brief yield for state settling
-             }
-          } catch (err) {
-             console.error("[WordUp Logs] Failed to restore active game:", err);
-          }
-       }
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+     // Accidental refresh recovery
+     useEffect(() => {
+        const activeGameStr = safeLocalStorage.getItem("wordup_active_game");
+        if (activeGameStr) {
+           try {
+              const activeGame = JSON.parse(activeGameStr);
+              if (activeGame && activeGame.matchId && activeGame.matchData?.status !== "completed") {
+                 console.log("[WordUp Logs] Restoring active game from localStorage:", activeGame.matchId);
+                 
+                 const store = useWordUpStore.getState();
+                 store.setMatchId(activeGame.matchId);
+                 store.setRole(activeGame.role);
+                 store.setCategory(activeGame.category || "mixed");
+                 store.setQuestions(activeGame.questions || []);
+                 store.setCurrentIdx(activeGame.currentIdx || 0);
+                 store.setMatchData(activeGame.matchData);
+                 store.setOpponentStats(activeGame.opponentStats);
+                 store.setRevealAnswers(activeGame.revealAnswers || false);
+                 store.setSelectedAnswer(activeGame.selectedAnswer || null);
+                 
+                 store.setView("battle");
+                 
+                 setTimeout(async () => {
+                    const match = await loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
+                    const loadedQuestions = useWordUpStore.getState().questions;
+                    if (!match || !loadedQuestions || loadedQuestions.length === 0) {
+                       console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
+                       triggerToast("Failed to restore game.", 3000);
+                       resetGame();
+                       setView("menu");
+                       return;
+                    }
+                    startQuestionRound(match, activeGame.currentIdx || 0);
+                 }, 100); // brief yield for state settling
+              }
+           } catch (err) {
+              console.error("[WordUp Logs] Failed to restore active game:", err);
+           }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, []);
 
-    // Reactive sync: If matchData status changes to active externally, jump to battle
-    useEffect(() => {
-       if (matchData?.status === "active" && view === "countdown") {
-          console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
-          cleanUpCountdown();
-          setView("battle");
-          startQuestionRound(matchData, matchData.current_question_index || 0);
-       }
-    }, [matchData?.status, view, setView, startQuestionRound, matchData, cleanUpCountdown]);
+     // Reactive sync: If matchData status changes to active externally, jump to battle
+     useEffect(() => {
+        if (matchData?.status === "active" && view === "countdown") {
+           console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
+           cleanUpCountdown();
+           setView("battle");
+           startQuestionRound(matchData, matchData.current_question_index || 0);
+        }
+     }, [matchData?.status, view, setView, startQuestionRound, matchData, cleanUpCountdown]);
 
-    const startCountdown = useCallback((match: any) => {
-       cleanUpCountdown();
-        let count = WORDUP_TIMEOUT.COUNTDOWN_START;
-       setCountdownText(String(WORDUP_TIMEOUT.COUNTDOWN_START));
-       countdownIntervalRef.current = window.setInterval(() => {
-          count--;
-          if (count === 0) {
-             cleanUpCountdown();
-             setView("battle");
+     const startCountdown = useCallback((match: any) => {
+        cleanUpCountdown();
+         let count = WORDUP_TIMEOUT.COUNTDOWN_START;
+        setCountdownText(String(WORDUP_TIMEOUT.COUNTDOWN_START));
+        countdownIntervalRef.current = window.setInterval(() => {
+           count--;
+           if (count === 0) {
+              cleanUpCountdown();
+              setView("battle");
 
-             // Set match status to active in database (only for real-time matches)
-             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
-                supabase
-                   .from("wordup_matches")
-                   .update({ status: "active" })
-                   .eq("id", match.id)
-                   .then(({ error }: any) => {
-                      if (error) console.error("Failed to set match status to active:", error);
-                   });
-             }
+              // Set match status to active in database (only for real-time matches)
+              if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
+                 supabase
+                    .from("wordup_matches")
+                    .update({ status: "active" })
+                    .eq("id", match.id)
+                    .then(({ error }: any) => {
+                       if (error) console.error("Failed to set match status to active:", error);
+                    });
+              }
 
-             startQuestionRound(match, 0);
-          } else {
-             setCountdownText(String(count));
-          }
-        }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
-    }, [startQuestionRound, role, cleanUpCountdown, setView]);
+              // Broadcast game_active over WebSocket to transition peer immediately
+              if (matchChannelRef?.current) {
+                 matchChannelRef.current.send({
+                    type: "broadcast",
+                    event: "game_active",
+                    payload: {}
+                 });
+              }
+
+              startQuestionRound(match, 0);
+           } else {
+              setCountdownText(String(count));
+           }
+         }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
+     }, [startQuestionRound, role, cleanUpCountdown, setView, matchChannelRef]);
 
    const handleAbortMatch = useCallback(async () => {
       if (matchId) {
