@@ -334,14 +334,25 @@ serve(async (req) => {
          // Query 'math_fundamentals' facts for hybrid math trivia
          dbCategoryQuery = "math_fundamentals";
       } else if (category === "english_language") {
-         // Query 'english_vocabulary' or 'english_fundamentals' facts
-         dbCategoryQuery = "english_vocabulary";
+         // Query 'english_vocabulary', 'english_idioms', and 'english_fundamentals' facts
+         dbCategoryQuery = "english_vocabulary,english_idioms,english_fundamentals";
       }
 
-      const { data: entities, error: entityError } = await supabaseClient
+      const typeFilter = dbCategoryQuery.includes(",")
+         ? { typeFilter: "in", types: dbCategoryQuery.split(",") }
+         : { typeFilter: "eq", types: [dbCategoryQuery] };
+
+      let queryBuilder = supabaseClient
          .from("wordup_entities")
-         .select("*")
-         .eq("type", dbCategoryQuery)
+         .select("*");
+
+      if (typeFilter.typeFilter === "in") {
+         queryBuilder = queryBuilder.in("type", typeFilter.types);
+      } else {
+         queryBuilder = queryBuilder.eq("type", dbCategoryQuery);
+      }
+
+      const { data: entities, error: entityError } = await queryBuilder
          .limit(100);
 
       if (entityError) {
