@@ -540,7 +540,7 @@ export const WordUpView = () => {
             )}
 
             {view === "loading" && (
-               <LoadingView />
+               <LoadingView onCancel={handleAbortMatch} />
             )}
 
             {view === "battle" && (

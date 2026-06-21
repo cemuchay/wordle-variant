@@ -1,13 +1,16 @@
 import { createSeededRandom, seededShuffle } from "./utils.ts";
 
 export function generateEnglishQuestion(seed: string, entity: any, allEntities: any[], rng: () => number, variant: number): any {
-   // Mix: 50% chance of procedural grammar quiz, 50% chance of DB vocabulary words (if available)
+   const logPrefix = "[english.ts]";
    const useDB = entity && (rng() > 0.5);
+   console.log(`${logPrefix} seed=${seed} entity=${entity?.label ?? "null"} useDB=${useDB} variant=${variant}`);
 
    if (!useDB || !entity) {
       const qIdx = Math.floor(rng() * 4);
+      console.log(`${logPrefix} Procedural question qIdx=${qIdx}`);
       if (qIdx === 0) {
          // Verb Subject Agreement
+         console.log(`${logPrefix} Generating grammar/subject-verb agreement question`);
          const sentences = [
             { s: "Every morning, my father ___ the newspaper.", c: "reads", f: ["read", "reading", "readed"] },
             { s: "Neither of the boys ___ there yesterday.", c: "was", f: ["were", "are", "been"] },
@@ -26,6 +29,7 @@ export function generateEnglishQuestion(seed: string, entity: any, allEntities: 
       
       if (qIdx === 1) {
          // Plurals
+         console.log(`${logPrefix} Generating plural question`);
          const plurals = [
             { word: "child", c: "children", f: ["childs", "childrens", "childes"] },
             { word: "cactus", c: "cacti", f: ["cactuses", "cactus", "cactii"] },
@@ -45,6 +49,7 @@ export function generateEnglishQuestion(seed: string, entity: any, allEntities: 
       
       if (qIdx === 2) {
          // Spelling
+         console.log(`${logPrefix} Generating spelling question`);
          const spellings = [
             { c: "definitely", f: ["definately", "definitly", "definatley"] },
             { c: "necessary", f: ["neccessary", "necesary", "neccesary"] },
@@ -62,7 +67,8 @@ export function generateEnglishQuestion(seed: string, entity: any, allEntities: 
          };
       }
 
-      // Tenses
+      // Tenses (qIdx === 3)
+      console.log(`${logPrefix} Generating tense question`);
       const tenses = [
          { s: "They had already ___ when I arrived.", c: "eaten", f: ["ate", "eat", "eating"] },
          { s: "She has ___ three miles today.", c: "run", f: ["ran", "running", "runs"] },
@@ -78,6 +84,8 @@ export function generateEnglishQuestion(seed: string, entity: any, allEntities: 
          answer: correct
       };
    }
+
+   console.log(`${logPrefix} Returning null (useDB=true, entity exists) — letting parent handle via generateQuestion`);
 
    // If using DB entity, the parent executor will parse it via standard generateQuestion handler
    return null;

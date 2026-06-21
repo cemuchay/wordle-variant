@@ -556,12 +556,25 @@ export const useWordUpLiveGame = ({
 
          setMatchData(match);
 
-          try {
-             const dec = await decryptMatchQuestions(match);
-             setQuestions(dec);
-          } catch (e) {
-             console.error("Decrypt failed:", e);
-          }
+         if (!match.questions && !match.encrypted_questions) {
+            await generateMatchQuestions(match.id, match.category);
+            const { data: refreshed } = await supabase
+               .from("wordup_matches")
+               .select("*")
+               .eq("id", match.id)
+               .single();
+            if (refreshed) {
+               match = refreshed;
+               setMatchData(match);
+            }
+         }
+
+           try {
+              const dec = await decryptMatchQuestions(match);
+              setQuestions(dec);
+           } catch (e) {
+              console.error("Decrypt failed:", e);
+           }
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {

@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
-import { Loader2, Swords } from "lucide-react";
+import { Loader2, Swords, XCircle } from "lucide-react";
 
 interface LoadingViewProps {
    message?: string;
+   onCancel?: () => void;
 }
 
-export const LoadingView = ({ message = "Preparing Arena..." }: LoadingViewProps) => {
+export const LoadingView = ({ message = "Preparing Arena...", onCancel }: LoadingViewProps) => {
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -51,6 +52,19 @@ export const LoadingView = ({ message = "Preparing Arena..." }: LoadingViewProps
                Please wait a moment
             </motion.p>
          </div>
+
+         {onCancel && (
+            <motion.button
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.5 }}
+               onClick={onCancel}
+               className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-xs font-bold uppercase tracking-wider transition-all duration-200"
+            >
+               <XCircle size={14} />
+               Cancel
+            </motion.button>
+         )}
       </motion.div>
    );
 };
