@@ -45,6 +45,7 @@ export const WordUpView = () => {
 
    const view = useWordUpStore((s) => s.view);
    const setView = useWordUpStore((s) => s.setView);
+   const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
    const category = useWordUpStore((s) => s.category);
    const setCategory = useWordUpStore((s) => s.setCategory);
    const matchId = useWordUpStore((s) => s.matchId);
@@ -83,9 +84,14 @@ export const WordUpView = () => {
          wordupAudio.stopAmbient();
       }
       return () => {
-         wordupAudio.stopAmbient();
-      };
+      wordupAudio.stopAmbient();
+      }
    }, [view]);
+
+   // Hide global headers during battle
+   useEffect(() => {
+      setIsBattlePlaying(view === "battle");
+   }, [view, setIsBattlePlaying]);
 
    const onGameOver = useCallback(async (match: any) => {
       if (view === "gameover") return;

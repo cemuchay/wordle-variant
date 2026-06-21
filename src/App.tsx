@@ -55,6 +55,7 @@ export default function App() {
   const { user } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
+  const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
   const {
     triggerToast,
     date,
@@ -303,6 +304,23 @@ export default function App() {
   useEffect(() => {
     const parseUrlParams = () => {
       const params = new URLSearchParams(window.location.search);
+      const hasChallenge = params.has("challenge");
+      const hasOpen = params.has("open") || params.has("group_id") || params.has("dm_user_id");
+
+      if (hasChallenge || hasOpen) {
+        // Clear all other view states to let the notification click override persistence
+        const appState = useAppStore.getState();
+        appState.setChallengeOpen(false);
+        appState.setNotificationsOpen(false);
+        appState.setChatOpen(false);
+        appState.setChatConversationOpen(false);
+        appState.setStatsOpen(false);
+        appState.setSettingsOpen(false);
+        appState.setInfoOpen(false);
+        appState.setWordUpOpen(false);
+        appState.setWeeklyWrappedOpen(false);
+        appState.setShowNotifications(false);
+      }
 
       const challengeId = params.get("challenge");
       if (challengeId) {
@@ -646,7 +664,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isChatConversationOpen && !selectedChallenge && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -829,7 +847,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isChatConversationOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}

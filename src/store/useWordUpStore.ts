@@ -5,6 +5,7 @@ import { type ProfileStats } from "../components/wordup/WordUpView/types";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 interface WordUpState {
+   isBattlePlaying: boolean;
    view:
       | "menu"
       | "connecting"
@@ -27,6 +28,7 @@ interface WordUpState {
    revealAnswers: boolean;
 
    // Actions
+   setIsBattlePlaying: (playing: boolean) => void;
    setView: (
       view:
          | "menu"
@@ -53,6 +55,7 @@ interface WordUpState {
 }
 
 export const useWordUpStore = create<WordUpState>((set) => ({
+   isBattlePlaying: false,
    view: "menu",
    category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
@@ -67,6 +70,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    selectedAnswer: null,
    revealAnswers: false,
 
+   setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
    setCategory: (category) => {
       safeSessionStorage.setItem("wordup_selected_category", category);
@@ -86,6 +90,7 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
       set({
+         isBattlePlaying: false,
          view: "menu",
          matchId: null,
          role: null,

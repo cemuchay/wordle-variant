@@ -26,11 +26,11 @@ export const INACTIVITY = {
 
 /** Rank tiers with rating thresholds and display metadata. */
 export const RANKS = {
-   MASTER: { THRESHOLD: 1700, NAME: 'Master', COLOR: 'text-purple-400' },
-   DIAMOND: { THRESHOLD: 1400, NAME: 'Diamond', COLOR: 'text-cyan-400' },
-   GOLD: { THRESHOLD: 1100, NAME: 'Gold', COLOR: 'text-yellow-400' },
-   SILVER: { THRESHOLD: 800, NAME: 'Silver', COLOR: 'text-slate-300' },
-   BRONZE: { THRESHOLD: 0, NAME: 'Bronze', COLOR: 'text-amber-600' },
+   MASTER: { THRESHOLD: 1700, NAME: "Master", COLOR: "text-purple-400" },
+   DIAMOND: { THRESHOLD: 1400, NAME: "Diamond", COLOR: "text-cyan-400" },
+   GOLD: { THRESHOLD: 1100, NAME: "Gold", COLOR: "text-yellow-400" },
+   SILVER: { THRESHOLD: 800, NAME: "Silver", COLOR: "text-slate-300" },
+   BRONZE: { THRESHOLD: 0, NAME: "Bronze", COLOR: "text-amber-600" },
 } as const;
 
 /** Experience point reward values for match completion. */
@@ -72,9 +72,9 @@ export const WORDUP_TIMEOUT = {
    /** Safety timer (ms) — aborts to lobby if game doesn't start. */
    SAFETY: 15000,
    /** Matchmaking search timeout (ms) before falling back to bot. */
-   MATCHMAKING: 30000,
+   MATCHMAKING: 8000,
    /** Delay (ms) before auto-matching with a bot after queue expires. */
-   BOT_FALLBACK: 60000,
+   BOT_FALLBACK: 30000,
    /** How long (ms) an invite ring notification is shown. */
    INVITE_RING: 15000,
    /** Interval (ms) between countdown ticks. */
@@ -140,9 +140,9 @@ export const CONFETTI = {
    /** Maximum animation duration variance (s). */
    MAX_DURATION: 0.4,
    /** Available particle colors. */
-   COLORS: ['#4ade80', '#2ec871', '#facc15', '#38bdf8', '#ec4899', '#a855f7'],
+   COLORS: ["#4ade80", "#2ec871", "#facc15", "#38bdf8", "#ec4899", "#a855f7"],
    /** Available particle shapes. */
-   SHAPES: ['circle', 'square', 'triangle'],
+   SHAPES: ["circle", "square", "triangle"],
 } as const;
 
 /** Floating chat bubble layout and timing. */
