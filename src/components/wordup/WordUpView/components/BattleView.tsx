@@ -189,7 +189,7 @@ export const BattleView = ({
    };
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-sm sm:text-base" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-base sm:text-lg" : "text-lg sm:text-xl";
+         const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-base sm:text-lg" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-lg sm:text-xl" : "text-xl sm:text-2xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
    const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[8px] sm:text-[10px]" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-[10px] sm:text-xs" : "text-xs";
@@ -198,7 +198,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full py-2 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-12 pb-3 relative overflow-hidden"
       >
          {/* Floating Chat Bubbles */}
          <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
@@ -220,17 +220,17 @@ export const BattleView = ({
          </div>
 
          {/* Players Panel */}
-         <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-3 rounded-2xl shrink-0">
+         <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
                <ProtectedAvatar
                   userId={playerProfile?.id || undefined}
                   src={playerProfile?.avatar_url || undefined}
                   username={playerProfile?.username || "You"}
-                  className="w-8 h-8 rounded-full border border-correct/30 shrink-0"
+                   className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
                />
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                  <p className="text-sm font-black text-white">{myScore} pts</p>
+                   <p className="text-base font-black text-white">{myScore} pts</p>
                </div>
             </div>
             <div className="flex items-center gap-2 min-w-0 justify-end text-right">
@@ -238,19 +238,19 @@ export const BattleView = ({
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">
                      {opponentName}
                   </p>
-                  <p className="text-sm font-black text-white">{oppScore} pts</p>
+                   <p className="text-base font-black text-white">{oppScore} pts</p>
                </div>
                <ProtectedAvatar
                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
                   src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
                   username={opponentName}
-                  className="w-8 h-8 rounded-full border border-pink-500/30 shrink-0"
+                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
                />
             </div>
          </div>
 
          {/* Score Indicators / Answer Status */}
-         <div className="flex justify-between items-center px-2 py-2 shrink-0">
+         <div className="flex justify-between items-center px-1 py-3 shrink-0">
             <div className="flex items-center gap-1">
                <span className={`w-2.5 h-2.5 rounded-full ${myColor}`} />
                <span className="text-[9px] text-gray-500 uppercase font-black">
@@ -275,7 +275,7 @@ export const BattleView = ({
          </div>
 
           {/* Timer Bar */}
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
+          <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
                 <motion.div
                    key={currentIdx}
@@ -308,7 +308,7 @@ export const BattleView = ({
           </div>
 
          {/* Question Container */}
-         <div className="flex-1 flex flex-col justify-start md:justify-center gap-4 md:gap-6 py-4 md:py-6 overflow-y-auto scrollbar-hide min-h-0">
+         <div className="flex-1 flex flex-col justify-start md:justify-center gap-4 md:gap-6 py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
             <div className="text-center space-y-2">
                 <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                    {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
@@ -343,13 +343,13 @@ export const BattleView = ({
             )}
 
             {/* Choices Grid */}
-            <div className="grid grid-cols-2 gap-3 shrink-0">
+            <div className="grid grid-cols-2 gap-4 shrink-0">
                {activeQuestion.choices.map((choice) => {
                   const isSelected = selectedAnswer === choice;
                   const isCorrect = choice === activeQuestion.answer;
                   const isOppSelected = revealAnswers && oppChoice === choice;
 
-                  let btnClass = `p-4 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[56px] relative overflow-hidden`;
+                   let btnClass = `p-5 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[64px] relative overflow-hidden`;
                   if (selectedAnswer === null) {
                      btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
                   } else {
@@ -426,13 +426,13 @@ export const BattleView = ({
          </div>
 
          {/* Prefilled Quick Chat Row */}
-         <div className="flex gap-2 overflow-x-auto py-2.5 px-2.5 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full">
+         <div className="flex gap-3 overflow-x-auto py-3 px-3 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full">
             <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1.5">Chat:</span>
             {PREFILLED_MESSAGES.map((msg) => (
                <button
                   key={msg}
                   onClick={() => sendQuickChat(msg)}
-                  className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                   className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
                >
                   {msg}
                </button>

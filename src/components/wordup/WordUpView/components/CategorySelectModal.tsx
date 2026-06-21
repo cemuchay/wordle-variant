@@ -224,10 +224,10 @@ export const CategorySelectModal = ({
       cat.desc.toLowerCase().includes(searchQuery.toLowerCase())
    );
 
-   const generalCats = filteredCategories.filter(c => c.type === "general");
-   const lengthCats = filteredCategories.filter(c => c.type === "length");
-   const gameTypeCats = filteredCategories.filter(c => c.type === "game_type");
-   const proceduralCats = filteredCategories.filter(c => c.type === "procedural");
+   const featuredCats = filteredCategories.filter(c => c.featured);
+   const regularCats = filteredCategories
+      .filter(c => !c.featured)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
    const recentCats = recents
       .map((id) => CATEGORIES.find((c) => c.id === id))
@@ -322,82 +322,12 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
-               {/* Mixed / Quick Match */}
-               {generalCats.length > 0 && (
+               {/* Editor's Picks */}
+               {featuredCats.length > 0 && (
                   <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">General</p>
-                     <div className="grid grid-cols-1 gap-2">
-                        {generalCats.map((cat) => {
-                           const isSel = category === cat.id;
-                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                           const visual = getCategoryStyles(cat.id, isSel);
-                           return (
-                              <motion.button
-                                 key={cat.id}
-                                 whileHover={{ scale: 1.02 }}
-                                 onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
-                              >
-                                 <div className="flex items-center gap-3 w-full">
-                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 shadow-inner ${visual.emojiContainerClass}`}>
-                                       {style.emoji}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                       <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
-                                          <p className="text-xs font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                       </div>
-                                       <p className="text-[9px] text-gray-400 mt-0.5">{cat.desc}</p>
-                                    </div>
-                                 </div>
-                              </motion.button>
-                           );
-                        })}
-                     </div>
-                  </div>
-               )}
-
-               {/* Lengths */}
-               {lengthCats.length > 0 && (
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Word Length Modes</p>
-                     <div className="grid grid-cols-2 gap-2">
-                        {lengthCats.map((cat) => {
-                           const isSel = category === cat.id;
-                           const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                           const visual = getCategoryStyles(cat.id, isSel);
-                           return (
-                              <motion.button
-                                 key={cat.id}
-                                 whileHover={{ scale: 1.02 }}
-                                 onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
-                              >
-                                 <div className="flex items-center gap-2.5 w-full">
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
-                                       {style.emoji}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                       <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
-                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                       </div>
-                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
-                                    </div>
-                                 </div>
-                              </motion.button>
-                           );
-                        })}
-                     </div>
-                  </div>
-               )}
-
-               {/* Game Types */}
-               {gameTypeCats.length > 0 && (
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">Game Type Modes</p>
-                     <div className="grid grid-cols-2 gap-2">
-                        {gameTypeCats.map((cat) => {
+                     <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1">Editor's Picks</p>
+                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                        {featuredCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            const visual = getCategoryStyles(cat.id, isSel);
@@ -406,7 +336,7 @@ export const CategorySelectModal = ({
                                  key={cat.id}
                                  whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
+                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer shrink-0 w-40 ${visual.btnClass}`}
                               >
                                  <div className="flex items-center gap-2.5 w-full">
                                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
@@ -417,9 +347,9 @@ export const CategorySelectModal = ({
                                           <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
                                           <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
                                        </div>
-                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>
                                     </div>
                                  </div>
+                                 <p className="text-[8px] text-gray-500 mt-1.5 line-clamp-2 leading-tight text-left">{cat.desc}</p>
                               </motion.button>
                            );
                         })}
@@ -427,12 +357,12 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
-               {/* Knowledge Categories */}
-               {proceduralCats.length > 0 && (
+               {/* All Categories (alphabetical) */}
+               {regularCats.length > 0 && (
                   <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-cyan-400 tracking-widest pl-1">Knowledge Categories</p>
+                     <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">All Categories</p>
                      <div className="grid grid-cols-2 gap-2">
-                        {proceduralCats.map((cat) => {
+                        {regularCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            const visual = getCategoryStyles(cat.id, isSel);

@@ -178,7 +178,15 @@ export default function FloatingChatBubble() {
    const getDecryptedContent = (m: any) => {
       if (!user?.id) return m.content;
       if (m.content && m.content.startsWith("e2ee:")) {
-         const key = getDMRoomKey(user.id, m.user_id === user.id ? m.recipient_id || m.group_id : m.user_id);
+         if (m.user_id === user.id) {
+            // Own message — find DM partner from group for correct key
+            const group = groups.find(g => g.id === m.group_id);
+            const partnerId = group?.dm_partner?.id;
+            if (!partnerId) return m.content;
+            const key = getDMRoomKey(user.id, partnerId);
+            return decryptDM(m.content, key);
+         }
+         const key = getDMRoomKey(user.id, m.user_id);
          return decryptDM(m.content, key);
       }
       return m.content;
@@ -226,10 +234,12 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-         setReplyText("");
-         setIsOverlayOpen(false);
-         setDismissed(true);
-         setSelectedGroupId(null);
+          setReplyText("");
+          setTimeout(() => {
+             setIsOverlayOpen(false);
+             setDismissed(true);
+             setSelectedGroupId(null);
+          }, 1200);
       } catch (err) {
          console.error("Failed to send reply:", err);
       } finally {
