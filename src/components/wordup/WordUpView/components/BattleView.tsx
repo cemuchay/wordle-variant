@@ -4,7 +4,9 @@ import type { TargetAndTransition, Transition } from "framer-motion";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";
+import { useConfirmation } from "../../../../hooks/useConfirmation";
 import { type ProfileStats } from "../types";
+
 
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
@@ -94,6 +96,7 @@ export const BattleView = ({
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
    const [frozenPercent, setFrozenPercent] = useState<number | null>(null);
+   const { ask } = useConfirmation();
 
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
@@ -227,8 +230,14 @@ export const BattleView = ({
          {/* Top Control Bar */}
          <div className="flex justify-between items-center px-1 pb-2 shrink-0 z-40">
             <button
-               onClick={() => {
-                  if (window.confirm("Are you sure you want to forfeit and abort this match? This will count as a loss/completed match.")) {
+               onClick={async () => {
+                  const confirmed = await ask({
+                     title: "Forfeit Match",
+                     message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                     confirmLabel: "Forfeit",
+                     type: "danger"
+                  });
+                  if (confirmed) {
                      onAbort();
                   }
                }}

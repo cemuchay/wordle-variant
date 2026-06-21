@@ -4,6 +4,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+
 import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
@@ -569,12 +571,16 @@ export const useWordUpLiveGame = ({
             }
          }
 
-           try {
-              const dec = await decryptMatchQuestions(match);
-              setQuestions(dec);
-           } catch (e) {
-              console.error("Decrypt failed:", e);
-           }
+            try {
+               const dec = await decryptMatchQuestions(match);
+               if (match.category === "flag_bearer") {
+                  await preloadMatchFlags(dec);
+               }
+               setQuestions(dec);
+            } catch (e) {
+               console.error("Decrypt/Preload failed:", e);
+               throw e;
+            }
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
          if (oppId) {
