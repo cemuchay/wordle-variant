@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabaseClient";
 import { isProceduralCategory } from "./generatorRegistry";
+import { wordupNetworkGate } from "../../components/wordup/WordUpView/services/wordupNetworkGate";
 
 /**
  * Generates questions for a match.
@@ -17,13 +18,23 @@ export async function generateMatchQuestions(matchId: string, category: string):
 async function generateViaEdgeFunction(matchId: string, category: string): Promise<void> {
    const seed = `${matchId}-${category}`;
 
-   const { error: invokeError } = await supabase.functions.invoke(
-      "generate-match-questions",
-      { body: { matchId, category, seed } },
-   );
-
-   if (invokeError) {
+   const invokeResult = await wordupNetworkGate.enqueue(
+      'post',
+      'invoke question generator edge function',
+      async () => {
+         const { data, error } = await supabase.functions.invoke(
+            "generate-match-questions",
+            { body: { matchId, category, seed } },
+         );
+         if (error) throw error;
+         return data;
+      }
+   ).catch((invokeError) => {
       console.error("[questionService] Edge function failed:", invokeError);
+      return { error: invokeError };
+   });
+
+   if (invokeResult && 'error' in invokeResult) {
       // Fallback: generate locally if edge function is unavailable
       await generateLocally(matchId, category);
    }
@@ -37,16 +48,39 @@ async function generateLocally(matchId: string, category: string): Promise<void>
    const secretKey = generateSecretKey();
    const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 
-   const { error } = await supabase
-      .from("wordup_matches")
-      .update({
-         questions: encryptedStr,
-         encryption_key: secretKey,
-         status: "countdown",
-      })
-      .eq("id", matchId);
+   // Fetch the match metadata to determine the game_type and status
+   const match = await wordupNetworkGate.enqueue(
+      "get",
+      `load match metadata for ID ${matchId}`,
+      async () => {
+         const { data, error } = await supabase
+            .from("wordup_matches")
+            .select("game_type, status")
+            .eq("id", matchId)
+            .single();
+         if (error) throw error;
+         return data;
+      }
+   );
 
-   if (error) {
+   const newStatus = match?.game_type === "async" ? (match?.status || "waiting") : "countdown";
+
+   try {
+      await wordupNetworkGate.enqueue(
+         "put",
+         "save local questions and set status",
+         {
+            table: "wordup_matches",
+            action: "update",
+            payload: {
+               questions: encryptedStr,
+               encryption_key: secretKey,
+               status: newStatus,
+            },
+            filter: { id: matchId }
+         }
+      );
+   } catch (error) {
       console.error("[questionService] Local generation DB update failed:", error);
       throw error;
    }
