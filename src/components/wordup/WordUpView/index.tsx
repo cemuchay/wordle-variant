@@ -106,7 +106,7 @@ export const WordUpView = () => {
 
       // Chess ELO expectancy calculation
       const myRating = userStats?.rating || RATING.DEFAULT;
-      let oppRating = RATING.DEFAULT_OPPONENT;
+      let oppRating: number = RATING.DEFAULT_OPPONENT;
       if (match?.is_bot_match) {
          const prof = match.bot_profile || "average";
          oppRating = BOT_PROFILES_RATINGS[prof] || RATING.DEFAULT_OPPONENT;

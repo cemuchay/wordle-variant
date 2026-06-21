@@ -33,7 +33,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                       games_won: 0,
                       games_lost: 0,
                       games_tied: 0,
-                      rank_name: RANKS.BRONZE.NAME
+                      rank_name: RANKS.BRONZE.NAME as string
                   };
                   const { error: insertError } = await supabase
                      .from("wordup_profiles")
@@ -56,7 +56,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                
                if (newRating !== data.rating) {
                   console.log(`[WordUp Logs] Inactivity ELO decay triggered: -${decayAmount} Elo. Rating: ${data.rating} -> ${newRating}`);
-                  let rank = RANKS.BRONZE.NAME;
+                  let rank: string = RANKS.BRONZE.NAME;
                   if (newRating >= RANKS.MASTER.THRESHOLD) rank = RANKS.MASTER.NAME;
                   else if (newRating >= RANKS.DIAMOND.THRESHOLD) rank = RANKS.DIAMOND.NAME;
                   else if (newRating >= RANKS.GOLD.THRESHOLD) rank = RANKS.GOLD.NAME;
@@ -130,7 +130,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                         games_won: 0,
                         games_lost: 0,
                         games_tied: 0,
-                        rank_name: RANKS.BRONZE.NAME
+                        rank_name: RANKS.BRONZE.NAME as string
                      };
                      const { error: insertError } = await supabase
                         .from("wordup_profiles")
@@ -144,7 +144,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                    const newRating = Math.max(RATING.FLOOR, currentProf.rating + eloGain);
                    const newXp = currentProf.xp + xpReward;
 
-                   let rank = RANKS.BRONZE.NAME;
+                   let rank: string = RANKS.BRONZE.NAME;
                    if (newRating >= RANKS.MASTER.THRESHOLD) rank = RANKS.MASTER.NAME;
                    else if (newRating >= RANKS.DIAMOND.THRESHOLD) rank = RANKS.DIAMOND.NAME;
                    else if (newRating >= RANKS.GOLD.THRESHOLD) rank = RANKS.GOLD.NAME;

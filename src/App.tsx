@@ -13,6 +13,7 @@ import { ImageModal } from "./components/common/ImageModal";
 import { TransitionLoader } from "./components/layout/TransitionLoader";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 import NotificationPermissionPrompt from "./components/NotificationPermissionPrompt";
+import FloatingChatBubble from "./components/chat/FloatingChatBubble";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { Bell, Swords } from "lucide-react";
 import { useWordUpStore } from "./store/useWordUpStore";
@@ -240,7 +241,7 @@ export default function App() {
         return () => clearTimeout(timer);
       }
     }
-  }, [user, date]);
+  }, [user, date, setIsWeeklyWrappedOpen]);
 
   // Mascot Greeting on app open
   useEffect(() => {
@@ -289,7 +290,7 @@ export default function App() {
     window.addEventListener("open-stats-modal", handleOpenStats);
     return () =>
       window.removeEventListener("open-stats-modal", handleOpenStats);
-  }, []);
+  }, [setStatsActiveTab, setIsStatsOpen]);
 
   // Listen to custom event to open auth modal
   useEffect(() => {
@@ -337,7 +338,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", parseUrlParams);
     };
-  }, [setIsChallengeOpen, setIsChatOpen, setIsNotificationsOpen, setIsStatsOpen]);
+  }, [setIsChallengeOpen, setIsChatOpen, setIsNotificationsOpen, setIsStatsOpen, setStatsActiveTab]);
 
   // Re-open challenge modal after successful login/signup if initiated from the challenge screen
   useEffect(() => {
@@ -370,9 +371,8 @@ export default function App() {
 
   // Intercept notifications open
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowNotifications(isNotificationsOpen);
-  }, [isNotificationsOpen]);
+  }, [isNotificationsOpen, setShowNotifications]);
 
   // Stats Logic
   const { stats } = useWordleStats(user, isStatsOpen, date as string);
@@ -601,6 +601,7 @@ export default function App() {
       <AudioConnectionLog />
       <GlobalAudioPlayer />
       <NotificationsManager />
+      <FloatingChatBubble />
       {/* Toast component has been migrated to DynamicIslandStatus */}
       {user && showDisconnectedUI && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
