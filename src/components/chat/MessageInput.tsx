@@ -7,7 +7,7 @@ import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 
-class WAVRecorder {
+export class WAVRecorder {
     private audioContext: AudioContext | null = null;
     private stream: MediaStream | null = null;
     private input: MediaStreamAudioSourceNode | null = null;

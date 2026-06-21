@@ -279,6 +279,9 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         const counts: Record<string, number> = {};
         globalMessages.forEach((m) => {
             if (m.user_id !== user?.id) {
+                // Game Analysis is locked if user hasn't played today
+                if (m.group_id === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) return;
+
                 const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
                 if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
                     counts[m.group_id] = (counts[m.group_id] || 0) + 1;
@@ -286,7 +289,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             }
         });
         return counts;
-    }, [globalMessages, readReceipts, user?.id]);
+    }, [globalMessages, readReceipts, user?.id, hasPlayedToday]);
 
     const sortRooms = (rooms: any[]) => {
         return [...rooms].sort((a, b) => {

@@ -2,13 +2,15 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, ShieldAlert } from "lucide-react";
+import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, ShieldAlert, Mic, Image as ImageIcon } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
 import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { AudioPlayer } from "./ChatMessage/AudioPlayer";
+
+const CLOSE_DELAY = 10000;
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
@@ -18,17 +20,205 @@ export default function FloatingChatBubble() {
    const [isNearDismiss, setIsNearDismiss] = useState(false);
    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
-   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-   const [replyText, setReplyText] = useState("");
-   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-   const [editText, setEditText] = useState("");
-   const [isSending, setIsSending] = useState(false);
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [replyText, setReplyText] = useState("");
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editText, setEditText] = useState("");
+    const [isSending, setIsSending] = useState(false);
 
-   const [groups, setGroups] = useState<any[]>([]);
-   const [hasPlayedToday, setHasPlayedToday] = useState(false);
+    const [groups, setGroups] = useState<any[]>([]);
+    const [hasPlayedToday, setHasPlayedToday] = useState(false);
 
-   const constraintsRef = useRef<HTMLDivElement>(null);
-   const scrollRef = useRef<HTMLDivElement>(null);
+    const constraintsRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Voice note recording states
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const timerRef = useRef<number | null>(null);
+    const wavRecorderRef = useRef<any>(null);
+
+    const closeBubbleAfterDelay = () => {
+       setTimeout(() => {
+          setIsOverlayOpen(false);
+          setDismissed(true);
+          setSelectedGroupId(null);
+       }, CLOSE_DELAY);
+    };
+
+    const startRecording = async () => {
+       try {
+          const { WAVRecorder } = await import("../chat/MessageInput");
+          const recorder = new WAVRecorder();
+          await recorder.start();
+          wavRecorderRef.current = recorder;
+
+          setIsRecording(true);
+          setRecordingTime(0);
+          timerRef.current = window.setInterval(() => {
+             setRecordingTime((prev) => prev + 1);
+          }, 1000);
+       } catch (err) {
+          console.error("Error accessing microphone:", err);
+          useAppStore.getState().triggerToast("Could not access microphone.", 4000);
+       }
+    };
+
+    const stopRecording = async () => {
+       if (!wavRecorderRef.current) return;
+       const audioBlob = wavRecorderRef.current.stop();
+       wavRecorderRef.current = null;
+       setIsRecording(false);
+       if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+       }
+
+       if (audioBlob.size < 500) {
+          useAppStore.getState().triggerToast("Audio capture failed.", 4000);
+       } else {
+          await handleSendVoice(audioBlob);
+       }
+    };
+
+    const cancelRecording = () => {
+       if (!wavRecorderRef.current) return;
+       wavRecorderRef.current.stop();
+       wavRecorderRef.current = null;
+       setIsRecording(false);
+       if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+       }
+    };
+
+    const formatDuration = (sec: number) => {
+       const mins = Math.floor(sec / 60);
+       const secs = sec % 60;
+       return `${mins}:${secs.toString().padStart(2, "0")}`;
+    };
+
+    useEffect(() => {
+       return () => {
+          if (timerRef.current) {
+             clearInterval(timerRef.current);
+          }
+       };
+    }, []);
+
+    const handleSendVoice = async (blob: Blob) => {
+       if (!user?.id || !selectedGroupId) return;
+       setIsSending(true);
+       try {
+          const mimeType = blob.type || "audio/wav";
+          const fileName = `${user.id}/${Date.now()}.wav`;
+
+          // 1. Upload to storage
+          const { error: uploadErr } = await supabase.storage
+             .from("voice-notes")
+             .upload(fileName, blob, {
+                contentType: mimeType,
+                cacheControl: "3600",
+             });
+
+          if (uploadErr) throw uploadErr;
+
+          const {
+             data: { publicUrl },
+          } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
+
+          // 2. Persist to database
+          const messagePayload = {
+             id: crypto.randomUUID(),
+             content: "[Voice Message]",
+             user_id: user.id,
+             is_read: false,
+             voice_url: publicUrl,
+             group_id: selectedGroupId,
+          };
+
+          const { error } = await supabase.from("messages").insert([messagePayload]);
+          if (error) throw error;
+
+          // Mark group as read immediately
+          const timestamp = new Date().toISOString();
+          updateReadReceipt(selectedGroupId, timestamp);
+          await supabase.from("chat_read_receipts").upsert(
+             {
+                user_id: user.id,
+                group_id: selectedGroupId,
+                last_seen_at: timestamp,
+             },
+             { onConflict: "user_id,group_id" }
+          );
+
+           setReplyText("");
+           closeBubbleAfterDelay();
+       } catch (err) {
+          console.error("Failed to send voice note:", err);
+          useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+       } finally {
+          setIsSending(false);
+       }
+    };
+
+    const handleSendImage = async (file: File) => {
+       if (!user?.id || !selectedGroupId) return;
+       setIsSending(true);
+       try {
+          const { compressImage } = await import("../../hooks/useChat");
+          const compressedBlob = await compressImage(file);
+          const fileName = `${user.id}/${Date.now()}.jpg`;
+
+          // 1. Upload to storage
+          const { error: uploadErr } = await supabase.storage
+             .from("chat-images")
+             .upload(fileName, compressedBlob, {
+                contentType: "image/jpeg",
+                cacheControl: "3600",
+             });
+
+          if (uploadErr) throw uploadErr;
+
+          const {
+             data: { publicUrl },
+          } = supabase.storage.from("chat-images").getPublicUrl(fileName);
+
+          // 2. Persist to database
+          const messagePayload = {
+             id: crypto.randomUUID(),
+             content: "[Image]",
+             user_id: user.id,
+             is_read: false,
+             image_url: publicUrl,
+             group_id: selectedGroupId,
+          };
+
+          const { error } = await supabase.from("messages").insert([messagePayload]);
+          if (error) throw error;
+
+          // Mark group as read immediately
+          const timestamp = new Date().toISOString();
+          updateReadReceipt(selectedGroupId, timestamp);
+          await supabase.from("chat_read_receipts").upsert(
+             {
+                user_id: user.id,
+                group_id: selectedGroupId,
+                last_seen_at: timestamp,
+             },
+             { onConflict: "user_id,group_id" }
+          );
+
+           setReplyText("");
+           closeBubbleAfterDelay();
+       } catch (err) {
+          console.error("Failed to send image:", err);
+          useAppStore.getState().triggerToast("Failed to send image.", 4000);
+       } finally {
+          setIsSending(false);
+       }
+    };
 
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
@@ -236,12 +426,8 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-          setReplyText("");
-          setTimeout(() => {
-             setIsOverlayOpen(false);
-             setDismissed(true);
-             setSelectedGroupId(null);
-          }, 1200);
+           setReplyText("");
+           closeBubbleAfterDelay();
       } catch (err) {
          console.error("Failed to send reply:", err);
       } finally {
@@ -330,6 +516,11 @@ export default function FloatingChatBubble() {
 
    const handleBubbleClick = () => {
       if (isDragging) return;
+      if (unreadMessages.length === 1) {
+         setSelectedGroupId(unreadMessages[0].group_id);
+      } else {
+         setSelectedGroupId(null);
+      }
       setIsOverlayOpen((prev) => !prev);
    };
 
@@ -645,24 +836,90 @@ export default function FloatingChatBubble() {
 
                      {/* Reply footer for detailed chat screen */}
                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
-                        <div className="p-3 bg-white/5 border-t border-white/10 flex items-center gap-1.5 shrink-0">
+                        <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0">
                            <input
-                              type="text"
-                              placeholder="Write a reply..."
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              onKeyDown={(e) => {
-                                 if (e.key === "Enter") handleSendReply();
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                 const file = e.target.files?.[0];
+                                 if (file) {
+                                    handleSendImage(file);
+                                    if (fileInputRef.current) fileInputRef.current.value = "";
+                                 }
                               }}
-                              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
                            />
-                           <button
-                              onClick={handleSendReply}
-                              disabled={!replyText.trim() || isSending}
-                              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
-                           >
-                              <Send className="w-4 h-4" />
-                           </button>
+                           <div className="flex items-center gap-1.5 w-full">
+                              {!isRecording && (
+                                 <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white cursor-pointer transition-colors"
+                                    title="Send image"
+                                 >
+                                    <ImageIcon className="w-4 h-4" />
+                                 </button>
+                              )}
+
+                              {isRecording ? (
+                                 <div className="flex-1 flex items-center justify-between bg-red-600/10 border border-red-500/20 rounded-xl px-3 py-1.5 text-white">
+                                    <div className="flex items-center gap-2">
+                                       <div className="relative w-2 h-2">
+                                          <div className="w-2 h-2 bg-red-500 rounded-full animate-ping absolute inset-0" />
+                                          <div className="w-2 h-2 bg-red-500 rounded-full absolute inset-0" />
+                                       </div>
+                                       <span className="text-[10px] font-black uppercase text-red-400">Rec</span>
+                                       <span className="text-xs font-black tabular-nums">{formatDuration(recordingTime)}</span>
+                                    </div>
+                                    <button
+                                       onClick={cancelRecording}
+                                       className="text-white/60 hover:text-red-400 p-1 rounded-full cursor-pointer"
+                                    >
+                                       <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                 </div>
+                              ) : (
+                                 <input
+                                    type="text"
+                                    placeholder="Write a reply..."
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                       if (e.key === "Enter") handleSendReply();
+                                    }}
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                                 />
+                              )}
+
+                              {replyText.trim() === "" ? (
+                                 isRecording ? (
+                                    <button
+                                       onClick={stopRecording}
+                                       className="bg-red-600 text-white p-2.5 rounded-xl cursor-pointer relative"
+                                       title="Stop and send"
+                                    >
+                                       <Send className="w-4 h-4" />
+                                       <div className="absolute inset-0 bg-red-500 rounded-xl animate-ping opacity-25" />
+                                    </button>
+                                 ) : (
+                                    <button
+                                       onClick={startRecording}
+                                       className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                                       title="Record voice note"
+                                    >
+                                       <Mic className="w-4 h-4" />
+                                    </button>
+                                 )
+                              ) : (
+                                 <button
+                                    onClick={handleSendReply}
+                                    disabled={!replyText.trim() || isSending}
+                                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
+                                 >
+                                    <Send className="w-4 h-4" />
+                                 </button>
+                              )}
+                           </div>
                         </div>
                      )}
                   </motion.div>

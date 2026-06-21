@@ -131,16 +131,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        const joinedSet = new Set(joinedGroupIds);
-        const count = globalMessages.filter((m) => {
-            if (m.user_id === user.id) return false;
-            if (!joinedSet.has(m.group_id)) return false;
-            const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
-            return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
-        }).length;
+        let isCancelled = false;
 
-        setUnreadCount(count);
-    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount]);
+        const calculateUnread = async () => {
+            let hasPlayed = false;
+            const cached = queryClient.getQueryData(['server-date']) as any;
+            const gameDate = cached?.formatted || null;
+            if (gameDate) {
+                const { data } = await supabase
+                    .from("scores")
+                    .select("status")
+                    .eq("user_id", user.id)
+                    .eq("game_date", gameDate)
+                    .in("status", ["won", "lost"])
+                    .maybeSingle();
+                hasPlayed = !!data;
+            }
+
+            if (isCancelled) return;
+
+            const joinedSet = new Set(joinedGroupIds);
+            const count = globalMessages.filter((m) => {
+                if (m.user_id === user.id) return false;
+                if (!joinedSet.has(m.group_id)) return false;
+                // Game Analysis is locked if user hasn't played today
+                if (!hasPlayed && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
+                const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+                return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
+            }).length;
+
+            setUnreadCount(count);
+        };
+
+        calculateUnread();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount, queryClient]);
 
     // Refs for signaling
     const signalingChannelRef = useRef<any>(null);
