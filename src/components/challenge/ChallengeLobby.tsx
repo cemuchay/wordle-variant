@@ -21,6 +21,7 @@ import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useApp } from "../../context/AppContext";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ConfirmationModal } from "../ConfirmationModal";
+import { SHAPESHIFTER_MAX_ATTEMPTS, DEFAULT_MAX_PARTICIPANTS, MAX_ATTEMPTS } from "../../constants/game";
 import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 import { ChallengeChat } from "./ChallengeChat";
 import { useChallengeChat } from "../../hooks/useChallengeChat";
@@ -379,7 +380,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     );
   }, [selectedChallenge, isMarathon]);
 
-  const maxParts = selectedChallenge.max_participants || 100;
+  const maxParts = selectedChallenge.max_participants || DEFAULT_MAX_PARTICIPANTS;
   const currentParts = participants.length;
   const isFull =
     currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
@@ -782,13 +783,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <div className="flex items-center gap-1.5">
                   <Trophy size={12} className="text-indigo-400" />
                   <span className="text-xs font-bold text-white">
-                    {selectedChallenge.is_shapeshifter ? 20 : (selectedChallenge.max_attempts || 6)} Tries
+                    {selectedChallenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : (selectedChallenge.max_attempts || MAX_ATTEMPTS)} Tries
                   </span>
                 </div>
                 <p className="text-[9px] text-white">
                   {selectedChallenge.is_shapeshifter
                     ? "Shifter Limit"
-                    : (selectedChallenge.max_attempts && selectedChallenge.max_attempts !== 6
+                    : (selectedChallenge.max_attempts && selectedChallenge.max_attempts !== MAX_ATTEMPTS
                       ? "Custom Limit"
                       : "Standard Limit")}
                 </p>
@@ -889,7 +890,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 </div>
                 <p className="text-[9px] text-white">
                   {selectedChallenge.is_public
-                    ? `Max ${selectedChallenge.max_participants || 100} players`
+                    ? `Max ${selectedChallenge.max_participants || DEFAULT_MAX_PARTICIPANTS} players`
                     : "Direct shares only"}
                 </p>
               </div>

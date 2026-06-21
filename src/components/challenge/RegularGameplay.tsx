@@ -2,6 +2,7 @@
 import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { ANIMATION_DURATION } from '../../constants/ui';
+import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
@@ -70,7 +71,7 @@ export const RegularGameplay = memo(function RegularGameplay({
             if (wasGameOverOnMount.current) {
                 setHideKeyboard(true);
             } else {
-                const hideDelay = wordLength * 400 + 400; // Match TILE_REVEAL + padding
+                const hideDelay = wordLength * ANIMATION_DURATION.TILE_REVEAL + ANIMATION.REVEAL_BUFFER;
                 const timer = setTimeout(() => {
                     setHideKeyboard(true);
                 }, hideDelay);
@@ -102,7 +103,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         ? getHandicapStarter(challenge, gameIndex, wordLength)
         : challenge.handicap_starter;
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
-    const showHint = stableGuessesCount >= 2 && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
+    const showHint = stableGuessesCount >= ANIMATION.HINT_MIN_GUESSES && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 
     const lastGuess = guesses[guesses.length - 1];
 
@@ -155,12 +156,12 @@ export const RegularGameplay = memo(function RegularGameplay({
                         {showHint && (
                             <button
                                 onClick={actions.handleHint}
-                                disabled={usedHint || stableGuessesCount >= 5 || stableIsHintDisabled}
-                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((stableGuessesCount >= 5 || stableIsHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
-                                title={usedHint ? "Hint Used" : (stableGuessesCount >= 5 || stableIsHintDisabled) ? "Hint Unavailable" : "Get Hint"}
+                                disabled={usedHint || stableGuessesCount >= maxAttempts - 1 || stableIsHintDisabled}
+                                className={`p-2 transition-all rounded-xl relative ${usedHint ? 'text-yellow-500/30 cursor-not-allowed' : ((stableGuessesCount >= maxAttempts - 1 || stableIsHintDisabled) ? 'text-gray-600 cursor-not-allowed opacity-50' : 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 animate-pulse')}`}
+                                title={usedHint ? "Hint Used" : (stableGuessesCount >= maxAttempts - 1 || stableIsHintDisabled) ? "Hint Unavailable" : "Get Hint"}
                             >
                                 <Lightbulb size={18} fill={usedHint ? "none" : "currentColor"} />
-                                {(stableGuessesCount >= 5 || stableIsHintDisabled) && !usedHint && (
+                                {(stableGuessesCount >= maxAttempts - 1 || stableIsHintDisabled) && !usedHint && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="w-[80%] h-[2px] bg-red-600/60 rotate-45" />
                                     </div>

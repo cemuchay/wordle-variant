@@ -6,6 +6,7 @@ import { type ProfileStats } from "../types";
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
+import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
 
 interface MatchData {
    p1_score?: number;
@@ -102,13 +103,13 @@ export const BattleView = ({
                id,
                text: detail.text,
                senderRole: detail.senderRole,
-               x: detail.senderRole === "player1" ? 15 + Math.random() * 30 : 55 + Math.random() * 30,
-               y: 70 + Math.random() * 15
-            };
-            setActiveBubbles((prev) => [...prev, newBubble]);
-            setTimeout(() => {
-               setActiveBubbles((prev) => prev.filter((b) => b.id !== id));
-            }, 2500);
+                x: detail.senderRole === "player1" ? CHAT_BUBBLE.POSITION_X_BASE + Math.random() * CHAT_BUBBLE.POSITION_X_VARIANCE : CHAT_BUBBLE.POSITION_X_OPP_BASE + Math.random() * CHAT_BUBBLE.POSITION_X_OPP_VARIANCE,
+                y: CHAT_BUBBLE.POSITION_Y_BASE + Math.random() * CHAT_BUBBLE.POSITION_Y_VARIANCE
+             };
+             setActiveBubbles((prev) => [...prev, newBubble]);
+             setTimeout(() => {
+                setActiveBubbles((prev) => prev.filter((b) => b.id !== id));
+             }, CHAT_BUBBLE.DURATION);
          }
       };
       window.addEventListener("wordup-quick-chat", handleChat);
@@ -160,19 +161,17 @@ export const BattleView = ({
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
       if (choice === activeQuestion.answer) {
-         const COLORS = ["#4ade80", "#2ec871", "#facc15", "#38bdf8", "#ec4899", "#a855f7"];
-         const SHAPES = ["circle", "square", "triangle"];
-         const newParticles = Array.from({ length: 30 }).map((_, i) => {
-            const angle = (i / 30) * 360 + (Math.random() * 20 - 10);
-            const distance = 90 + Math.random() * 140;
+         const newParticles = Array.from({ length: CONFETTI.PARTICLE_COUNT }).map((_, i) => {
+            const angle = (i / CONFETTI.PARTICLE_COUNT) * 360 + (Math.random() * 20 - 10);
+            const distance = CONFETTI.MIN_DISTANCE + Math.random() * CONFETTI.MAX_DISTANCE;
             const rad = (angle * Math.PI) / 180;
             const targetX = Math.cos(rad) * distance;
             const targetY = Math.sin(rad) * distance;
-            const size = 6 + Math.random() * 12;
-            const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const size = CONFETTI.MIN_SIZE + Math.random() * CONFETTI.MAX_SIZE;
+            const color = CONFETTI.COLORS[Math.floor(Math.random() * CONFETTI.COLORS.length)];
             const rotation = Math.random() * 360;
-            const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-            const duration = 0.8 + Math.random() * 0.4;
+            const shape = CONFETTI.SHAPES[Math.floor(Math.random() * CONFETTI.SHAPES.length)];
+            const duration = CONFETTI.MIN_DURATION + Math.random() * CONFETTI.MAX_DURATION;
 
             return {
                id: i,
@@ -190,10 +189,10 @@ export const BattleView = ({
    };
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > 80 ? "text-sm sm:text-base" : promptLen > 50 ? "text-base sm:text-lg" : "text-lg sm:text-xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-sm sm:text-base" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-base sm:text-lg" : "text-lg sm:text-xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-   const choiceSizeClass = maxChoiceLen > 25 ? "text-[8px] sm:text-[10px]" : maxChoiceLen > 15 ? "text-[10px] sm:text-xs" : "text-xs";
+   const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[8px] sm:text-[10px]" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-[10px] sm:text-xs" : "text-xs";
 
    return (
       <motion.div
@@ -210,7 +209,7 @@ export const BattleView = ({
                      initial={{ opacity: 0, y: `${bubble.y}%`, scale: 0.8 }}
                      animate={{ opacity: 1, y: `${bubble.y - 40}%`, scale: 1 }}
                      exit={{ opacity: 0, scale: 0.9 }}
-                     transition={{ duration: 2.2, ease: "easeOut" }}
+                     transition={{ duration: CHAT_BUBBLE.FADE_DURATION, ease: "easeOut" }}
                      style={{ left: `${bubble.x}%` }}
                      className="absolute -translate-x-1/2 bg-slate-900/90 text-white border border-white/20 px-3 py-1.5 rounded-2xl shadow-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"
                   >
@@ -262,8 +261,8 @@ export const BattleView = ({
                {categoryName && (
                   <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider mb-0.5">{categoryName}</span>
                )}
-               <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of 7</span>
-               {currentIdx === 6 && (
+                <span className="text-xs font-black text-gray-400">Round {currentIdx + 1} of {WORDUP_GAME.TOTAL_ROUNDS}</span>
+                {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
                   <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ DOUBLE POINTS</span>
                )}
             </div>
@@ -311,8 +310,8 @@ export const BattleView = ({
          {/* Question Container */}
          <div className="flex-1 flex flex-col justify-start md:justify-center gap-4 md:gap-6 py-4 md:py-6 overflow-y-auto scrollbar-hide min-h-0">
             <div className="text-center space-y-2">
-               <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
-                  {currentIdx === 6 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
+                <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} font-black tracking-tight leading-relaxed text-white whitespace-pre-line`}>

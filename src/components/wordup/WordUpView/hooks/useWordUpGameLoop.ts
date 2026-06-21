@@ -1,38 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
+import { QUESTION_DURATION } from "../../../../constants/wordup";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { useWordUpLiveGame } from "./useWordUpLiveGame";
 import { useWordUpBotGame } from "./useWordUpBotGame";
 import { useWordUpAsyncGame } from "./useWordUpAsyncGame";
 
 export const getQuestionDuration = (type: string): number => {
-   switch (type) {
-      case "real_fake":
-      case "length":
-      case "missing_letter":
-         return 8;
-      case "definition":
-       case "anagram":
-       case "anagram_scrambled":
-       case "pattern":
-       case "math":
-       case "odd_one_out":
-       case "synonym_match":
-       case "word_chain":
-       case "letter_shift":
-       case "compound_break":
-       case "cryptogram":
-       case "category_sort":
-       case "letter_add_remove":
-          return 12;
-       case "reverse_wordle":
-          return 15;
-       case "word_within":
-          return 20;
-       default:
-          return 10;
-   }
+   return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
 };
 
 export const useWordUpGameLoop = (

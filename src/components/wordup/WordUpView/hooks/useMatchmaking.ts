@@ -5,6 +5,7 @@ import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 import { generateMatchQuestions } from "../../../../services/wordup/questionService";
+import { WORDUP_TIMEOUT } from "../../../../constants/wordup";
 
 export const useWordUpMatchmaking = (
    user: any,
@@ -150,7 +151,7 @@ export const useWordUpMatchmaking = (
             useWordUpStore.getState().setView("matchmaking");
             setRole("player1");
             setMatchId(null);
-            setCountdownSecs(10);
+            setCountdownSecs(Math.floor(WORDUP_TIMEOUT.MATCHMAKING / 1000));
 
             matchmakingIntervalRef.current = window.setInterval(() => {
                const current = useWordUpStore.getState().countdownSecs;

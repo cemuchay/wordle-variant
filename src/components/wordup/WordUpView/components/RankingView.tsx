@@ -4,6 +4,7 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
 import { type ProfileStats } from "../types";
+import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../../../constants/wordup";
 
 interface LeaderboardEntry extends ProfileStats {
    id: string;
@@ -27,9 +28,9 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
       const updated = entry.updated_at ? new Date(entry.updated_at).getTime() : new Date().getTime();
       const now = Date.now();
       const diffDays = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
-      if (diffDays >= 7 && entry.games_played > 0) {
-         const decayWeeks = Math.floor(diffDays / 7);
-         return Math.max(600, entry.rating - (decayWeeks * 15));
+      if (diffDays >= INACTIVITY.THRESHOLD_DAYS && entry.games_played > 0) {
+         const decayWeeks = Math.floor(diffDays / INACTIVITY.THRESHOLD_DAYS);
+         return Math.max(RATING.FLOOR, entry.rating - (decayWeeks * INACTIVITY.DECAY_PER_WEEK));
       }
       return entry.rating;
    }, []);
@@ -49,7 +50,7 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
             `)
             .gt("games_played", 0)
             .order("rating", { ascending: false })
-            .limit(30);
+            .limit(WORDUP_GAME.LEADERBOARD_LIMIT);
 
          if (error) throw error;
 
@@ -111,19 +112,19 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
    };
 
    const getRankNameColor = (rating: number) => {
-      if (rating >= 1700) return "text-purple-400";
-      if (rating >= 1400) return "text-cyan-400";
-      if (rating >= 1100) return "text-yellow-400";
-      if (rating >= 800) return "text-slate-300";
+      if (rating >= RANKS.MASTER.THRESHOLD) return RANKS.MASTER.COLOR;
+      if (rating >= RANKS.DIAMOND.THRESHOLD) return RANKS.DIAMOND.COLOR;
+      if (rating >= RANKS.GOLD.THRESHOLD) return RANKS.GOLD.COLOR;
+      if (rating >= RANKS.SILVER.THRESHOLD) return RANKS.SILVER.COLOR;
       return "text-gray-500";
    };
 
    const getRankName = (rating: number) => {
-      if (rating >= 1700) return "Master";
-      if (rating >= 1400) return "Diamond";
-      if (rating >= 1100) return "Gold";
-      if (rating >= 800) return "Silver";
-      return "Bronze";
+      if (rating >= RANKS.MASTER.THRESHOLD) return RANKS.MASTER.NAME;
+      if (rating >= RANKS.DIAMOND.THRESHOLD) return RANKS.DIAMOND.NAME;
+      if (rating >= RANKS.GOLD.THRESHOLD) return RANKS.GOLD.NAME;
+      if (rating >= RANKS.SILVER.THRESHOLD) return RANKS.SILVER.NAME;
+      return RANKS.BRONZE.NAME;
    };
 
    if (loading) {

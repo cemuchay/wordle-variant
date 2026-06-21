@@ -4,7 +4,8 @@ import { getWordLists } from '../../data/words';
 import { checkGuess, getLetterStatuses, isHintDisabled, getHint, updateStats, obfuscateWord } from '../../lib/game-logic';
 import { generateRoast } from '../../utils/roastEngine';
 import returnAnimationTime from '../../utils/returnAnimationTime';
-import { TOAST_DURATION } from '../../constants/ui';
+import { TOAST_DURATION, ANIMATION_DURATION } from '../../constants/ui';
+import { ANIMATION } from '../../constants/game';
 import { safeLocalStorage } from '../../utils/storage';
 import { getLocalSalt } from './utils';
 
@@ -107,7 +108,7 @@ export const useActions = ({
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });
-            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
+            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), ANIMATION_DURATION.SHAKE);
             return;
          }
 
@@ -177,16 +178,16 @@ export const useActions = ({
             if (!success) {
                triggerToast(
                   "Cloud sync failed after 3 attempts. Progress saved locally.",
-                  TOAST_DURATION.LONG + 1000,
+                  TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
                );
             }
          }
 
-         // Stabilization Delay: Wait 300ms after sync attempt before triggering reveal
-         await new Promise((r) => setTimeout(r, 300));
+         // Stabilization Delay: Wait after sync attempt before triggering reveal
+         await new Promise((r) => setTimeout(r, ANIMATION.STABILIZATION_DELAY));
 
          // Calculate delay: use returnAnimationTime + extra buffer for safety
-         const revealDelay = returnAnimationTime(config.length) + 600;
+          const revealDelay = returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
 
          // 2. Update UI (flips row)
          dispatch({
@@ -205,7 +206,7 @@ export const useActions = ({
             if (lost) {
                triggerToast(
                   `The word is: ${config.word}`,
-                  TOAST_DURATION.LONG + 1000,
+                  TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
                );
             }
 
@@ -216,7 +217,7 @@ export const useActions = ({
                if (won) {
                   triggerToast(
                      message || state.gameMessage,
-                     TOAST_DURATION.LONG + 1000,
+                     TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
                   );
                }
             }, revealDelay);
@@ -249,7 +250,7 @@ export const useActions = ({
    ]);
 
    const handleHint = useCallback(async () => {
-      if (state.guesses.length < 2 || state.isGameOver || state.usedHint)
+      if (state.guesses.length < ANIMATION.HINT_MIN_GUESSES || state.isGameOver || state.usedHint)
          return;
       if (state.guesses.length >= config.maxAttempts - 1) {
          triggerToast("Hint locked on last available guess.");

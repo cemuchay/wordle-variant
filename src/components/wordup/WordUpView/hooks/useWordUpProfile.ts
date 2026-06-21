@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { type ProfileStats } from "../types";
+import { RATING, INACTIVITY, RANKS } from "../../../../constants/wordup";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 
 export const useWordUpProfile = (user: { id: string } | null) => {
@@ -26,13 +27,13 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                } else {
                   const defaultProfile = {
                      id: user.id,
-                     rating: 600,
-                     xp: 0,
-                     games_played: 0,
-                     games_won: 0,
-                     games_lost: 0,
-                     games_tied: 0,
-                     rank_name: "Bronze"
+                      rating: RATING.DEFAULT,
+                      xp: 0,
+                      games_played: 0,
+                      games_won: 0,
+                      games_lost: 0,
+                      games_tied: 0,
+                      rank_name: RANKS.BRONZE.NAME
                   };
                   const { error: insertError } = await supabase
                      .from("wordup_profiles")
@@ -44,22 +45,22 @@ export const useWordUpProfile = (user: { id: string } | null) => {
          );
 
          if (data) {
-            // Check for inactivity decay (15 points for every 7 days since last update)
+            // Check for inactivity decay
             const lastUpdate = data.updated_at ? new Date(data.updated_at).getTime() : new Date().getTime();
             const now = new Date().getTime();
             const diffDays = Math.floor((now - lastUpdate) / (1000 * 60 * 60 * 24));
-            if (diffDays >= 7 && data.games_played > 0) {
-               const decayWeeks = Math.floor(diffDays / 7);
-               const decayAmount = decayWeeks * 15;
-               const newRating = Math.max(600, data.rating - decayAmount);
+            if (diffDays >= INACTIVITY.THRESHOLD_DAYS && data.games_played > 0) {
+               const decayWeeks = Math.floor(diffDays / INACTIVITY.THRESHOLD_DAYS);
+               const decayAmount = decayWeeks * INACTIVITY.DECAY_PER_WEEK;
+               const newRating = Math.max(RATING.FLOOR, data.rating - decayAmount);
                
                if (newRating !== data.rating) {
                   console.log(`[WordUp Logs] Inactivity ELO decay triggered: -${decayAmount} Elo. Rating: ${data.rating} -> ${newRating}`);
-                  let rank = "Bronze";
-                  if (newRating >= 1700) rank = "Master";
-                  else if (newRating >= 1400) rank = "Diamond";
-                  else if (newRating >= 1100) rank = "Gold";
-                  else if (newRating >= 800) rank = "Silver";
+                  let rank = RANKS.BRONZE.NAME;
+                  if (newRating >= RANKS.MASTER.THRESHOLD) rank = RANKS.MASTER.NAME;
+                  else if (newRating >= RANKS.DIAMOND.THRESHOLD) rank = RANKS.DIAMOND.NAME;
+                  else if (newRating >= RANKS.GOLD.THRESHOLD) rank = RANKS.GOLD.NAME;
+                  else if (newRating >= RANKS.SILVER.THRESHOLD) rank = RANKS.SILVER.NAME;
 
                   await supabase
                      .from("wordup_profiles")
@@ -96,10 +97,10 @@ export const useWordUpProfile = (user: { id: string } | null) => {
 
    const getRankColor = useCallback((rankName: string) => {
       switch (rankName) {
-         case "Master": return "text-purple-400 border-purple-500/30 bg-purple-500/10";
-         case "Diamond": return "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
-         case "Gold": return "text-yellow-400 border-yellow-500/30 bg-yellow-500/10";
-         case "Silver": return "text-slate-300 border-slate-500/30 bg-slate-500/10";
+         case RANKS.MASTER.NAME: return "text-purple-400 border-purple-500/30 bg-purple-500/10";
+         case RANKS.DIAMOND.NAME: return "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
+         case RANKS.GOLD.NAME: return "text-yellow-400 border-yellow-500/30 bg-yellow-500/10";
+         case RANKS.SILVER.NAME: return "text-slate-300 border-slate-500/30 bg-slate-500/10";
          default: return "text-amber-600 border-amber-600/30 bg-amber-600/10";
       }
    }, []);
@@ -123,31 +124,31 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                   } else {
                      const defaultProfile = {
                         id: user.id,
-                        rating: 600,
+                        rating: RATING.DEFAULT,
                         xp: 0,
                         games_played: 0,
                         games_won: 0,
                         games_lost: 0,
                         games_tied: 0,
-                        rank_name: "Bronze"
+                        rank_name: RANKS.BRONZE.NAME
                      };
                      const { error: insertError } = await supabase
                         .from("wordup_profiles")
                         .insert(defaultProfile);
                      if (insertError) throw insertError;
-                     return defaultProfile;
-                  }
-               }, 3, 1000);
+                      return defaultProfile;
+                   }
+                }, 3, 1000);
 
-               if (currentProf) {
-                  const newRating = Math.max(600, currentProf.rating + eloGain);
-                  const newXp = currentProf.xp + xpReward;
+                 if (currentProf) {
+                   const newRating = Math.max(RATING.FLOOR, currentProf.rating + eloGain);
+                   const newXp = currentProf.xp + xpReward;
 
-                  let rank = "Bronze";
-                  if (newRating >= 1700) rank = "Master";
-                  else if (newRating >= 1400) rank = "Diamond";
-                  else if (newRating >= 1100) rank = "Gold";
-                  else if (newRating >= 800) rank = "Silver";
+                   let rank = RANKS.BRONZE.NAME;
+                   if (newRating >= RANKS.MASTER.THRESHOLD) rank = RANKS.MASTER.NAME;
+                   else if (newRating >= RANKS.DIAMOND.THRESHOLD) rank = RANKS.DIAMOND.NAME;
+                   else if (newRating >= RANKS.GOLD.THRESHOLD) rank = RANKS.GOLD.NAME;
+                   else if (newRating >= RANKS.SILVER.THRESHOLD) rank = RANKS.SILVER.NAME;
 
                   await fetchWithRetry(async () => {
                       const { error } = await supabase

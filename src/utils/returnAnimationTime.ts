@@ -1,11 +1,11 @@
 import { ANIMATION_DURATION } from "../constants/ui";
+import { ANIMATION } from "../constants/game";
 
 const returnAnimationTime = (wordLength: number) => {
-   const buffer = 400;
    if (wordLength < 7) {
-      return wordLength * ANIMATION_DURATION.TILE_REVEAL + buffer;
+      return wordLength * ANIMATION_DURATION.TILE_REVEAL + ANIMATION.REVEAL_BUFFER;
    } else {
-      return wordLength * ANIMATION_DURATION.TILE_REVEAL_LONG + buffer;
+      return wordLength * ANIMATION_DURATION.TILE_REVEAL_LONG + ANIMATION.REVEAL_BUFFER;
    }
 };
 
