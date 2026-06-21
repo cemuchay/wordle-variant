@@ -31,6 +31,7 @@ export interface WordUpQuestion {
    choices: string[];
    answer: string;
    imageUrl?: string; // Optional URL pointing to the Supabase Storage bucket asset
+   imageUrls?: string[]; // Optional array of image codes/urls for multi-image questions
 }
 
 export const getQuestionImageUrl = (path: string): string => {

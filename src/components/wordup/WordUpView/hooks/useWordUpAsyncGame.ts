@@ -4,6 +4,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator";
+import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
@@ -466,6 +468,9 @@ export const useWordUpAsyncGame = ({
 
           try {
              const dec = await decryptMatchQuestions(match);
+             if (match.category === "flag_bearer") {
+                await preloadMatchFlags(dec);
+             }
              setQuestions(dec);
           } catch (e) {
              console.error("Decrypt failed:", e);

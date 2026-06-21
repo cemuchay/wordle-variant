@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
+import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";
 import { type ProfileStats } from "../types";
+
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
@@ -348,106 +350,188 @@ export const BattleView = ({
                      {activeQuestion.subPrompt}
                   </p>
                )}
-            </div>
+               {activeQuestion.imageUrl && (
+                <div className="w-full flex justify-center shrink-0 my-1">
+                   <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="w-full max-w-[280px] h-[140px] rounded-2xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1.5 shadow-inner"
+                   >
+                      <img
+                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
+                         alt="Question Clue"
+                         className="max-h-full max-w-full object-contain rounded-xl select-none"
+                         loading="lazy"
+                         draggable={false}
+                      />
+                   </motion.div>
+                </div>
+             )}
 
-            {activeQuestion.imageUrl && (
-               <div className="w-full flex justify-center shrink-0 my-1">
-                  <motion.div
-                     initial={{ opacity: 0, scale: 0.95 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     className="w-full max-w-[280px] h-[140px] rounded-2xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1.5 shadow-inner"
-                  >
-                     <img
-                        src={activeQuestion.imageUrl}
-                        alt="Question Clue"
-                        className="max-h-full max-w-full object-contain rounded-xl select-none"
-                        loading="lazy"
-                        draggable={false}
-                     />
-                  </motion.div>
-               </div>
-            )}
+             {/* Choices Grid */}
+             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 shrink-0">
+                   {activeQuestion.choices.map((choice, index) => {
+                      const isSelected = selectedAnswer === choice;
+                      const isCorrect = choice === activeQuestion.answer;
+                      const isOppSelected = revealAnswers && oppChoice === choice;
+                      const flagCode = activeQuestion.imageUrls?.[index] || choice;
+                      const imageUrl = getCachedFlagUrl(flagCode);
+                      const optionLetter = String.fromCharCode(65 + index);
 
-            {/* Choices Grid */}
-            <div className="grid grid-cols-2 gap-4 shrink-0">
-               {activeQuestion.choices.map((choice) => {
-                  const isSelected = selectedAnswer === choice;
-                  const isCorrect = choice === activeQuestion.answer;
-                  const isOppSelected = revealAnswers && oppChoice === choice;
+                      let cardClass = "relative w-full aspect-[3/2] rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-1.5 transition-all shadow-md select-none shrink-0 ";
+                      if (selectedAnswer === null) {
+                         cardClass += " cursor-pointer bg-slate-950/40 border-white/10 hover:border-cyan-400 hover:bg-slate-950/60";
+                      } else {
+                         cardClass += " cursor-default";
+                         if (isCorrect) {
+                            cardClass += " border-correct shadow-[0_0_20px_rgba(106,170,100,0.6)] bg-correct/10";
+                         } else if (isSelected) {
+                            cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
+                         } else {
+                            cardClass += " border-white/5 bg-slate-950/20 opacity-40";
+                         }
+                      }
 
-                   let btnClass = `p-5 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[64px] relative overflow-hidden`;
-                  if (selectedAnswer === null) {
-                     btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
-                  } else {
-                     btnClass += " cursor-default";
-                     if (isCorrect) {
-                        btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
-                     } else if (isSelected) {
-                        btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
-                     } else {
-                        btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
-                     }
-                  }
+                      if (isOppSelected) {
+                         cardClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                      }
 
-                  if (isOppSelected) {
-                     btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
-                  }
+                      let buttonAnimate: TargetAndTransition | undefined = undefined;
+                      let buttonTransition: Transition | undefined = undefined;
 
-                  let buttonAnimate: TargetAndTransition | undefined = undefined;
-                  let buttonTransition: Transition | undefined = undefined;
+                      if (selectedAnswer !== null) {
+                         if (isSelected && isCorrect) {
+                            buttonAnimate = {
+                               scale: [1, 1.1, 0.98, 1.02, 1],
+                               rotate: [0, -2, 2, -1, 1, 0]
+                            };
+                            buttonTransition = { duration: 0.5, ease: "easeInOut" };
+                         } else if (isSelected && !isCorrect) {
+                            buttonAnimate = {
+                               x: [0, -6, 6, -6, 6, 0]
+                            };
+                            buttonTransition = { duration: 0.4, ease: "linear" };
+                         }
+                      }
 
-                  if (selectedAnswer !== null) {
-                     if (isSelected && isCorrect) {
-                        buttonAnimate = {
-                           scale: [1, 1.15, 0.95, 1.05, 1],
-                           rotate: [0, -3, 3, -2, 2, 0],
-                           boxShadow: [
-                              "0 0 0px rgba(106,170,100,0)",
-                              "0 0 45px rgba(106,170,100,0.95)",
-                              "0 0 20px rgba(106,170,100,0.5)",
-                              "0 0 0px rgba(106,170,100,0)"
-                           ]
-                        };
-                        buttonTransition = { duration: 0.65, ease: "easeInOut" };
-                     } else if (isSelected && !isCorrect) {
-                        buttonAnimate = {
-                           x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
-                           scale: [1, 0.95, 1.02, 1],
-                           boxShadow: [
-                              "0 0 0px rgba(239,68,68,0)",
-                              "0 0 35px rgba(239,68,68,0.95)",
-                              "0 0 10px rgba(239,68,68,0.4)",
-                              "0 0 0px rgba(239,68,68,0)"
-                           ]
-                        };
-                        buttonTransition = { duration: 0.5, ease: "linear" };
-                     }
-                  }
+                      return (
+                         <motion.button
+                            key={choice}
+                            disabled={selectedAnswer !== null || revealAnswers}
+                            onClick={() => onChoiceSelect(choice)}
+                            animate={buttonAnimate}
+                            transition={buttonTransition}
+                            className={cardClass}
+                         >
+                            <img
+                               src={imageUrl}
+                               alt={`Flag Option ${optionLetter}`}
+                               className="w-full h-full object-cover rounded-xl"
+                               loading="lazy"
+                               draggable={false}
+                            />
 
-                  return (
-                     <motion.button
-                        key={choice}
-                        disabled={selectedAnswer !== null || revealAnswers}
-                        onClick={() => onChoiceSelect(choice)}
-                        animate={buttonAnimate}
-                        transition={buttonTransition}
-                        className={btnClass}
-                     >
-                        <span className="flex-1 text-center pr-8">{choice}</span>
+                            <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-lg select-none">
+                               {optionLetter}
+                            </div>
 
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
-                           {isSelected && (
-                              <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
-                           )}
-                           {isOppSelected && (
-                              <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
-                                 {opponentName.slice(0, 5)}
-                              </span>
-                           )}
-                        </div>
-                     </motion.button>
-                  );
-               })}
+                            <div className="absolute right-2 bottom-2 flex gap-1 items-center z-10">
+                               {isSelected && (
+                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                               )}
+                               {isOppSelected && (
+                                  <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                     {opponentName.slice(0, 5)}
+                                  </span>
+                               )}
+                            </div>
+                         </motion.button>
+                      );
+                   })}
+                </div>
+             ) : (
+                <div className="grid grid-cols-2 gap-4 shrink-0">
+                   {activeQuestion.choices.map((choice) => {
+                      const isSelected = selectedAnswer === choice;
+                      const isCorrect = choice === activeQuestion.answer;
+                      const isOppSelected = revealAnswers && oppChoice === choice;
+
+                      let btnClass = `p-5 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[64px] relative overflow-hidden`;
+                      if (selectedAnswer === null) {
+                         btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                      } else {
+                         btnClass += " cursor-default";
+                         if (isCorrect) {
+                            btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
+                         } else if (isSelected) {
+                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
+                         } else {
+                            btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
+                         }
+                      }
+
+                      if (isOppSelected) {
+                         btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                      }
+
+                      let buttonAnimate: TargetAndTransition | undefined = undefined;
+                      let buttonTransition: Transition | undefined = undefined;
+
+                      if (selectedAnswer !== null) {
+                         if (isSelected && isCorrect) {
+                            buttonAnimate = {
+                               scale: [1, 1.15, 0.95, 1.05, 1],
+                               rotate: [0, -3, 3, -2, 2, 0],
+                               boxShadow: [
+                                  "0 0 0px rgba(106,170,100,0)",
+                                  "0 0 45px rgba(106,170,100,0.95)",
+                                  "0 0 20px rgba(106,170,100,0.5)",
+                                  "0 0 0px rgba(106,170,100,0)"
+                               ]
+                            };
+                            buttonTransition = { duration: 0.65, ease: "easeInOut" };
+                         } else if (isSelected && !isCorrect) {
+                            buttonAnimate = {
+                               x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
+                               scale: [1, 0.95, 1.02, 1],
+                               boxShadow: [
+                                  "0 0 0px rgba(239,68,68,0)",
+                                  "0 0 35px rgba(239,68,68,0.95)",
+                                  "0 0 10px rgba(239,68,68,0.4)",
+                                  "0 0 0px rgba(239,68,68,0)"
+                               ]
+                            };
+                            buttonTransition = { duration: 0.5, ease: "linear" };
+                         }
+                      }
+
+                      return (
+                         <motion.button
+                            key={choice}
+                            disabled={selectedAnswer !== null || revealAnswers}
+                            onClick={() => onChoiceSelect(choice)}
+                            animate={buttonAnimate}
+                            transition={buttonTransition}
+                            className={btnClass}
+                         >
+                            <span className="flex-1 text-center pr-8">{choice}</span>
+
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
+                               {isSelected && (
+                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                               )}
+                               {isOppSelected && (
+                                  <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                     {opponentName.slice(0, 5)}
+                                  </span>
+                               )}
+                            </div>
+                         </motion.button>
+                      );
+                   })}
+                </div>
+             )}
             </div>
 
             {/* Prefilled Quick Chat Row */}

@@ -4,6 +4,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+
 import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
@@ -590,6 +592,9 @@ export const useWordUpBotGame = ({
                      setMatchData(match);
                      try {
                         const dec = await decryptMatchQuestions(match);
+                        if (category === "flag_bearer") {
+                           await preloadMatchFlags(dec);
+                        }
                         setQuestions(dec);
                      } catch (e) {
                         console.error("Decrypt failed:", e);
@@ -636,6 +641,9 @@ export const useWordUpBotGame = ({
                encryption_key: secretKey,
             };
 
+            if (category === "flag_bearer") {
+               await preloadMatchFlags(rawQuestions);
+            }
             setMatchData(match);
             setQuestions(rawQuestions);
          } else {
@@ -662,6 +670,9 @@ export const useWordUpBotGame = ({
 
             try {
                const dec = await decryptMatchQuestions(match);
+               if (match.category === "flag_bearer") {
+                  await preloadMatchFlags(dec);
+               }
                setQuestions(dec);
             } catch (e) {
                console.error("Decrypt failed:", e);

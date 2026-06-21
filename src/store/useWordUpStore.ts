@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../components/wordup/WordUpView/types";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
+import { postProcessQuestions } from "../utils/wordupQuestionPostProcessor";
+
 
 interface WordUpState {
    isBattlePlaying: boolean;
@@ -78,7 +80,11 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    },
    setMatchId: (matchId) => set({ matchId }),
    setRole: (role) => set({ role }),
-   setQuestions: (questions) => set({ questions }),
+   setQuestions: (questions) => {
+      const category = useWordUpStore.getState().category;
+      const processed = postProcessQuestions(questions, category);
+      set({ questions: processed });
+   },
    setCurrentIdx: (currentIdx) => set({ currentIdx }),
    setMatchData: (matchData) => set({ matchData }),
    setOpponentStats: (opponentStats) => set({ opponentStats }),

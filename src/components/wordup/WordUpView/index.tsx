@@ -12,6 +12,8 @@ import { supabase } from "../../../lib/supabaseClient";
 import { Swords } from "lucide-react";
 
 import { decryptMatchQuestions } from "../../../utils/wordupQuestionGenerator";
+import { preloadMatchFlags } from "../../../utils/wordupQuestionPostProcessor";
+
 
 import { LobbyView } from "./components/LobbyView";
 import { MatchmakingView } from "./components/MatchmakingView";
@@ -285,6 +287,13 @@ export const WordUpView = () => {
       const match = await loadAndSubscribeMatch(mId, mRole);
       const loadedQuestions = useWordUpStore.getState().questions;
       if (match && loadedQuestions && loadedQuestions.length > 0) {
+         if (match.category === "flag_bearer") {
+            try {
+               await preloadMatchFlags(loadedQuestions);
+            } catch (err) {
+               console.warn("Failed to preload flags:", err);
+            }
+         }
          wordupAudio.playMatchStart();
          setView("countdown");
          startCountdown(match);
