@@ -328,6 +328,38 @@ export default function FloatingChatBubble() {
       checkGameStatus();
    }, [user?.id, date]);
 
+   // Mark all unread messages as read when the bubble overlay opens
+   useEffect(() => {
+      if (!isOverlayOpen || !user?.id) return;
+      const state = useAppStore.getState();
+      const receipts = state.readReceipts;
+      const joined = new Set(state.joinedGroupIds);
+      const timestamp = new Date().toISOString();
+      const marked = new Set<string>();
+
+      state.globalMessages.forEach((m: any) => {
+         if (m.user_id === user.id) return;
+         if (!joined.has(m.group_id)) return;
+         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+         const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
+         if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+            if (!marked.has(m.group_id)) {
+               marked.add(m.group_id);
+               updateReadReceipt(m.group_id, timestamp);
+               supabase
+                  .from("chat_read_receipts")
+                  .upsert(
+                     { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
+                     { onConflict: "user_id,group_id" }
+                  )
+                  .then(({ error }) => {
+                     if (error) console.error("Failed to mark as read:", error);
+                  });
+            }
+         }
+      });
+   }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
+
    // Auto-scroll detailed message view to bottom
    useEffect(() => {
       if (scrollRef.current) {
