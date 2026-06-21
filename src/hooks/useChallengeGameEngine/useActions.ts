@@ -2,6 +2,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { getWordLists } from '../../data/words';
 import { checkGuess, getLetterStatuses, calculateSkillIndex, getShapeShifterFeedbackAndWord, isHintDisabled, getHint } from '../../lib/game-logic';
+import { ANIMATION_DURATION } from '../../constants/ui';
 import { logger } from '../../lib/logger';
 import returnAnimationTime from '../../utils/returnAnimationTime';
 
@@ -93,7 +94,7 @@ export const useActions = ({
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });
-            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), 500);
+            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), ANIMATION_DURATION.SHAKE);
             return;
          }
 

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { deobfuscateWord } from '../lib/game-logic';
+import { BOT_MARATHON_WORD_LENGTHS } from '../constants/game';
 
 export interface MarathonGame {
     gameIndex: number;
@@ -18,7 +19,7 @@ export function parseMarathonGames(targetWordField: string | any, salt?: string)
     
     // Special case for Daily Bot Marathons
     if (targetWordField === "MARATHON") {
-        return [3, 4, 5, 6, 7].map((l, idx) => ({
+        return [...BOT_MARATHON_WORD_LENGTHS].map((l, idx) => ({
             gameIndex: idx,
             wordLength: l,
             word: '' // Words are fetched async for bot marathons

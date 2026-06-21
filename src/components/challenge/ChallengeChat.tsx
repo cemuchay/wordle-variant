@@ -4,6 +4,7 @@ import { Send, MessageSquare, Pencil, Trash2, Play, Pause, Smile } from "lucide-
 import { type ChallengeMessage } from "../../hooks/useChallengeChat";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useConfirmation } from "../../hooks/useConfirmation";
+import { CHALLENGE_LIMITS, CHALLENGE_TIMEOUT } from "../../constants/challenge";
 import { useAppStore } from "../../store/useAppStore";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 
@@ -72,7 +73,7 @@ const ReactionBadge = React.forwardRef<HTMLDivElement, {
   onShowDetails: () => void;
   isMe: boolean;
 }>(({ reactions, onShowDetails, isMe }, ref) => {
-  const emojis = Array.from(new Set(Object.values(reactions))).slice(0, 3);
+  const emojis = Array.from(new Set(Object.values(reactions))).slice(0, CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS);
   const count = Object.keys(reactions).length;
 
   return (
@@ -178,7 +179,7 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
   const isWithinTimeLimit = useMemo(() => {
     // eslint-disable-next-line react-hooks/purity
     const elapsed = Date.now() - new Date(msg.created_at).getTime();
-    return elapsed < 5 * 60 * 1000;
+    return elapsed < CHALLENGE_TIMEOUT.EDIT_TIME_LIMIT;
   }, [msg.created_at]);
 
   const isEditable = isMe && !msg.is_deleted && isWithinTimeLimit;
@@ -306,9 +307,9 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
                 onChange={(e) => setEditText(e.target.value)}
                 className="w-full bg-black/25 text-white border border-white/15 rounded-lg p-1.5 text-xs outline-none focus:border-correct resize-none font-sans"
                 rows={2}
-                maxLength={300}
-              />
-              <div className="flex justify-end gap-1">
+                maxLength={CHALLENGE_LIMITS.MAX_MESSAGE_LENGTH}
+               />
+               <div className="flex justify-end gap-1">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
@@ -696,7 +697,7 @@ export const ChallengeChat = memo(function ChallengeChat({
         className="flex items-end gap-2 border-t border-white/5 pt-3 shrink-0"
       >
         <textarea
-          maxLength={300}
+          maxLength={CHALLENGE_LIMITS.MAX_MESSAGE_LENGTH}
           placeholder="Type a message..."
           value={inputText}
           onChange={(e) => {

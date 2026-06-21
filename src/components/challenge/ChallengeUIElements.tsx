@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { CHALLENGE_LIMITS } from "../../constants/challenge";
 import { memo, useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
@@ -21,7 +22,7 @@ import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
-      {[1, 2, 3].map((i) => (
+      {Array.from({ length: CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS }).map((_, i) => (
         <div key={i} className="h-40 bg-white/5 rounded-4xl" />
       ))}
     </div>
@@ -425,7 +426,7 @@ export const ChallengeItem = memo(function ChallengeItem({
               {/* Avatar facepile */}
               <div className="flex items-center gap-1 mb-1">
                 <div className="flex -space-x-2 overflow-hidden">
-                  {opponents.slice(0, 3).map((p: any) => (
+                  {opponents.slice(0, CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS).map((p: any) => (
                     <ProtectedAvatar
                       key={p.id}
                       userId={p.user_id}
@@ -435,9 +436,9 @@ export const ChallengeItem = memo(function ChallengeItem({
                     />
                   ))}
                 </div>
-                {opponents.length > 3 && (
+                {opponents.length > CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS && (
                   <span className="text-[8px] font-bold text-white/80 ml-1">
-                    +{opponents.length - 3} more
+                     +{opponents.length - CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS} more
                   </span>
                 )}
               </div>
@@ -488,7 +489,7 @@ export const NetworkLog = memo(function NetworkLog({
   if (logs.length === 0) return null;
   return (
     <div className="absolute top-2 right-2 z-110 flex-col items-end gap-1 pointer-events-none max-w-[200px] hidden">
-      {logs.slice(-5).map((log, index) => (
+      {logs.slice(-CHALLENGE_LIMITS.MAX_CONNECTION_LOGS).map((log, index) => (
         <div
           key={log.id}
           className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 text-[8px] font-mono text-white uppercase tracking-tighter animate-in fade-in slide-in-from-right-2"

@@ -418,14 +418,18 @@ export function getDailyConfig(
                maxAttempts: MAX_ATTEMPTS,
             };
          } else {
-            // Find history of last 14 days using final cached values
+            // Find history of last days using final cached values (18 months / 540 days starting June 22, 2026, otherwise 14 days)
             const history = new Set<string>();
-            for (let i = 1; i <= 14; i++) {
+            const lookbackDays = currentStr >= "2026-06-22" ? 540 : 14;
+            for (let i = 1; i <= lookbackDays; i++) {
                const prev = new Date(current);
                prev.setDate(current.getDate() - i);
                const prevStr = formatDateString(prev);
                const prevKey = `${prevStr}_auth_${isAuthenticated}`;
-               const prevConfig = dailyConfigCache[prevKey];
+               let prevConfig = dailyConfigCache[prevKey];
+               if (!prevConfig) {
+                  prevConfig = getDailyConfig(isAuthenticated, prevStr);
+               }
                if (prevConfig) {
                   history.add(prevConfig.word);
                }
@@ -1374,14 +1378,13 @@ export function getShapeShifterFeedbackAndWord(
 
    // Choose the next target word from the selected bucket
    // If the current target word is in the selected bucket, keep it. Otherwise, choose one from the bucket.
-   let nextWord = upperCurrent;
-   if (bestBucketWords.includes(upperCurrent)) {
-      nextWord = upperCurrent;
-   } else {
-      nextWord = bestBucketWords[0];
-   }
+    let nextWord: string;
+    if (bestBucketWords.includes(upperCurrent)) {
+       nextWord = upperCurrent;
+    } else {
+       nextWord = bestBucketWords[0];
+    }
 
    const feedback = checkGuess(upperGuess, nextWord);
    return { nextWord, feedback };
 }
-

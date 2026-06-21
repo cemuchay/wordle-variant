@@ -443,7 +443,26 @@ export const useWordUpAsyncGame = ({
             return null;
          }
 
-         setMatchData(match);
+          setMatchData(match);
+
+          // If questions aren't ready yet (edge function may have been called but not completed),
+          // poll briefly or generate them on the spot
+          if (!match.questions && !match.encrypted_questions) {
+             console.log("[WordUp Async] Questions not ready yet, generating now...");
+             const { generateMatchQuestions } = await import("../../../../services/wordup/questionService");
+             await generateMatchQuestions(match.id, match.category);
+
+             const { data: refreshed } = await supabase
+                .from("wordup_matches")
+                .select("*")
+                .eq("id", match.id)
+                .single();
+
+             if (refreshed) {
+                match = refreshed;
+                setMatchData(match);
+             }
+          }
 
           try {
              const dec = await decryptMatchQuestions(match);

@@ -6,7 +6,7 @@ import { RegularGameplay } from './RegularGameplay';
 import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useApp } from '../../context/AppContext';
-import { MAX_ATTEMPTS } from '../../constants/game';
+import { MAX_ATTEMPTS, SHAPESHIFTER_MAX_ATTEMPTS, BOT_MARATHON_WORD_LENGTHS } from '../../constants/game';
 import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
 import { supabase } from '../../lib/supabaseClient';
 import { deobfuscateWord } from '../../lib/game-logic';
@@ -179,7 +179,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     const marathonGames = useMemo(() => {
         if (challenge.is_bot_marathon && challenge.target_word === 'MARATHON') {
             // For legacy bot marathon, we always show 3-7 sequence
-            return [3, 4, 5, 6, 7].map((len, idx) => {
+            return [...BOT_MARATHON_WORD_LENGTHS].map((len, idx) => {
                 const botData = botDailyWords[len];
                 return {
                     wordLength: len,
@@ -294,7 +294,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             let hasUnfinished = false;
             for (let idx = dayGamesRangeStart; idx < dayGamesRangeEnd; idx++) {
                 const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-                const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
+    const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
                 const isCompleted = prog?.status === 'completed';
                 const isFailed = prog?.attempts >= effectiveMaxAttempts && !isCompleted;
                 const isFinished = isCompleted || isFailed || prog?.status === 'timed_out';
@@ -321,7 +321,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         for (let idx = 0; idx < marathonGames.length; idx++) {
             const game = marathonGames[idx];
             const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-            const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
+    const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
             const isCompleted = prog?.status === 'completed';
             const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
             const isFinished = isCompleted || isFailed;

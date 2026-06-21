@@ -425,6 +425,7 @@ export const useChallengeMutations = () => {
 
          if (resolvedMarathonGames) {
             const targetArray: { length: number; word: string }[] = [];
+            const chosenWords = new Set<string>();
             resolvedMarathonGames.forEach((l: number, idx: number) => {
                let rawWord = "";
                if (isCustomWord) {
@@ -434,7 +435,15 @@ export const useChallengeMutations = () => {
                      rawWord = customWords[l];
                   }
                }
-               const word = (rawWord || getRandomWord(l)).toUpperCase();
+               let word = (rawWord || getRandomWord(l)).toUpperCase();
+               if (!rawWord) {
+                  let limit = 0;
+                  while (chosenWords.has(word) && limit < 200) {
+                     word = getRandomWord(l).toUpperCase();
+                     limit++;
+                  }
+               }
+               chosenWords.add(word);
                plainMarathonTargets[idx] = word;
                targetArray.push({
                   length: l,
@@ -820,6 +829,7 @@ export const useChallengeMutations = () => {
             salt = Math.random().toString(36).substring(2, 15);
             if (resolvedMarathonGames) {
                const targetArray: { length: number; word: string }[] = [];
+               const chosenWords = new Set<string>();
                resolvedMarathonGames.forEach((l: number, idx: number) => {
                   let rawWord = "";
                   if (isCustomWord) {
@@ -832,7 +842,15 @@ export const useChallengeMutations = () => {
                         rawWord = customWords[l];
                      }
                   }
-                  const word = (rawWord || getRandomWord(l)).toUpperCase();
+                  let word = (rawWord || getRandomWord(l)).toUpperCase();
+                  if (!rawWord) {
+                     let limit = 0;
+                     while (chosenWords.has(word) && limit < 200) {
+                        word = getRandomWord(l).toUpperCase();
+                        limit++;
+                     }
+                  }
+                  chosenWords.add(word);
                   plainMarathonTargets[idx] = word;
                   targetArray.push({
                      length: l,

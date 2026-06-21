@@ -23,6 +23,7 @@ import { ConnectionOverlay } from "./components/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 
+import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 import { useWordUpStore } from "../../../store/useWordUpStore";
 
 export const WordUpView = () => {
@@ -44,6 +45,7 @@ export const WordUpView = () => {
 
    const view = useWordUpStore((s) => s.view);
    const setView = useWordUpStore((s) => s.setView);
+   const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
    const category = useWordUpStore((s) => s.category);
    const setCategory = useWordUpStore((s) => s.setCategory);
    const matchId = useWordUpStore((s) => s.matchId);
@@ -54,7 +56,7 @@ export const WordUpView = () => {
    const setMatchData = useWordUpStore((s) => s.setMatchData);
    const setQuestions = useWordUpStore((s) => s.setQuestions);
 
-   const [countdownText, setCountdownText] = useState("3");
+   const [countdownText, setCountdownText] = useState(String(WORDUP_TIMEOUT.COUNTDOWN_START));
 
    const countdownIntervalRef = useRef<number | null>(null);
    const cleanUpCountdown = useCallback(() => {
@@ -82,9 +84,14 @@ export const WordUpView = () => {
          wordupAudio.stopAmbient();
       }
       return () => {
-         wordupAudio.stopAmbient();
-      };
+      wordupAudio.stopAmbient();
+      }
    }, [view]);
+
+   // Hide global headers during battle
+   useEffect(() => {
+      setIsBattlePlaying(view === "battle");
+   }, [view, setIsBattlePlaying]);
 
    const onGameOver = useCallback(async (match: any) => {
       if (view === "gameover") return;
@@ -101,18 +108,14 @@ export const WordUpView = () => {
       const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
       const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
 
-      const xpReward = 50 + (won ? 100 : 0) + (correctCount * 10);
+      const xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
 
       // Chess ELO expectancy calculation
-      const myRating = userStats?.rating || 600;
-      let oppRating = 1000;
+      const myRating = userStats?.rating || RATING.DEFAULT;
+      let oppRating: number = RATING.DEFAULT_OPPONENT;
       if (match?.is_bot_match) {
          const prof = match.bot_profile || "average";
-         if (prof === "impossible") oppRating = 2200;
-         else if (prof === "master") oppRating = 1800;
-         else if (prof === "gold" || prof === "expert") oppRating = 1400;
-         else if (prof === "slow_thinker") oppRating = 800;
-         else oppRating = 1000;
+         oppRating = BOT_PROFILES_RATINGS[prof] || RATING.DEFAULT_OPPONENT;
       } else {
          const storeOppStats = useWordUpStore.getState().opponentStats;
          if (storeOppStats?.rating) {
@@ -120,20 +123,20 @@ export const WordUpView = () => {
          }
       }
 
-      const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
+      const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
       const actual = won ? 1 : tied ? 0.5 : 0;
-      const baseEloChange = Math.round(32 * (actual - expected));
+      const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected));
       const accuracyBonus = won ? correctCount : 0;
 
       let eloGain = baseEloChange + accuracyBonus;
       // Safety bounds to prevent losing points on a win, or gaining on a loss
-      if (won && eloGain < 2) eloGain = 2;
-      if (!won && !tied && eloGain > -2) eloGain = -2;
+      if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
+      if (!won && !tied && eloGain > RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
 
       try {
          await updateStats(eloGain, xpReward, won, tied);
       } catch {
-         triggerToast("Rating update delayed. Syncing in background...", 4000);
+         triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION);
       }
    }, [effectiveUser, view, updateStats, triggerToast, role, userStats, setView]);
 
@@ -186,7 +189,7 @@ export const WordUpView = () => {
                 setTimeout(() => {
                    loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
                    startQuestionRound(activeGame.matchData, activeGame.currentIdx || 0);
-                }, 100);
+                }, 100); // brief yield for state settling
              }
           } catch (err) {
              console.error("[WordUp Logs] Failed to restore active game:", err);
@@ -207,8 +210,8 @@ export const WordUpView = () => {
 
     const startCountdown = useCallback((match: any) => {
        cleanUpCountdown();
-       let count = 3;
-       setCountdownText("3");
+        let count = WORDUP_TIMEOUT.COUNTDOWN_START;
+       setCountdownText(String(WORDUP_TIMEOUT.COUNTDOWN_START));
        countdownIntervalRef.current = window.setInterval(() => {
           count--;
           if (count === 0) {
@@ -230,7 +233,7 @@ export const WordUpView = () => {
           } else {
              setCountdownText(String(count));
           }
-       }, 1000);
+        }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
     }, [startQuestionRound, role, cleanUpCountdown, setView]);
 
    const launchedMatchIdRef = useRef<string | null>(null);
@@ -302,7 +305,7 @@ export const WordUpView = () => {
       }
       resetGame();
       cancelMatchmaking();
-      triggerToast("Local data purged and stale matches cleaned.", 4000);
+      triggerToast("Local data purged and stale matches cleaned.", WORDUP_TIMEOUT.TOAST_DURATION);
    }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
 
     // Safety timeout: if stuck in loading or countdown for too long, abort to lobby
@@ -317,14 +320,14 @@ export const WordUpView = () => {
        clearSafetyTimer();
        safetyTimerRef.current = window.setTimeout(() => {
           console.warn("[WordUp Logs] Safety timeout triggered — game failed to start. Aborting to lobby.");
-          triggerToast("Game creation timed out. Please try again.", 4000);
+          triggerToast("Game creation timed out. Please try again.", WORDUP_TIMEOUT.TOAST_DURATION);
           cleanUpAll();
           cleanUpCountdown();
           safeLocalStorage.removeItem("wordup_active_game");
           resetGame();
           setView("menu");
           clearSafetyTimer();
-       }, 15000);
+       }, WORDUP_TIMEOUT.SAFETY);
     }, [triggerToast, cleanUpAll, cleanUpCountdown, resetGame, setView, clearSafetyTimer]);
 
     useEffect(() => {
@@ -401,58 +404,58 @@ export const WordUpView = () => {
                      onClick={() => {
                         window.dispatchEvent(new CustomEvent("open-auth-modal"));
                      }}
-                     className="bg-correct text-black py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                     Log In / Sign Up
-                  </button>
-                  <button
-                     onClick={() => setShowGuestInput(true)}
-                     className="bg-white/10 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-white/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-white/5"
-                  >
-                     Play as Guest
-                  </button>
-               </div>
-            ) : (
-               <div className="space-y-3 w-full max-w-xs">
-                  <input
-                     type="text"
-                     maxLength={15}
-                     placeholder="Enter nickname..."
-                     value={nicknameInput}
-                     onChange={(e) =>
-                        setNicknameInput(
-                           e.target.value.replace(/[^A-Za-z0-9_]/g, ""),
-                        )
-                     }
-                     className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                     <button
-                        onClick={() => setShowGuestInput(false)}
-                        className="bg-white/5 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
-                     >
-                        Back
-                     </button>
-                     <button
-                        onClick={async () => {
-                           const name = nicknameInput.trim();
-                           if (name.length < 3) {
-                              triggerToast("Nickname must be at least 3 characters.", 3000);
-                              return;
-                           }
-                           const anonId = crypto.randomUUID();
-                           localStorage.setItem('wordle_anon_id', anonId);
-                           localStorage.setItem('wordle_anon_username', name);
+                   className="bg-correct text-black py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                   >
+                      Log In / Sign Up
+                   </button>
+                   <button
+                      onClick={() => setShowGuestInput(true)}
+                      className="bg-white/10 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-white/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-white/5"
+                   >
+                      Play as Guest
+                   </button>
+                </div>
+             ) : (
+                <div className="space-y-3 w-full max-w-xs">
+                   <input
+                      type="text"
+                      maxLength={WORDUP_LIMITS.MAX_NICKNAME_LENGTH}
+                      placeholder="Enter nickname..."
+                      value={nicknameInput}
+                      onChange={(e) =>
+                         setNicknameInput(
+                            e.target.value.replace(/[^A-Za-z0-9_]/g, ""),
+                         )
+                      }
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-correct outline-none uppercase text-center font-black tracking-widest text-correct"
+                   />
+                   <div className="grid grid-cols-2 gap-3">
+                      <button
+                         onClick={() => setShowGuestInput(false)}
+                         className="bg-white/5 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                      >
+                         Back
+                      </button>
+                      <button
+                         onClick={async () => {
+                            const name = nicknameInput.trim();
+                            if (name.length < WORDUP_LIMITS.MIN_NICKNAME_LENGTH) {
+                               triggerToast("Nickname must be at least 3 characters.", WORDUP_TIMEOUT.TOAST_DURATION);
+                               return;
+                            }
+                            const anonId = crypto.randomUUID();
+                            localStorage.setItem('wordle_anon_id', anonId);
+                            localStorage.setItem('wordle_anon_username', name);
 
-                           // Upsert guest profile in DB
-                           await supabase.from('guest_profiles').upsert({
-                              id: anonId,
-                              username: name,
-                              avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
-                           });
+                            // Upsert guest profile in DB
+                            await supabase.from('guest_profiles').upsert({
+                               id: anonId,
+                               username: name,
+                               avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${anonId}`
+                            });
 
-                           setGuestUser({ id: anonId, username: name, user_metadata: { full_name: name } });
-                           triggerToast("Guest profile created! Welcome.", 3000);
+                            setGuestUser({ id: anonId, username: name, user_metadata: { full_name: name } });
+                            triggerToast("Guest profile created! Welcome.", WORDUP_TIMEOUT.TOAST_DURATION);
                         }}
                         className="bg-correct text-black py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
                      >
