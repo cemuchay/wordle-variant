@@ -40,6 +40,14 @@ export const GameOverView = ({
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
       : "Opponent";
 
+   const statusColor = isWinner 
+      ? "text-correct border-correct/20 bg-correct/10 shadow-[0_0_15px_rgba(46,204,113,0.1)]"
+      : isDraw 
+         ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+         : "text-red-400 border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
+
+   const statusTextClass = isWinner ? "text-correct" : isDraw ? "text-yellow-500" : "text-red-400";
+
    return (
       <motion.div
          initial={{ opacity: 0, scale: 0.95 }}
@@ -47,8 +55,8 @@ export const GameOverView = ({
          className="flex flex-col flex-1 justify-center gap-6 py-4"
       >
          <div className="text-center space-y-1">
-            <Award size={48} className="mx-auto text-correct animate-bounce" />
-            <h2 className="text-2xl font-black uppercase tracking-wider text-white">
+            <Award size={48} className={`mx-auto animate-bounce ${statusTextClass}`} />
+            <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
                {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
             </h2>
             <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
@@ -69,8 +77,8 @@ export const GameOverView = ({
          </div>
 
          {/* Rewards and Elo changes */}
-         <div className="bg-correct/10 border border-correct/20 rounded-2xl p-4 text-center space-y-1 shadow-[0_0_15px_rgba(46,204,113,0.1)]">
-            <p className="text-xs font-bold text-correct uppercase tracking-wider">
+         <div className={`border rounded-2xl p-4 text-center space-y-1 ${statusColor}`}>
+            <p className="text-xs font-bold uppercase tracking-wider">
                Rating Change: {isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}
             </p>
             <p className="text-[10px] text-gray-400 uppercase font-black">

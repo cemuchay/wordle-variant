@@ -79,6 +79,7 @@ export const BattleView = ({
    currentIdx,
    matchData,
    opponentStats,
+   timeLeft,
    maxTime,
    selectedAnswer,
    revealAnswers,
@@ -90,6 +91,7 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
+   const [frozenPercent, setFrozenPercent] = useState<number | null>(null);
 
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
@@ -127,6 +129,19 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
+
+   useEffect(() => {
+      if (selectedAnswer !== null) {
+         if (frozenPercent === null) {
+            setFrozenPercent((timeLeft / qMaxTime) * 100);
+         }
+      } else {
+         setFrozenPercent(null);
+      }
+   }, [selectedAnswer, timeLeft, qMaxTime, frozenPercent]);
+
+   const displayPercent = frozenPercent !== null ? frozenPercent : (timeLeft / qMaxTime) * 100;
+   const barColor = displayPercent > 30 ? "#4ade80" : "#ef4444";
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -307,32 +322,13 @@ export const BattleView = ({
           {/* Timer Bar */}
           <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
-                <motion.div
-                   key={currentIdx}
-                   initial={{ width: "100%", backgroundColor: "#4ade80", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }}
-                   animate={{
-                      width: "0%",
-                      backgroundColor: ["#4ade80", "#4ade80", "#ef4444"],
-                      boxShadow: [
-                         "0 0 8px rgba(34,197,94,0.5)",
-                         "0 0 8px rgba(34,197,94,0.5)",
-                         "0 0 8px rgba(239,68,68,0.5)"
-                      ]
+                <div
+                   className="h-full rounded-full transition-all duration-100 ease-out"
+                   style={{
+                      width: `${displayPercent}%`,
+                      backgroundColor: barColor,
+                      boxShadow: `0 0 8px ${barColor}`
                    }}
-                   transition={{
-                      width: { duration: qMaxTime, ease: "linear" },
-                      backgroundColor: {
-                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
-                         duration: qMaxTime,
-                         ease: "linear"
-                      },
-                      boxShadow: {
-                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
-                         duration: qMaxTime,
-                         ease: "linear"
-                      }
-                   }}
-                   className="h-full rounded-full"
                 />
              )}
           </div>
@@ -453,20 +449,20 @@ export const BattleView = ({
                   );
                })}
             </div>
-         </div>
 
-         {/* Prefilled Quick Chat Row */}
-         <div className="flex gap-3 overflow-x-auto py-3 px-3 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full">
-            <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1.5">Chat:</span>
-            {PREFILLED_MESSAGES.map((msg) => (
-               <button
-                  key={msg}
-                  onClick={() => sendQuickChat(msg)}
-                   className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
-               >
-                  {msg}
-               </button>
-            ))}
+            {/* Prefilled Quick Chat Row */}
+            <div className="flex gap-3 overflow-x-auto py-3 px-3 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full mt-4">
+               <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1.5">Chat:</span>
+               {PREFILLED_MESSAGES.map((msg) => (
+                  <button
+                     key={msg}
+                     onClick={() => sendQuickChat(msg)}
+                     className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                     {msg}
+                  </button>
+               ))}
+            </div>
          </div>
 
          {/* Celebratory Confetti Splash */}

@@ -66,11 +66,11 @@ export const CATEGORIES = [
       name: "Currencies",
       desc: "Match currencies to their countries",
    },
-   // {
-   //    id: "flag_bearer",
-   //    name: "Flags",
-   //    desc: "Identify countries by their flag colors",
-   // },
+   {
+      id: "flag_bearer",
+      name: "Flags",
+      desc: "Identify countries by their flag colors",
+   },
    {
       id: "element_arena",
       name: "Periodic Table",
