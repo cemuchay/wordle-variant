@@ -10,7 +10,7 @@ import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 import { useApp } from "../../../../context/AppContext";
 import { safeLocalStorage } from "../../../../utils/storage";
-import { CategorySelectModal } from "./CategorySelectModal";
+import { CategorySelectModal, CATEGORY_STYLE_MAP } from "./CategorySelectModal";
 import { RankingView } from "./RankingView";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
@@ -538,23 +538,30 @@ export const LobbyView = ({
                   <div className="space-y-3">
                       <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Active Arena Category</p>
                       {(() => {
-                         const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
-                         return (
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
-                               <div className="flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-correct animate-pulse" />
-                                  <p className="text-sm font-black uppercase tracking-wider text-white">{activeCatObj.name}</p>
-                               </div>
-                               <p className="text-xs text-gray-400 leading-relaxed">{activeCatObj.desc}</p>
-                               <button
-                                  onClick={() => setShowCategoryModal(true)}
-                                  className="w-full mt-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
-                               >
-                                  Change Category / Select Modes
-                               </button>
-                            </div>
-                         );
-                      })()}
+                          const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
+                          const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
+                          const borderCol = style.border.split(" ")[0];
+                          return (
+                             <div className={`bg-gradient-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-white/10`}>
+                                <div className="flex items-center gap-3">
+                                   <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
+                                      {style.emoji}
+                                   </div>
+                                   <div className="min-w-0">
+                                      <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
+                                      <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{activeCatObj.name}</p>
+                                   </div>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed font-bold">{activeCatObj.desc}</p>
+                                <button
+                                   onClick={() => setShowCategoryModal(true)}
+                                   className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
+                                >
+                                   Change Category / Select Modes
+                                </button>
+                             </div>
+                          );
+                       })()}
 
                       <CategorySelectModal
                          isOpen={showCategoryModal}
@@ -668,10 +675,11 @@ export const LobbyView = ({
                         {pendingMatches.map((match) => {
                            const isP1 = match.player1_id === currentUser?.id;
                            const oppProfile = isP1 ? match.player2 : match.player1;
-                            const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
-                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
-
-                            const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
+                           const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
+                           const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
+                           const hoursLeft = Math.max(1, Math.round(24 - (new Date().getTime() - new Date(match.created_at).getTime()) / (1000 * 60 * 60)));
+                           const catObj = CATEGORIES.find(c => c.id === match.category);
+                           const categoryName = catObj ? catObj.name : match.category.replace('_', ' ');
 
                            return (
                               <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
@@ -683,8 +691,15 @@ export const LobbyView = ({
                                         className="w-9 h-9 rounded-full border border-white/10 shrink-0"
                                      />
                                     <div className="min-w-0">
-                                       <p className="text-xs font-black text-white truncate">{oppName}</p>
-                                       <p className="text-[9px] text-gray-500 uppercase font-bold mt-0.5">{match.category.replace('_', ' ')} • {hoursLeft}h left</p>
+                                       <p className="text-xs font-black text-white truncate">vs {oppName}</p>
+                                       <div className="flex items-center gap-1.5 mt-1">
+                                          <span className="text-[8.5px] font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                                             {categoryName}
+                                          </span>
+                                          <span className="text-[9px] text-gray-500 font-bold uppercase shrink-0">
+                                             • {hoursLeft}h left
+                                          </span>
+                                       </div>
                                     </div>
                                  </div>
                                  {hasPlayed ? (

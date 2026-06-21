@@ -35,7 +35,7 @@ interface CategorySelectModalProps {
    startMatchmaking: () => void;
 }
 
-const CATEGORY_STYLE_MAP: Record<string, { emoji: string; gradient: string; glow: string; border: string }> = {
+export const CATEGORY_STYLE_MAP: Record<string, { emoji: string; gradient: string; glow: string; border: string }> = {
    mixed: {
       emoji: "🎲",
       gradient: "from-emerald-950/40 via-teal-950/30 to-slate-950/40",
@@ -201,6 +201,24 @@ export const CategorySelectModal = ({
 
    if (!isOpen) return null;
 
+   const getCategoryStyles = (catId: string, isSel: boolean) => {
+      const style = CATEGORY_STYLE_MAP[catId] || DEFAULT_STYLE;
+      if (isSel) {
+         return {
+            btnClass: `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow} shadow-md`,
+            emojiContainerClass: `bg-white/10 border ${style.border.split(" ")[0]}`,
+            dotClass: catId === "mixed" ? "bg-emerald-400 animate-pulse" : "bg-cyan-400 animate-pulse"
+         };
+      } else {
+         const borderCol = style.border.split(" ")[0].replace("/50", "/20");
+         return {
+            btnClass: `bg-slate-950/45 ${borderCol} border text-gray-300 hover:bg-slate-900/60 hover:border-white/20`,
+            emojiContainerClass: `bg-white/5 border ${borderCol}`,
+            dotClass: "bg-gray-600"
+         };
+      }
+   };
+
    const filteredCategories = CATEGORIES.filter(cat =>
       cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cat.desc.toLowerCase().includes(searchQuery.toLowerCase())
@@ -226,6 +244,7 @@ export const CategorySelectModal = ({
    const handleCategoryClick = (id: string) => {
       setCategory(id);
       recordRecent(id);
+      onClose();
    };
 
    const handleSelectAndPlay = () => {
@@ -311,24 +330,21 @@ export const CategorySelectModal = ({
                         {generalCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                           const visual = getCategoryStyles(cat.id, isSel);
                            return (
                               <motion.button
                                  key={cat.id}
                                  whileHover={{ scale: 1.02 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                                    isSel
-                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
-                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                 }`}
+                                 className={`flex flex-col items-start p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
                               >
                                  <div className="flex items-center gap-3 w-full">
-                                    <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-lg shrink-0 shadow-inner">
+                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 shadow-inner ${visual.emojiContainerClass}`}>
                                        {style.emoji}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct animate-pulse" : "bg-gray-600"}`} />
+                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
                                           <p className="text-xs font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
                                        </div>
                                        <p className="text-[9px] text-gray-400 mt-0.5">{cat.desc}</p>
@@ -349,24 +365,21 @@ export const CategorySelectModal = ({
                         {lengthCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                           const visual = getCategoryStyles(cat.id, isSel);
                            return (
                               <motion.button
                                  key={cat.id}
                                  whileHover={{ scale: 1.02 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                                    isSel
-                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
-                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                 }`}
+                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
                               >
                                  <div className="flex items-center gap-2.5 w-full">
-                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
                                        {style.emoji}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct" : "bg-gray-600"}`} />
+                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
                                           <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
                                        </div>
                                        <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-1">{cat.desc}</p>
@@ -387,24 +400,21 @@ export const CategorySelectModal = ({
                         {gameTypeCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                           const visual = getCategoryStyles(cat.id, isSel);
                            return (
                               <motion.button
                                  key={cat.id}
                                  whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                                    isSel
-                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
-                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                 }`}
+                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
                               >
                                  <div className="flex items-center gap-2.5 w-full">
-                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
                                        {style.emoji}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-correct animate-pulse" : "bg-gray-600"}`} />
+                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
                                           <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
                                        </div>
                                        <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>
@@ -425,24 +435,21 @@ export const CategorySelectModal = ({
                         {proceduralCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                           const visual = getCategoryStyles(cat.id, isSel);
                            return (
                               <motion.button
                                  key={cat.id}
                                  whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                                    isSel
-                                       ? `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow}`
-                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                                 }`}
+                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
                               >
                                  <div className="flex items-center gap-2.5 w-full">
-                                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-base shrink-0">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
                                        {style.emoji}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${isSel ? "bg-cyan-400 animate-pulse" : "bg-gray-600"}`} />
+                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
                                           <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
                                        </div>
                                        <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>

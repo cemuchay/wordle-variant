@@ -309,13 +309,13 @@ export const BattleView = ({
           </div>
 
          {/* Question Container */}
-         <div className="flex-1 flex flex-col justify-center gap-6 py-6 min-h-0">
+         <div className="flex-1 flex flex-col justify-start md:justify-center gap-4 md:gap-6 py-4 md:py-6 overflow-y-auto scrollbar-hide min-h-0">
             <div className="text-center space-y-2">
                <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === 6 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
-               <h2 className={`${promptSizeClass} font-black tracking-tight leading-relaxed text-white`}>
+               <h2 className={`${promptSizeClass} font-black tracking-tight leading-relaxed text-white whitespace-pre-line`}>
                   {activeQuestion.prompt}
                </h2>
                {activeQuestion.subPrompt && (

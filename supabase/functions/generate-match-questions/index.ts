@@ -227,6 +227,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          if (usedKeys.has(key)) return;
          const v = String(meta[key] ?? "");
          const keyLabel = key.replace(/_/g, " ").trim();
+         const capitalizedLabel = keyLabel.charAt(0).toUpperCase() + keyLabel.slice(1);
          const k = key.toLowerCase();
          const isTime = k.includes("year") || k.includes("date") || k.includes("founded") || k.includes("released") || k.includes("created") || k.includes("acquired");
          
@@ -243,14 +244,19 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          if (isTime && verb !== "done") {
             clueParts.push(`${verb.toUpperCase()} IN: ${v}`);
          } else {
-            clueParts.push(`${keyLabel}: ${v}`);
+            clueParts.push(`${capitalizedLabel}: ${v}`);
          }
       });
       
-      const cluesStr = clueParts.join(" | ");
+      const cluesStr = clueParts.map((p) => `• ${p}`).join("\n");
+      const isWordMatch = categoryType.includes("english") || categoryType.includes("language") || categoryType.includes("vocab");
+      const intro = isWordMatch 
+         ? "Find the word that fits these clues:" 
+         : "Identify the match that fits these clues:";
+
       return {
          type: "definition",
-         prompt: `${cluesStr} — which option fits these clues?`,
+         prompt: `${intro}\n${cluesStr}`,
          choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
          answer: label,
       };

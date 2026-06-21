@@ -103,10 +103,11 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
    }, [loadLeaderboard]);
 
    const getRankIcon = (index: number) => {
-      if (index === 0) return <Medal size={16} className="text-yellow-400" />;
-      if (index === 1) return <Medal size={16} className="text-slate-300" />;
-      if (index === 2) return <Medal size={16} className="text-amber-600" />;
-      return <span className="text-[10px] text-gray-500 font-black">#{index + 1}</span>;
+      const num = index + 1;
+      if (index === 0) return <span className="flex items-center gap-0.5 text-[10px] font-black text-yellow-400">#1<Medal size={13} className="text-yellow-400" /></span>;
+      if (index === 1) return <span className="flex items-center gap-0.5 text-[10px] font-black text-slate-300">#2<Medal size={13} className="text-slate-300" /></span>;
+      if (index === 2) return <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-600">#3<Medal size={13} className="text-amber-600" /></span>;
+      return <span className="text-[10px] text-gray-500 font-black">#{num}</span>;
    };
 
    const getRankNameColor = (rating: number) => {
