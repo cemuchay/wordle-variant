@@ -27,6 +27,7 @@ import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
+import { wordupNetworkGate } from "./components/wordup/WordUpView/services/wordupNetworkGate";
 import { type AppUser, type Challenge } from "./types/game";
 import { useChallengeStore } from "./store/useChallengeStore";
 import { useAppStore } from "./store/useAppStore";
@@ -478,20 +479,26 @@ export default function App() {
     setIncomingWordUpInvite(null);
     try {
       // Create match in status "waiting"
-      const { data: newMatch, error } = await supabase
-        .from("wordup_matches")
-        .insert({
-          category: invite.category,
-          player1_id: invite.senderId,
-          player2_id: user?.id,
-          status: "waiting",
-          p1_answered: false,
-          p2_answered: false
-        })
-        .select()
-        .single();
+      const matches = await wordupNetworkGate.enqueue(
+        'post',
+        'create pending async match',
+        {
+          table: 'wordup_matches',
+          action: 'insert',
+          payload: {
+            category: invite.category,
+            player1_id: invite.senderId,
+            player2_id: user?.id,
+            status: "waiting",
+            game_type: "async",
+            p1_answered: false,
+            p2_answered: false
+          }
+        }
+      );
 
-      if (error || !newMatch) throw error || new Error("Failed to create match");
+      const newMatch = matches?.[0];
+      if (!newMatch) throw new Error("Failed to create match");
 
       // Generate questions (edge function for procedural, local for legacy)
       const { generateMatchQuestions } = await import("./services/wordup/questionService");
@@ -500,14 +507,22 @@ export default function App() {
       );
 
       // App notification for B (the current user)
-      await supabase.from("notifications").insert({
-        user_id: user?.id,
-        type: "CHALLENGE_INVITE",
-        title: "Pending WordUp Battle",
-        message: `${invite.senderName} challenged you to a WordUp Battle!`,
-        data: { mode: "wordup", matchId: newMatch.id },
-        is_read: false
-      });
+      await wordupNetworkGate.enqueue(
+        'post',
+        'create challenge notification',
+        {
+          table: 'notifications',
+          action: 'insert',
+          payload: {
+            user_id: user?.id,
+            type: "CHALLENGE_INVITE",
+            title: "Pending WordUp Battle",
+            message: `${invite.senderName} challenged you to a WordUp Battle!`,
+            data: { mode: "wordup", matchId: newMatch.id },
+            is_read: false
+          }
+        }
+      );
 
       // Broadcast to player 1 (A)
       const laterChannel = supabase.channel(`user_signals_${invite.senderId}`);

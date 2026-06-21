@@ -25,6 +25,7 @@ import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 
 import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 import { useWordUpStore } from "../../../store/useWordUpStore";
+import { useAppStore } from "../../../store/useAppStore";
 
 export const WordUpView = () => {
    const { user: authUser } = useAuth();
@@ -518,6 +519,7 @@ export const WordUpView = () => {
                   soundEnabled={soundEnabled}
                   onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
+                  onBack={() => useAppStore.getState().setWordUpOpen(false)}
                />
             )}
 

@@ -7,6 +7,116 @@ import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 
+class WAVRecorder {
+    private audioContext: AudioContext | null = null;
+    private stream: MediaStream | null = null;
+    private input: MediaStreamAudioSourceNode | null = null;
+    private processor: ScriptProcessorNode | null = null;
+    private leftchannel: Float32Array[] = [];
+    private recordingLength = 0;
+    private sampleRate = 44100;
+
+    constructor() {}
+
+    async start() {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        });
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        this.audioContext = new AudioCtx();
+        this.sampleRate = this.audioContext.sampleRate;
+        this.input = this.audioContext.createMediaStreamSource(this.stream);
+        
+        // 4096 buffer size, 1 input channel, 1 output channel
+        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        
+        this.leftchannel = [];
+        this.recordingLength = 0;
+
+        this.processor.onaudioprocess = (e) => {
+            const left = e.inputBuffer.getChannelData(0);
+            this.leftchannel.push(new Float32Array(left));
+            this.recordingLength += left.length;
+        };
+
+        this.input.connect(this.processor);
+        this.processor.connect(this.audioContext.destination);
+    }
+
+    stop(): Blob {
+        if (this.processor && this.input && this.audioContext) {
+            this.processor.disconnect();
+            this.input.disconnect();
+            if (this.audioContext.state !== 'closed') {
+                this.audioContext.close();
+            }
+        }
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+        }
+
+        // Flatten the left channel buffers
+        const result = new Float32Array(this.recordingLength);
+        let offset = 0;
+        for (let i = 0; i < this.leftchannel.length; i++) {
+            const buffer = this.leftchannel[i];
+            result.set(buffer, offset);
+            offset += buffer.length;
+        }
+        
+        // Create WAV file buffer
+        const buffer = new ArrayBuffer(44 + this.recordingLength * 2);
+        const view = new DataView(buffer);
+
+        // write string helper
+        const writeString = (view: DataView, offset: number, string: string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+
+        /* RIFF identifier */
+        writeString(view, 0, 'RIFF');
+        /* file length */
+        view.setUint32(4, 36 + this.recordingLength * 2, true);
+        /* RIFF type */
+        writeString(view, 8, 'WAVE');
+        /* format chunk identifier */
+        writeString(view, 12, 'fmt ');
+        /* format chunk length */
+        view.setUint32(16, 16, true);
+        /* sample format (raw PCM = 1) */
+        view.setUint16(20, 1, true);
+        /* channel count */
+        view.setUint16(22, 1, true);
+        /* sample rate */
+        view.setUint32(24, this.sampleRate, true);
+        /* byte rate (sample rate * block align) */
+        view.setUint32(28, this.sampleRate * 2, true);
+        /* block align (channel count * bytes per sample) */
+        view.setUint16(32, 2, true);
+        /* bits per sample */
+        view.setUint16(34, 16, true);
+        /* data chunk identifier */
+        writeString(view, 36, 'data');
+        /* data chunk length */
+        view.setUint32(40, this.recordingLength * 2, true);
+
+        // Float to 16-bit PCM
+        let writeOffset = 44;
+        for (let i = 0; i < result.length; i++, writeOffset += 2) {
+            const s = Math.max(-1, Math.min(1, result[i]));
+            view.setInt16(writeOffset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+
+        return new Blob([view], { type: 'audio/wav' });
+    }
+}
+
 interface MessageInputProps {
     onSend: (content: string, replyToId?: string, mentions?: string[]) => void;
     onSendVoice: (audioBlob: Blob) => void;
@@ -27,8 +137,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     // Voice recording states
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
+    const wavRecorderRef = useRef<WAVRecorder | null>(null);
     const timerRef = useRef<number | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -117,52 +226,19 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
         }
     };
 
+    const formatDuration = (sec: number) => {
+        const mins = Math.floor(sec / 60);
+        const secs = sec % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     // Voice note recording helpers
     const startRecording = async () => {
         try {
-            // 1. Explicitly check for supported MIME types (iOS fallback)
-            const mimeType = [
-                'audio/webm;codecs=opus',
-                'audio/mp4',
-                'audio/ogg;codecs=opus',
-                'audio/wav'
-            ].find(type => MediaRecorder.isTypeSupported(type)) || '';
+            const recorder = new WAVRecorder();
+            await recorder.start();
+            wavRecorderRef.current = recorder;
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
-
-            const mediaRecorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorderRef.current = mediaRecorder;
-            audioChunksRef.current = [];
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-
-                // 2. Validate blob size (prevent silent/empty notes)
-                // If it's less than 1000 bytes, it's likely empty or failed
-                if (audioBlob.size < 500) {
-                    console.warn("Captured audio is too small, likely failed:", audioBlob.size);
-                    useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", 4000);
-                } else {
-                    onSendVoice(audioBlob);
-                }
-
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            // 3. Use a smaller timeslice for dataavailable to ensure data is captured on mobile
-            mediaRecorder.start(200);
             setIsRecording(true);
             setRecordingTime(0);
             timerRef.current = window.setInterval(() => {
@@ -175,36 +251,32 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
     };
 
     const stopRecording = () => {
-        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
-        mediaRecorderRef.current.stop();
+        if (!wavRecorderRef.current) return;
+        const audioBlob = wavRecorderRef.current.stop();
+        wavRecorderRef.current = null;
         setIsRecording(false);
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
+        }
+
+        if (audioBlob.size < 500) {
+            console.warn("Captured audio is too small, likely failed:", audioBlob.size);
+            useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", 4000);
+        } else {
+            onSendVoice(audioBlob);
         }
     };
 
     const cancelRecording = () => {
-        if (!mediaRecorderRef.current) return;
-        mediaRecorderRef.current.onstop = () => {
-            audioChunksRef.current = [];
-            const stream = mediaRecorderRef.current?.stream;
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-        mediaRecorderRef.current.stop();
+        if (!wavRecorderRef.current) return;
+        wavRecorderRef.current.stop();
+        wavRecorderRef.current = null;
         setIsRecording(false);
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
-    };
-
-    const formatDuration = (sec: number) => {
-        const mins = Math.floor(sec / 60);
-        const secs = sec % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     // Focus input when replyingTo changes

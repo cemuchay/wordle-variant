@@ -8,6 +8,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
 import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
+import { AudioPlayer } from "./ChatMessage/AudioPlayer";
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
@@ -33,6 +34,7 @@ export default function FloatingChatBubble() {
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
    const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
+   const setPreviewImage = useAppStore((s) => s.setPreviewImage);
    const { user } = useAuth();
 
    // Core group constant names
@@ -510,7 +512,14 @@ export default function FloatingChatBubble() {
                                                 </span>
                                              </div>
                                              <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}{getDecryptedContent(latestMsg)}
+                                                {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}
+                                                {latestMsg.voice_url ? (
+                                                   <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
+                                                ) : latestMsg.image_url ? (
+                                                   <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                ) : (
+                                                   getDecryptedContent(latestMsg)
+                                                )}
                                              </p>
                                           </div>
                                        </button>
@@ -578,26 +587,43 @@ export default function FloatingChatBubble() {
                                              </div>
                                           ) : (
                                              <div className="relative group/msg">
-                                                <p className={`text-xs text-gray-200 mt-1 leading-relaxed break-words px-3 py-2 rounded-2xl bg-white/5 border border-white/5`}>
-                                                   {getDecryptedContent(msg)}
-                                                   {msg.is_edited && (
-                                                      <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
-                                                   )}
-                                                </p>
+                                                {msg.voice_url ? (
+                                                   <AudioPlayer url={msg.voice_url} />
+                                                ) : msg.image_url ? (
+                                                   <div
+                                                      className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full"
+                                                      onClick={() => setPreviewImage(msg.image_url)}
+                                                   >
+                                                      <img
+                                                         src={msg.image_url}
+                                                         className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
+                                                         alt="shared file"
+                                                      />
+                                                   </div>
+                                                ) : (
+                                                   <p className={`text-xs text-gray-200 mt-1 leading-relaxed break-words px-3 py-2 rounded-2xl bg-white/5 border border-white/5`}>
+                                                      {getDecryptedContent(msg)}
+                                                      {msg.is_edited && (
+                                                         <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
+                                                      )}
+                                                   </p>
+                                                )}
 
                                                 {/* Edit/Delete options for my messages */}
                                                 {isMe && !msg.is_deleted && (
                                                    <div className="absolute right-0 top-0 -translate-y-full hidden group-hover/msg:flex items-center gap-1 bg-slate-900 border border-white/10 px-1 py-0.5 rounded-lg shadow-lg">
-                                                      <button
-                                                         onClick={() => {
-                                                            setEditingMessageId(msg.id);
-                                                            setEditText(getDecryptedContent(msg));
-                                                         }}
-                                                         className="p-1 hover:text-indigo-400 text-gray-400 cursor-pointer"
-                                                         title="Edit"
-                                                      >
-                                                         <Edit2 className="w-2.5 h-2.5" />
-                                                      </button>
+                                                      {!msg.voice_url && !msg.image_url && (
+                                                         <button
+                                                            onClick={() => {
+                                                               setEditingMessageId(msg.id);
+                                                               setEditText(getDecryptedContent(msg));
+                                                            }}
+                                                            className="p-1 hover:text-indigo-400 text-gray-400 cursor-pointer"
+                                                            title="Edit"
+                                                         >
+                                                            <Edit2 className="w-2.5 h-2.5" />
+                                                         </button>
+                                                      )}
                                                       <button
                                                          onClick={() => handleDeleteMessage(msg.id)}
                                                          className="p-1 hover:text-rose-400 text-gray-400 cursor-pointer"

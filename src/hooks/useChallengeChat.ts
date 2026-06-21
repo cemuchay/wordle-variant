@@ -260,14 +260,23 @@ export const useChallengeChat = (
 
          try {
             const userId = effectiveUser.id;
-            const fileName = `${userId}/${Date.now()}.ogg`;
+            const mimeType = blob.type || "audio/wav";
+            let extension = "wav";
+            if (mimeType.includes("webm")) {
+               extension = "webm";
+            } else if (mimeType.includes("mp4")) {
+               extension = "mp4";
+            } else if (mimeType.includes("ogg")) {
+               extension = "ogg";
+            }
+            const fileName = `${userId}/${Date.now()}.${extension}`;
 
             // 1. Upload to storage with retry
             await retryOperation(async () => {
                const { error: uploadErr } = await supabase.storage
                   .from("voice-notes")
                   .upload(fileName, blob, {
-                     contentType: "audio/ogg; codecs=opus",
+                     contentType: mimeType,
                      cacheControl: "3600",
                   });
                if (uploadErr) throw uploadErr;
