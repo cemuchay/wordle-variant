@@ -186,9 +186,17 @@ export const WordUpView = () => {
                 
                 store.setView("battle");
                 
-                setTimeout(() => {
-                   loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
-                   startQuestionRound(activeGame.matchData, activeGame.currentIdx || 0);
+                setTimeout(async () => {
+                   const match = await loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
+                   const loadedQuestions = useWordUpStore.getState().questions;
+                   if (!match || !loadedQuestions || loadedQuestions.length === 0) {
+                      console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
+                      triggerToast("Failed to restore game.", 3000);
+                      resetGame();
+                      setView("menu");
+                      return;
+                   }
+                   startQuestionRound(match, activeGame.currentIdx || 0);
                 }, 100); // brief yield for state settling
              }
           } catch (err) {
@@ -236,6 +244,25 @@ export const WordUpView = () => {
         }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
     }, [startQuestionRound, role, cleanUpCountdown, setView]);
 
+   const handleAbortMatch = useCallback(async () => {
+      if (matchId) {
+         try {
+            await supabase
+               .from("wordup_matches")
+               .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString(),
+               })
+               .eq("id", matchId);
+         } catch (e) {
+            console.error("Failed to mark match as completed on abort:", e);
+         }
+      }
+      safeLocalStorage.removeItem("wordup_active_game");
+      resetGame();
+      triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
+   }, [matchId, resetGame, triggerToast]);
+
    const launchedMatchIdRef = useRef<string | null>(null);
 
    // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -245,14 +272,17 @@ export const WordUpView = () => {
       setRole(mRole);
       setView("loading");
       const match = await loadAndSubscribeMatch(mId, mRole);
-      if (match) {
+      const loadedQuestions = useWordUpStore.getState().questions;
+      if (match && loadedQuestions && loadedQuestions.length > 0) {
          wordupAudio.playMatchStart();
          setView("countdown");
          startCountdown(match);
       } else {
+         triggerToast("Failed to load match questions.", 3000);
+         resetGame();
          setView("menu");
       }
-   }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView]);
+   }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView, resetGame, triggerToast]);
 
    // Reactive sync for direct invites and rematch transitions
    useEffect(() => {
@@ -525,6 +555,7 @@ export const WordUpView = () => {
                   role={role}
                   playerProfile={profile}
                   sendQuickChat={sendQuickChat}
+                  onAbort={handleAbortMatch}
                />
             )}
 

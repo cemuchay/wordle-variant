@@ -1004,6 +1004,7 @@ export default function App() {
                 onClick={() => {
                   const matchId = opponentLaterInvite.matchId;
                   setOpponentLaterInvite(null);
+                  useWordUpStore.getState().setView("loading");
                   useWordUpStore.getState().setMatchId(matchId);
                   useWordUpStore.getState().setRole("player1");
                   handleNavigation("wordup");

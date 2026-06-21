@@ -313,7 +313,7 @@ serve(async (req) => {
       // Idempotency check
       const { data: existing } = await supabaseClient
          .from("wordup_matches")
-         .select("questions, encryption_key")
+         .select("questions, encryption_key, player1_id, player2_id, is_bot_match")
          .eq("id", matchId)
          .single();
 
@@ -324,39 +324,23 @@ serve(async (req) => {
          );
       }
 
-      // Generate 7 questions
-      const questions: any[] = [];
-
-      // Query database entities if it's a procedural database category
-      // Unified 'maths' and 'english_language' topics will query their corresponding DB facts
-      let dbCategoryQuery = category;
-      if (category === "maths") {
-         // Query 'math_fundamentals' facts for hybrid math trivia
-         dbCategoryQuery = "math_fundamentals";
-      } else if (category === "english_language") {
-         // Query 'english_vocabulary', 'english_idioms', and 'english_fundamentals' facts
-         dbCategoryQuery = "english_vocabulary,english_idioms,english_fundamentals";
+      // Gather player IDs to exclude/deprioritize seen entities
+      const playerIds: string[] = [];
+      if (existing?.player1_id) playerIds.push(existing.player1_id);
+      if (existing?.player2_id && !existing.is_bot_match) {
+         playerIds.push(existing.player2_id);
       }
 
-      const typeFilter = dbCategoryQuery.includes(",")
-         ? { typeFilter: "in", types: dbCategoryQuery.split(",") }
-         : { typeFilter: "eq", types: [dbCategoryQuery] };
-
-      let queryBuilder = supabaseClient
-         .from("wordup_entities")
-         .select("*");
-
-      if (typeFilter.typeFilter === "in") {
-         queryBuilder = queryBuilder.in("type", typeFilter.types);
-      } else {
-         queryBuilder = queryBuilder.eq("type", dbCategoryQuery);
-      }
-
-      const { data: entities, error: entityError } = await queryBuilder
-         .limit(100);
+      // Call the RPC function to get randomized entities with even type distribution and user history filter
+      const { data: entities, error: entityError } = await supabaseClient
+         .rpc("get_wordup_entities_v2", {
+            p_category: category,
+            p_user_ids: playerIds,
+            p_limit_per_type: 40
+         });
 
       if (entityError) {
-         console.warn("[generate-match-questions] Entity fetch error:", entityError);
+         console.warn("[generate-match-questions] RPC get_wordup_entities_v2 error:", entityError);
       }
 
       const entityList: any[] = entities || [];
@@ -484,6 +468,23 @@ serve(async (req) => {
             .insert({ match_id: matchId, encrypted_payload: encryptedQuestions });
          if (payloadError) {
             throw new Error(`Failed to store payload: ${payloadError.message}`);
+         }
+      } else {
+         // Log the chosen entities in the user history table for tracking
+         const validChosenEntityIds = chosenEntities
+            .filter((e) => e && e.id)
+            .map((e) => e.id);
+
+         if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
+            const { error: historyError } = await supabaseClient
+               .rpc("record_user_entities_seen", {
+                  p_user_ids: playerIds,
+                  p_entity_ids: validChosenEntityIds
+               });
+
+            if (historyError) {
+               console.error("[generate-match-questions] Failed to record entity history:", historyError);
+            }
          }
       }
 

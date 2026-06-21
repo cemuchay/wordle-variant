@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
+import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
 import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
+import { useWordUpStore } from "../../../../store/useWordUpStore";
 
 interface MatchData {
    p1_score?: number;
@@ -41,6 +43,7 @@ interface BattleViewProps {
    role: "player1" | "player2" | null;
    playerProfile: PlayerProfile | null;
    sendQuickChat: (text: string) => void;
+   onAbort: () => void;
 }
 
 const PREFILLED_MESSAGES = [
@@ -82,10 +85,14 @@ export const BattleView = ({
    handleAnswerSelect,
    role,
    playerProfile,
-   sendQuickChat
+   sendQuickChat,
+   onAbort
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
+
+   const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
+   const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
 
    const [prevIdx, setPrevIdx] = useState(currentIdx);
    if (currentIdx !== prevIdx) {
@@ -198,8 +205,31 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-12 pb-3 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-4 pb-3 relative overflow-hidden"
       >
+         {/* Top Control Bar */}
+         <div className="flex justify-between items-center px-1 pb-2 shrink-0 z-40">
+            <button
+               onClick={() => {
+                  if (window.confirm("Are you sure you want to forfeit and abort this match? This will count as a loss/completed match.")) {
+                     onAbort();
+                  }
+               }}
+               className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+            >
+               <AlertTriangle size={12} />
+               <span>Abort Game</span>
+            </button>
+
+            <button
+               onClick={() => setIsBattlePlaying(!isBattlePlaying)}
+               className="flex items-center gap-1.5 bg-slate-800/60 border border-white/10 text-gray-300 hover:text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+               title="Toggle App Header and Navigation"
+            >
+               {isBattlePlaying ? <Eye size={12} className="text-cyan-400" /> : <EyeOff size={12} className="text-gray-400" />}
+               <span>{isBattlePlaying ? "Show Navigation" : "Hide Navigation"}</span>
+            </button>
+         </div>
          {/* Floating Chat Bubbles */}
          <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
             <AnimatePresence>

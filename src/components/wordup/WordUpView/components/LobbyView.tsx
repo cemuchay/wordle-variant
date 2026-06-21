@@ -858,11 +858,14 @@ export const LobbyView = ({
                      <button
                         onClick={async () => {
                            const target = incomingOfflineOrTimeout.targetUser;
+                           useWordUpStore.getState().setView("loading");
                            const mId = await createPendingMatchAndNotification(target);
                            setIncomingOfflineOrTimeout(null);
                            if (mId) {
                               useWordUpStore.getState().setMatchId(mId);
                               useWordUpStore.getState().setRole("player1");
+                           } else {
+                              useWordUpStore.getState().setView("menu");
                            }
                         }}
                         className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
