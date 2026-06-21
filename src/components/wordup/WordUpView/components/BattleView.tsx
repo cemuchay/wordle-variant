@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
@@ -39,7 +39,6 @@ interface BattleViewProps {
    currentIdx: number;
    matchData: MatchData | null;
    opponentStats: ProfileStats | null;
-   timeLeft: number;
    maxTime: number;
    selectedAnswer: string | null;
    revealAnswers: boolean;
@@ -83,7 +82,6 @@ export const BattleView = ({
    currentIdx,
    matchData,
    opponentStats,
-   timeLeft,
    maxTime,
    selectedAnswer,
    revealAnswers,
@@ -95,8 +93,8 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
-   const [frozenPercent, setFrozenPercent] = useState<number | null>(null);
    const { ask } = useConfirmation();
+   const timerBarRef = useRef<HTMLDivElement | null>(null);
 
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
@@ -131,22 +129,49 @@ export const BattleView = ({
    }, []);
 
    const activeQuestion = questions[currentIdx];
-   if (!activeQuestion) return null;
-
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
+   // GPU-accelerated CSS transition logic for smooth countdown animation
    useEffect(() => {
-      if (selectedAnswer !== null) {
-         if (frozenPercent === null) {
-            setFrozenPercent((timeLeft / qMaxTime) * 100);
-         }
-      } else {
-         setFrozenPercent(null);
-      }
-   }, [selectedAnswer, timeLeft, qMaxTime, frozenPercent]);
+      const bar = timerBarRef.current;
+      if (!bar || revealAnswers || !activeQuestion) return;
 
-   const displayPercent = frozenPercent !== null ? frozenPercent : (timeLeft / qMaxTime) * 100;
-   const barColor = displayPercent > 30 ? "#4ade80" : "#ef4444";
+      // Reset immediately to 100% and green
+      bar.style.transition = "none";
+      bar.style.width = "100%";
+      bar.style.backgroundColor = "#4ade80";
+      bar.style.boxShadow = "0 0 8px #4ade80";
+
+      // Force layout reflow to apply the reset instantly
+      void bar.offsetHeight;
+
+      // Apply transition to 0% and red
+      bar.style.transition = `width ${qMaxTime}s linear, background-color ${qMaxTime}s linear, box-shadow ${qMaxTime}s linear`;
+      bar.style.width = "0%";
+      bar.style.backgroundColor = "#ef4444";
+      bar.style.boxShadow = "0 0 8px #ef4444";
+   }, [currentIdx, revealAnswers, qMaxTime, activeQuestion]);
+
+   // Freeze the timer bar when an answer is selected
+   useEffect(() => {
+      const bar = timerBarRef.current;
+      if (!bar) return;
+
+      if (selectedAnswer !== null) {
+         const computedStyle = window.getComputedStyle(bar);
+         const currentWidth = computedStyle.width;
+         const currentColor = computedStyle.backgroundColor;
+         const currentBoxShadow = computedStyle.boxShadow;
+
+         bar.style.transition = "none";
+         bar.style.width = currentWidth;
+         bar.style.backgroundColor = currentColor;
+         bar.style.boxShadow = currentBoxShadow;
+      }
+   }, [selectedAnswer]);
+
+   if (!activeQuestion) return null;
+
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -334,12 +359,8 @@ export const BattleView = ({
           <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
                 <div
-                   className="h-full rounded-full transition-all duration-100 ease-out"
-                   style={{
-                      width: `${displayPercent}%`,
-                      backgroundColor: barColor,
-                      boxShadow: `0 0 8px ${barColor}`
-                   }}
+                   ref={timerBarRef}
+                   className="h-full rounded-full"
                 />
              )}
           </div>
