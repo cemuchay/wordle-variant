@@ -286,22 +286,35 @@ export const WordUpView = () => {
       setView("loading");
       const match = await loadAndSubscribeMatch(mId, mRole);
       const loadedQuestions = useWordUpStore.getState().questions;
-      if (match && loadedQuestions && loadedQuestions.length > 0) {
-         if (match.category === "flag_bearer") {
-            try {
-               await preloadMatchFlags(loadedQuestions);
-            } catch (err) {
-               console.warn("Failed to preload flags:", err);
-            }
-         }
-         wordupAudio.playMatchStart();
-         setView("countdown");
-         startCountdown(match);
-      } else {
-         triggerToast("Failed to load match questions.", 3000);
-         resetGame();
-         setView("menu");
-      }
+       if (match && loadedQuestions && loadedQuestions.length > 0) {
+          if (match.category === "flag_bearer") {
+             try {
+                await preloadMatchFlags(loadedQuestions);
+             } catch (err) {
+                console.error("Failed to preload flags after retries:", err);
+                triggerToast("Failed to download match images. Aborting game.", 5000);
+                if (match.id && !match.id.startsWith("bot-match-") && match.status !== "completed") {
+                   supabase
+                      .from("wordup_matches")
+                      .update({ status: "completed", completed_at: new Date().toISOString() })
+                      .eq("id", match.id)
+                      .then(({ error }) => {
+                         if (error) console.error("Failed to set match status on preload failure:", error);
+                      });
+                }
+                resetGame();
+                setView("menu");
+                return;
+             }
+          }
+          wordupAudio.playMatchStart();
+          setView("countdown");
+          startCountdown(match);
+       } else {
+          triggerToast("Failed to load match questions.", 3000);
+          resetGame();
+          setView("menu");
+       }
    }, [loadAndSubscribeMatch, startCountdown, setMatchId, setRole, setView, resetGame, triggerToast]);
 
    // Reactive sync for direct invites and rematch transitions

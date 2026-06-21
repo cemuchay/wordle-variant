@@ -39,6 +39,26 @@ export function getCountryName(code: string): string {
    return code.toUpperCase();
 }
 
+function tryLoadImage(url: string, retries = 3, delay = 500): Promise<void> {
+   return new Promise<void>((resolve, reject) => {
+      let attempts = 0;
+      const load = () => {
+         const img = new Image();
+         img.onload = () => resolve();
+         img.onerror = () => {
+            attempts++;
+            if (attempts < retries) {
+               setTimeout(load, delay);
+            } else {
+               reject(new Error(`Failed to load ${url}`));
+            }
+         };
+         img.src = url;
+      };
+      load();
+   });
+}
+
 /**
  * Preloads a single flag image using parallel/sequential fallback checks.
  */
@@ -49,26 +69,19 @@ export function preloadFlagImage(code: string): Promise<void> {
    const primaryUrl = getPrimaryFlagUrl(lowerCode);
    const fallbackUrl = getFallbackFlagUrl(lowerCode);
 
-   return new Promise<void>((resolve) => {
-      const img = new Image();
-      img.onload = () => {
+   return tryLoadImage(primaryUrl, 3, 500)
+      .then(() => {
          flagUrlCache[lowerCode] = primaryUrl;
-         resolve();
-      };
-      img.onerror = () => {
-         const imgFallback = new Image();
-         imgFallback.onload = () => {
-            flagUrlCache[lowerCode] = fallbackUrl;
-            resolve();
-         };
-         imgFallback.onerror = () => {
-            flagUrlCache[lowerCode] = primaryUrl; // default fallback to primary
-            resolve();
-         };
-         imgFallback.src = fallbackUrl;
-      };
-      img.src = primaryUrl;
-   });
+      })
+      .catch(() => {
+         return tryLoadImage(fallbackUrl, 3, 500)
+            .then(() => {
+               flagUrlCache[lowerCode] = fallbackUrl;
+            })
+            .catch((err) => {
+               throw new Error(`Flag preloading failed for code: ${lowerCode} after all retries. ${err.message}`);
+            });
+      });
 }
 
 /**

@@ -473,7 +473,12 @@ export const useWordUpAsyncGame = ({
              }
              setQuestions(dec);
           } catch (e) {
-             console.error("Decrypt failed:", e);
+             console.error("Decrypt/Preload failed:", e);
+             triggerToast("Failed to load match images. Returning to menu.", 5000);
+             const store = useWordUpStore.getState();
+             store.resetGame();
+             store.setView("menu");
+             return null;
           }
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
