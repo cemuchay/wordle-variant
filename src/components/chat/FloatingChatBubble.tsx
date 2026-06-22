@@ -10,7 +10,7 @@ import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
 import { AudioPlayer } from "./ChatMessage/AudioPlayer";
-import { ProtectedAvatar } from "./ChatMessage/ProtectedAvatar";
+import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
@@ -481,14 +481,24 @@ export default function FloatingChatBubble() {
       return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
    });
 
-   // Group unread messages by group_id
-   const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
-      if (!acc[m.group_id]) {
-         acc[m.group_id] = [];
-      }
-      acc[m.group_id].push(m);
-      return acc;
-   }, {});
+    // Group unread messages by group_id
+    const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
+       if (!acc[m.group_id]) {
+          acc[m.group_id] = [];
+       }
+       acc[m.group_id].push(m);
+       return acc;
+    }, {});
+
+    // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
+    const getSmartInitials = (name: string) =>
+       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
+
+    // Latest unread sender info for the bubble display
+    const latestUnreadMsg = unreadMessages[unreadMessages.length - 1] as any;
+    const latestUnreadGroup = latestUnreadMsg ? groups.find((g: any) => g.id === latestUnreadMsg.group_id) : null;
+    const isLatestDM = latestUnreadGroup?.type === "dm";
+    const latestPartner = latestUnreadGroup?.dm_partner as { id: string; username: string; avatar_url: string } | undefined;
 
    // Resolve DM partner and room key for a message
    const getDecryptedContent = (m: any) => {
@@ -742,9 +752,24 @@ export default function FloatingChatBubble() {
                      style={{
                         zIndex: 99999,
                      }}
-                  >
-                     <MessageCircle className="w-7 h-7 text-white" />
-                     {unreadCount > 0 && (
+                   >
+                      {unreadCount > 0 && latestUnreadMsg ? (
+                         isLatestDM && latestPartner ? (
+                            <ProtectedAvatar
+                               userId={latestPartner.id}
+                               src={latestPartner.avatar_url}
+                               username={latestPartner.username}
+                               className="w-full h-full rounded-full"
+                            />
+                         ) : (
+                            <span className="text-white font-black text-[11px] uppercase leading-none select-none tracking-tight">
+                               {getSmartInitials(latestUnreadGroup?.name || '') || '?'}
+                            </span>
+                         )
+                      ) : (
+                         <MessageCircle className="w-7 h-7 text-white" />
+                      )}
+                      {unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-extrabold text-[11px] h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center border-2 border-slate-950 shadow-md">
                            {unreadCount}
                         </span>
