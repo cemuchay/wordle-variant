@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
+import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
@@ -34,7 +34,7 @@ export default function FloatingChatBubble() {
    const inactivityTimerRef = useRef<number | null>(null);
 
    // Bubble position persistence
-   const [bubblePos] = useState(() => {
+   const [bubblePos, setBubblePos] = useState(() => {
       try {
          const saved = safeLocalStorage.getItem('floating_bubble_pos');
          if (saved) {
@@ -710,7 +710,9 @@ export default function FloatingChatBubble() {
          dragStartPos.current.y + info.offset.y,
          window.innerHeight - 40,
       ));
-      safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify({ x: finalX, y: finalY }));
+      const newPos = { x: finalX, y: finalY };
+      setBubblePos(newPos);
+      safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify(newPos));
    };
 
    // Filter messages context for the active room in popover
@@ -748,27 +750,31 @@ export default function FloatingChatBubble() {
                      onClick={handleBubbleClick}
                      whileHover={{ scale: 1.05 }}
                      whileTap={{ scale: 0.95 }}
-                     className="absolute w-10 h-10 rounded-full bg-slate-950/40 hover:bg-slate-900/60 border border-white/10 shadow-2xl flex items-center justify-center cursor-pointer pointer-events-auto backdrop-blur-md select-none touch-none"
+                      className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
                      style={{
                         zIndex: 99999,
                      }}
                    >
-                      {unreadCount > 0 && latestUnreadMsg ? (
-                         isLatestDM && latestPartner ? (
-                            <ProtectedAvatar
-                               userId={latestPartner.id}
-                               src={latestPartner.avatar_url}
-                               username={latestPartner.username}
-                               className="w-full h-full rounded-full"
-                            />
-                         ) : (
-                            <span className="text-white font-black text-[11px] uppercase leading-none select-none tracking-tight">
-                               {getSmartInitials(latestUnreadGroup?.name || '') || '?'}
-                            </span>
-                         )
-                      ) : (
-                         <MessageCircle className="w-7 h-7 text-white" />
-                      )}
+                       {unreadCount > 0 && latestUnreadMsg ? (
+                          isLatestDM && latestPartner ? (
+                             <ProtectedAvatar
+                                userId={latestPartner.id}
+                                src={latestPartner.avatar_url}
+                                username={latestPartner.username}
+                                className="w-full h-full rounded-full"
+                             />
+                          ) : (
+                             <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
+                                <span className="text-white font-black text-[11px] uppercase leading-none select-none tracking-tight">
+                                   {getSmartInitials(latestUnreadGroup?.name || '') || '?'}
+                                </span>
+                             </div>
+                          )
+                       ) : (
+                          <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
+                             <MessageCircle className="w-7 h-7 text-white" />
+                          </div>
+                       )}
                       {unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-extrabold text-[11px] h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center border-2 border-slate-950 shadow-md">
                            {unreadCount}
@@ -974,9 +980,18 @@ export default function FloatingChatBubble() {
                                                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
                                                     {msg.profiles?.username || "User"}
                                                  </span>
-                                                 <span className="text-[8px] text-gray-500">
-                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                 </span>
+                                                  <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
+                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                     {isMe && !msg.is_deleted && (
+                                                        msg.status === "sending" ? (
+                                                           <span className="animate-spin text-white/50 text-[8px]">⌛</span>
+                                                        ) : msg.status === "failed" ? (
+                                                           <span className="text-red-400 text-[8px] font-black">⚠️</span>
+                                                        ) : (
+                                                           <CheckCheck size={10} className={msg.is_read ? "text-blue-400" : "text-white/30"} />
+                                                        )
+                                                     )}
+                                                  </span>
                                               </div>
 
                                               {isEditing ? (
