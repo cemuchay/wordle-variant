@@ -5,6 +5,11 @@ import { useApp } from "../context/AppContext";
 import { useAppStore } from "../store/useAppStore";
 import { logger } from "../lib/logger";
 import { safeLocalStorage } from "../utils/storage";
+import {
+   editMessage as editMessageAction,
+   deleteMessage as deleteMessageAction,
+   reactToMessage as reactToMessageAction,
+} from "./chatActions";
 
 export interface Message {
    id: string;
@@ -882,91 +887,16 @@ export const useChat = (userId: string) => {
    };
 
    // Reaction
-   const reactToMessage = async (messageId: string, emoji: string | null) => {
-      if (!userId) return;
-
-      // Optimistic UI: update global store immediately
-      const msg = globalMessages.find((m) => m.id === messageId);
-      if (!msg) return;
-
-      const currentReactions = { ...(msg.reactions || {}) };
-      if (emoji) {
-         currentReactions[userId] = emoji;
-      } else {
-         delete currentReactions[userId];
-      }
-
-      useAppStore
-         .getState()
-         .updateGlobalMessage({ id: messageId, reactions: currentReactions });
-
-      // Resilience: Use RPC call for atomic DB update
-      const { error } = await supabase.rpc("toggle_message_reaction", {
-         p_message_id: messageId,
-         p_user_id: userId,
-         p_emoji: emoji,
-      });
-
-      if (error) {
-         console.error("Failed to react resiliently:", error);
-         // Optionally rollback optimistic UI if it's a persistent failure
-      }
-   };
+   const reactToMessage = (messageId: string, emoji: string | null) =>
+      reactToMessageAction(messageId, emoji, userId);
 
    // Edit message
-   const editMessage = async (messageId: string, newContent: string) => {
-      if (!userId || !newContent.trim()) return;
-
-      let finalContent = newContent;
-      if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
-         const key = getDMRoomKey(userId, activeRoom.dm_partner.id);
-         finalContent = encryptDM(newContent, key);
-      }
-
-      useAppStore.getState().updateGlobalMessage({
-         id: messageId,
-         content: newContent,
-         is_edited: true,
-      });
-
-      const { error } = await supabase
-         .from("messages")
-         .update({ content: finalContent, is_edited: true })
-         .eq("id", messageId);
-
-      if (error) {
-         console.error("Failed to edit:", error);
-      }
-   };
+   const editMessage = (messageId: string, newContent: string) =>
+      editMessageAction(messageId, newContent, userId, activeRoom ?? undefined);
 
    // Delete message
-   const deleteMessage = async (messageId: string) => {
-      if (!userId) return;
-
-      useAppStore.getState().updateGlobalMessage({
-         id: messageId,
-         content: "🚫 This message was deleted",
-         is_deleted: true,
-         voice_url: null,
-         image_url: null,
-         reactions: {},
-      });
-
-      const { error } = await supabase
-         .from("messages")
-         .update({
-            content: "🚫 This message was deleted",
-            is_deleted: true,
-            voice_url: null,
-            image_url: null,
-            reactions: {},
-         })
-         .eq("id", messageId);
-
-      if (error) {
-         console.error("Failed to delete message:", error);
-      }
-   };
+   const deleteMessage = (messageId: string) =>
+      deleteMessageAction(messageId, userId);
 
    // Mark room as read
    const markAsRead = async (messageId: string) => {
