@@ -78,6 +78,10 @@ export default function FloatingChatBubble() {
     // Reply tracking
     const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
 
+    // Unread divider state
+    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
+    const [showUnreadLine, setShowUnreadLine] = useState(true);
+
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +99,17 @@ export default function FloatingChatBubble() {
           setIsOverlayOpen(false);
           setSelectedGroupId(null);
        }, CLOSE_DELAY);
+    };
+
+    // Handle scroll in the messages area
+    const handleScroll = () => {
+       resetInactivityTimer();
+       if (showUnreadLine && visibleUnreadId && scrollRef.current) {
+          const el = document.getElementById("fb-unread-line");
+          if (el && el.getBoundingClientRect().bottom < 0) {
+             setShowUnreadLine(false);
+          }
+       }
     };
 
     const resetInactivityTimer = () => {
@@ -715,10 +730,85 @@ export default function FloatingChatBubble() {
       safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify(newPos));
    };
 
-   // Filter messages context for the active room in popover
-   const activeRoomMessages = globalMessages
-      .filter(m => m.group_id === selectedGroupId)
-      .slice(-10);
+    // Filter messages context for the active room in popover
+    const activeRoomMessages = globalMessages
+       .filter(m => m.group_id === selectedGroupId)
+       .slice(-10);
+
+    // Find first unread message ID for the unread divider
+    const lastSeen = selectedGroupId ? readReceipts[selectedGroupId] : null;
+    const effectiveLastSeen = lastSeen || new Date(0).toISOString();
+    const firstUnreadMsg = activeRoomMessages.find(
+       (m: any) => m.user_id !== user?.id && new Date(m.created_at).getTime() > new Date(effectiveLastSeen).getTime(),
+    );
+    const firstUnreadId = firstUnreadMsg?.id || null;
+
+    // Mark a message as read (hover-based)
+    const handleMarkAsRead = (messageId: string) => {
+       if (!user?.id || !selectedGroupId) return;
+       const timestamp = new Date().toISOString();
+       updateReadReceipt(selectedGroupId, timestamp);
+       supabase
+          .from("chat_read_receipts")
+          .upsert(
+             { user_id: user.id, group_id: selectedGroupId, last_seen_at: timestamp },
+             { onConflict: "user_id,group_id" },
+          )
+          .then(({ error }) => {
+             if (error) console.error("Failed to mark as read:", error);
+          });
+       supabase
+          .from("messages")
+          .update({ is_read: true })
+          .eq("id", messageId)
+          .then(({ error }) => {
+             if (error) console.error("Failed to update message read status:", error);
+          });
+    };
+
+    // Snapshot firstUnreadId for the unread divider
+    useEffect(() => {
+       if (firstUnreadId && selectedGroupId) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setVisibleUnreadId(firstUnreadId);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setShowUnreadLine(true);
+       }
+    }, [firstUnreadId]);
+
+    // Reset snapshot on room change
+    useEffect(() => {
+       // eslint-disable-next-line react-hooks/set-state-in-effect
+       setVisibleUnreadId(null);
+       // eslint-disable-next-line react-hooks/set-state-in-effect
+       setShowUnreadLine(true);
+    }, [selectedGroupId]);
+
+    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
+    useEffect(() => {
+       if (!visibleUnreadId || !scrollRef.current) return;
+
+       const raf = requestAnimationFrame(() => {
+          const el = document.getElementById("fb-unread-line");
+          if (!el || !scrollRef.current) return;
+
+          const rect = el.getBoundingClientRect();
+          const containerRect = scrollRef.current.getBoundingClientRect();
+
+          if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
+             // Fully in view — auto-hide after short delay
+             // eslint-disable-next-line react-hooks/set-state-in-effect
+             const timer = setTimeout(() => setShowUnreadLine(false), 6000);
+             cleanupTimers.push(timer);
+          }
+       });
+
+       const cleanupTimers: number[] = [];
+       return () => {
+          cancelAnimationFrame(raf);
+          cleanupTimers.forEach(clearTimeout);
+       };
+    }, [visibleUnreadId]);
 
    const selectedGroupObject = groups.find(g => g.id === selectedGroupId);
    const selectedGroupName = selectedGroupObject?.name || "Conversation";
@@ -848,7 +938,7 @@ export default function FloatingChatBubble() {
                      </div>
 
                      {/* Content List */}
-                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={resetInactivityTimer}>
+                       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
                         {!selectedGroupId ? (
                            /* Screen A: Conversation List */
                            Object.keys(groupedUnread).length === 0 ? (
@@ -918,8 +1008,27 @@ export default function FloatingChatBubble() {
                                   const content = getDecryptedContent(msg);
 
                                   return (
-                                     <div key={msg.id} className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}>
-                                        {/* Reaction Picker */}
+                                      <div
+                                         key={msg.id}
+                                         onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                         className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
+                                      >
+                                         {/* Unread divider */}
+                                         {msg.id === visibleUnreadId && showUnreadLine && (
+                                            <motion.div
+                                               id="fb-unread-line"
+                                               initial={{ opacity: 0, scale: 0.8 }}
+                                               animate={{ opacity: 1, scale: 1 }}
+                                               className="flex items-center my-4 gap-3 px-2"
+                                            >
+                                               <div className="h-px flex-1 bg-white/20" />
+                                               <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] bg-white/10 px-3 py-1 rounded-full border border-white/20 shadow-[0_0_12px_rgba(255,255,255,0.08)]">
+                                                  Unread Messages
+                                               </span>
+                                               <div className="h-px flex-1 bg-white/20" />
+                                            </motion.div>
+                                         )}
+                                         {/* Reaction Picker */}
                                         <AnimatePresence>
                                            {reactingMessageId === msg.id && (
                                               <>

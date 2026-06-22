@@ -73,6 +73,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
     const [showUnreadLine, setShowUnreadLine] = useState(true);
+    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -138,16 +139,45 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
 
 
+    // Snapshot firstUnreadId on room entry (before auto-mark clears it)
     useEffect(() => {
-        if (firstUnreadId) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (firstUnreadId && activeRoomId) {
+            setVisibleUnreadId(firstUnreadId);
             setShowUnreadLine(true);
-            const timer = setTimeout(() => {
-                setShowUnreadLine(false);
-            }, 6000);
-            return () => clearTimeout(timer);
         }
     }, [firstUnreadId]);
+
+    // Reset snapshot on room change
+    useEffect(() => {
+        setVisibleUnreadId(null);
+        setShowUnreadLine(true);
+    }, [activeRoomId]);
+
+    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
+    useEffect(() => {
+        if (!visibleUnreadId || !scrollNode) return;
+
+        const raf = requestAnimationFrame(() => {
+            const el = document.getElementById("unread-line");
+            if (!el) return;
+
+            const rect = el.getBoundingClientRect();
+            const containerRect = scrollNode.getBoundingClientRect();
+
+            if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
+                // Fully in view — auto-hide after short delay
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                const timer = setTimeout(() => setShowUnreadLine(false), 6000);
+                cleanupTimers.push(timer);
+            }
+        });
+
+        const cleanupTimers: number[] = [];
+        return () => {
+            cancelAnimationFrame(raf);
+            cleanupTimers.forEach(clearTimeout);
+        };
+    }, [visibleUnreadId, scrollNode]);
 
     // Handle pending DM from Store
     useEffect(() => {
@@ -180,8 +210,12 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     }, [pendingChatGroupId, groups, setActiveRoomId, setPendingChatGroupId]);
 
     const handleScroll = () => {
-        if (showUnreadLine) {
-            setShowUnreadLine(false);
+        if (showUnreadLine && visibleUnreadId) {
+            const el = document.getElementById("unread-line");
+            if (el && el.getBoundingClientRect().bottom < 0) {
+                // Divider scrolled above viewport — hide it
+                setShowUnreadLine(false);
+            }
         }
         // Show scroll-down button when scrolled up more than 300px from bottom
         if (scrollNode) {
@@ -898,7 +932,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
                                             return (
                                                 <div key={msg.id}>
-                                                    {msg.id === firstUnreadId && showUnreadLine && (
+                                                    {msg.id === visibleUnreadId && showUnreadLine && (
                                                         <motion.div
                                                             id="unread-line"
                                                             initial={{ opacity: 0, scale: 0.8 }}
