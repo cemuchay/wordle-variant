@@ -1,8 +1,11 @@
 import { type WordUpQuestion } from "./wordupQuestionGenerator";
 import { FLAG_MAP } from "../components/wordup/WordUpView/constants";
 
-// Cache to hold preloaded image URLs so we don't have to resolve/re-verify them mid-game
+// Cache to hold preloaded flag image URLs so we don't have to resolve/re-verify them mid-game
 const flagUrlCache: Record<string, string> = {};
+
+// Tracks which general (non-flag) image URLs have been preloaded into browser cache
+const preloadedUrls: Set<string> = new Set();
 
 export const getPrimaryFlagUrl = (code: string) => `https://flagcdn.com/${code.toLowerCase()}.svg`;
 export const getFallbackFlagUrl = (code: string) => `https://raw.githubusercontent.com/lipis/flag-icons/main/flags/4x3/${code.toLowerCase()}.svg`;
@@ -85,28 +88,57 @@ export function preloadFlagImage(code: string): Promise<void> {
 }
 
 /**
- * Preloads all unique flag codes for the rounds in parallel.
+ * Preloads a single general (non-flag) image URL into the browser cache.
  */
-export async function preloadMatchFlags(questions: WordUpQuestion[]): Promise<void> {
-   const codes = new Set<string>();
+function preloadGeneralImage(url: string): Promise<void> {
+   if (preloadedUrls.has(url)) return Promise.resolve();
+   return tryLoadImage(url, 2, 300).then(() => {
+      preloadedUrls.add(url);
+   });
+}
+
+/**
+ * Preloads all unique images (both flag codes and full URLs) for the rounds in parallel.
+ */
+export async function preloadMatchImages(questions: WordUpQuestion[]): Promise<void> {
+   const flagCodes = new Set<string>();
+   const generalUrls = new Set<string>();
+
    for (const q of questions) {
-      if (q.imageUrl && q.imageUrl.length === 2) {
-         codes.add(q.imageUrl);
+      if (q.imageUrl) {
+         if (q.imageUrl.length === 2) {
+            flagCodes.add(q.imageUrl);
+         } else {
+            generalUrls.add(q.imageUrl);
+         }
       }
       if (q.imageUrls) {
-         for (const code of q.imageUrls) {
-            if (code && code.length === 2) {
-               codes.add(code);
+         for (const entry of q.imageUrls) {
+            if (entry && entry.length === 2) {
+               flagCodes.add(entry);
+            } else if (entry) {
+               generalUrls.add(entry);
             }
          }
       }
    }
 
-   if (codes.size === 0) return;
+   const tasks: Promise<void>[] = [];
 
-   // Preload all in parallel and resolve
-   await Promise.all(Array.from(codes).map((code) => preloadFlagImage(code)));
+   if (flagCodes.size > 0) {
+      tasks.push(...Array.from(flagCodes).map((code) => preloadFlagImage(code)));
+   }
+   if (generalUrls.size > 0) {
+      tasks.push(...Array.from(generalUrls).map((url) => preloadGeneralImage(url)));
+   }
+
+   if (tasks.length === 0) return;
+
+   await Promise.all(tasks);
 }
+
+/** @deprecated Use `preloadMatchImages` instead */
+export const preloadMatchFlags = preloadMatchImages;
 
 /**
  * Post-processes questions client-side to convert textual flag bearer prompts

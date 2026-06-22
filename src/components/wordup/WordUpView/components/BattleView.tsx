@@ -392,9 +392,8 @@ export const BattleView = ({
                        <img
                           src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
                           alt="Question Clue"
-                          className="max-h-full max-w-full object-contain rounded-lg select-none"
-                          loading="lazy"
-                          draggable={false}
+                           className="max-h-full max-w-full object-contain rounded-lg select-none"
+                           draggable={false}
                        />
                     </motion.div>
                  </div>
@@ -459,9 +458,8 @@ export const BattleView = ({
                              <img
                                 src={imageUrl}
                                 alt={`Flag Option ${optionLetter}`}
-                                className="w-full h-full object-cover rounded-lg"
-                                loading="lazy"
-                                draggable={false}
+                                 className="w-full h-full object-cover rounded-lg"
+                                 draggable={false}
                              />
 
                              <div className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md select-none">

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Award } from "lucide-react";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
+import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";
 
 interface GameOverViewProps {
    matchData: any;
@@ -155,14 +156,47 @@ export const GameOverView = ({
                               <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
                            </div>
                            <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
-                           {q.subPrompt && (
-                              <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
-                                 {q.subPrompt}
-                              </p>
-                           )}
-                           <p className="text-[10px] text-gray-400 mt-1">
-                              Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
-                           </p>
+                            {q.subPrompt && (
+                               <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
+                                  {q.subPrompt}
+                               </p>
+                            )}
+                            {q.imageUrl && (
+                               <div className="flex justify-center py-1">
+                                  <div className="w-full max-w-[120px] h-[70px] rounded-lg overflow-hidden border border-white/10 bg-slate-950/60 flex items-center justify-center">
+                                     <img
+                                        src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl}
+                                        alt="Question Clue"
+                                        className="max-h-full max-w-full object-contain rounded"
+                                        draggable={false}
+                                     />
+                                  </div>
+                               </div>
+                            )}
+                            {q.imageUrls && q.imageUrls.length > 0 && (
+                               <div className="grid grid-cols-2 gap-1.5 py-1">
+                                  {q.imageUrls.map((code, i) => (
+                                     <div
+                                        key={i}
+                                        className={`rounded-lg overflow-hidden border ${
+                                           q.choices[i] === q.answer
+                                              ? "border-correct ring-1 ring-correct"
+                                              : "border-white/10"
+                                        } bg-slate-950/60 flex items-center justify-center aspect-[2/1]`}
+                                     >
+                                        <img
+                                           src={getCachedFlagUrl(code)}
+                                           alt={`Choice ${String.fromCharCode(65 + i)}`}
+                                           className="w-full h-full object-cover"
+                                           draggable={false}
+                                        />
+                                     </div>
+                                  ))}
+                               </div>
+                            )}
+                            <p className="text-[10px] text-gray-400 mt-1">
+                               Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
+                            </p>
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
                                  <p className="font-black text-gray-500 uppercase">You</p>

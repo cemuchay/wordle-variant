@@ -4,7 +4,7 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
-import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+import { preloadMatchImages } from "../../../../utils/wordupQuestionPostProcessor";
 
 import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
@@ -593,7 +593,7 @@ export const useWordUpBotGame = ({
                       try {
                          const dec = await decryptMatchQuestions(match);
                          if (category === "flag_bearer") {
-                            await preloadMatchFlags(dec);
+                            await preloadMatchImages(dec);
                          }
                          setQuestions(dec);
                       } catch (e) {
@@ -648,7 +648,7 @@ export const useWordUpBotGame = ({
 
             if (category === "flag_bearer") {
                try {
-                  await preloadMatchFlags(rawQuestions);
+                  await preloadMatchImages(rawQuestions);
                } catch (e) {
                   console.error("Local preloading failed:", e);
                   triggerToast("Failed to load match images. Returning to menu.", 5000);
@@ -685,7 +685,7 @@ export const useWordUpBotGame = ({
             try {
                const dec = await decryptMatchQuestions(match);
                if (match.category === "flag_bearer") {
-                  await preloadMatchFlags(dec);
+                  await preloadMatchImages(dec);
                }
                setQuestions(dec);
             } catch (e) {
