@@ -1355,53 +1355,91 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
    };
 
    const useRemove = Math.random() > 0.5;
-   let pair = useRemove ? tryRemove() : tryAdd();
+   interface WordPair {
+      base: string;
+      result: string;
+   }
+
+   // 1. Scalable Pre-verified Fallback Pools
+   const FALLBACK_REMOVE_POOL: WordPair[] = [
+      { base: "BREAD", result: "READ" },
+      { base: "BEACH", result: "EACH" },
+      { base: "PLANET", result: "PLANE" },
+      { base: "START", result: "TART" },
+      { base: "TRAIN", result: "RAIN" },
+   ];
+
+   const FALLBACK_ADD_POOL: WordPair[] = [
+      { base: "READ", result: "BREAD" },
+      { base: "EACH", result: "BEACH" },
+      { base: "PLANE", result: "PLANET" },
+      { base: "TART", result: "START" },
+      { base: "RAIN", result: "TRAIN" },
+   ];
+
+   // 2. Pure Helper Functions for Interleaved Execution
+   const checkRemoval = (
+      word: string,
+      validSet: Set<string>,
+   ): WordPair | null => {
+      for (let i = 0; i < word.length; i++) {
+         const candidate = word.substring(0, i) + word.substring(i + 1);
+         if (candidate.length >= 3 && validSet.has(candidate)) {
+            return { base: word, result: candidate };
+         }
+      }
+      return null;
+   };
+
+   const checkAddition = (
+      word: string,
+      validSet: Set<string>,
+      maxLen: number,
+   ): WordPair | null => {
+      if (word.length >= maxLen) return null;
+      for (let i = 0; i <= word.length; i++) {
+         for (let c = 65; c <= 90; c++) {
+            // A-Z
+            const letter = String.fromCharCode(c);
+            const candidate = word.substring(0, i) + letter + word.substring(i);
+            if (candidate.length <= 10 && validSet.has(candidate)) {
+               return { base: word, result: candidate };
+            }
+         }
+      }
+      return null;
+   };
+
+   // 3. Core Logic Block
+   let pair: WordPair | null = useRemove ? tryRemove() : tryAdd();
+   const maxLen = Math.max(...allowedLengths);
 
    let retries = 0;
    while (!pair && retries < 30) {
       retries++;
-      // Try a different word
+      // Pull a random seed word from the client-side alphabetical list
       const newWord = official[Math.floor(Math.random() * official.length)];
-      const newPair = useRemove
-         ? (() => {
-              for (let i = 0; i < newWord.length; i++) {
-                 const candidate =
-                    newWord.substring(0, i) + newWord.substring(i + 1);
-                 if (candidate.length >= 3 && valid.has(candidate)) {
-                    return { base: newWord, result: candidate };
-                 }
-              }
-              return null;
-           })()
-         : (() => {
-              const maxLen = Math.max(...allowedLengths);
-              if (newWord.length >= maxLen) return null;
-              for (let i = 0; i <= newWord.length; i++) {
-                 for (let c = 65; c <= 90; c++) {
-                    const letter = String.fromCharCode(c);
-                    const candidate =
-                       newWord.substring(0, i) + letter + newWord.substring(i);
-                    if (candidate.length <= 10 && valid.has(candidate)) {
-                       return { base: newWord, result: candidate };
-                    }
-                 }
-              }
-              return null;
-           })();
-      if (newPair) pair = newPair;
+
+      // Respect the useRemove flag during retries
+      pair = useRemove
+         ? checkRemoval(newWord, valid)
+         : checkAddition(newWord, valid, maxLen);
    }
 
+   // 4. Expanded Fallback Safety net
    if (!pair) {
-      // Hardcoded fallback
-      pair = useRemove
-         ? { base: "BEACH", result: "BEACH" }
-         : { base: "BEACH", result: "BEACH" };
-      // Let's give a real fallback
-      if (useRemove) {
-         pair = { base: "BREAD", result: "READ" };
-      } else {
-         pair = { base: "READ", result: "BREAD" };
-      }
+      const pool = useRemove ? FALLBACK_REMOVE_POOL : FALLBACK_ADD_POOL;
+
+      // Try to respect maxLen, otherwise use the whole pool to prevent a crash
+      const validFallbacks = pool.filter((p) => p.result.length <= maxLen);
+      const safePool = validFallbacks.length > 0 ? validFallbacks : pool;
+
+      const randomIndex = Math.floor(Math.random() * safePool.length);
+      pair = safePool[randomIndex];
+
+      console.warn(
+         `[WordGen] Fallback used: ${pair.base} -> ${pair.result}. Respected maxLen: ${validFallbacks.length > 0}`,
+      );
    }
 
    const isRemove = pair.base.length > pair.result.length;
@@ -2107,7 +2145,7 @@ export interface BotProfile {
 export const BOT_PROFILES: Record<string, BotProfile> = {
    slow_thinker: {
       name: "Sloths",
-      accuracy: 0.6,
+      accuracy: 0.5,
       minDelay: 6.0,
       maxDelay: 9.0,
    },
@@ -2117,12 +2155,12 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
       minDelay: 4.0,
       maxDelay: 7.5,
    },
-   fast: { name: "Speedy", accuracy: 0.85, minDelay: 2.0, maxDelay: 5.0 },
+   fast: { name: "Speedy", accuracy: 0.85, minDelay: 1.5, maxDelay: 2 },
    master: {
       name: "Zeeny",
-      accuracy: 0.95,
-      minDelay: 1.5,
-      maxDelay: 3.5,
+      accuracy: 0.97,
+      minDelay: 1,
+      maxDelay: 2,
    },
    impossible: {
       name: "Variant",
@@ -2133,61 +2171,61 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
 
    // New bots
    lagos_boy: {
-      name: "Lagos Boy",
+      name: "LagosBoy",
       accuracy: 0.78,
       minDelay: 3.5,
       maxDelay: 6.5,
    },
    jollof_brain: {
-      name: "Jollof Brain",
+      name: "Jollof",
       accuracy: 0.8,
       minDelay: 3.0,
       maxDelay: 6.0,
    },
    okada_rider: {
-      name: "Okada Rider",
+      name: "Okada",
       accuracy: 0.82,
       minDelay: 2.5,
       maxDelay: 5.5,
    },
    naija_flash: {
-      name: "Naija Flash",
-      accuracy: 0.87,
-      minDelay: 2.0,
-      maxDelay: 4.5,
+      name: "Flash",
+      accuracy: 0.95,
+      minDelay: 1,
+      maxDelay: 2,
    },
    suya_thinker: {
-      name: "Suya Thinker",
+      name: "Suya",
       accuracy: 0.74,
       minDelay: 4.0,
       maxDelay: 7.0,
    },
    pepper_soup: {
-      name: "Pepper Soup",
+      name: "PepperSoup",
       accuracy: 0.79,
       minDelay: 3.2,
       maxDelay: 6.2,
    },
    agbada_mode: {
-      name: "Agbada Mode",
+      name: "Agidi",
       accuracy: 0.83,
       minDelay: 2.8,
       maxDelay: 5.8,
    },
    street_king: {
-      name: "Street King",
-      accuracy: 0.81,
+      name: "Marlians",
+      accuracy: 0.5,
       minDelay: 3.0,
       maxDelay: 5.5,
    },
    ogbonge_mind: {
-      name: "Ogbonge Mind",
+      name: "Ogbeni",
       accuracy: 0.9,
       minDelay: 1.8,
       maxDelay: 4.0,
    },
    eko_flash: {
-      name: "Eko Flash",
+      name: "Eko",
       accuracy: 0.86,
       minDelay: 2.2,
       maxDelay: 4.8,

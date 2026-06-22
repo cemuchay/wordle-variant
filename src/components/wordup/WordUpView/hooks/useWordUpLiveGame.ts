@@ -4,7 +4,7 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator";
-import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+import { preloadMatchImages } from "../../../../utils/wordupQuestionPostProcessor";
 
 import { generateMatchQuestions } from "../../../../services/wordup/questionService";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
@@ -574,7 +574,7 @@ export const useWordUpLiveGame = ({
             try {
                const dec = await decryptMatchQuestions(match);
                if (match.category === "flag_bearer") {
-                  await preloadMatchFlags(dec);
+                  await preloadMatchImages(dec);
                }
                setQuestions(dec);
             } catch (e) {

@@ -31,5 +31,7 @@ research/
 GEMINI.md
 GEMINI_README.md
 opencode.json
+SPEC.md
+AGENTS.md
 
 deno.lock

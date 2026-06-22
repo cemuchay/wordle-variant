@@ -70,6 +70,7 @@ export const CATEGORIES = [
       id: "flag_bearer",
       name: "Flags",
       desc: "Identify countries by their flag colors",
+      featured: true,
    },
    {
       id: "element_arena",
