@@ -617,11 +617,13 @@ serve(async (req) => {
                    p_entity_ids: validChosenEntityIds
                 });
 
-             if (historyError) {
-                console.error(`${logPrefix} Failed to record entity history:`, historyError);
-             } else {
-                console.log(`${logPrefix} Entity history recorded`);
-        }
+              if (historyError) {
+                 console.error(`${logPrefix} Failed to record entity history:`, historyError);
+              } else {
+                 console.log(`${logPrefix} Entity history recorded`);
+            }
+         }
+      }
 
        console.log(`${logPrefix} Returning success response`);
        return new Response(
