@@ -4,6 +4,8 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../../utils/wordupAudio";
 import { decryptMatchQuestions, generateWordUpQuestions, generateSecretKey, encryptQuestions, simulateBotResponse, getRandomBotProfile } from "../../../../utils/wordupQuestionGenerator";
+import { preloadMatchFlags } from "../../../../utils/wordupQuestionPostProcessor";
+
 import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
@@ -588,12 +590,20 @@ export const useWordUpBotGame = ({
                   if (loadedMatch) {
                      match = loadedMatch;
                      setMatchData(match);
-                     try {
-                        const dec = await decryptMatchQuestions(match);
-                        setQuestions(dec);
-                     } catch (e) {
-                        console.error("Decrypt failed:", e);
-                     }
+                      try {
+                         const dec = await decryptMatchQuestions(match);
+                         if (category === "flag_bearer") {
+                            await preloadMatchFlags(dec);
+                         }
+                         setQuestions(dec);
+                      } catch (e) {
+                         console.error("Decrypt/Preload failed:", e);
+                         triggerToast("Failed to load match images. Returning to menu.", 5000);
+                         const store = useWordUpStore.getState();
+                         store.resetGame();
+                         store.setView("menu");
+                         return null;
+                      }
                      setOpponentStats({
                         rating: botProfile === "impossible" ? 2200 : botProfile === "master" ? 1800 : 1200,
                         xp: 5000, games_played: 150, games_won: 95, games_lost: 50, games_tied: 5,
@@ -636,6 +646,18 @@ export const useWordUpBotGame = ({
                encryption_key: secretKey,
             };
 
+            if (category === "flag_bearer") {
+               try {
+                  await preloadMatchFlags(rawQuestions);
+               } catch (e) {
+                  console.error("Local preloading failed:", e);
+                  triggerToast("Failed to load match images. Returning to menu.", 5000);
+                  const store = useWordUpStore.getState();
+                  store.resetGame();
+                  store.setView("menu");
+                  return;
+               }
+            }
             setMatchData(match);
             setQuestions(rawQuestions);
          } else {
@@ -662,9 +684,17 @@ export const useWordUpBotGame = ({
 
             try {
                const dec = await decryptMatchQuestions(match);
+               if (match.category === "flag_bearer") {
+                  await preloadMatchFlags(dec);
+               }
                setQuestions(dec);
             } catch (e) {
-               console.error("Decrypt failed:", e);
+               console.error("Decrypt/Preload failed:", e);
+               triggerToast("Failed to load match images. Returning to menu.", 5000);
+               const store = useWordUpStore.getState();
+               store.resetGame();
+               store.setView("menu");
+               return null;
             }
          }
 

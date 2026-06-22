@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
+import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";
+import { useConfirmation } from "../../../../hooks/useConfirmation";
 import { type ProfileStats } from "../types";
+
+
 import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
@@ -35,7 +39,6 @@ interface BattleViewProps {
    currentIdx: number;
    matchData: MatchData | null;
    opponentStats: ProfileStats | null;
-   timeLeft: number;
    maxTime: number;
    selectedAnswer: string | null;
    revealAnswers: boolean;
@@ -90,6 +93,8 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
+   const { ask } = useConfirmation();
+   const timerBarRef = useRef<HTMLDivElement | null>(null);
 
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
@@ -124,9 +129,49 @@ export const BattleView = ({
    }, []);
 
    const activeQuestion = questions[currentIdx];
+   const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
+
+   // GPU-accelerated CSS transition logic for smooth countdown animation
+   useEffect(() => {
+      const bar = timerBarRef.current;
+      if (!bar || revealAnswers || !activeQuestion) return;
+
+      // Reset immediately to 100% and green
+      bar.style.transition = "none";
+      bar.style.width = "100%";
+      bar.style.backgroundColor = "#4ade80";
+      bar.style.boxShadow = "0 0 8px #4ade80";
+
+      // Force layout reflow to apply the reset instantly
+      void bar.offsetHeight;
+
+      // Apply transition to 0% and red
+      bar.style.transition = `width ${qMaxTime}s linear, background-color ${qMaxTime}s linear, box-shadow ${qMaxTime}s linear`;
+      bar.style.width = "0%";
+      bar.style.backgroundColor = "#ef4444";
+      bar.style.boxShadow = "0 0 8px #ef4444";
+   }, [currentIdx, revealAnswers, qMaxTime, activeQuestion]);
+
+   // Freeze the timer bar when an answer is selected
+   useEffect(() => {
+      const bar = timerBarRef.current;
+      if (!bar) return;
+
+      if (selectedAnswer !== null) {
+         const computedStyle = window.getComputedStyle(bar);
+         const currentWidth = computedStyle.width;
+         const currentColor = computedStyle.backgroundColor;
+         const currentBoxShadow = computedStyle.boxShadow;
+
+         bar.style.transition = "none";
+         bar.style.width = currentWidth;
+         bar.style.backgroundColor = currentColor;
+         bar.style.boxShadow = currentBoxShadow;
+      }
+   }, [selectedAnswer]);
+
    if (!activeQuestion) return null;
 
-   const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -210,8 +255,14 @@ export const BattleView = ({
          {/* Top Control Bar */}
          <div className="flex justify-between items-center px-1 pb-2 shrink-0 z-40">
             <button
-               onClick={() => {
-                  if (window.confirm("Are you sure you want to forfeit and abort this match? This will count as a loss/completed match.")) {
+               onClick={async () => {
+                  const confirmed = await ask({
+                     title: "Forfeit Match",
+                     message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                     confirmLabel: "Forfeit",
+                     type: "danger"
+                  });
+                  if (confirmed) {
                      onAbort();
                   }
                }}
@@ -307,167 +358,227 @@ export const BattleView = ({
           {/* Timer Bar */}
           <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
-                <motion.div
-                   key={currentIdx}
-                   initial={{ width: "100%", backgroundColor: "#4ade80", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }}
-                   animate={{
-                      width: "0%",
-                      backgroundColor: ["#4ade80", "#4ade80", "#ef4444"],
-                      boxShadow: [
-                         "0 0 8px rgba(34,197,94,0.5)",
-                         "0 0 8px rgba(34,197,94,0.5)",
-                         "0 0 8px rgba(239,68,68,0.5)"
-                      ]
-                   }}
-                   transition={{
-                      width: { duration: qMaxTime, ease: "linear" },
-                      backgroundColor: {
-                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
-                         duration: qMaxTime,
-                         ease: "linear"
-                      },
-                      boxShadow: {
-                         times: [0, Math.max(0, qMaxTime - 3) / qMaxTime, 1],
-                         duration: qMaxTime,
-                         ease: "linear"
-                      }
-                   }}
+                <div
+                   ref={timerBarRef}
                    className="h-full rounded-full"
                 />
              )}
           </div>
 
-         {/* Question Container */}
-         <div className="flex-1 flex flex-col justify-start md:justify-center gap-4 md:gap-6 py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
-            <div className="text-center space-y-2">
-                <p className="text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
-                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
-                  {activeQuestion.type.replace("_", " ")}
-               </p>
-               <h2 className={`${promptSizeClass} font-black tracking-tight leading-relaxed text-white whitespace-pre-line`}>
-                  {activeQuestion.prompt}
-               </h2>
-               {activeQuestion.subPrompt && (
-                  <p className="text-xs text-gray-400 bg-white/5 px-3 py-1 rounded-lg inline-block">
-                     {activeQuestion.subPrompt}
-                  </p>
-               )}
+          {/* Question Container */}
+          <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
+             <div className="text-center space-y-1 sm:space-y-2">
+                 <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+                    {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
+                   {activeQuestion.type.replace("_", " ")}
+                </p>
+                <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
+                   {activeQuestion.prompt}
+                </h2>
+                {activeQuestion.subPrompt && (
+                   <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
+                      {activeQuestion.subPrompt}
+                   </p>
+                )}
+             </div>
+
+              {activeQuestion.imageUrl && (
+                 <div className="w-full flex justify-center shrink-0 my-0.5 sm:my-1">
+                    <motion.div
+                       initial={{ opacity: 0, scale: 0.95 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       className="w-full max-w-[200px] sm:max-w-[280px] h-[90px] sm:h-[140px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
+                    >
+                       <img
+                          src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
+                          alt="Question Clue"
+                          className="max-h-full max-w-full object-contain rounded-lg select-none"
+                          loading="lazy"
+                          draggable={false}
+                       />
+                    </motion.div>
+                 </div>
+              )}
+
+              {/* Choices Grid */}
+              {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
+                 <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0">
+                    {activeQuestion.choices.map((choice, index) => {
+                       const isSelected = selectedAnswer === choice;
+                       const isCorrect = choice === activeQuestion.answer;
+                       const isOppSelected = revealAnswers && oppChoice === choice;
+                       const flagCode = activeQuestion.imageUrls?.[index] || choice;
+                       const imageUrl = getCachedFlagUrl(flagCode);
+                       const optionLetter = String.fromCharCode(65 + index);
+
+                       let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-1 transition-all shadow-md select-none shrink-0 ";
+                       if (selectedAnswer === null) {
+                          cardClass += " cursor-pointer bg-slate-950/40 border-white/10 hover:border-cyan-400 hover:bg-slate-950/60";
+                       } else {
+                          cardClass += " cursor-default";
+                          if (isCorrect) {
+                             cardClass += " border-correct shadow-[0_0_20px_rgba(106,170,100,0.6)] bg-correct/10";
+                          } else if (isSelected) {
+                             cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
+                          } else {
+                             cardClass += " border-white/5 bg-slate-950/20 opacity-40";
+                          }
+                       }
+
+                       if (isOppSelected) {
+                          cardClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                       }
+
+                       let buttonAnimate: TargetAndTransition | undefined = undefined;
+                       let buttonTransition: Transition | undefined = undefined;
+
+                       if (selectedAnswer !== null) {
+                          if (isSelected && isCorrect) {
+                             buttonAnimate = {
+                                scale: [1, 1.1, 0.98, 1.02, 1],
+                                rotate: [0, -2, 2, -1, 1, 0]
+                             };
+                             buttonTransition = { duration: 0.5, ease: "easeInOut" };
+                          } else if (isSelected && !isCorrect) {
+                             buttonAnimate = {
+                                x: [0, -6, 6, -6, 6, 0]
+                             };
+                             buttonTransition = { duration: 0.4, ease: "linear" };
+                          }
+                       }
+
+                       return (
+                          <motion.button
+                             key={choice}
+                             disabled={selectedAnswer !== null || revealAnswers}
+                             onClick={() => onChoiceSelect(choice)}
+                             animate={buttonAnimate}
+                             transition={buttonTransition}
+                             className={cardClass}
+                          >
+                             <img
+                                src={imageUrl}
+                                alt={`Flag Option ${optionLetter}`}
+                                className="w-full h-full object-cover rounded-lg"
+                                loading="lazy"
+                                draggable={false}
+                             />
+
+                             <div className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md select-none">
+                                {optionLetter}
+                             </div>
+
+                             <div className="absolute right-1.5 bottom-1.5 flex gap-1 items-center z-10">
+                                {isSelected && (
+                                   <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                                )}
+                                {isOppSelected && (
+                                   <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                      {opponentName.slice(0, 5)}
+                                   </span>
+                                )}
+                             </div>
+                          </motion.button>
+                       );
+                    })}
+                 </div>
+              ) : (
+                 <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0">
+                    {activeQuestion.choices.map((choice) => {
+                       const isSelected = selectedAnswer === choice;
+                       const isCorrect = choice === activeQuestion.answer;
+                       const isOppSelected = revealAnswers && oppChoice === choice;
+
+                       let btnClass = `p-3 sm:p-5 rounded-xl sm:rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                       if (selectedAnswer === null) {
+                          btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                       } else {
+                          btnClass += " cursor-default";
+                          if (isCorrect) {
+                             btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
+                          } else if (isSelected) {
+                             btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
+                          } else {
+                             btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
+                          }
+                       }
+
+                      if (isOppSelected) {
+                         btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                      }
+
+                      let buttonAnimate: TargetAndTransition | undefined = undefined;
+                      let buttonTransition: Transition | undefined = undefined;
+
+                      if (selectedAnswer !== null) {
+                         if (isSelected && isCorrect) {
+                            buttonAnimate = {
+                               scale: [1, 1.15, 0.95, 1.05, 1],
+                               rotate: [0, -3, 3, -2, 2, 0],
+                               boxShadow: [
+                                  "0 0 0px rgba(106,170,100,0)",
+                                  "0 0 45px rgba(106,170,100,0.95)",
+                                  "0 0 20px rgba(106,170,100,0.5)",
+                                  "0 0 0px rgba(106,170,100,0)"
+                               ]
+                            };
+                            buttonTransition = { duration: 0.65, ease: "easeInOut" };
+                         } else if (isSelected && !isCorrect) {
+                            buttonAnimate = {
+                               x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
+                               scale: [1, 0.95, 1.02, 1],
+                               boxShadow: [
+                                  "0 0 0px rgba(239,68,68,0)",
+                                  "0 0 35px rgba(239,68,68,0.95)",
+                                  "0 0 10px rgba(239,68,68,0.4)",
+                                  "0 0 0px rgba(239,68,68,0)"
+                               ]
+                            };
+                            buttonTransition = { duration: 0.5, ease: "linear" };
+                         }
+                      }
+
+                      return (
+                         <motion.button
+                            key={choice}
+                            disabled={selectedAnswer !== null || revealAnswers}
+                            onClick={() => onChoiceSelect(choice)}
+                            animate={buttonAnimate}
+                            transition={buttonTransition}
+                            className={btnClass}
+                         >
+                            <span className="flex-1 text-center pr-8">{choice}</span>
+
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
+                               {isSelected && (
+                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                               )}
+                               {isOppSelected && (
+                                  <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                     {opponentName.slice(0, 5)}
+                                  </span>
+                               )}
+                            </div>
+                         </motion.button>
+                      );
+                   })}
+                </div>
+             )}
+
+             {/* Prefilled Quick Chat Row */}
+             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-2 sm:py-3 px-2 sm:px-3 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-xl sm:rounded-2xl w-full mt-2 sm:mt-4">
+                <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1 sm:mr-1.5">Chat:</span>
+                {PREFILLED_MESSAGES.map((msg) => (
+                   <button
+                      key={msg}
+                      onClick={() => sendQuickChat(msg)}
+                      className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-[10px] sm:text-xs font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                   >
+                      {msg}
+                   </button>
+                ))}
+             </div>
             </div>
-
-            {activeQuestion.imageUrl && (
-               <div className="w-full flex justify-center shrink-0 my-1">
-                  <motion.div
-                     initial={{ opacity: 0, scale: 0.95 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     className="w-full max-w-[280px] h-[140px] rounded-2xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1.5 shadow-inner"
-                  >
-                     <img
-                        src={activeQuestion.imageUrl}
-                        alt="Question Clue"
-                        className="max-h-full max-w-full object-contain rounded-xl select-none"
-                        loading="lazy"
-                        draggable={false}
-                     />
-                  </motion.div>
-               </div>
-            )}
-
-            {/* Choices Grid */}
-            <div className="grid grid-cols-2 gap-4 shrink-0">
-               {activeQuestion.choices.map((choice) => {
-                  const isSelected = selectedAnswer === choice;
-                  const isCorrect = choice === activeQuestion.answer;
-                  const isOppSelected = revealAnswers && oppChoice === choice;
-
-                   let btnClass = `p-5 rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[64px] relative overflow-hidden`;
-                  if (selectedAnswer === null) {
-                     btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
-                  } else {
-                     btnClass += " cursor-default";
-                     if (isCorrect) {
-                        btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
-                     } else if (isSelected) {
-                        btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
-                     } else {
-                        btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
-                     }
-                  }
-
-                  if (isOppSelected) {
-                     btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
-                  }
-
-                  let buttonAnimate: TargetAndTransition | undefined = undefined;
-                  let buttonTransition: Transition | undefined = undefined;
-
-                  if (selectedAnswer !== null) {
-                     if (isSelected && isCorrect) {
-                        buttonAnimate = {
-                           scale: [1, 1.15, 0.95, 1.05, 1],
-                           rotate: [0, -3, 3, -2, 2, 0],
-                           boxShadow: [
-                              "0 0 0px rgba(106,170,100,0)",
-                              "0 0 45px rgba(106,170,100,0.95)",
-                              "0 0 20px rgba(106,170,100,0.5)",
-                              "0 0 0px rgba(106,170,100,0)"
-                           ]
-                        };
-                        buttonTransition = { duration: 0.65, ease: "easeInOut" };
-                     } else if (isSelected && !isCorrect) {
-                        buttonAnimate = {
-                           x: [0, -10, 10, -10, 10, -8, 8, -4, 4, 0],
-                           scale: [1, 0.95, 1.02, 1],
-                           boxShadow: [
-                              "0 0 0px rgba(239,68,68,0)",
-                              "0 0 35px rgba(239,68,68,0.95)",
-                              "0 0 10px rgba(239,68,68,0.4)",
-                              "0 0 0px rgba(239,68,68,0)"
-                           ]
-                        };
-                        buttonTransition = { duration: 0.5, ease: "linear" };
-                     }
-                  }
-
-                  return (
-                     <motion.button
-                        key={choice}
-                        disabled={selectedAnswer !== null || revealAnswers}
-                        onClick={() => onChoiceSelect(choice)}
-                        animate={buttonAnimate}
-                        transition={buttonTransition}
-                        className={btnClass}
-                     >
-                        <span className="flex-1 text-center pr-8">{choice}</span>
-
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
-                           {isSelected && (
-                              <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
-                           )}
-                           {isOppSelected && (
-                              <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
-                                 {opponentName.slice(0, 5)}
-                              </span>
-                           )}
-                        </div>
-                     </motion.button>
-                  );
-               })}
-            </div>
-         </div>
-
-         {/* Prefilled Quick Chat Row */}
-         <div className="flex gap-3 overflow-x-auto py-3 px-3 scrollbar-hide shrink-0 items-center justify-start border-t border-white/5 bg-black/20 rounded-2xl w-full">
-            <span className="text-[9px] text-gray-500 font-black uppercase tracking-wider shrink-0 mr-1.5">Chat:</span>
-            {PREFILLED_MESSAGES.map((msg) => (
-               <button
-                  key={msg}
-                  onClick={() => sendQuickChat(msg)}
-                   className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 transition-all cursor-pointer whitespace-nowrap"
-               >
-                  {msg}
-               </button>
-            ))}
-         </div>
 
          {/* Celebratory Confetti Splash */}
          {particles.length > 0 && (

@@ -305,12 +305,16 @@ serve(async (req) => {
       }
 
       const seed = clientSeed || `${matchId}-${category}`;
+      const logPrefix = `[generate-match-questions]`;
+
+      console.log(`${logPrefix} Starting for match=${matchId} category=${category} seed=${seed}`);
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
       // Idempotency check
+      console.log(`${logPrefix} Checking existing match ${matchId}`);
       const { data: existing } = await supabaseClient
          .from("wordup_matches")
          .select("questions, encryption_key, player1_id, player2_id, is_bot_match")
@@ -344,6 +348,13 @@ serve(async (req) => {
       }
 
       const entityList: any[] = entities || [];
+      console.log(`${logPrefix} Fetched ${entityList.length} entities for category="${category}"`);
+      if (entityList.length > 0) {
+         console.log(`${logPrefix} Entity sample:`, JSON.stringify(entityList.slice(0, 2)).substring(0, 300));
+      } else {
+         console.warn(`${logPrefix} No entities returned from RPC — will fallback to procedural questions`);
+      }
+
       const matchRng = createSeededRandom(hashSeed(seed));
 
       // 6 variants (0-5), 7 rounds → each variant at least once, 7th is random
@@ -360,6 +371,7 @@ serve(async (req) => {
 
       const chosenEntities: any[] = [];
       const usedIds = new Set<string>();
+      const questions: any[] = [];
 
       const getNextEntity = (preferredPool: any[], fallbackPools: any[][]): any => {
          for (const e of preferredPool) {
@@ -383,10 +395,15 @@ serve(async (req) => {
          return null;
       };
 
+      console.log(`${logPrefix} Variant sequence: [${variantSequence.join(", ")}]`);
+      console.log(`${logPrefix} Easy=${easy.length} Medium=${medium.length} Hard=${hard.length}`);
+
       for (let i = 0; i < 7; i++) {
          const roundSeed = `${seed}-${i}`;
          const roundRng = createSeededRandom(hashSeed(roundSeed));
          const variant = variantSequence[i] ?? 0;
+
+         console.log(`${logPrefix} Round ${i}: variant=${variant} category=${category}`);
 
          // Route by category: hybrid algorithmic logic takes precedence
          if (category === "maths") {
@@ -397,16 +414,20 @@ serve(async (req) => {
                else entity = getNextEntity(hard, [medium, easy]);
                chosenEntities.push(entity);
             }
+            console.log(`${logPrefix} Round ${i} [maths]: entity=${entity?.label ?? "null"}`);
             const q = generateMathsQuestion(roundSeed, entity, entityList, roundRng, variant);
             if (q) {
+               console.log(`${logPrefix} Round ${i} [maths]: generated procedural question type=${q.type}`);
                questions.push(q);
                continue;
             }
             // Fallback to standard entity question
             if (entity) {
+               console.log(`${logPrefix} Round ${i} [maths]: falling back to entity question for ${entity.label}`);
                questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
                continue;
             }
+            console.warn(`${logPrefix} Round ${i} [maths]: no question generated at all!`);
          }
 
          if (category === "english_language") {
@@ -417,81 +438,104 @@ serve(async (req) => {
                else entity = getNextEntity(hard, [medium, easy]);
                chosenEntities.push(entity);
             }
+            console.log(`${logPrefix} Round ${i} [english]: entity=${entity?.label ?? "null"}`);
             const q = generateEnglishQuestion(roundSeed, entity, entityList, roundRng, variant);
             if (q) {
+               console.log(`${logPrefix} Round ${i} [english]: generated procedural question type=${q.type}`);
                questions.push(q);
                continue;
             }
             // Fallback to standard entity question
             if (entity) {
+               console.log(`${logPrefix} Round ${i} [english]: falling back to entity question for ${entity.label}`);
                questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
                continue;
             }
+            console.warn(`${logPrefix} Round ${i} [english]: no question generated at all!`);
          }
 
-         // Standard entity-based procedural category logic
-         if (entityList.length === 0) {
-            // No entities found → fallback to math calculations
-            const q = generateMathsQuestion(roundSeed, null, [], roundRng, variant);
-            questions.push(q);
-         } else {
-            let entity = null;
-            if (i < 2) {
-               entity = getNextEntity(easy, [medium, hard]);
-            } else if (i < 5) {
-               entity = getNextEntity(medium, [hard, easy]);
-            } else {
-               entity = getNextEntity(hard, [medium, easy]);
-            }
-            chosenEntities.push(entity);
-            questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
-         }
-      }
+          // Standard entity-based procedural category logic
+          if (entityList.length === 0) {
+             console.log(`${logPrefix} Round ${i} [standard]: no entities — fallback to maths procedural`);
+             const q = generateMathsQuestion(roundSeed, null, [], roundRng, variant);
+             questions.push(q);
+          } else {
+             let entity = null;
+             if (i < 2) {
+                entity = getNextEntity(easy, [medium, hard]);
+             } else if (i < 5) {
+                entity = getNextEntity(medium, [hard, easy]);
+             } else {
+                entity = getNextEntity(hard, [medium, easy]);
+             }
+             chosenEntities.push(entity);
+             console.log(`${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`);
+             questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
+          }
 
-      // Encrypt and persist
-      const plaintext = JSON.stringify(questions);
-      const encryptionKey = await generateSecureSessionKey();
-      const encryptedQuestions = await encryptPayload(plaintext, encryptionKey);
+          console.log(`${logPrefix} Round ${i}: question generated successfully`);
+       }
 
-      const { error: updateError } = await supabaseClient
-         .from("wordup_matches")
-         .update({
-            questions: encryptedQuestions,
-            encryption_key: encryptionKey,
-         })
-         .eq("id", matchId);
+       console.log(`${logPrefix} Generated ${questions.length} questions total`);
+       console.log(`${logPrefix} Chosen entities:`, chosenEntities.filter(Boolean).map((e: any) => e.label));
 
-      if (updateError) {
-         console.error("[generate-match-questions] DB update error:", updateError);
-         const { error: payloadError } = await supabaseClient
-            .from("wordup_match_payloads")
-            .insert({ match_id: matchId, encrypted_payload: encryptedQuestions });
-         if (payloadError) {
-            throw new Error(`Failed to store payload: ${payloadError.message}`);
-         }
-      } else {
-         // Log the chosen entities in the user history table for tracking
-         const validChosenEntityIds = chosenEntities
-            .filter((e) => e && e.id)
-            .map((e) => e.id);
+       // Encrypt and persist
+       const plaintext = JSON.stringify(questions);
+       console.log(`${logPrefix} Plaintext payload length: ${plaintext.length} chars`);
+       const encryptionKey = await generateSecureSessionKey();
+       console.log(`${logPrefix} Encryption key generated (${encryptionKey.length} chars)`);
+       const encryptedQuestions = await encryptPayload(plaintext, encryptionKey);
+       console.log(`${logPrefix} Payload encrypted (${encryptedQuestions.length} chars)`);
 
-         if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
-            const { error: historyError } = await supabaseClient
-               .rpc("record_user_entities_seen", {
-                  p_user_ids: playerIds,
-                  p_entity_ids: validChosenEntityIds
-               });
+       console.log(`${logPrefix} Updating wordup_matches ${matchId} with questions and encryption_key`);
+        const { error: updateError } = await supabaseClient
+           .from("wordup_matches")
+           .update({
+              questions: encryptedQuestions,
+              encryption_key: encryptionKey,
+           })
+           .eq("id", matchId)
+           .is("questions", null);
 
-            if (historyError) {
-               console.error("[generate-match-questions] Failed to record entity history:", historyError);
-            }
-         }
-      }
+       if (updateError) {
+          console.error(`${logPrefix} DB update error:`, updateError);
+          console.log(`${logPrefix} Falling back to wordup_match_payloads insert`);
+          const { error: payloadError } = await supabaseClient
+             .from("wordup_match_payloads")
+             .insert({ match_id: matchId, encrypted_payload: encryptedQuestions });
+          if (payloadError) {
+             throw new Error(`Failed to store payload: ${payloadError.message}`);
+          }
+          console.log(`${logPrefix} Payload stored in wordup_match_payloads`);
+       } else {
+          console.log(`${logPrefix} Match updated successfully`);
 
-      return new Response(
-         JSON.stringify({ matchId, encryptedQuestions, encryptionKey, questionCount: questions.length }),
-         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+          // Log the chosen entities in the user history table for tracking
+          const validChosenEntityIds = chosenEntities
+             .filter((e) => e && e.id)
+             .map((e) => e.id);
+
+          if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
+             console.log(`${logPrefix} Recording entity history for ${playerIds.length} user(s)`);
+             const { error: historyError } = await supabaseClient
+                .rpc("record_user_entities_seen", {
+                   p_user_ids: playerIds,
+                   p_entity_ids: validChosenEntityIds
+                });
+
+             if (historyError) {
+                console.error(`${logPrefix} Failed to record entity history:`, historyError);
+             } else {
+                console.log(`${logPrefix} Entity history recorded`);
+             }
+          }
+       }
+
+       console.log(`${logPrefix} Returning success response`);
+       return new Response(
+          JSON.stringify({ matchId, encryptedQuestions, encryptionKey, questionCount: questions.length }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+       );
    } catch (err: any) {
       console.error("[generate-match-questions] Error:", err);
       return new Response(

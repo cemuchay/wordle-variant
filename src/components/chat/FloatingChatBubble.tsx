@@ -18,7 +18,9 @@ export default function FloatingChatBubble() {
    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
    const [isDragging, setIsDragging] = useState(false);
    const [isNearDismiss, setIsNearDismiss] = useState(false);
-   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+    const overlayOpenedAtRef = useRef<number>(0);
+    const prevOverlayOpenRef = useRef(false);
 
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState("");
@@ -328,37 +330,46 @@ export default function FloatingChatBubble() {
       checkGameStatus();
    }, [user?.id, date]);
 
-   // Mark all unread messages as read when the bubble overlay opens
-   useEffect(() => {
-      if (!isOverlayOpen || !user?.id) return;
-      const state = useAppStore.getState();
-      const receipts = state.readReceipts;
-      const joined = new Set(state.joinedGroupIds);
-      const timestamp = new Date().toISOString();
-      const marked = new Set<string>();
+    // Mark all unread messages as read when the bubble overlay closes
+    useEffect(() => {
+       if (isOverlayOpen || !user?.id) {
+          prevOverlayOpenRef.current = isOverlayOpen;
+          return;
+       }
+       if (!prevOverlayOpenRef.current) {
+          prevOverlayOpenRef.current = false;
+          return;
+       }
+       prevOverlayOpenRef.current = false;
 
-      state.globalMessages.forEach((m: any) => {
-         if (m.user_id === user.id) return;
-         if (!joined.has(m.group_id)) return;
-         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
-         const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-         if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
-            if (!marked.has(m.group_id)) {
-               marked.add(m.group_id);
-               updateReadReceipt(m.group_id, timestamp);
-               supabase
-                  .from("chat_read_receipts")
-                  .upsert(
-                     { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
-                     { onConflict: "user_id,group_id" }
-                  )
-                  .then(({ error }) => {
-                     if (error) console.error("Failed to mark as read:", error);
-                  });
-            }
-         }
-      });
-   }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
+       const state = useAppStore.getState();
+       const receipts = state.readReceipts;
+       const joined = new Set(state.joinedGroupIds);
+       const timestamp = new Date().toISOString();
+       const marked = new Set<string>();
+
+       state.globalMessages.forEach((m: any) => {
+          if (m.user_id === user.id) return;
+          if (!joined.has(m.group_id)) return;
+          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+          const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
+          if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+             if (!marked.has(m.group_id)) {
+                marked.add(m.group_id);
+                updateReadReceipt(m.group_id, timestamp);
+                supabase
+                   .from("chat_read_receipts")
+                   .upsert(
+                      { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
+                      { onConflict: "user_id,group_id" }
+                   )
+                   .then(({ error }) => {
+                      if (error) console.error("Failed to mark as read:", error);
+                   });
+             }
+          }
+       });
+    }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
 
    // Auto-scroll detailed message view to bottom
    useEffect(() => {
@@ -546,15 +557,18 @@ export default function FloatingChatBubble() {
       setSelectedGroupId(null);
    };
 
-   const handleBubbleClick = () => {
-      if (isDragging) return;
-      if (unreadMessages.length === 1) {
-         setSelectedGroupId(unreadMessages[0].group_id);
-      } else {
-         setSelectedGroupId(null);
-      }
-      setIsOverlayOpen((prev) => !prev);
-   };
+    const handleBubbleClick = () => {
+       if (isDragging) return;
+       if (unreadMessages.length === 1) {
+          setSelectedGroupId(unreadMessages[0].group_id);
+       } else {
+          setSelectedGroupId(null);
+       }
+       setIsOverlayOpen((prev) => {
+          if (!prev) overlayOpenedAtRef.current = Date.now();
+          return !prev;
+       });
+    };
 
    const handleDragStart = () => {
       setIsDragging(true);
@@ -645,11 +659,12 @@ export default function FloatingChatBubble() {
                      initial={{ opacity: 0 }}
                      animate={{ opacity: 1 }}
                      exit={{ opacity: 0 }}
-                     onClick={() => {
-                        setIsOverlayOpen(false);
-                        setSelectedGroupId(null);
-                     }}
-                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
+                      onClick={() => {
+                         if (Date.now() - overlayOpenedAtRef.current < 400) return;
+                         setIsOverlayOpen(false);
+                         setSelectedGroupId(null);
+                      }}
+                      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
                   />
 
                   {/* Centered Modal Card */}

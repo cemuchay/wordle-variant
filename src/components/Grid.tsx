@@ -280,18 +280,32 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   useEffect(() => {
     if (maxAttempts > 6) {
       if ((isWon || isLost) && scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo({
-          top: scrollContainerRef.current.scrollHeight,
+        // Wait for the reveal animation to finish before scrolling to the bottom
+        const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
+        const timer = setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({
+              top: scrollContainerRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }
+        }, delay);
+        return () => clearTimeout(timer);
+      } else if (currentRowRef.current && scrollContainerRef.current) {
+        // Scroll only the grid's local scrollContainer instead of using window-shifting scrollIntoView
+        const container = scrollContainerRef.current;
+        const targetRow = currentRowRef.current;
+        const targetTop = targetRow.offsetTop;
+        const containerHeight = container.clientHeight;
+        const rowHeight = targetRow.clientHeight;
+
+        container.scrollTo({
+          top: targetTop - (containerHeight / 2) + (rowHeight / 2),
           behavior: 'smooth'
-        });
-      } else if (currentRowRef.current) {
-        currentRowRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest'
         });
       }
     }
-  }, [guesses.length, currentGuess.length, maxAttempts, isWon, isLost]);
+  }, [guesses.length, currentGuess.length, maxAttempts, isWon, isLost, isCurrentRevealing, wordLength]);
 
   const rowGapClass = compact ? 'gap-1 sm:gap-1.5' : 'gap-1.5 sm:gap-2';
 
