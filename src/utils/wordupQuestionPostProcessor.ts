@@ -7,8 +7,10 @@ const flagUrlCache: Record<string, string> = {};
 // Tracks which general (non-flag) image URLs have been preloaded into browser cache
 const preloadedUrls: Set<string> = new Set();
 
-export const getPrimaryFlagUrl = (code: string) => `https://flagcdn.com/${code.toLowerCase()}.svg`;
-export const getFallbackFlagUrl = (code: string) => `https://raw.githubusercontent.com/lipis/flag-icons/main/flags/4x3/${code.toLowerCase()}.svg`;
+export const getPrimaryFlagUrl = (code: string) =>
+   `https://flagcdn.com/${code.toLowerCase()}.svg`;
+export const getFallbackFlagUrl = (code: string) =>
+   `https://raw.githubusercontent.com/lipis/flag-icons/main/flags/4x3/${code.toLowerCase()}.svg`;
 
 /**
  * Returns the cached flag URL or falls back to primary.
@@ -82,7 +84,9 @@ export function preloadFlagImage(code: string): Promise<void> {
                flagUrlCache[lowerCode] = fallbackUrl;
             })
             .catch((err) => {
-               throw new Error(`Flag preloading failed for code: ${lowerCode} after all retries. ${err.message}`);
+               throw new Error(
+                  `Flag preloading failed for code: ${lowerCode} after all retries. ${err.message}`,
+               );
             });
       });
 }
@@ -100,7 +104,9 @@ function preloadGeneralImage(url: string): Promise<void> {
 /**
  * Preloads all unique images (both flag codes and full URLs) for the rounds in parallel.
  */
-export async function preloadMatchImages(questions: WordUpQuestion[]): Promise<void> {
+export async function preloadMatchImages(
+   questions: WordUpQuestion[],
+): Promise<void> {
    const flagCodes = new Set<string>();
    const generalUrls = new Set<string>();
 
@@ -126,10 +132,14 @@ export async function preloadMatchImages(questions: WordUpQuestion[]): Promise<v
    const tasks: Promise<void>[] = [];
 
    if (flagCodes.size > 0) {
-      tasks.push(...Array.from(flagCodes).map((code) => preloadFlagImage(code)));
+      tasks.push(
+         ...Array.from(flagCodes).map((code) => preloadFlagImage(code)),
+      );
    }
    if (generalUrls.size > 0) {
-      tasks.push(...Array.from(generalUrls).map((url) => preloadGeneralImage(url)));
+      tasks.push(
+         ...Array.from(generalUrls).map((url) => preloadGeneralImage(url)),
+      );
    }
 
    if (tasks.length === 0) return;
@@ -144,7 +154,10 @@ export const preloadMatchFlags = preloadMatchImages;
  * Post-processes questions client-side to convert textual flag bearer prompts
  * into image-rich visual question formats.
  */
-export function postProcessQuestions(questions: WordUpQuestion[], category: string): WordUpQuestion[] {
+export function postProcessQuestions(
+   questions: WordUpQuestion[],
+   category: string,
+): WordUpQuestion[] {
    if (category !== "flag_bearer") return questions;
 
    return questions.map((q) => {
@@ -169,7 +182,10 @@ export function postProcessQuestions(questions: WordUpQuestion[], category: stri
       }
 
       // 2. Is this a True/False flag matching question?
-      const isTrueFalse = q.choices.length === 2 && q.choices.includes("True") && q.choices.includes("False");
+      const isTrueFalse =
+         q.choices.length === 2 &&
+         q.choices.includes("True") &&
+         q.choices.includes("False");
       if (isTrueFalse) {
          // Attempt to find country name and flag code in prompt
          let countryName = "";
@@ -178,7 +194,10 @@ export function postProcessQuestions(questions: WordUpQuestion[], category: stri
          for (const [name, code] of Object.entries(FLAG_MAP)) {
             const regex = new RegExp(`\\b${name}\\b`, "i");
             if (regex.test(q.prompt)) {
-               countryName = name.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+               countryName = name
+                  .split(" ")
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(" ");
                countryCode = code;
                break;
             }

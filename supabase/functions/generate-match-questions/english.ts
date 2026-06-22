@@ -1,8 +1,8 @@
 import { createSeededRandom, seededShuffle } from "./utils.ts";
 
-export function generateEnglishQuestion(seed: string, entity: any, allEntities: any[], rng: () => number, variant: number): any {
+export function generateEnglishQuestion(seed: string, entity: any, allEntities: any[], rng: () => number, variant: number, proceduralWeight: number = 0.5): any {
    const logPrefix = "[english.ts]";
-   const useDB = entity && (rng() > 0.5);
+   const useDB = entity && (rng() > proceduralWeight);
    console.log(`${logPrefix} seed=${seed} entity=${entity?.label ?? "null"} useDB=${useDB} variant=${variant}`);
 
    if (!useDB || !entity) {

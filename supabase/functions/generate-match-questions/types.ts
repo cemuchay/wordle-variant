@@ -44,7 +44,4 @@ export const CATEGORY_SUPER_MAP: Record<string, SuperCategory> = {
    english_language: "language_arts"
 };
 
-export const ALGORITHMIC_CATEGORIES = new Set([
-   "maths",
-   "english_language"
-]);
+
