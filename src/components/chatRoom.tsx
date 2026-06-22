@@ -139,17 +139,25 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
 
 
+    const hasCapturedDividerRef = useRef(false);
+
     // Snapshot firstUnreadId on room entry (before auto-mark clears it)
     useEffect(() => {
-        if (firstUnreadId && activeRoomId) {
+        if (firstUnreadId && activeRoomId && !hasCapturedDividerRef.current) {
+            hasCapturedDividerRef.current = true;
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setVisibleUnreadId(firstUnreadId);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowUnreadLine(true);
         }
-    }, [firstUnreadId]);
+    }, [firstUnreadId, activeRoomId]);
 
     // Reset snapshot on room change
     useEffect(() => {
+        hasCapturedDividerRef.current = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setVisibleUnreadId(null);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowUnreadLine(true);
     }, [activeRoomId]);
 
@@ -236,7 +244,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         if (activeRoomId && lastRoomIdRef.current !== activeRoomId) {
             const timer = setTimeout(() => {
                 const unreadEl = document.getElementById("unread-line");
-                if (unreadEl && showUnreadLine) {
+                if (unreadEl && visibleUnreadId) {
                     unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
                 } else {
                     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
@@ -249,7 +257,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
             }, 100);
             return () => clearTimeout(timer);
         }
-    }, [activeRoomId, showSidebar, messages.length, showUnreadLine]);
+    }, [activeRoomId, showSidebar, messages.length, visibleUnreadId]);
 
     // Handle scroll to bottom on new incoming messages or typing changes only if already at the bottom
     useEffect(() => {

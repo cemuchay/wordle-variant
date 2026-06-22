@@ -46,7 +46,8 @@ export default function FloatingChatBubble() {
                y: Math.max(0, Math.min(pos.y, maxY)),
             };
          }
-      } catch {}
+         // eslint-disable-next-line no-empty
+      } catch { }
       return null;
    });
    const dragStartPos = useRef({ x: 0, y: 0 });
@@ -65,257 +66,259 @@ export default function FloatingChatBubble() {
    const fileInputRef = useRef<HTMLInputElement>(null);
    const replyInputRef = useRef<HTMLTextAreaElement>(null);
 
-    // Voice note recording states
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingTime, setRecordingTime] = useState(0);
-    const timerRef = useRef<number | null>(null);
-    const wavRecorderRef = useRef<any>(null);
+   // Voice note recording states
+   const [isRecording, setIsRecording] = useState(false);
+   const [recordingTime, setRecordingTime] = useState(0);
+   const timerRef = useRef<number | null>(null);
+   const wavRecorderRef = useRef<any>(null);
 
-    // Reaction states
-    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
-    const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
+   // Reaction states
+   const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+   const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
 
-    // Reply tracking
-    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
+   // Reply tracking
+   const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
 
-    // Unread divider state
-    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
-    const [showUnreadLine, setShowUnreadLine] = useState(true);
+   // Unread divider state
+   const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
+   const [showUnreadLine, setShowUnreadLine] = useState(true);
 
-    const reactionsRef = useRef<HTMLDivElement>(null);
-    const detailsRef = useRef<HTMLDivElement>(null);
+   const reactionsRef = useRef<HTMLDivElement>(null);
+   const detailsRef = useRef<HTMLDivElement>(null);
 
-    // Inactivity timer for auto-closing the overlay (not the bubble)
-    const clearInactivityTimer = () => {
-       if (inactivityTimerRef.current !== null) {
-          clearTimeout(inactivityTimerRef.current);
-          inactivityTimerRef.current = null;
-       }
-    };
+   // Inactivity timer for auto-closing the overlay (not the bubble)
+   const clearInactivityTimer = () => {
+      if (inactivityTimerRef.current !== null) {
+         clearTimeout(inactivityTimerRef.current);
+         inactivityTimerRef.current = null;
+      }
+   };
 
-    const startInactivityTimer = () => {
-       clearInactivityTimer();
-       inactivityTimerRef.current = window.setTimeout(() => {
-          setIsOverlayOpen(false);
-          setSelectedGroupId(null);
-       }, CLOSE_DELAY);
-    };
+   const startInactivityTimer = () => {
+      clearInactivityTimer();
+      inactivityTimerRef.current = window.setTimeout(() => {
+         setIsOverlayOpen(false);
+         setSelectedGroupId(null);
+      }, CLOSE_DELAY);
+   };
 
-    // Handle scroll in the messages area
-    const handleScroll = () => {
-       resetInactivityTimer();
-       if (showUnreadLine && visibleUnreadId && scrollRef.current) {
-          const el = document.getElementById("fb-unread-line");
-          if (el && el.getBoundingClientRect().bottom < 0) {
-             setShowUnreadLine(false);
-          }
-       }
-    };
+   // Handle scroll in the messages area
+   const handleScroll = () => {
+      resetInactivityTimer();
+      if (showUnreadLine && visibleUnreadId && scrollRef.current) {
+         const el = document.getElementById("fb-unread-line");
+         if (el && el.getBoundingClientRect().bottom < 0) {
+            setShowUnreadLine(false);
+         }
+      }
+   };
 
-    const resetInactivityTimer = () => {
-       if (inactivityTimerRef.current !== null) {
-          startInactivityTimer();
-       }
-    };
+   const resetInactivityTimer = () => {
+      if (inactivityTimerRef.current !== null) {
+         startInactivityTimer();
+      }
+   };
 
-    const startRecording = async () => {
-       try {
-          const { WAVRecorder } = await import("../chat/MessageInput");
-          const recorder = new WAVRecorder();
-          await recorder.start();
-          wavRecorderRef.current = recorder;
+   const startRecording = async () => {
+      try {
+         const { WAVRecorder } = await import("../chat/MessageInput");
+         const recorder = new WAVRecorder();
+         await recorder.start();
+         wavRecorderRef.current = recorder;
 
-          setIsRecording(true);
-          setRecordingTime(0);
-          timerRef.current = window.setInterval(() => {
-             setRecordingTime((prev) => prev + 1);
-          }, 1000);
-       } catch (err) {
-          console.error("Error accessing microphone:", err);
-          useAppStore.getState().triggerToast("Could not access microphone.", 4000);
-       }
-    };
+         setIsRecording(true);
+         setRecordingTime(0);
+         timerRef.current = window.setInterval(() => {
+            setRecordingTime((prev) => prev + 1);
+         }, 1000);
+      } catch (err) {
+         console.error("Error accessing microphone:", err);
+         useAppStore.getState().triggerToast("Could not access microphone.", 4000);
+      }
+   };
 
-    const stopRecording = async () => {
-       if (!wavRecorderRef.current) return;
-       const audioBlob = wavRecorderRef.current.stop();
-       wavRecorderRef.current = null;
-       setIsRecording(false);
-       if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-       }
+   const stopRecording = async () => {
+      if (!wavRecorderRef.current) return;
+      const audioBlob = wavRecorderRef.current.stop();
+      wavRecorderRef.current = null;
+      setIsRecording(false);
+      if (timerRef.current) {
+         clearInterval(timerRef.current);
+         timerRef.current = null;
+      }
 
-       if (audioBlob.size < 500) {
-          useAppStore.getState().triggerToast("Audio capture failed.", 4000);
-       } else {
-          await handleSendVoice(audioBlob);
-       }
-    };
+      if (audioBlob.size < 500) {
+         useAppStore.getState().triggerToast("Audio capture failed.", 4000);
+      } else {
+         await handleSendVoice(audioBlob);
+      }
+   };
 
-    const cancelRecording = () => {
-       if (!wavRecorderRef.current) return;
-       wavRecorderRef.current.stop();
-       wavRecorderRef.current = null;
-       setIsRecording(false);
-       if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-       }
-    };
+   const cancelRecording = () => {
+      if (!wavRecorderRef.current) return;
+      wavRecorderRef.current.stop();
+      wavRecorderRef.current = null;
+      setIsRecording(false);
+      if (timerRef.current) {
+         clearInterval(timerRef.current);
+         timerRef.current = null;
+      }
+   };
 
-    const formatDuration = (sec: number) => {
-       const mins = Math.floor(sec / 60);
-       const secs = sec % 60;
-       return `${mins}:${secs.toString().padStart(2, "0")}`;
-    };
+   const formatDuration = (sec: number) => {
+      const mins = Math.floor(sec / 60);
+      const secs = sec % 60;
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+   };
 
-    useEffect(() => {
-       return () => {
-          if (timerRef.current) {
-             clearInterval(timerRef.current);
-          }
-       };
-    }, []);
+   useEffect(() => {
+      return () => {
+         if (timerRef.current) {
+            clearInterval(timerRef.current);
+         }
+      };
+   }, []);
 
-    // Outside click to close reaction menus
-    useEffect(() => {
-       if (!reactingMessageId && !showReactionDetailsId) return;
-       const handleClickOutside = (e: MouseEvent) => {
-          if (reactingMessageId && reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
-             setReactingMessageId(null);
-          }
-          if (showReactionDetailsId && detailsRef.current && !detailsRef.current.contains(e.target as Node)) {
-             setShowReactionDetailsId(null);
-          }
-       };
-       document.addEventListener('mousedown', handleClickOutside);
-       return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [reactingMessageId, showReactionDetailsId]);
+   // Outside click to close reaction menus
+   useEffect(() => {
+      if (!reactingMessageId && !showReactionDetailsId) return;
+      const handleClickOutside = (e: MouseEvent) => {
+         if (reactingMessageId && reactionsRef.current && !reactionsRef.current.contains(e.target as Node)) {
+            setReactingMessageId(null);
+         }
+         if (showReactionDetailsId && detailsRef.current && !detailsRef.current.contains(e.target as Node)) {
+            setShowReactionDetailsId(null);
+         }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+   }, [reactingMessageId, showReactionDetailsId]);
 
-    // Clear inactivity timer on overlay close or unmount
-    useEffect(() => {
-       if (!isOverlayOpen) {
-          clearInactivityTimer();
-       }
-    }, [isOverlayOpen]);
+   // Clear inactivity timer on overlay close or unmount
+   useEffect(() => {
+      if (!isOverlayOpen) {
+         clearInactivityTimer();
+      }
+   }, [isOverlayOpen]);
 
-    useEffect(() => {
-       return () => clearInactivityTimer();
-    }, []);
+   useEffect(() => {
+      return () => clearInactivityTimer();
+   }, []);
 
-    const handleSendVoice = async (blob: Blob) => {
-       if (!user?.id || !selectedGroupId) return;
-       setIsSending(true);
-       try {
-          const mimeType = blob.type || "audio/wav";
-          const fileName = `${user.id}/${Date.now()}.wav`;
+   const handleSendVoice = async (blob: Blob) => {
+      if (!user?.id || !selectedGroupId) return;
+      setIsSending(true);
+      try {
+         const mimeType = blob.type || "audio/wav";
+         // eslint-disable-next-line react-hooks/purity
+         const fileName = `${user.id}/${Date.now()}.wav`;
 
-          // 1. Upload to storage
-          const { error: uploadErr } = await supabase.storage
-             .from("voice-notes")
-             .upload(fileName, blob, {
-                contentType: mimeType,
-                cacheControl: "3600",
-             });
+         // 1. Upload to storage
+         const { error: uploadErr } = await supabase.storage
+            .from("voice-notes")
+            .upload(fileName, blob, {
+               contentType: mimeType,
+               cacheControl: "3600",
+            });
 
-          if (uploadErr) throw uploadErr;
+         if (uploadErr) throw uploadErr;
 
-          const {
-             data: { publicUrl },
-          } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
+         const {
+            data: { publicUrl },
+         } = supabase.storage.from("voice-notes").getPublicUrl(fileName);
 
-          // 2. Persist to database
-          const messagePayload = {
-             id: crypto.randomUUID(),
-             content: "[Voice Message]",
-             user_id: user.id,
-             is_read: false,
-             voice_url: publicUrl,
-             group_id: selectedGroupId,
-          };
+         // 2. Persist to database
+         const messagePayload = {
+            id: crypto.randomUUID(),
+            content: "[Voice Message]",
+            user_id: user.id,
+            is_read: false,
+            voice_url: publicUrl,
+            group_id: selectedGroupId,
+         };
 
-          const { error } = await supabase.from("messages").insert([messagePayload]);
-          if (error) throw error;
+         const { error } = await supabase.from("messages").insert([messagePayload]);
+         if (error) throw error;
 
-          // Mark group as read immediately
-          const timestamp = new Date().toISOString();
-          updateReadReceipt(selectedGroupId, timestamp);
-          await supabase.from("chat_read_receipts").upsert(
-             {
-                user_id: user.id,
-                group_id: selectedGroupId,
-                last_seen_at: timestamp,
-             },
-             { onConflict: "user_id,group_id" }
-          );
+         // Mark group as read immediately
+         const timestamp = new Date().toISOString();
+         updateReadReceipt(selectedGroupId, timestamp);
+         await supabase.from("chat_read_receipts").upsert(
+            {
+               user_id: user.id,
+               group_id: selectedGroupId,
+               last_seen_at: timestamp,
+            },
+            { onConflict: "user_id,group_id" }
+         );
 
-            setReplyText("");
-            startInactivityTimer();
-        } catch (err) {
-           console.error("Failed to send voice note:", err);
-          useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
-       } finally {
-          setIsSending(false);
-       }
-    };
+         setReplyText("");
+         startInactivityTimer();
+      } catch (err) {
+         console.error("Failed to send voice note:", err);
+         useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+      } finally {
+         setIsSending(false);
+      }
+   };
 
-    const handleSendImage = async (file: File) => {
-       if (!user?.id || !selectedGroupId) return;
-       setIsSending(true);
-       try {
-          const { compressImage } = await import("../../hooks/useChat");
-          const compressedBlob = await compressImage(file);
-          const fileName = `${user.id}/${Date.now()}.jpg`;
+   const handleSendImage = async (file: File) => {
+      if (!user?.id || !selectedGroupId) return;
+      setIsSending(true);
+      try {
+         const { compressImage } = await import("../../hooks/useChat");
+         const compressedBlob = await compressImage(file);
+         // eslint-disable-next-line react-hooks/purity
+         const fileName = `${user.id}/${Date.now()}.jpg`;
 
-          // 1. Upload to storage
-          const { error: uploadErr } = await supabase.storage
-             .from("chat-images")
-             .upload(fileName, compressedBlob, {
-                contentType: "image/jpeg",
-                cacheControl: "3600",
-             });
+         // 1. Upload to storage
+         const { error: uploadErr } = await supabase.storage
+            .from("chat-images")
+            .upload(fileName, compressedBlob, {
+               contentType: "image/jpeg",
+               cacheControl: "3600",
+            });
 
-          if (uploadErr) throw uploadErr;
+         if (uploadErr) throw uploadErr;
 
-          const {
-             data: { publicUrl },
-          } = supabase.storage.from("chat-images").getPublicUrl(fileName);
+         const {
+            data: { publicUrl },
+         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
 
-          // 2. Persist to database
-          const messagePayload = {
-             id: crypto.randomUUID(),
-             content: "[Image]",
-             user_id: user.id,
-             is_read: false,
-             image_url: publicUrl,
-             group_id: selectedGroupId,
-          };
+         // 2. Persist to database
+         const messagePayload = {
+            id: crypto.randomUUID(),
+            content: "[Image]",
+            user_id: user.id,
+            is_read: false,
+            image_url: publicUrl,
+            group_id: selectedGroupId,
+         };
 
-          const { error } = await supabase.from("messages").insert([messagePayload]);
-          if (error) throw error;
+         const { error } = await supabase.from("messages").insert([messagePayload]);
+         if (error) throw error;
 
-          // Mark group as read immediately
-          const timestamp = new Date().toISOString();
-          updateReadReceipt(selectedGroupId, timestamp);
-          await supabase.from("chat_read_receipts").upsert(
-             {
-                user_id: user.id,
-                group_id: selectedGroupId,
-                last_seen_at: timestamp,
-             },
-             { onConflict: "user_id,group_id" }
-          );
+         // Mark group as read immediately
+         const timestamp = new Date().toISOString();
+         updateReadReceipt(selectedGroupId, timestamp);
+         await supabase.from("chat_read_receipts").upsert(
+            {
+               user_id: user.id,
+               group_id: selectedGroupId,
+               last_seen_at: timestamp,
+            },
+            { onConflict: "user_id,group_id" }
+         );
 
-            setReplyText("");
-            startInactivityTimer();
-        } catch (err) {
-           console.error("Failed to send image:", err);
-          useAppStore.getState().triggerToast("Failed to send image.", 4000);
-       } finally {
-          setIsSending(false);
-       }
-    };
+         setReplyText("");
+         startInactivityTimer();
+      } catch (err) {
+         console.error("Failed to send image:", err);
+         useAppStore.getState().triggerToast("Failed to send image.", 4000);
+      } finally {
+         setIsSending(false);
+      }
+   };
 
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
@@ -339,9 +342,11 @@ export default function FloatingChatBubble() {
       try {
          const cached = localStorage.getItem(`chat_groups_${user.id}`);
          if (cached) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setGroups(JSON.parse(cached));
          }
-      } catch (e) { }
+         // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e) { /* empty */ }
 
       const fetchGroupsData = async () => {
          const { data: memberData } = await supabase
@@ -425,46 +430,46 @@ export default function FloatingChatBubble() {
       checkGameStatus();
    }, [user?.id, date]);
 
-    // Mark all unread messages as read when the bubble overlay closes
-    useEffect(() => {
-       if (isOverlayOpen || !user?.id) {
-          prevOverlayOpenRef.current = isOverlayOpen;
-          return;
-       }
-       if (!prevOverlayOpenRef.current) {
-          prevOverlayOpenRef.current = false;
-          return;
-       }
-       prevOverlayOpenRef.current = false;
+   // Mark all unread messages as read when the bubble overlay closes
+   useEffect(() => {
+      if (isOverlayOpen || !user?.id) {
+         prevOverlayOpenRef.current = isOverlayOpen;
+         return;
+      }
+      if (!prevOverlayOpenRef.current) {
+         prevOverlayOpenRef.current = false;
+         return;
+      }
+      prevOverlayOpenRef.current = false;
 
-       const state = useAppStore.getState();
-       const receipts = state.readReceipts;
-       const joined = new Set(state.joinedGroupIds);
-       const timestamp = new Date().toISOString();
-       const marked = new Set<string>();
+      const state = useAppStore.getState();
+      const receipts = state.readReceipts;
+      const joined = new Set(state.joinedGroupIds);
+      const timestamp = new Date().toISOString();
+      const marked = new Set<string>();
 
-       state.globalMessages.forEach((m: any) => {
-          if (m.user_id === user.id) return;
-          if (!joined.has(m.group_id)) return;
-          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
-          const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
-          if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
-             if (!marked.has(m.group_id)) {
-                marked.add(m.group_id);
-                updateReadReceipt(m.group_id, timestamp);
-                supabase
-                   .from("chat_read_receipts")
-                   .upsert(
-                      { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
-                      { onConflict: "user_id,group_id" }
-                   )
-                   .then(({ error }) => {
-                      if (error) console.error("Failed to mark as read:", error);
-                   });
-             }
-          }
-       });
-    }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
+      state.globalMessages.forEach((m: any) => {
+         if (m.user_id === user.id) return;
+         if (!joined.has(m.group_id)) return;
+         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+         const lastSeen = receipts[m.group_id] || new Date(0).toISOString();
+         if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+            if (!marked.has(m.group_id)) {
+               marked.add(m.group_id);
+               updateReadReceipt(m.group_id, timestamp);
+               supabase
+                  .from("chat_read_receipts")
+                  .upsert(
+                     { user_id: user.id, group_id: m.group_id, last_seen_at: timestamp },
+                     { onConflict: "user_id,group_id" }
+                  )
+                  .then(({ error }) => {
+                     if (error) console.error("Failed to mark as read:", error);
+                  });
+            }
+         }
+      });
+   }, [isOverlayOpen, user?.id, hasPlayedToday, updateReadReceipt]);
 
    // Auto-scroll detailed message view to bottom
    useEffect(() => {
@@ -473,16 +478,16 @@ export default function FloatingChatBubble() {
       }
    }, [selectedGroupId, globalMessages]);
 
-    // Reset dismissal state on new unread message; track session activity
-    if (unreadCount !== prevUnreadCount) {
-       setPrevUnreadCount(unreadCount);
-       if (unreadCount > 0) setHasSessionActivity(true);
-       if (unreadCount > prevUnreadCount && dismissed) {
-          setDismissed(false);
-       }
-    }
+   // Reset dismissal state on new unread message; track session activity
+   if (unreadCount !== prevUnreadCount) {
+      setPrevUnreadCount(unreadCount);
+      if (unreadCount > 0) setHasSessionActivity(true);
+      if (unreadCount > prevUnreadCount && dismissed) {
+         setDismissed(false);
+      }
+   }
 
-    const isVisible = hasSessionActivity && !isChatOpen && !dismissed;
+   const isVisible = hasSessionActivity && !isChatOpen && !dismissed;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -496,24 +501,24 @@ export default function FloatingChatBubble() {
       return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
    });
 
-    // Group unread messages by group_id
-    const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
-       if (!acc[m.group_id]) {
-          acc[m.group_id] = [];
-       }
-       acc[m.group_id].push(m);
-       return acc;
-    }, {});
+   // Group unread messages by group_id
+   const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
+      if (!acc[m.group_id]) {
+         acc[m.group_id] = [];
+      }
+      acc[m.group_id].push(m);
+      return acc;
+   }, {});
 
-    // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
-    const getSmartInitials = (name: string) =>
-       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
+   // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
+   const getSmartInitials = (name: string) =>
+      name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
 
-    // Latest unread sender info for the bubble display
-    const latestUnreadMsg = unreadMessages[unreadMessages.length - 1] as any;
-    const latestUnreadGroup = latestUnreadMsg ? groups.find((g: any) => g.id === latestUnreadMsg.group_id) : null;
-    const isLatestDM = latestUnreadGroup?.type === "dm";
-    const latestPartner = latestUnreadGroup?.dm_partner as { id: string; username: string; avatar_url: string } | undefined;
+   // Latest unread sender info for the bubble display
+   const latestUnreadMsg = unreadMessages[unreadMessages.length - 1] as any;
+   const latestUnreadGroup = latestUnreadMsg ? groups.find((g: any) => g.id === latestUnreadMsg.group_id) : null;
+   const isLatestDM = latestUnreadGroup?.type === "dm";
+   const latestPartner = latestUnreadGroup?.dm_partner as { id: string; username: string; avatar_url: string } | undefined;
 
    // Resolve DM partner and room key for a message
    const getDecryptedContent = (m: any) => {
@@ -550,37 +555,37 @@ export default function FloatingChatBubble() {
             finalContent = encryptDM(replyText, key);
          }
 
-          const tempId = crypto.randomUUID();
-          const messagePayload: any = {
-             id: tempId,
-             content: finalContent,
-             user_id: user.id,
-             group_id: selectedGroupId,
-             is_read: false,
-          };
-          if (replyingToMsg) {
-             messagePayload.reply_to = replyingToMsg.id;
-          }
+         const tempId = crypto.randomUUID();
+         const messagePayload: any = {
+            id: tempId,
+            content: finalContent,
+            user_id: user.id,
+            group_id: selectedGroupId,
+            is_read: false,
+         };
+         if (replyingToMsg) {
+            messagePayload.reply_to = replyingToMsg.id;
+         }
 
-          // Insert reply message
-          const { error } = await supabase.from("messages").insert([messagePayload]);
-          if (error) throw error;
+         // Insert reply message
+         const { error } = await supabase.from("messages").insert([messagePayload]);
+         if (error) throw error;
 
-          // Mark group as read immediately
-          const timestamp = new Date().toISOString();
-          updateReadReceipt(selectedGroupId, timestamp);
-          await supabase.from("chat_read_receipts").upsert(
-             {
-                user_id: user.id,
-                group_id: selectedGroupId,
-                last_seen_at: timestamp,
-             },
-             { onConflict: "user_id,group_id" }
-          );
+         // Mark group as read immediately
+         const timestamp = new Date().toISOString();
+         updateReadReceipt(selectedGroupId, timestamp);
+         await supabase.from("chat_read_receipts").upsert(
+            {
+               user_id: user.id,
+               group_id: selectedGroupId,
+               last_seen_at: timestamp,
+            },
+            { onConflict: "user_id,group_id" }
+         );
 
-            setReplyText("");
-            setReplyingToMsg(null);
-            startInactivityTimer();
+         setReplyText("");
+         setReplyingToMsg(null);
+         startInactivityTimer();
       } catch (err) {
          console.error("Failed to send reply:", err);
       } finally {
@@ -588,71 +593,71 @@ export default function FloatingChatBubble() {
       }
    };
 
-    // Edit Message
-    const handleEditSave = async (messageId: string) => {
-       if (!editText.trim() || !user?.id || !selectedGroupId) return;
-       const group = groups.find(g => g.id === selectedGroupId);
-       await editMessage(messageId, editText, user.id, group);
-       setEditingMessageId(null);
-       setEditText("");
-    };
+   // Edit Message
+   const handleEditSave = async (messageId: string) => {
+      if (!editText.trim() || !user?.id || !selectedGroupId) return;
+      const group = groups.find(g => g.id === selectedGroupId);
+      await editMessage(messageId, editText, user.id, group);
+      setEditingMessageId(null);
+      setEditText("");
+   };
 
-    // Delete Message
-    const handleDeleteMessage = async (messageId: string) => {
-       if (!user?.id) return;
-       await deleteMessage(messageId, user.id);
-    };
+   // Delete Message
+   const handleDeleteMessage = async (messageId: string) => {
+      if (!user?.id) return;
+      await deleteMessage(messageId, user.id);
+   };
 
-    // Copy to clipboard
-    const copyToClipboard = async (text: string) => {
-       try {
-          if (navigator.clipboard && window.isSecureContext) {
-             await navigator.clipboard.writeText(text);
-          } else {
-             const textArea = document.createElement("textarea");
-             textArea.value = text;
-             textArea.style.position = "fixed";
-             textArea.style.left = "-9999px";
-             textArea.style.top = "0";
-             textArea.style.opacity = "0";
-             document.body.appendChild(textArea);
-             textArea.focus();
-             textArea.select();
-             try {
-                document.execCommand('copy');
-             } catch (copyErr) {
-                console.error('execCommand copy failed:', copyErr);
-             }
-             textArea.remove();
-          }
-          useAppStore.getState().triggerToast("Message copied to clipboard", 2000);
-       } catch (err) {
-          console.error('Failed to copy:', err);
-          useAppStore.getState().triggerToast("Failed to copy message", 2000);
-       }
-    };
+   // Copy to clipboard
+   const copyToClipboard = async (text: string) => {
+      try {
+         if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+         } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+               document.execCommand('copy');
+            } catch (copyErr) {
+               console.error('execCommand copy failed:', copyErr);
+            }
+            textArea.remove();
+         }
+         useAppStore.getState().triggerToast("Message copied to clipboard", 2000);
+      } catch (err) {
+         console.error('Failed to copy:', err);
+         useAppStore.getState().triggerToast("Failed to copy message", 2000);
+      }
+   };
 
-    // Handle reaction
-    const handleReact = (msgId: string, emoji: string | null) => {
-       if (!user?.id) return;
-       reactToMessage(msgId, emoji, user.id);
-       setReactingMessageId(null);
-    };
+   // Handle reaction
+   const handleReact = (msgId: string, emoji: string | null) => {
+      if (!user?.id) return;
+      reactToMessage(msgId, emoji, user.id);
+      setReactingMessageId(null);
+   };
 
-    // Handle reply
-    const handleReply = (msg: any) => {
-       setReplyingToMsg(msg);
-       // Focus the input
-       if (replyInputRef.current) replyInputRef.current.focus();
-    };
+   // Handle reply
+   const handleReply = (msg: any) => {
+      setReplyingToMsg(msg);
+      // Focus the input
+      if (replyInputRef.current) replyInputRef.current.focus();
+   };
 
-    // Handle swipe to reply
-    const handleSwipeToReply = (msg: any) => {
-       handleReply(msg);
-    };
+   // Handle swipe to reply
+   const handleSwipeToReply = (msg: any) => {
+      handleReply(msg);
+   };
 
-    // Open full chat and close popover
-    const handleExpand = () => {
+   // Open full chat and close popover
+   const handleExpand = () => {
       if (!selectedGroupId) return;
       const group = groups.find(g => g.id === selectedGroupId);
 
@@ -667,21 +672,21 @@ export default function FloatingChatBubble() {
       setSelectedGroupId(null);
    };
 
-    const handleBubbleClick = () => {
-       if (isDragging) return;
-       if (unreadMessages.length === 1) {
-          setSelectedGroupId(unreadMessages[0].group_id);
-       } else {
-          setSelectedGroupId(null);
-       }
-       setIsOverlayOpen((prev) => {
-          if (!prev) {
-             overlayOpenedAtRef.current = Date.now();
-             clearInactivityTimer();
-          }
-          return !prev;
-       });
-    };
+   const handleBubbleClick = () => {
+      if (isDragging) return;
+      if (unreadMessages.length === 1) {
+         setSelectedGroupId(unreadMessages[0].group_id);
+      } else {
+         setSelectedGroupId(null);
+      }
+      setIsOverlayOpen((prev) => {
+         if (!prev) {
+            overlayOpenedAtRef.current = Date.now();
+            clearInactivityTimer();
+         }
+         return !prev;
+      });
+   };
 
    const handleDragStart = () => {
       setIsDragging(true);
@@ -730,85 +735,88 @@ export default function FloatingChatBubble() {
       safeLocalStorage.setItem('floating_bubble_pos', JSON.stringify(newPos));
    };
 
-    // Filter messages context for the active room in popover
-    const activeRoomMessages = globalMessages
-       .filter(m => m.group_id === selectedGroupId)
-       .slice(-10);
+   // Filter messages context for the active room in popover
+   const allRoomMessages = selectedGroupId
+      ? globalMessages.filter(m => m.group_id === selectedGroupId)
+      : [];
+   const activeRoomMessages = allRoomMessages.slice(-20);
+   const hasMoreMessages = allRoomMessages.length > 20;
 
-    // Find first unread message ID for the unread divider
-    const lastSeen = selectedGroupId ? readReceipts[selectedGroupId] : null;
-    const effectiveLastSeen = lastSeen || new Date(0).toISOString();
-    const firstUnreadMsg = activeRoomMessages.find(
-       (m: any) => m.user_id !== user?.id && new Date(m.created_at).getTime() > new Date(effectiveLastSeen).getTime(),
-    );
-    const firstUnreadId = firstUnreadMsg?.id || null;
+   // Find first unread message ID for the unread divider
+   const lastSeen = selectedGroupId ? readReceipts[selectedGroupId] : null;
+   const effectiveLastSeen = lastSeen || new Date(0).toISOString();
+   const firstUnreadMsg = activeRoomMessages.find(
+      (m: any) => m.user_id !== user?.id && new Date(m.created_at).getTime() > new Date(effectiveLastSeen).getTime(),
+   );
+   const firstUnreadId = firstUnreadMsg?.id || null;
 
-    // Mark a message as read (hover-based)
-    const handleMarkAsRead = (messageId: string) => {
-       if (!user?.id || !selectedGroupId) return;
-       const timestamp = new Date().toISOString();
-       updateReadReceipt(selectedGroupId, timestamp);
-       supabase
-          .from("chat_read_receipts")
-          .upsert(
-             { user_id: user.id, group_id: selectedGroupId, last_seen_at: timestamp },
-             { onConflict: "user_id,group_id" },
-          )
-          .then(({ error }) => {
-             if (error) console.error("Failed to mark as read:", error);
-          });
-       supabase
-          .from("messages")
-          .update({ is_read: true })
-          .eq("id", messageId)
-          .then(({ error }) => {
-             if (error) console.error("Failed to update message read status:", error);
-          });
-    };
+   // Mark a message as read (hover-based)
+   const handleMarkAsRead = (messageId: string) => {
+      if (!user?.id || !selectedGroupId) return;
+      const timestamp = new Date().toISOString();
+      updateReadReceipt(selectedGroupId, timestamp);
+      supabase
+         .from("chat_read_receipts")
+         .upsert(
+            { user_id: user.id, group_id: selectedGroupId, last_seen_at: timestamp },
+            { onConflict: "user_id,group_id" },
+         )
+         .then(({ error }) => {
+            if (error) console.error("Failed to mark as read:", error);
+         });
+      supabase
+         .from("messages")
+         .update({ is_read: true })
+         .eq("id", messageId)
+         .then(({ error }) => {
+            if (error) console.error("Failed to update message read status:", error);
+         });
+   };
 
-    // Snapshot firstUnreadId for the unread divider
-    useEffect(() => {
-       if (firstUnreadId && selectedGroupId) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setVisibleUnreadId(firstUnreadId);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setShowUnreadLine(true);
-       }
-    }, [firstUnreadId]);
+   const hasCapturedDividerRef = useRef(false);
 
-    // Reset snapshot on room change
-    useEffect(() => {
-       // eslint-disable-next-line react-hooks/set-state-in-effect
-       setVisibleUnreadId(null);
-       // eslint-disable-next-line react-hooks/set-state-in-effect
-       setShowUnreadLine(true);
-    }, [selectedGroupId]);
+   // Snapshot firstUnreadId for the unread divider
+   useEffect(() => {
+      if (firstUnreadId && selectedGroupId && !hasCapturedDividerRef.current) {
+         hasCapturedDividerRef.current = true;
+         setVisibleUnreadId(firstUnreadId);
+         setShowUnreadLine(true);
+      }
+   }, [firstUnreadId, selectedGroupId]);
 
-    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
-    useEffect(() => {
-       if (!visibleUnreadId || !scrollRef.current) return;
+   // Reset snapshot on room change
+   useEffect(() => {
+      hasCapturedDividerRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisibleUnreadId(null);
+      setShowUnreadLine(true);
+   }, [selectedGroupId]);
 
-       const raf = requestAnimationFrame(() => {
-          const el = document.getElementById("fb-unread-line");
-          if (!el || !scrollRef.current) return;
+   // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
+   useEffect(() => {
+      if (!visibleUnreadId || !scrollRef.current) return;
 
-          const rect = el.getBoundingClientRect();
-          const containerRect = scrollRef.current.getBoundingClientRect();
+      const raf = requestAnimationFrame(() => {
+         const el = document.getElementById("fb-unread-line");
+         if (!el || !scrollRef.current) return;
 
-          if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
-             // Fully in view — auto-hide after short delay
-             // eslint-disable-next-line react-hooks/set-state-in-effect
-             const timer = setTimeout(() => setShowUnreadLine(false), 6000);
-             cleanupTimers.push(timer);
-          }
-       });
+         const rect = el.getBoundingClientRect();
+         const containerRect = scrollRef.current.getBoundingClientRect();
 
-       const cleanupTimers: number[] = [];
-       return () => {
-          cancelAnimationFrame(raf);
-          cleanupTimers.forEach(clearTimeout);
-       };
-    }, [visibleUnreadId]);
+         if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
+            // Fully in view — auto-hide after short delay
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            const timer = setTimeout(() => setShowUnreadLine(false), 6000);
+            cleanupTimers.push(timer);
+         }
+      });
+
+      const cleanupTimers: number[] = [];
+      return () => {
+         cancelAnimationFrame(raf);
+         cleanupTimers.forEach(clearTimeout);
+      };
+   }, [visibleUnreadId]);
 
    const selectedGroupObject = groups.find(g => g.id === selectedGroupId);
    const selectedGroupName = selectedGroupObject?.name || "Conversation";
@@ -830,7 +838,7 @@ export default function FloatingChatBubble() {
                      onDragStart={handleDragStart}
                      onDrag={handleDrag}
                      onDragEnd={handleDragEnd}
-                      initial={{ scale: 0, opacity: 0, x: bubblePos?.x ?? window.innerWidth - 80, y: bubblePos?.y ?? 120 }}
+                     initial={{ scale: 0, opacity: 0, x: bubblePos?.x ?? window.innerWidth - 80, y: bubblePos?.y ?? 120 }}
                      animate={{
                         scale: 1,
                         opacity: 1,
@@ -840,32 +848,32 @@ export default function FloatingChatBubble() {
                      onClick={handleBubbleClick}
                      whileHover={{ scale: 1.05 }}
                      whileTap={{ scale: 0.95 }}
-                      className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
+                     className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
                      style={{
                         zIndex: 99999,
                      }}
-                   >
-                       {unreadCount > 0 && latestUnreadMsg ? (
-                          isLatestDM && latestPartner ? (
-                             <ProtectedAvatar
-                                userId={latestPartner.id}
-                                src={latestPartner.avatar_url}
-                                username={latestPartner.username}
-                                className="w-full h-full rounded-full"
-                             />
-                          ) : (
-                             <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
-                                <span className="text-white font-black text-[11px] uppercase leading-none select-none tracking-tight">
-                                   {getSmartInitials(latestUnreadGroup?.name || '') || '?'}
-                                </span>
-                             </div>
-                          )
-                       ) : (
-                          <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
-                             <MessageCircle className="w-7 h-7 text-white" />
-                          </div>
-                       )}
-                      {unreadCount > 0 && (
+                  >
+                     {unreadCount > 0 && latestUnreadMsg ? (
+                        isLatestDM && latestPartner ? (
+                           <ProtectedAvatar
+                              userId={latestPartner.id}
+                              src={latestPartner.avatar_url}
+                              username={latestPartner.username}
+                              className="w-full h-full rounded-full"
+                           />
+                        ) : (
+                           <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
+                              <span className="text-white font-black text-[11px] uppercase leading-none select-none tracking-tight">
+                                 {getSmartInitials(latestUnreadGroup?.name || '') || '?'}
+                              </span>
+                           </div>
+                        )
+                     ) : (
+                        <div className="w-full h-full rounded-full flex items-center justify-center bg-slate-950/40">
+                           <MessageCircle className="w-7 h-7 text-white" />
+                        </div>
+                     )}
+                     {unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-extrabold text-[11px] h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center border-2 border-slate-950 shadow-md">
                            {unreadCount}
                         </span>
@@ -884,12 +892,12 @@ export default function FloatingChatBubble() {
                      initial={{ opacity: 0 }}
                      animate={{ opacity: 1 }}
                      exit={{ opacity: 0 }}
-                      onClick={() => {
-                         if (Date.now() - overlayOpenedAtRef.current < 400) return;
-                         setIsOverlayOpen(false);
-                         setSelectedGroupId(null);
-                      }}
-                      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
+                     onClick={() => {
+                        if (Date.now() - overlayOpenedAtRef.current < 400) return;
+                        setIsOverlayOpen(false);
+                        setSelectedGroupId(null);
+                     }}
+                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
                   />
 
                   {/* Centered Modal Card */}
@@ -938,7 +946,7 @@ export default function FloatingChatBubble() {
                      </div>
 
                      {/* Content List */}
-                       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
+                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
                         {!selectedGroupId ? (
                            /* Screen A: Conversation List */
                            Object.keys(groupedUnread).length === 0 ? (
@@ -999,353 +1007,361 @@ export default function FloatingChatBubble() {
                                  Complete today's daily puzzle to unlock this discussion.
                               </p>
                            </div>
-                         ) : (
-                            /* Screen B: Detailed Chat view (Last 10 messages) */
-                            <div className="space-y-4">
-                               {activeRoomMessages.map((msg: any) => {
-                                  const isMe = msg.user_id === user?.id;
-                                  const isEditing = editingMessageId === msg.id;
-                                  const content = getDecryptedContent(msg);
+                        ) : (
+                           (
+                              <div className="space-y-4">
+                                 {hasMoreMessages && (
+                                    <div className="flex flex-col items-center gap-2 pb-2">
+                                       <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
+                                          {allRoomMessages.length - 20}+ older · View full chat
+                                       </button>
+                                       <div className="h-px w-full bg-white/10" />
+                                    </div>
+                                 )}
+                                 {activeRoomMessages.map((msg: any) => {
+                                    const isMe = msg.user_id === user?.id;
+                                    const isEditing = editingMessageId === msg.id;
+                                    const content = getDecryptedContent(msg);
 
-                                  return (
-                                      <div
-                                         key={msg.id}
-                                         onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
-                                         className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
-                                      >
-                                         {/* Unread divider */}
-                                         {msg.id === visibleUnreadId && showUnreadLine && (
-                                            <motion.div
-                                               id="fb-unread-line"
-                                               initial={{ opacity: 0, scale: 0.8 }}
-                                               animate={{ opacity: 1, scale: 1 }}
-                                               className="flex items-center my-4 gap-3 px-2"
-                                            >
-                                               <div className="h-px flex-1 bg-white/20" />
-                                               <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] bg-white/10 px-3 py-1 rounded-full border border-white/20 shadow-[0_0_12px_rgba(255,255,255,0.08)]">
-                                                  Unread Messages
-                                               </span>
-                                               <div className="h-px flex-1 bg-white/20" />
-                                            </motion.div>
-                                         )}
-                                         {/* Reaction Picker */}
-                                        <AnimatePresence>
-                                           {reactingMessageId === msg.id && (
-                                              <>
-                                                 <motion.div
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    exit={{ opacity: 0 }}
-                                                    onClick={() => setReactingMessageId(null)}
-                                                    className="fixed inset-0 bg-black/20 z-40"
-                                                 />
-                                                 <ReactionPicker
-                                                    ref={reactionsRef}
-                                                    isMe={isMe}
-                                                    onReact={(emoji) => handleReact(msg.id, emoji)}
-                                                    currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
-                                                    onCopy={() => {
-                                                       copyToClipboard(content);
-                                                       setReactingMessageId(null);
-                                                    }}
-                                                 />
-                                              </>
-                                           )}
-                                        </AnimatePresence>
+                                    return (
+                                       <div
+                                          key={msg.id}
+                                          onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                          className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
+                                       >
+                                          {/* Unread divider */}
+                                          {msg.id === visibleUnreadId && showUnreadLine && (
+                                             <motion.div
+                                                id="fb-unread-line"
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="flex items-center my-4 gap-3 px-2"
+                                             >
+                                                <div className="h-px flex-1 bg-white/20" />
+                                                <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] bg-white/10 px-3 py-1 rounded-full border border-white/20 shadow-[0_0_12px_rgba(255,255,255,0.08)]">
+                                                   Unread Messages
+                                                </span>
+                                                <div className="h-px flex-1 bg-white/20" />
+                                             </motion.div>
+                                          )}
+                                          {/* Reaction Picker */}
+                                          <AnimatePresence>
+                                             {reactingMessageId === msg.id && (
+                                                <>
+                                                   <motion.div
+                                                      initial={{ opacity: 0 }}
+                                                      animate={{ opacity: 1 }}
+                                                      exit={{ opacity: 0 }}
+                                                      onClick={() => setReactingMessageId(null)}
+                                                      className="fixed inset-0 bg-black/20 z-40"
+                                                   />
+                                                   <ReactionPicker
+                                                      ref={reactionsRef}
+                                                      isMe={isMe}
+                                                      onReact={(emoji) => handleReact(msg.id, emoji)}
+                                                      currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
+                                                      onCopy={() => {
+                                                         copyToClipboard(content);
+                                                         setReactingMessageId(null);
+                                                      }}
+                                                   />
+                                                </>
+                                             )}
+                                          </AnimatePresence>
 
-                                        {/* Reaction Details */}
-                                        <AnimatePresence>
-                                           {showReactionDetailsId === msg.id && msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                                              <motion.div
-                                                 ref={detailsRef}
-                                                 initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                                                 className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-slate-900 border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
-                                                 onClick={(e) => e.stopPropagation()}
-                                              >
-                                                 <div className="flex flex-col gap-1.5">
-                                                    {Object.entries(msg.reactions).map(([uid, emoji]) => (
-                                                       <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                                          <span className="text-[10px] font-black text-white truncate">
-                                                             {uid === user?.id ? 'You' : uid}
-                                                          </span>
-                                                          <span className="text-[12px] shrink-0">{emoji as string}</span>
-                                                       </div>
-                                                    ))}
-                                                 </div>
-                                              </motion.div>
-                                           )}
-                                        </AnimatePresence>
+                                          {/* Reaction Details */}
+                                          <AnimatePresence>
+                                             {showReactionDetailsId === msg.id && msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                                <motion.div
+                                                   ref={detailsRef}
+                                                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                                   animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                                   className={`absolute bottom-full mb-2 ${isMe ? 'left-0' : 'right-0'} bg-slate-900 border border-white/15 rounded-2xl p-2 shadow-2xl z-50 min-w-[140px] max-w-[200px]`}
+                                                   onClick={(e) => e.stopPropagation()}
+                                                >
+                                                   <div className="flex flex-col gap-1.5">
+                                                      {Object.entries(msg.reactions).map(([uid, emoji]) => (
+                                                         <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
+                                                            <span className="text-[10px] font-black text-white truncate">
+                                                               {uid === user?.id ? 'You' : uid}
+                                                            </span>
+                                                            <span className="text-[12px] shrink-0">{emoji as string}</span>
+                                                         </div>
+                                                      ))}
+                                                   </div>
+                                                </motion.div>
+                                             )}
+                                          </AnimatePresence>
 
-                                        <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-                                           <img
-                                              src={msg.profiles?.avatar_url || "/default-avatar.png"}
-                                              alt={msg.profiles?.username}
-                                              className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                           />
-                                           <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
-                                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                                 <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
-                                                    {msg.profiles?.username || "User"}
-                                                 </span>
-                                                  <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
-                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                     {isMe && !msg.is_deleted && (
-                                                        msg.status === "sending" ? (
-                                                           <span className="animate-spin text-white/50 text-[8px]">⌛</span>
-                                                        ) : msg.status === "failed" ? (
-                                                           <span className="text-red-400 text-[8px] font-black">⚠️</span>
-                                                        ) : (
-                                                           <CheckCheck size={10} className={msg.is_read ? "text-blue-400" : "text-white/30"} />
-                                                        )
-                                                     )}
-                                                  </span>
-                                              </div>
+                                          <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                             <img
+                                                src={msg.profiles?.avatar_url || "/default-avatar.png"}
+                                                alt={msg.profiles?.username}
+                                                className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
+                                             />
+                                             <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
+                                                <div className="flex items-baseline gap-1.5 flex-wrap">
+                                                   <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
+                                                      {msg.profiles?.username || "User"}
+                                                   </span>
+                                                   <span className="text-[8px] text-gray-500 inline-flex items-center gap-1">
+                                                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                      {isMe && !msg.is_deleted && (
+                                                         msg.status === "sending" ? (
+                                                            <span className="animate-spin text-white/50 text-[8px]">⌛</span>
+                                                         ) : msg.status === "failed" ? (
+                                                            <span className="text-red-400 text-[8px] font-black">⚠️</span>
+                                                         ) : (
+                                                            <CheckCheck size={10} className={msg.is_read ? "text-blue-400" : "text-white/30"} />
+                                                         )
+                                                      )}
+                                                   </span>
+                                                </div>
 
-                                              {isEditing ? (
-                                                 <div className="mt-1 flex items-center gap-1.5">
-                                                    <input
-                                                       type="text"
-                                                       value={editText}
-                                                       onChange={(e) => setEditText(e.target.value)}
-                                                       onKeyDown={(e) => {
-                                                          if (e.key === "Enter") handleEditSave(msg.id);
-                                                          else if (e.key === "Escape") setEditingMessageId(null);
-                                                       }}
-                                                       className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none"
-                                                    />
-                                                    <button
-                                                       onClick={() => handleEditSave(msg.id)}
-                                                       className="bg-indigo-600 hover:bg-indigo-500 p-1.5 rounded-lg text-white cursor-pointer"
-                                                    >
-                                                       <Check className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                       onClick={() => setEditingMessageId(null)}
-                                                       className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg text-gray-400 cursor-pointer"
-                                                    >
-                                                       <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                 </div>
-                                               ) : (
-                                                  <div className="relative group/msg pb-2 sm:pb-4">
-                                                    {msg.voice_url ? (
-                                                       <AudioPlayer url={msg.voice_url} />
-                                                    ) : msg.image_url ? (
-                                                       <div
-                                                          className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full"
-                                                          onClick={() => setPreviewImage(msg.image_url)}
-                                                       >
-                                                          <img
-                                                             src={msg.image_url}
-                                                             className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                                                             alt="shared file"
-                                                          />
-                                                       </div>
-                                                    ) : (
-                                                       <motion.div
-                                                          drag={!msg.is_deleted && !isEditing ? "x" : false}
-                                                          dragDirectionLock
-                                                          dragConstraints={{ left: 0, right: 0 }}
-                                                          dragSnapToOrigin
-                                                          dragElastic={{ left: 0, right: 0.6 }}
-                                                          onDragEnd={(_, info) => {
-                                                             if (info.offset.x > 50) {
-                                                                handleSwipeToReply(msg);
-                                                             }
-                                                          }}
-                                                       >
-                                                          <p className={`text-xs text-gray-200 mt-1 leading-relaxed break-words px-3 py-2 rounded-2xl bg-white/5 border border-white/5`}>
-                                                             {getDecryptedContent(msg)}
-                                                             {msg.is_edited && (
-                                                                <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
-                                                             )}
-                                                          </p>
-                                                       </motion.div>
-                                                    )}
+                                                {isEditing ? (
+                                                   <div className="mt-1 flex items-center gap-1.5">
+                                                      <input
+                                                         type="text"
+                                                         value={editText}
+                                                         onChange={(e) => setEditText(e.target.value)}
+                                                         onKeyDown={(e) => {
+                                                            if (e.key === "Enter") handleEditSave(msg.id);
+                                                            else if (e.key === "Escape") setEditingMessageId(null);
+                                                         }}
+                                                         className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none"
+                                                      />
+                                                      <button
+                                                         onClick={() => handleEditSave(msg.id)}
+                                                         className="bg-indigo-600 hover:bg-indigo-500 p-1.5 rounded-lg text-white cursor-pointer"
+                                                      >
+                                                         <Check className="w-3.5 h-3.5" />
+                                                      </button>
+                                                      <button
+                                                         onClick={() => setEditingMessageId(null)}
+                                                         className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg text-gray-400 cursor-pointer"
+                                                      >
+                                                         <X className="w-3.5 h-3.5" />
+                                                      </button>
+                                                   </div>
+                                                ) : (
+                                                   <div className="relative group/msg pb-2 sm:pb-4">
+                                                      {msg.voice_url ? (
+                                                         <AudioPlayer url={msg.voice_url} />
+                                                      ) : msg.image_url ? (
+                                                         <div
+                                                            className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full"
+                                                            onClick={() => setPreviewImage(msg.image_url)}
+                                                         >
+                                                            <img
+                                                               src={msg.image_url}
+                                                               className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
+                                                               alt="shared file"
+                                                            />
+                                                         </div>
+                                                      ) : (
+                                                         <motion.div
+                                                            drag={!msg.is_deleted && !isEditing ? "x" : false}
+                                                            dragDirectionLock
+                                                            dragConstraints={{ left: 0, right: 0 }}
+                                                            dragSnapToOrigin
+                                                            dragElastic={{ left: 0, right: 0.6 }}
+                                                            onDragEnd={(_, info) => {
+                                                               if (info.offset.x > 50) {
+                                                                  handleSwipeToReply(msg);
+                                                               }
+                                                            }}
+                                                         >
+                                                            <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed break-words px-3 py-2 rounded-2xl bg-white/5 border border-white/5`}>
+                                                               {getDecryptedContent(msg)}
+                                                               {msg.is_edited && (
+                                                                  <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
+                                                               )}
+                                                            </p>
+                                                         </motion.div>
+                                                      )}
 
-                                                    {/* Action buttons (Reply, React, Edit, Delete) */}
-                                                    {!msg.is_deleted && !isEditing && (
-                                                       <div className="absolute right-0 top-0 -translate-y-full hidden group-hover/msg:flex items-center gap-1 bg-slate-900 border border-white/10 px-1 py-0.5 rounded-lg shadow-lg">
-                                                          <button
-                                                             onClick={() => handleReply(msg)}
-                                                             className="p-1 hover:text-correct text-gray-400 cursor-pointer"
-                                                             title="Reply"
-                                                          >
-                                                             <Reply className="w-2.5 h-2.5" />
-                                                          </button>
-                                                          <button
-                                                             onClick={() => setReactingMessageId(reactingMessageId === msg.id ? null : msg.id)}
-                                                             className="p-1 hover:text-yellow-400 text-gray-400 cursor-pointer"
-                                                             title="React"
-                                                          >
-                                                             <Smile className="w-2.5 h-2.5" />
-                                                          </button>
-                                                          {isMe && !msg.voice_url && !msg.image_url && (
-                                                             <button
-                                                                onClick={() => {
-                                                                   setEditingMessageId(msg.id);
-                                                                   setEditText(getDecryptedContent(msg));
-                                                                }}
-                                                                className="p-1 hover:text-indigo-400 text-gray-400 cursor-pointer"
-                                                                title="Edit"
-                                                             >
-                                                                <Edit2 className="w-2.5 h-2.5" />
-                                                             </button>
-                                                          )}
-                                                          {isMe && (
-                                                             <button
-                                                                onClick={() => handleDeleteMessage(msg.id)}
-                                                                className="p-1 hover:text-rose-400 text-gray-400 cursor-pointer"
-                                                                title="Delete"
-                                                             >
-                                                                <Trash2 className="w-2.5 h-2.5" />
-                                                             </button>
-                                                          )}
-                                                       </div>
-                                                    )}
+                                                      {/* Action buttons (Reply, React, Edit, Delete) */}
+                                                      {!msg.is_deleted && !isEditing && (
+                                                         <div className="absolute right-0 top-0 -translate-y-full hidden group-hover/msg:flex items-center gap-1 bg-slate-900 border border-white/10 px-1 py-0.5 rounded-lg shadow-lg">
+                                                            <button
+                                                               onClick={() => handleReply(msg)}
+                                                               className="p-1 hover:text-correct text-gray-400 cursor-pointer"
+                                                               title="Reply"
+                                                            >
+                                                               <Reply className="w-2.5 h-2.5" />
+                                                            </button>
+                                                            <button
+                                                               onClick={() => setReactingMessageId(reactingMessageId === msg.id ? null : msg.id)}
+                                                               className="p-1 hover:text-yellow-400 text-gray-400 cursor-pointer"
+                                                               title="React"
+                                                            >
+                                                               <Smile className="w-2.5 h-2.5" />
+                                                            </button>
+                                                            {isMe && !msg.voice_url && !msg.image_url && (
+                                                               <button
+                                                                  onClick={() => {
+                                                                     setEditingMessageId(msg.id);
+                                                                     setEditText(getDecryptedContent(msg));
+                                                                  }}
+                                                                  className="p-1 hover:text-indigo-400 text-gray-400 cursor-pointer"
+                                                                  title="Edit"
+                                                               >
+                                                                  <Edit2 className="w-2.5 h-2.5" />
+                                                               </button>
+                                                            )}
+                                                            {isMe && (
+                                                               <button
+                                                                  onClick={() => handleDeleteMessage(msg.id)}
+                                                                  className="p-1 hover:text-rose-400 text-gray-400 cursor-pointer"
+                                                                  title="Delete"
+                                                               >
+                                                                  <Trash2 className="w-2.5 h-2.5" />
+                                                               </button>
+                                                            )}
+                                                         </div>
+                                                      )}
 
-                                                    {/* Reaction badges */}
-                                                    {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
-                                                       <ReactionBadge
-                                                          reactions={msg.reactions}
-                                                          isMe={isMe}
-                                                          onShowDetails={() => setShowReactionDetailsId(showReactionDetailsId === msg.id ? null : msg.id)}
-                                                       />
-                                                    )}
-                                                 </div>
-                                              )}
-                                           </div>
-                                        </div>
-                                     </div>
-                                  );
-                               })}
-                            </div>
-                         )}
+                                                      {/* Reaction badges */}
+                                                      {msg.reactions && Object.keys(msg.reactions).length > 0 && !msg.is_deleted && (
+                                                         <ReactionBadge
+                                                            reactions={msg.reactions}
+                                                            isMe={isMe}
+                                                            onShowDetails={() => setShowReactionDetailsId(showReactionDetailsId === msg.id ? null : msg.id)}
+                                                         />
+                                                      )}
+                                                   </div>
+                                                )}
+                                             </div>
+                                          </div>
+                                       </div>
+                                    );
+                                 })}
+                              </div>
+                           ))}
                      </div>
 
-                      {/* Reply footer for detailed chat screen */}
-                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
-                         <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0">
-                            <input
-                               ref={fileInputRef}
-                               type="file"
-                               accept="image/*"
-                               className="hidden"
-                               onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                     handleSendImage(file);
-                                     if (fileInputRef.current) fileInputRef.current.value = "";
-                                  }
-                               }}
-                            />
+                     {/* Reply footer for detailed chat screen */}
+                     {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
+                        <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0">
+                           <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                 const file = e.target.files?.[0];
+                                 if (file) {
+                                    handleSendImage(file);
+                                    if (fileInputRef.current) fileInputRef.current.value = "";
+                                 }
+                              }}
+                           />
 
-                            {/* Reply preview */}
-                            {replyingToMsg && (
-                               <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-3 py-1.5">
-                                  <Reply className="w-3 h-3 text-indigo-400 shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                     <span className="text-[9px] font-black uppercase text-indigo-400">
-                                        Replying to {replyingToMsg.profiles?.username || "User"}
-                                     </span>
-                                     <p className="text-[10px] text-gray-400 truncate">
-                                        {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : getDecryptedContent(replyingToMsg)}
-                                     </p>
-                                  </div>
-                                  <button
-                                     onClick={() => setReplyingToMsg(null)}
-                                     className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer shrink-0"
-                                  >
-                                     <X className="w-3 h-3" />
-                                  </button>
-                               </div>
-                            )}
+                           {/* Reply preview */}
+                           {replyingToMsg && (
+                              <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-3 py-1.5">
+                                 <Reply className="w-3 h-3 text-indigo-400 shrink-0" />
+                                 <div className="flex-1 min-w-0">
+                                    <span className="text-[9px] font-black uppercase text-indigo-400">
+                                       Replying to {replyingToMsg.profiles?.username || "User"}
+                                    </span>
+                                    <p className="text-[10px] text-gray-400 truncate">
+                                       {replyingToMsg.voice_url ? "🎤 Voice note" : replyingToMsg.image_url ? "📷 Image" : getDecryptedContent(replyingToMsg)}
+                                    </p>
+                                 </div>
+                                 <button
+                                    onClick={() => setReplyingToMsg(null)}
+                                    className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer shrink-0"
+                                 >
+                                    <X className="w-3 h-3" />
+                                 </button>
+                              </div>
+                           )}
 
-                            <div className="flex items-center gap-1.5 w-full">
-                               {!isRecording && (
-                                  <button
-                                     onClick={() => fileInputRef.current?.click()}
-                                     className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white cursor-pointer transition-colors"
-                                     title="Send image"
-                                  >
-                                     <ImageIcon className="w-4 h-4" />
-                                  </button>
-                               )}
+                           <div className="flex items-center gap-1.5 w-full">
+                              {!isRecording && (
+                                 <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white cursor-pointer transition-colors"
+                                    title="Send image"
+                                 >
+                                    <ImageIcon className="w-4 h-4" />
+                                 </button>
+                              )}
 
-                               {isRecording ? (
-                                  <div className="flex-1 flex items-center justify-between bg-red-600/10 border border-red-500/20 rounded-xl px-3 py-1.5 text-white">
-                                     <div className="flex items-center gap-2">
-                                        <div className="relative w-2 h-2">
-                                           <div className="w-2 h-2 bg-red-500 rounded-full animate-ping absolute inset-0" />
-                                           <div className="w-2 h-2 bg-red-500 rounded-full absolute inset-0" />
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase text-red-400">Rec</span>
-                                        <span className="text-xs font-black tabular-nums">{formatDuration(recordingTime)}</span>
-                                     </div>
-                                     <button
-                                        onClick={cancelRecording}
-                                        className="text-white/60 hover:text-red-400 p-1 rounded-full cursor-pointer"
-                                     >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                     </button>
-                                  </div>
-                               ) : (
-                                   <textarea
-                                      ref={replyInputRef}
-                                      rows={1}
-                                      placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
-                                      value={replyText}
-                                      onChange={(e) => {
-                                         setReplyText(e.target.value);
-                                         resetInactivityTimer();
-                                      }}
-                                      onInput={(e) => {
-                                         e.currentTarget.style.height = 'auto';
-                                         e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
-                                      }}
-                                      onKeyDown={(e) => {
-                                         if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-                                            e.preventDefault();
-                                            handleSendReply();
-                                         }
-                                      }}
-                                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
-                                   />
-                                )}
+                              {isRecording ? (
+                                 <div className="flex-1 flex items-center justify-between bg-red-600/10 border border-red-500/20 rounded-xl px-3 py-1.5 text-white">
+                                    <div className="flex items-center gap-2">
+                                       <div className="relative w-2 h-2">
+                                          <div className="w-2 h-2 bg-red-500 rounded-full animate-ping absolute inset-0" />
+                                          <div className="w-2 h-2 bg-red-500 rounded-full absolute inset-0" />
+                                       </div>
+                                       <span className="text-[10px] font-black uppercase text-red-400">Rec</span>
+                                       <span className="text-xs font-black tabular-nums">{formatDuration(recordingTime)}</span>
+                                    </div>
+                                    <button
+                                       onClick={cancelRecording}
+                                       className="text-white/60 hover:text-red-400 p-1 rounded-full cursor-pointer"
+                                    >
+                                       <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                 </div>
+                              ) : (
+                                 <textarea
+                                    ref={replyInputRef}
+                                    rows={1}
+                                    placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
+                                    value={replyText}
+                                    onChange={(e) => {
+                                       setReplyText(e.target.value);
+                                       resetInactivityTimer();
+                                    }}
+                                    onInput={(e) => {
+                                       e.currentTarget.style.height = 'auto';
+                                       e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                                    }}
+                                    onKeyDown={(e) => {
+                                       if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+                                          e.preventDefault();
+                                          handleSendReply();
+                                       }
+                                    }}
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
+                                 />
+                              )}
 
-                               {replyText.trim() === "" ? (
-                                  isRecording ? (
-                                     <button
-                                        onClick={stopRecording}
-                                        className="bg-red-600 text-white p-2.5 rounded-xl cursor-pointer relative"
-                                        title="Stop and send"
-                                     >
-                                        <Send className="w-4 h-4" />
-                                        <div className="absolute inset-0 bg-red-500 rounded-xl animate-ping opacity-25" />
-                                     </button>
-                                  ) : (
-                                     <button
-                                        onClick={startRecording}
-                                        className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all"
-                                        title="Record voice note"
-                                     >
-                                        <Mic className="w-4 h-4" />
-                                     </button>
-                                  )
-                               ) : (
-                                  <button
-                                     onClick={handleSendReply}
-                                     disabled={!replyText.trim() || isSending}
-                                     className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
-                                  >
-                                     <Send className="w-4 h-4" />
-                                  </button>
-                               )}
-                            </div>
-                         </div>
-                      )}
+                              {replyText.trim() === "" ? (
+                                 isRecording ? (
+                                    <button
+                                       onClick={stopRecording}
+                                       className="bg-red-600 text-white p-2.5 rounded-xl cursor-pointer relative"
+                                       title="Stop and send"
+                                    >
+                                       <Send className="w-4 h-4" />
+                                       <div className="absolute inset-0 bg-red-500 rounded-xl animate-ping opacity-25" />
+                                    </button>
+                                 ) : (
+                                    <button
+                                       onClick={startRecording}
+                                       className="bg-correct text-black p-2.5 rounded-xl cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                                       title="Record voice note"
+                                    >
+                                       <Mic className="w-4 h-4" />
+                                    </button>
+                                 )
+                              ) : (
+                                 <button
+                                    onClick={handleSendReply}
+                                    disabled={!replyText.trim() || isSending}
+                                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white p-2.5 rounded-xl transition-colors cursor-pointer"
+                                 >
+                                    <Send className="w-4 h-4" />
+                                 </button>
+                              )}
+                           </div>
+                        </div>
+                     )}
                   </motion.div>
                </>
             )}
@@ -1367,8 +1383,8 @@ export default function FloatingChatBubble() {
                >
                   <div
                      className={`w-14 h-14 rounded-full flex items-center justify-center border-2 shadow-2xl transition-colors duration-200 ${isNearDismiss
-                           ? "bg-rose-600/90 border-rose-400 text-white"
-                           : "bg-slate-900/80 border-white/20 text-gray-400"
+                        ? "bg-rose-600/90 border-rose-400 text-white"
+                        : "bg-slate-900/80 border-white/20 text-gray-400"
                         } backdrop-blur-md`}
                   >
                      <X className="w-6 h-6 animate-pulse" />
