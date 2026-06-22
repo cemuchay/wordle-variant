@@ -38,6 +38,7 @@ const corsHeaders = {
 // ── Generic entity-based question generator ──────────────────
 
 const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id", "image"]);
+const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
 function pickVariants(weights: number[], rng: () => number, count: number): number[] {
    const total = weights.reduce((a, b) => a + b, 0);
@@ -165,8 +166,9 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       .filter((l) => l);
 
    const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
-   const assignedVariant = variantOverride !== undefined ? variantOverride : Math.floor(rng() * 6);
-   const tryOrder = buildVariantTryOrder(assignedVariant, variantWeights ?? [1, 1, 1, 1, 1, 1]);
+   const weights = variantWeights ?? DEFAULT_WEIGHTS;
+   const assignedVariant = variantOverride !== undefined ? variantOverride : Math.floor(rng() * weights.length);
+   const tryOrder = buildVariantTryOrder(assignedVariant, weights);
 
    for (const v of tryOrder) {
       let q: any = null;
@@ -307,9 +309,97 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             return q;
          }
       }
-   }
 
-   // Fallback: forward
+      // ── Variant 6: Tag Match ─────────────────────────────
+      if (v === 6 && entity.tags?.length > 0) {
+         const allTags = [...new Set(allEntities.flatMap((e: any) => e.tags || []))];
+         const myTags: string[] = entity.tags;
+         const otherTags = allTags.filter((t: string) => !myTags.includes(t));
+         if (otherTags.length >= 3) {
+            const tagCounts = new Map<string, number>();
+            for (const e of allEntities) {
+               for (const t of (e.tags || [])) {
+                  tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+               }
+            }
+            const sortedTags = seededShuffle([...myTags], rng)
+               .sort((a, b) => (tagCounts.get(a) || 0) - (tagCounts.get(b) || 0));
+            const chosenTag = sortedTags[0];
+            const tagDistractors = seededShuffle(otherTags, rng).slice(0, 3);
+            q = {
+               type: "definition",
+               prompt: `Which tag best describes "${label}"?`,
+               choices: seededShuffle([chosenTag, ...tagDistractors], rng),
+               answer: chosenTag,
+            };
+            return q;
+         }
+      }
+
+      // ── Variant 7: Compare (Numeric) ─────────────────────
+      if (v === 7 && isNum) {
+         const validPeers = allEntities.filter(
+            (e: any) => e.id !== entity.id && e.metadata?.[chosenKey] !== undefined &&
+               isNumeric(String(e.metadata[chosenKey]))
+         );
+         if (validPeers.length >= 1) {
+            const peer = seededShuffle(validPeers, rng)[0];
+            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const peerNum = parseFloat(sanitize(String(peer.metadata[chosenKey])));
+            const correctNum = parseFloat(sanitize(correctValue));
+            if (!isNaN(correctNum) && !isNaN(peerNum) && correctNum !== peerNum) {
+               const isHigher = rng() > 0.5;
+               const winner = isHigher
+                  ? (correctNum > peerNum ? label : peer.label)
+                  : (correctNum < peerNum ? label : peer.label);
+               q = {
+                  type: "definition",
+                  prompt: isHigher
+                     ? `Which has a higher ${keyLabel}: "${label}" or "${peer.label}"?`
+                     : `Which has a lower ${keyLabel}: "${label}" or "${peer.label}"?`,
+                  choices: seededShuffle([label, peer.label], rng),
+                  answer: winner,
+               };
+               return q;
+            }
+         }
+      }
+
+      // ── Variant 8: Timeline ──────────────────────────────
+      if (v === 8 && isNum) {
+         const k = chosenKey.toLowerCase();
+         const isTime = k.includes("year") || k.includes("date") || k.includes("founded") ||
+            k.includes("released") || k.includes("created") || k.includes("acquired");
+         if (isTime) {
+            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const candidates: { label: string; value: number }[] = [];
+            for (const e of allEntities) {
+               const raw = String(e.metadata?.[chosenKey] ?? "");
+               const num = parseFloat(sanitize(raw));
+               if (!isNaN(num)) {
+                  candidates.push({ label: e.label, value: num });
+               }
+            }
+            if (candidates.length >= 4) {
+               candidates.sort((a, b) => a.value - b.value);
+               const askEarliest = rng() > 0.5;
+               const answer = askEarliest ? candidates[0] : candidates[candidates.length - 1];
+               const timelineDistractors = seededShuffle(
+                  candidates.filter((c) => c.label !== answer.label), rng
+               ).slice(0, 3).map((c) => c.label);
+               q = {
+                  type: "definition",
+                  prompt: askEarliest
+                     ? `Which of these happened earliest (${keyLabel})?`
+                     : `Which of these happened most recently (${keyLabel})?`,
+                  choices: seededShuffle([answer.label, ...timelineDistractors], rng),
+                  answer: answer.label,
+               };
+               return q;
+            }
+         }
+      }
+   }
    const fallbackQ = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
    return {
       type: "definition",
@@ -531,9 +621,7 @@ serve(async (req) => {
                 console.error(`${logPrefix} Failed to record entity history:`, historyError);
              } else {
                 console.log(`${logPrefix} Entity history recorded`);
-             }
-          }
-       }
+        }
 
        console.log(`${logPrefix} Returning success response`);
        return new Response(
