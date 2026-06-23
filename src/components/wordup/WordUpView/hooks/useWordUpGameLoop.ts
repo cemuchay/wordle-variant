@@ -30,13 +30,15 @@ export const useWordUpGameLoop = (
    const maxTime = useWordUpStore((s) => s.maxTime);
 
    // Determine the game type safely
-   const gameType = matchData?.game_type
-      ? matchData.game_type
-      : matchData?.is_bot_match
-        ? "live-bot"
-        : matchData?.status === "waiting"
-          ? "async"
-          : "live";
+    const gameType = !matchData
+       ? null
+       : matchData.game_type
+         ? matchData.game_type
+         : matchData.is_bot_match
+           ? "live-bot"
+           : matchData.status === "waiting"
+             ? "async"
+             : "live";
 
    // Call all three hooks unconditionally (hook rules)
    const liveGame = useWordUpLiveGame({

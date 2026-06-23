@@ -57,8 +57,9 @@ export const useWordUpBotGame = ({
    const roundTimeoutRef = useRef<number | null>(null);
    const botActionRef = useRef<any>(null);
    const isSubmittingAnswerRef = useRef(false);
-   const isAdvancingRef = useRef(false);
-   const isRevealingRef = useRef(false);
+    const isAdvancingRef = useRef(false);
+    const isRevealingRef = useRef(false);
+    const rematchHideRef = useRef<number | null>(null);
    const rematchTimerRef = useRef<number | null>(null);
 
    const currentIdxRef = useRef(currentIdx);
@@ -275,7 +276,7 @@ export const useWordUpBotGame = ({
             const latestMatch = matchDataRef.current;
             if (!latestMatch) throw new Error("Match data not found");
 
-            const botAction = botActionRef.current;
+            const botAction = botActionRef.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
             let botPoints = 0;
             if (botAction?.correct) {
                const speedBonus = Math.max(0, Math.round((1.0 - botAction.time_taken / duration) * 50));
@@ -336,11 +337,12 @@ export const useWordUpBotGame = ({
             return;
          }
 
-         console.log(`[WordUp Logs] Bot startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
+          console.log(`[WordUp Logs] Bot startQuestionRound: Initiating round ${index + 1} (idx: ${index})`);
 
           currentIdxRef.current = index;
 
           cleanUpIntervals();
+          botActionRef.current = null;
 
           const q = questionsRef.current[index];
           const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -404,16 +406,16 @@ export const useWordUpBotGame = ({
          const mergedMatch = { ...currentMatch, ...newMatch };
 
          if (currentMatch) {
-            if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
-               mergedMatch.p1_answers = currentMatch.p1_answers;
-               mergedMatch.p1_score = currentMatch.p1_score;
-               mergedMatch.p1_answered = currentMatch.p1_answered;
-            }
-            if ((currentMatch.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)) {
-               mergedMatch.p2_answers = currentMatch.p2_answers;
-               mergedMatch.p2_score = currentMatch.p2_score;
-               mergedMatch.p2_answered = currentMatch.p2_answered;
-            }
+             if ((currentMatch.p1_answers?.length || 0) >= (newMatch.p1_answers?.length || 0)) {
+                mergedMatch.p1_answers = currentMatch.p1_answers;
+                mergedMatch.p1_score = currentMatch.p1_score;
+                mergedMatch.p1_answered = currentMatch.p1_answered;
+             }
+             if ((currentMatch.p2_answers?.length || 0) >= (newMatch.p2_answers?.length || 0)) {
+                mergedMatch.p2_answers = currentMatch.p2_answers;
+                mergedMatch.p2_score = currentMatch.p2_score;
+                mergedMatch.p2_answered = currentMatch.p2_answered;
+             }
             mergedMatch.current_question_index = Math.max(
                currentMatch.current_question_index || 0,
                newMatch.current_question_index || 0,
@@ -443,11 +445,13 @@ export const useWordUpBotGame = ({
                async () => {
                   isRevealingRef.current = false;
                   roundTimeoutRef.current = null;
+                  const latestMatch = matchDataRef.current;
+                  if (!latestMatch) return;
                   if (nextIdx >= 7) {
                      useWordUpStore.getState().setView("loading");
-                     endGame(mergedMatch);
+                     endGame(latestMatch);
                   } else {
-                     advanceRound(mergedMatch.id, nextIdx);
+                     advanceRound(latestMatch.id, nextIdx);
                   }
                },
                nextIdx === 6 ? 3200 : 1800,
@@ -463,10 +467,12 @@ export const useWordUpBotGame = ({
 
          if (mergedMatch.status === "completed") {
             safeSessionStorage.setItem("wordup_completed_" + mergedMatch.id, "true");
-            setShowRematchButton(true);
-            setTimeout(() => {
-               setShowRematchButton(false);
-            }, 120000);
+             setShowRematchButton(true);
+             if (rematchHideRef.current) clearTimeout(rematchHideRef.current);
+             rematchHideRef.current = window.setTimeout(() => {
+                setShowRematchButton(false);
+                rematchHideRef.current = null;
+             }, 120000);
             onGameOver(mergedMatch);
          }
       },
@@ -726,10 +732,11 @@ export const useWordUpBotGame = ({
    }, []);
 
    useEffect(() => {
-      return () => {
-         cleanUpIntervals();
-         if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
-      };
+       return () => {
+          cleanUpIntervals();
+          if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+          if (rematchHideRef.current) clearTimeout(rematchHideRef.current);
+       };
    }, [cleanUpIntervals]);
 
    return {

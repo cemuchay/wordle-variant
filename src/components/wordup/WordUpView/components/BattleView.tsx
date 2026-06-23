@@ -99,11 +99,10 @@ export const BattleView = ({
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
 
-   const [prevIdx, setPrevIdx] = useState(currentIdx);
-   if (currentIdx !== prevIdx) {
-      setPrevIdx(currentIdx);
-      setParticles([]);
-   }
+    useEffect(() => {
+        setParticles([]);
+        setScorePopups([]);
+    }, [currentIdx]);
 
    const [showLastRound, setShowLastRound] = useState(false);
    const lastRoundShownRef = useRef(false);

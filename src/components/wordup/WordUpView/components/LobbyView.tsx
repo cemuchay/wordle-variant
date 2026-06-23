@@ -95,8 +95,9 @@ export const LobbyView = ({
          }
          triggerToast(`${detail.senderName || "Opponent"} accepted! Starting match...`, 3000);
          // Transition to match
-         useWordUpStore.getState().setMatchId(detail.matchId);
-         useWordUpStore.getState().setRole("player1");
+          useWordUpStore.getState().setMatchId(detail.matchId);
+          useWordUpStore.getState().setRole("player1");
+          useWordUpStore.getState().setView("loading");
       };
 
       window.addEventListener("wordup-invite-rejected", handleRejected);
@@ -198,10 +199,9 @@ export const LobbyView = ({
                const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
                const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
 
-               if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
-                  markNotified(m.id);
-                  triggerToast("Your opponent completed their turn! Check the results.", 6000);
-               }
+                if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
+                   markNotified(m.id);
+                }
                continue;
             }
 
@@ -456,11 +456,12 @@ export const LobbyView = ({
       }, 15000);
    };
 
-   const handlePlayMyTurn = (match: any) => {
-      const role = match.player1_id === currentUser.id ? "player1" : "player2";
-      useWordUpStore.getState().setMatchId(match.id);
-      useWordUpStore.getState().setRole(role);
-   };
+    const handlePlayMyTurn = (match: any) => {
+       const role = match.player1_id === currentUser.id ? "player1" : "player2";
+       useWordUpStore.getState().setMatchId(match.id);
+       useWordUpStore.getState().setRole(role);
+       useWordUpStore.getState().setView("loading");
+    };
 
    return (
       <motion.div

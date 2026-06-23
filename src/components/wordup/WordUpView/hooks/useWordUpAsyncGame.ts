@@ -7,7 +7,7 @@ import { decryptMatchQuestions } from "../../../../utils/wordupQuestionGenerator
 import { preloadMatchImages } from "../../../../utils/wordupQuestionPostProcessor";
 
 import { useWordUpStore } from "../../../../store/useWordUpStore";
-import { safeSessionStorage } from "../../../../utils/storage";
+import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 import { getQuestionDuration } from "./useWordUpGameLoop";
 
@@ -48,7 +48,8 @@ export const useWordUpAsyncGame = ({
    const roundTimeoutRef = useRef<number | null>(null);
    const isSubmittingAnswerRef = useRef(false);
    const isAdvancingRef = useRef(false);
-   const isRevealingRef = useRef(false);
+    const isRevealingRef = useRef(false);
+    const matchChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
    const currentIdxRef = useRef(currentIdx);
    const matchDataRef = useRef(matchData);
@@ -102,6 +103,47 @@ export const useWordUpAsyncGame = ({
           cleanUpIntervals();
        }
     }, [isActive, cleanUpIntervals]);
+
+    useEffect(() => {
+       if (!isActive || !matchId) return;
+
+       const channel = supabase
+          .channel(`async-match-${matchId}`)
+          .on('postgres_changes', {
+             event: 'UPDATE',
+             schema: 'public',
+             table: 'wordup_matches',
+             filter: `id=eq.${matchId}`,
+          }, (payload) => {
+             const updated = payload.new;
+             if (updated.status === 'completed') {
+                console.log('[WordUp Async] Opponent completed match — transitioning to gameover');
+                const store = useWordUpStore.getState();
+                store.setMatchData(updated);
+                if (!store.questions || store.questions.length === 0) {
+                    const matchWithKey = updated as { encrypted_questions?: string; encryption_key: string };
+                    if (matchWithKey.encryption_key) {
+                       decryptMatchQuestions(matchWithKey).then(dec => {
+                          store.setQuestions(dec);
+                       }).catch(() => {});
+                    }
+                 }
+                onGameOver(updated);
+             }
+          })
+          .subscribe((status) => {
+             if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                console.warn('[WordUp Async] Channel closed/error:', status);
+             }
+          });
+
+       matchChannelRef.current = channel;
+
+       return () => {
+          supabase.removeChannel(channel);
+          matchChannelRef.current = null;
+       };
+    }, [isActive, matchId, onGameOver, triggerToast]);
 
    const endGame = useCallback(
       async (match: any) => {
@@ -307,7 +349,7 @@ export const useWordUpAsyncGame = ({
                   handleAnswerSelectRef.current("");
                }
             }
-         }, 30);
+          }, 50);
       },
       [cleanUpIntervals, stopRoundTimer, getSyncedNow, setCurrentIdx, setSelectedAnswer, setRevealAnswers, setTimeLeft, isActive],
    );
@@ -365,35 +407,55 @@ export const useWordUpAsyncGame = ({
                      const oppAnswers = isP1 ? mergedMatch.p2_answers : mergedMatch.p1_answers;
                      const oppCompleted = oppAnswers && oppAnswers.length === 7;
 
-                     if (oppCompleted) {
-                        endGame(mergedMatch);
+                      if (oppCompleted) {
+                         endGame(matchDataRef.current || mergedMatch);
                      } else {
-                        // Opponent hasn't played yet. Save our progress in database and exit.
-                        try {
-                           await wordupNetworkGate.enqueue(
-                              'put',
-                              'submit async turn answers and score',
-                              async () => {
-                                 const { error } = await supabase
-                                    .from("wordup_matches")
-                                    .update({
-                                       p1_answers: mergedMatch.p1_answers,
-                                       p2_answers: mergedMatch.p2_answers,
-                                       p1_score: mergedMatch.p1_score,
-                                       p2_score: mergedMatch.p2_score,
-                                       p1_answered: isP1 ? true : mergedMatch.p1_answered,
-                                       p2_answered: !isP1 ? true : mergedMatch.p2_answered,
-                                    })
-                                    .eq("id", mergedMatch.id);
-                                 if (error) throw error;
-                              },
-                              true
-                           );
-                           triggerToast("Turn submitted! Waiting for opponent.", 5000);
-                        } catch (err) {
-                           console.error("Failed to save async turn:", err);
-                           triggerToast("Failed to save progress.", 4000);
-                        }
+                         // Re-read match row to merge opponent's latest answers
+                         try {
+                            await wordupNetworkGate.enqueue(
+                               'put',
+                               'submit async turn answers and score',
+                               async () => {
+                                  const { data: freshMatch } = await supabase
+                                     .from("wordup_matches")
+                                     .select("*")
+                                     .eq("id", mergedMatch.id)
+                                     .single();
+
+                                  const saveData: Record<string, any> = {
+                                     p1_answers: mergedMatch.p1_answers,
+                                     p2_answers: mergedMatch.p2_answers,
+                                     p1_score: mergedMatch.p1_score,
+                                     p2_score: mergedMatch.p2_score,
+                                     p1_answered: isP1 ? true : mergedMatch.p1_answered,
+                                     p2_answered: !isP1 ? true : mergedMatch.p2_answered,
+                                  };
+
+                                  if (freshMatch) {
+                                     if (isP1) {
+                                        saveData.p2_answers = freshMatch.p2_answers || saveData.p2_answers;
+                                        saveData.p2_score = freshMatch.p2_score ?? saveData.p2_score;
+                                        saveData.p2_answered = freshMatch.p2_answered ?? saveData.p2_answered;
+                                     } else {
+                                        saveData.p1_answers = freshMatch.p1_answers || saveData.p1_answers;
+                                        saveData.p1_score = freshMatch.p1_score ?? saveData.p1_score;
+                                        saveData.p1_answered = freshMatch.p1_answered ?? saveData.p1_answered;
+                                     }
+                                  }
+
+                                  const { error } = await supabase
+                                     .from("wordup_matches")
+                                     .update(saveData)
+                                     .eq("id", mergedMatch.id);
+                                  if (error) throw error;
+                               },
+                               true
+                            );
+                            triggerToast("Turn submitted! Waiting for opponent.", 5000);
+                         } catch (err) {
+                            console.error("Failed to save async turn:", err);
+                            triggerToast("Failed to save progress.", 4000);
+                         }
                         useWordUpStore.getState().resetGame();
                      }
                   } else {
@@ -463,6 +525,28 @@ export const useWordUpAsyncGame = ({
              if (refreshed) {
                 match = refreshed;
                 setMatchData(match);
+
+           // Guard: Already completed
+           if (match.status === "completed" || safeSessionStorage.getItem("wordup_completed_" + match.id) === "true") {
+              console.log("[WordUp Async] Match already completed, skipping.");
+              triggerToast("This match is already completed.", 3000);
+              useWordUpStore.getState().resetGame();
+              useWordUpStore.getState().setView("menu");
+              return null;
+           }
+
+           // Guard: Expired (>5 min old, not active/completed)
+           const matchAge = Date.now() - new Date(match.created_at).getTime();
+           if (matchAge > 5 * 60 * 1000 && match.status !== "completed" && match.status !== "active") {
+              supabase.from("wordup_matches").update({
+                 status: "completed",
+                 completed_at: new Date().toISOString(),
+              }).eq("id", match.id).then(() => {});
+              triggerToast("This match has expired.", 3000);
+              useWordUpStore.getState().resetGame();
+              useWordUpStore.getState().setView("menu");
+              return null;
+           }
              }
           }
 
@@ -531,17 +615,39 @@ export const useWordUpAsyncGame = ({
       [setMatchData, setQuestions, setOpponentStats],
    );
 
-   useEffect(() => {
-      return () => {
-         cleanUpIntervals();
-      };
-   }, [cleanUpIntervals]);
+    useEffect(() => {
+       return () => {
+          cleanUpIntervals();
+          if (matchChannelRef.current) {
+             supabase.removeChannel(matchChannelRef.current);
+             matchChannelRef.current = null;
+          }
+       };
+    }, [cleanUpIntervals]);
 
-   return {
-      maxTime,
-      handleAnswerSelect,
-      startQuestionRound,
-      cleanUpIntervals,
-      loadAndSubscribeMatch,
-   };
+    useEffect(() => {
+       if (!isActive || !matchId || matchData?.status === "completed") return;
+       const activeState = {
+          matchId,
+          role: roleRef.current,
+          questions,
+          currentIdx,
+          matchData,
+          revealAnswers,
+          selectedAnswer,
+          timeLeft,
+          maxTime,
+          gameType: "async"
+       };
+       safeLocalStorage.setItem("wordup_active_game", JSON.stringify(activeState));
+    }, [isActive, matchId, questions, currentIdx, matchData, revealAnswers, selectedAnswer, timeLeft, maxTime]);
+
+    return {
+       maxTime,
+       handleAnswerSelect,
+       startQuestionRound,
+       cleanUpIntervals,
+       loadAndSubscribeMatch,
+       matchChannelRef,
+    };
 };

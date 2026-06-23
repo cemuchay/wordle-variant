@@ -95,9 +95,9 @@ export const WordUpView = () => {
       setIsBattlePlaying(view === "battle");
    }, [view, setIsBattlePlaying]);
 
-   const onGameOver = useCallback(async (match: any) => {
-      if (view === "gameover") return;
-      setView("gameover");
+    const onGameOver = useCallback(async (match: any) => {
+       if (useWordUpStore.getState().view === "gameover") return;
+       setView("gameover");
 
       if (!effectiveUser) return;
       const isP1 = role === "player1";
@@ -186,7 +186,7 @@ export const WordUpView = () => {
                  store.setRevealAnswers(activeGame.revealAnswers || false);
                  store.setSelectedAnswer(activeGame.selectedAnswer || null);
                  
-                 store.setView("battle");
+                  store.setView("loading");
                  
                  setTimeout(async () => {
                     const match = await loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
@@ -208,15 +208,22 @@ export const WordUpView = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
      }, []);
 
-     // Reactive sync: If matchData status changes to active externally, jump to battle
-     useEffect(() => {
-        if (matchData?.status === "active" && view === "countdown") {
-           console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
-           cleanUpCountdown();
-           setView("battle");
-           startQuestionRound(matchData, matchData.current_question_index || 0);
-        }
-     }, [matchData?.status, view, setView, startQuestionRound, matchData, cleanUpCountdown]);
+      // Reactive sync: If matchData status changes to active externally, jump to battle
+      const startQuestionRoundRef = useRef(startQuestionRound);
+      useEffect(() => {
+         startQuestionRoundRef.current = startQuestionRound;
+      }, [startQuestionRound]);
+
+      useEffect(() => {
+         if (matchData?.status === "active" && view === "countdown") {
+            console.log("[WordUp Logs] Match status became ACTIVE. Transitioning to battle...");
+            cleanUpCountdown();
+            setView("battle");
+            const idx = useWordUpStore.getState().matchData?.current_question_index || 0;
+            startQuestionRoundRef.current(matchData, idx);
+         }
+         // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [matchData?.status, view, cleanUpCountdown, setView]);
 
      const startCountdown = useCallback((match: any) => {
         cleanUpCountdown();
@@ -292,8 +299,9 @@ export const WordUpView = () => {
           } else {
              throw new Error("Failed to load match or questions.");
           }
-       } catch (err) {
-          console.error("onMatchFound error:", err);
+        } catch (err) {
+           launchedMatchIdRef.current = null;
+           console.error("onMatchFound error:", err);
           triggerToast("Failed to load match questions. Aborting game.", 5000);
           const storeMatchData = useWordUpStore.getState().matchData;
           if (storeMatchData && storeMatchData.id && !storeMatchData.id.startsWith("bot-match-") && storeMatchData.status !== "completed") {
@@ -400,13 +408,21 @@ export const WordUpView = () => {
     }, [cancelMatchmaking]);
 
     useEffect(() => {
-       return () => {
-          cancelMatchmakingRef.current();
-          cleanUpCountdown();
-          resetGame();
-          clearSafetyTimer();
-       };
-       // eslint-disable-next-line react-hooks/exhaustive-deps
+        return () => {
+            cancelMatchmakingRef.current();
+            cleanUpCountdown();
+            clearSafetyTimer();
+            const state = useWordUpStore.getState();
+            const isGameActive = (
+                state.view === "battle" ||
+                state.view === "countdown" ||
+                state.view === "gameover"
+            ) && state.matchId;
+            if (!isGameActive) {
+                resetGame();
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cleanUpCountdown]);
 
    const handleCancelMatchmaking = useCallback(async () => {
