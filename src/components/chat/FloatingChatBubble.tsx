@@ -28,9 +28,7 @@ export default function FloatingChatBubble() {
    const overlayOpenedAtRef = useRef<number>(0);
    const prevOverlayOpenRef = useRef(false);
 
-   // Session activity: once true, bubble stays visible until dismissed by drag
-   const [hasSessionActivity, setHasSessionActivity] = useState(unreadCount > 0);
-   const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
 
    // Inactivity timer for auto-closing the overlay
    const inactivityTimerRef = useRef<number | null>(null);
@@ -63,29 +61,7 @@ export default function FloatingChatBubble() {
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
 
-   // Recent conversations (persisted) so the bubble never shows empty
-   const [recentGroupIds, setRecentGroupIds] = useState<string[]>(() => {
-      try {
-         const saved = safeLocalStorage.getItem('floating_bubble_recents');
-         if (saved) return JSON.parse(saved) as string[];
-      } catch { /* empty */ }
-      return [];
-   });
-   const addToRecents = (groupId: string) => {
-      setRecentGroupIds((prev) => {
-         const next = [groupId, ...prev.filter(id => id !== groupId)].slice(0, 10);
-         safeLocalStorage.setItem('floating_bubble_recents', JSON.stringify(next));
-         return next;
-      });
-   };
-   // Reload recents from storage when overlay opens
-   useEffect(() => {
-      if (!isOverlayOpen) return;
-      try {
-         const saved = safeLocalStorage.getItem('floating_bubble_recents');
-         if (saved) setRecentGroupIds(JSON.parse(saved) as string[]);
-      } catch { /* empty */ }
-   }, [isOverlayOpen]);
+
 
    const constraintsRef = useRef<HTMLDivElement>(null);
    const scrollRef = useRef<HTMLDivElement>(null);
@@ -278,11 +254,10 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-          setReplyText("");
-          addToRecents(selectedGroupId);
-          startInactivityTimer();
-       } catch (err) {
-          console.error("Failed to send voice note:", err);
+           setReplyText("");
+           startInactivityTimer();
+        } catch (err) {
+           console.error("Failed to send voice note:", err);
           useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
        } finally {
           setIsSending(false);
@@ -337,11 +312,10 @@ export default function FloatingChatBubble() {
              { onConflict: "user_id,group_id" }
           );
 
-          setReplyText("");
-          addToRecents(selectedGroupId);
-          startInactivityTimer();
-       } catch (err) {
-          console.error("Failed to send image:", err);
+           setReplyText("");
+           startInactivityTimer();
+        } catch (err) {
+           console.error("Failed to send image:", err);
           useAppStore.getState().triggerToast("Failed to send image.", 4000);
        } finally {
           setIsSending(false);
@@ -540,16 +514,15 @@ export default function FloatingChatBubble() {
       }
    }, [selectedGroupId, globalMessages]);
 
-   // Reset dismissal state on new unread message; track session activity
-   if (unreadCount !== prevUnreadCount) {
-      setPrevUnreadCount(unreadCount);
-      if (unreadCount > 0) setHasSessionActivity(true);
-      if (unreadCount > prevUnreadCount && dismissed) {
-         setDismissed(false);
-      }
-   }
+    // Re-show bubble on new unread after dismissal
+    if (unreadCount !== prevUnreadCount) {
+       setPrevUnreadCount(unreadCount);
+       if (unreadCount > prevUnreadCount && dismissed) {
+          setDismissed(false);
+       }
+    }
 
-   const isVisible = hasSessionActivity && !isChatOpen && !dismissed;
+    const isVisible = !isChatOpen && !dismissed;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -563,16 +536,35 @@ export default function FloatingChatBubble() {
       return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
    });
 
-   // Group unread messages by group_id
-   const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
-      if (!acc[m.group_id]) {
-         acc[m.group_id] = [];
-      }
-      acc[m.group_id].push(m);
-      return acc;
-   }, {});
 
-   // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
+
+    // Unified conversation list: all groups with messages, sorted by latest
+    const conversations = (() => {
+       const joinedSet = new Set(joinedGroupIds);
+       const groupMap = new Map<string, { group: any; lastMessage: any; unreadCount: number }>();
+       groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
+       globalMessages.forEach((m: any) => {
+          if (!user?.id) return;
+          if (!joinedSet.has(m.group_id)) return;
+          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+          const entry = groupMap.get(m.group_id);
+          if (!entry) return;
+          if (m.user_id !== user.id) {
+             const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+             if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+                entry.unreadCount++;
+             }
+          }
+          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
+             entry.lastMessage = m;
+          }
+       });
+       return Array.from(groupMap.values())
+          .filter(e => e.lastMessage)
+          .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
+    })();
+
+    // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
    const getSmartInitials = (name: string) =>
       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
 
@@ -647,7 +639,6 @@ export default function FloatingChatBubble() {
 
           setReplyText("");
           setReplyingToMsg(null);
-          addToRecents(selectedGroupId);
           startInactivityTimer();
        } catch (err) {
           console.error("Failed to send reply:", err);
@@ -778,7 +769,6 @@ export default function FloatingChatBubble() {
 
       if (distance < 90) {
          setDismissed(true);
-         setHasSessionActivity(false);
          setIsOverlayOpen(false);
          setSelectedGroupId(null);
       }
@@ -1008,93 +998,59 @@ export default function FloatingChatBubble() {
                         </div>
                      </div>
 
-                     {/* Content List */}
-                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
-                        {!selectedGroupId ? (
-                            /* Screen A: Conversation List */
-                            <div className="space-y-1">
-                               {Object.entries(groupedUnread).length > 0 && (
-                                  <>
-                                     {Object.entries(groupedUnread).map(([groupId, msgs]) => {
-                                        const groupObj = groups.find(g => g.id === groupId);
-                                        const name = groupObj?.name || CORE_GROUPS[groupId] || msgs[0]?.profiles?.username || "Room";
-                                        const avatar = groupObj?.dm_partner?.avatar_url || msgs[0]?.profiles?.avatar_url || "/default-avatar.png";
-                                        const latestMsg = msgs[msgs.length - 1];
-
-                                        return (
-                                           <button
-                                              key={groupId}
-                                              onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
-                                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                           >
-                                              <img
-                                                 src={avatar}
-                                                 alt={name}
-                                                 className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                              />
-                                              <div className="min-w-0 flex-1">
-                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                       {name}
-                                                    </span>
-                                                    <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
-                                                       {msgs.length} unread
-                                                    </span>
-                                                 </div>
-                                                 <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                    {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}
-                                                    {latestMsg.voice_url ? (
-                                                       <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
-                                                    ) : latestMsg.image_url ? (
-                                                       <span className="text-indigo-400 font-semibold">📷 Image</span>
-                                                    ) : (
-                                                       getDecryptedContent(latestMsg)
-                                                    )}
-                                                 </p>
-                                              </div>
-                                           </button>
-                                        );
-                                     })}
-                                     <div className="h-px bg-white/5 my-2" />
-                                  </>
-                               )}
-                               {/* Recent conversations (read or unread) */}
-                               {(() => {
-                                  const recentConvos = recentGroupIds.filter(id => !groupedUnread[id]);
-                                  if (recentConvos.length === 0 && Object.keys(groupedUnread).length === 0) {
-                                     return (
-                                        <div className="flex flex-col items-center justify-center h-full py-12">
-                                           <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
-                                           <p className="text-xs text-gray-500">No conversations yet</p>
-                                        </div>
-                                     );
-                                  }
-                                  return recentConvos.map((groupId) => {
-                                     const groupObj = groups.find(g => g.id === groupId);
-                                     const name = groupObj?.name || CORE_GROUPS[groupId] || "Room";
-                                     const avatar = groupObj?.dm_partner?.avatar_url || "/default-avatar.png";
-                                     return (
-                                        <button
-                                           key={groupId}
-                                           onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
-                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                        >
-                                           <img
-                                              src={avatar}
-                                              alt={name}
-                                              className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                           />
-                                           <div className="min-w-0 flex-1">
-                                              <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                 {name}
-                                              </span>
-                                           </div>
-                                        </button>
-                                     );
-                                  });
-                               })()}
-                             </div>
-                          ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
+                      {/* Content List */}
+                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
+                         {!selectedGroupId ? (
+                             /* Screen A: Conversation List */
+                             <div className="space-y-1">
+                                {conversations.length === 0 ? (
+                                   <div className="flex flex-col items-center justify-center h-full py-12">
+                                      <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
+                                      <p className="text-xs text-gray-500">No conversations yet</p>
+                                   </div>
+                                ) : (
+                                   conversations.map(({ group, lastMessage, unreadCount }) => {
+                                      const name = group?.name || CORE_GROUPS[group.id] || "Room";
+                                      const avatar = group?.dm_partner?.avatar_url || "/default-avatar.png";
+                                      return (
+                                         <button
+                                            key={group.id}
+                                            onClick={() => { setSelectedGroupId(group.id); }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                         >
+                                            <img
+                                               src={avatar}
+                                               alt={name}
+                                               className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                               <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                     {name}
+                                                  </span>
+                                                  {unreadCount > 0 && (
+                                                     <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                                        {unreadCount} unread
+                                                     </span>
+                                                  )}
+                                               </div>
+                                               <p className="text-[11px] text-gray-400 truncate mt-1">
+                                                  {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
+                                                  {lastMessage.voice_url ? (
+                                                     <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
+                                                  ) : lastMessage.image_url ? (
+                                                     <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                  ) : (
+                                                     getDecryptedContent(lastMessage)
+                                                  )}
+                                               </p>
+                                            </div>
+                                         </button>
+                                      );
+                                   })
+                                )}
+                              </div>
+                           ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
                            /* Locked Game Analysis placeholder */
                            <div className="flex flex-col items-center justify-center h-full py-12 text-center px-6">
                               <ShieldAlert className="w-10 h-10 text-red-400 mb-3" />
