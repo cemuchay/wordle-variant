@@ -1013,9 +1013,11 @@ export const generateOddOneOutQuestion = (
 // -------------------------------------------------------------
 
 const generateSynonymMatch = (): WordUpQuestion => {
-   const themeKeys = Object.keys(THEME_GROUPS);
+   const themeKeys = Object.keys(THEME_GROUPS).filter(
+      (k) => THEME_GROUPS[k].length <= 6,
+   );
 
-   // Pick a theme with at least 2 words
+   // Pick a tight theme where any two words feel intuitively related
    let theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
    let words = THEME_GROUPS[theme];
    let attempts = 0;
