@@ -1,9 +1,7 @@
 import { createSeededRandom, seededShuffle, smartFakeAnswers } from "./utils.ts";
 
-export function generateMathsQuestion(seed: string, entity: any, allEntities: any[], rng: () => number, variant: number): any {
-   // Decide if we should do a procedural calculation or use the database entity (if present)
-   // We prefer a mix: 50% chance of procedural equation/geometry, 50% chance of DB facts (if available)
-   const useDB = entity && (rng() > 0.5);
+export function generateMathsQuestion(seed: string, entity: any, allEntities: any[], rng: () => number, variant: number, proceduralWeight: number = 0.5): any {
+   const useDB = entity && (rng() > proceduralWeight);
 
    if (!useDB || !entity) {
       // Procedural calculation categories

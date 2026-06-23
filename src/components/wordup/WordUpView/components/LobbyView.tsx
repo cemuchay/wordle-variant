@@ -455,9 +455,9 @@ export const LobbyView = ({
          initial={{ opacity: 0, y: 15 }}
          animate={{ opacity: 1, y: 0 }}
          exit={{ opacity: 0, y: -15 }}
-         className="flex flex-col gap-6 flex-1 justify-center py-6"
+         className="flex flex-col gap-4 md:gap-6 flex-1 justify-center py-4 md:py-6"
       >
-         <div className="space-y-2 relative text-center">
+         <div className="space-y-1 relative text-center">
             <div className="flex items-center justify-between gap-4 px-2 shrink-0">
                {/* Left side Back button */}
                <div className="flex items-center gap-2 w-[84px] justify-start">
@@ -471,11 +471,6 @@ export const LobbyView = ({
                         <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">Back</span>
                      </button>
                   )}
-               </div>
-
-               {/* Center Swords Icon */}
-               <div className="inline-flex p-5 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
-                  <Swords size={48} />
                </div>
 
                {/* Right side Sound & Reset controls */}

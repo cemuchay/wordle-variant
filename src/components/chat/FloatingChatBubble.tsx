@@ -61,6 +61,30 @@ export default function FloatingChatBubble() {
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
 
+   // Recent conversations (persisted) so the bubble never shows empty
+   const [recentGroupIds, setRecentGroupIds] = useState<string[]>(() => {
+      try {
+         const saved = safeLocalStorage.getItem('floating_bubble_recents');
+         if (saved) return JSON.parse(saved) as string[];
+      } catch { /* empty */ }
+      return [];
+   });
+   const addToRecents = (groupId: string) => {
+      setRecentGroupIds((prev) => {
+         const next = [groupId, ...prev.filter(id => id !== groupId)].slice(0, 10);
+         safeLocalStorage.setItem('floating_bubble_recents', JSON.stringify(next));
+         return next;
+      });
+   };
+   // Reload recents from storage when overlay opens
+   useEffect(() => {
+      if (!isOverlayOpen) return;
+      try {
+         const saved = safeLocalStorage.getItem('floating_bubble_recents');
+         if (saved) setRecentGroupIds(JSON.parse(saved) as string[]);
+      } catch { /* empty */ }
+   }, [isOverlayOpen]);
+
    const constraintsRef = useRef<HTMLDivElement>(null);
    const scrollRef = useRef<HTMLDivElement>(null);
    const fileInputRef = useRef<HTMLInputElement>(null);
@@ -252,73 +276,75 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-         setReplyText("");
-         startInactivityTimer();
-      } catch (err) {
-         console.error("Failed to send voice note:", err);
-         useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
-      } finally {
-         setIsSending(false);
-      }
-   };
+          setReplyText("");
+          addToRecents(selectedGroupId);
+          startInactivityTimer();
+       } catch (err) {
+          console.error("Failed to send voice note:", err);
+          useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+       } finally {
+          setIsSending(false);
+       }
+    };
 
-   const handleSendImage = async (file: File) => {
-      if (!user?.id || !selectedGroupId) return;
-      setIsSending(true);
-      try {
-         const { compressImage } = await import("../../hooks/useChat");
-         const compressedBlob = await compressImage(file);
-         // eslint-disable-next-line react-hooks/purity
-         const fileName = `${user.id}/${Date.now()}.jpg`;
+    const handleSendImage = async (file: File) => {
+       if (!user?.id || !selectedGroupId) return;
+       setIsSending(true);
+       try {
+          const { compressImage } = await import("../../hooks/useChat");
+          const compressedBlob = await compressImage(file);
+          // eslint-disable-next-line react-hooks/purity
+          const fileName = `${user.id}/${Date.now()}.jpg`;
 
-         // 1. Upload to storage
-         const { error: uploadErr } = await supabase.storage
-            .from("chat-images")
-            .upload(fileName, compressedBlob, {
-               contentType: "image/jpeg",
-               cacheControl: "3600",
-            });
+          // 1. Upload to storage
+          const { error: uploadErr } = await supabase.storage
+             .from("chat-images")
+             .upload(fileName, compressedBlob, {
+                contentType: "image/jpeg",
+                cacheControl: "3600",
+             });
 
-         if (uploadErr) throw uploadErr;
+          if (uploadErr) throw uploadErr;
 
-         const {
-            data: { publicUrl },
-         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
+          const {
+             data: { publicUrl },
+          } = supabase.storage.from("chat-images").getPublicUrl(fileName);
 
-         // 2. Persist to database
-         const messagePayload = {
-            id: crypto.randomUUID(),
-            content: "[Image]",
-            user_id: user.id,
-            is_read: false,
-            image_url: publicUrl,
-            group_id: selectedGroupId,
-         };
+          // 2. Persist to database
+          const messagePayload = {
+             id: crypto.randomUUID(),
+             content: "[Image]",
+             user_id: user.id,
+             is_read: false,
+             image_url: publicUrl,
+             group_id: selectedGroupId,
+          };
 
-         const { error } = await supabase.from("messages").insert([messagePayload]);
-         if (error) throw error;
+          const { error } = await supabase.from("messages").insert([messagePayload]);
+          if (error) throw error;
 
-         // Mark group as read immediately
-         const timestamp = new Date().toISOString();
-         updateReadReceipt(selectedGroupId, timestamp);
-         await supabase.from("chat_read_receipts").upsert(
-            {
-               user_id: user.id,
-               group_id: selectedGroupId,
-               last_seen_at: timestamp,
-            },
-            { onConflict: "user_id,group_id" }
-         );
+          // Mark group as read immediately
+          const timestamp = new Date().toISOString();
+          updateReadReceipt(selectedGroupId, timestamp);
+          await supabase.from("chat_read_receipts").upsert(
+             {
+                user_id: user.id,
+                group_id: selectedGroupId,
+                last_seen_at: timestamp,
+             },
+             { onConflict: "user_id,group_id" }
+          );
 
-         setReplyText("");
-         startInactivityTimer();
-      } catch (err) {
-         console.error("Failed to send image:", err);
-         useAppStore.getState().triggerToast("Failed to send image.", 4000);
-      } finally {
-         setIsSending(false);
-      }
-   };
+          setReplyText("");
+          addToRecents(selectedGroupId);
+          startInactivityTimer();
+       } catch (err) {
+          console.error("Failed to send image:", err);
+          useAppStore.getState().triggerToast("Failed to send image.", 4000);
+       } finally {
+          setIsSending(false);
+       }
+    };
 
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
@@ -326,6 +352,41 @@ export default function FloatingChatBubble() {
    const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
    const setPreviewImage = useAppStore((s) => s.setPreviewImage);
    const { user } = useAuth();
+
+   // Profiles cache for reactor names
+   const profilesCacheRef = useRef<Record<string, string>>({});
+   useEffect(() => {
+      const map: Record<string, string> = {};
+      globalMessages.forEach((m: any) => {
+         if (m.profiles?.username && m.user_id) {
+            map[m.user_id] = m.profiles.username;
+         }
+      });
+      const missing = new Set<string>();
+      globalMessages.forEach((m: any) => {
+         if (m.reactions) {
+            Object.keys(m.reactions).forEach((uid) => {
+               if (!map[uid] && uid !== user?.id) missing.add(uid);
+            });
+         }
+      });
+      if (missing.size > 0) {
+         supabase
+            .from("profiles")
+            .select("id, username")
+            .in("id", Array.from(missing))
+            .then(({ data }) => {
+               if (data) data.forEach((p: any) => { map[p.id] = p.username; });
+               profilesCacheRef.current = map;
+            });
+      } else {
+         profilesCacheRef.current = map;
+      }
+   }, [globalMessages, user?.id]);
+   const getUserName = (uid: string) => {
+      if (uid === user?.id) return 'You';
+      return profilesCacheRef.current[uid] || uid;
+   };
 
    // Core group constant names
    const CORE_GROUPS: Record<string, string> = {
@@ -583,15 +644,16 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-         setReplyText("");
-         setReplyingToMsg(null);
-         startInactivityTimer();
-      } catch (err) {
-         console.error("Failed to send reply:", err);
-      } finally {
-         setIsSending(false);
-      }
-   };
+          setReplyText("");
+          setReplyingToMsg(null);
+          addToRecents(selectedGroupId);
+          startInactivityTimer();
+       } catch (err) {
+          console.error("Failed to send reply:", err);
+       } finally {
+          setIsSending(false);
+       }
+    };
 
    // Edit Message
    const handleEditSave = async (messageId: string) => {
@@ -948,57 +1010,90 @@ export default function FloatingChatBubble() {
                      {/* Content List */}
                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
                         {!selectedGroupId ? (
-                           /* Screen A: Conversation List */
-                           Object.keys(groupedUnread).length === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full py-12">
-                                 <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
-                                 <p className="text-xs text-gray-500">No unread messages</p>
-                              </div>
-                           ) : (
-                              <div className="space-y-1">
-                                 {Object.entries(groupedUnread).map(([groupId, msgs]) => {
-                                    const groupObj = groups.find(g => g.id === groupId);
-                                    const name = groupObj?.name || CORE_GROUPS[groupId] || msgs[0]?.profiles?.username || "Room";
-                                    const avatar = groupObj?.dm_partner?.avatar_url || msgs[0]?.profiles?.avatar_url || "/default-avatar.png";
-                                    const latestMsg = msgs[msgs.length - 1];
+                            /* Screen A: Conversation List */
+                            <div className="space-y-1">
+                               {Object.entries(groupedUnread).length > 0 && (
+                                  <>
+                                     {Object.entries(groupedUnread).map(([groupId, msgs]) => {
+                                        const groupObj = groups.find(g => g.id === groupId);
+                                        const name = groupObj?.name || CORE_GROUPS[groupId] || msgs[0]?.profiles?.username || "Room";
+                                        const avatar = groupObj?.dm_partner?.avatar_url || msgs[0]?.profiles?.avatar_url || "/default-avatar.png";
+                                        const latestMsg = msgs[msgs.length - 1];
 
-                                    return (
-                                       <button
-                                          key={groupId}
-                                          onClick={() => setSelectedGroupId(groupId)}
-                                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                       >
-                                          <img
-                                             src={avatar}
-                                             alt={name}
-                                             className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                          />
-                                          <div className="min-w-0 flex-1">
-                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                   {name}
-                                                </span>
-                                                <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
-                                                   {msgs.length} unread
-                                                </span>
-                                             </div>
-                                             <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}
-                                                {latestMsg.voice_url ? (
-                                                   <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
-                                                ) : latestMsg.image_url ? (
-                                                   <span className="text-indigo-400 font-semibold">📷 Image</span>
-                                                ) : (
-                                                   getDecryptedContent(latestMsg)
-                                                )}
-                                             </p>
-                                          </div>
-                                       </button>
-                                    );
-                                 })}
-                              </div>
-                           )
-                        ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
+                                        return (
+                                           <button
+                                              key={groupId}
+                                              onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
+                                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                           >
+                                              <img
+                                                 src={avatar}
+                                                 alt={name}
+                                                 className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
+                                              />
+                                              <div className="min-w-0 flex-1">
+                                                 <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                       {name}
+                                                    </span>
+                                                    <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                                       {msgs.length} unread
+                                                    </span>
+                                                 </div>
+                                                 <p className="text-[11px] text-gray-400 truncate mt-1">
+                                                    {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}
+                                                    {latestMsg.voice_url ? (
+                                                       <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
+                                                    ) : latestMsg.image_url ? (
+                                                       <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                    ) : (
+                                                       getDecryptedContent(latestMsg)
+                                                    )}
+                                                 </p>
+                                              </div>
+                                           </button>
+                                        );
+                                     })}
+                                     <div className="h-px bg-white/5 my-2" />
+                                  </>
+                               )}
+                               {/* Recent conversations (read or unread) */}
+                               {(() => {
+                                  const recentConvos = recentGroupIds.filter(id => !groupedUnread[id]);
+                                  if (recentConvos.length === 0 && Object.keys(groupedUnread).length === 0) {
+                                     return (
+                                        <div className="flex flex-col items-center justify-center h-full py-12">
+                                           <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
+                                           <p className="text-xs text-gray-500">No conversations yet</p>
+                                        </div>
+                                     );
+                                  }
+                                  return recentConvos.map((groupId) => {
+                                     const groupObj = groups.find(g => g.id === groupId);
+                                     const name = groupObj?.name || CORE_GROUPS[groupId] || "Room";
+                                     const avatar = groupObj?.dm_partner?.avatar_url || "/default-avatar.png";
+                                     return (
+                                        <button
+                                           key={groupId}
+                                           onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
+                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                        >
+                                           <img
+                                              src={avatar}
+                                              alt={name}
+                                              className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
+                                           />
+                                           <div className="min-w-0 flex-1">
+                                              <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                 {name}
+                                              </span>
+                                           </div>
+                                        </button>
+                                     );
+                                  });
+                               })()}
+                             </div>
+                          ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
                            /* Locked Game Analysis placeholder */
                            <div className="flex flex-col items-center justify-center h-full py-12 text-center px-6">
                               <ShieldAlert className="w-10 h-10 text-red-400 mb-3" />
@@ -1083,8 +1178,8 @@ export default function FloatingChatBubble() {
                                                    <div className="flex flex-col gap-1.5">
                                                       {Object.entries(msg.reactions).map(([uid, emoji]) => (
                                                          <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                                            <span className="text-[10px] font-black text-white truncate">
-                                                               {uid === user?.id ? 'You' : uid}
+                                                             <span className="text-[10px] font-black text-white truncate">
+                                                                {getUserName(uid)}
                                                             </span>
                                                             <span className="text-[12px] shrink-0">{emoji as string}</span>
                                                          </div>
@@ -1144,9 +1239,22 @@ export default function FloatingChatBubble() {
                                                          <X className="w-3.5 h-3.5" />
                                                       </button>
                                                    </div>
-                                                ) : (
-                                                   <div className="relative group/msg pb-2 sm:pb-4">
-                                                      {msg.voice_url ? (
+                                                 ) : (
+                                                    <div className="relative group/msg pb-2 sm:pb-4">
+                                                       {/* Reply preview */}
+                                                       {msg.reply_to && !msg.is_deleted && (() => {
+                                                          const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
+                                                          if (!replyToMsg) return null;
+                                                          return (
+                                                             <div className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] ${isMe ? 'flex-row-reverse ml-auto' : ''}`}>
+                                                                <Reply size={10} className="text-correct shrink-0" />
+                                                                <span className="truncate text-gray-400">
+                                                                   {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                                </span>
+                                                             </div>
+                                                          );
+                                                       })()}
+                                                       {msg.voice_url ? (
                                                          <AudioPlayer url={msg.voice_url} />
                                                       ) : msg.image_url ? (
                                                          <div

@@ -205,16 +205,14 @@ export const CategorySelectModal = ({
       const style = CATEGORY_STYLE_MAP[catId] || DEFAULT_STYLE;
       if (isSel) {
          return {
-            btnClass: `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow} shadow-md`,
+            btnClass: `bg-linear-to-br ${style.gradient} ${style.border} ${style.glow} shadow-md ring-1 ring-white/10`,
             emojiContainerClass: `bg-white/10 border ${style.border.split(" ")[0]}`,
-            dotClass: catId === "mixed" ? "bg-emerald-400 animate-pulse" : "bg-cyan-400 animate-pulse"
          };
       } else {
          const borderCol = style.border.split(" ")[0].replace("/50", "/20");
          return {
-            btnClass: `bg-slate-950/45 ${borderCol} border text-gray-300 hover:bg-slate-900/60 hover:border-white/20`,
+            btnClass: `bg-slate-950/45 ${borderCol} border text-gray-300 hover:bg-slate-900/60 hover:border-white/30`,
             emojiContainerClass: `bg-white/5 border ${borderCol}`,
-            dotClass: "bg-gray-600"
          };
       }
    };
@@ -275,8 +273,8 @@ export const CategorySelectModal = ({
                </button>
             </div>
 
-            {/* Search Box */}
-            <div className="p-4 border-b border-white/5 bg-slate-950/45 flex items-center gap-2">
+            {/* Search Box — always visible */}
+            <div className="p-4 border-b border-white/5 bg-slate-950/45 flex items-center gap-2 shrink-0">
                <Search size={16} className="text-gray-500 shrink-0 ml-1" />
                <input
                   type="text"
@@ -322,70 +320,58 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
-               {/* Editor's Picks */}
+               {/* Editor's Picks — vertical list */}
                {featuredCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1">Editor's Picks</p>
-                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                     <div className="flex flex-col gap-2">
                         {featuredCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            const visual = getCategoryStyles(cat.id, isSel);
                            return (
-                              <motion.button
+                              <button
                                  key={cat.id}
-                                 whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer shrink-0 w-40 ${visual.btnClass}`}
+                                 className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
                               >
-                                 <div className="flex items-center gap-2.5 w-full">
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
-                                       {style.emoji}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                       <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
-                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                       </div>
-                                    </div>
+                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${visual.emojiContainerClass}`}>
+                                    {style.emoji}
                                  </div>
-                                 <p className="text-[8px] text-gray-500 mt-1.5 line-clamp-2 leading-tight text-left">{cat.desc}</p>
-                              </motion.button>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">{cat.desc}</p>
+                                 </div>
+                              </button>
                            );
                         })}
                      </div>
                   </div>
                )}
 
-               {/* All Categories (alphabetical) */}
+               {/* All Categories (alphabetical) — single column */}
                {regularCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">All Categories</p>
-                     <div className="grid grid-cols-2 gap-2">
+                     <div className="flex flex-col gap-2">
                         {regularCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                            const visual = getCategoryStyles(cat.id, isSel);
                            return (
-                              <motion.button
+                              <button
                                  key={cat.id}
-                                 whileHover={{ scale: 1.03 }}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer ${visual.btnClass}`}
+                                 className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
                               >
-                                 <div className="flex items-center gap-2.5 w-full">
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
-                                       {style.emoji}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                       <div className="flex items-center gap-1.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
-                                          <p className="text-[10px] font-bold uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                       </div>
-                                       <p className="text-[8px] text-gray-500 mt-0.5 line-clamp-2 leading-tight">{cat.desc}</p>
-                                    </div>
+                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${visual.emojiContainerClass}`}>
+                                    {style.emoji}
                                  </div>
-                              </motion.button>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">{cat.desc}</p>
+                                 </div>
+                              </button>
                            );
                         })}
                      </div>

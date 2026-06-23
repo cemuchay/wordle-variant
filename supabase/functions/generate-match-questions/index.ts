@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
-import { ALGORITHMIC_CATEGORIES, CATEGORY_SUPER_MAP } from "./types.ts";
+import { CATEGORY_SUPER_MAP } from "./types.ts";
+import { getQuestionConfig } from "./questionConfig.ts";
 import { createSeededRandom, seededShuffle, hashSeed, isNumeric, getNumericDistractors } from "./utils.ts";
 import { formatQuestionPrompt } from "./promptFormatter.ts";
 import { generateMathsQuestion } from "./maths.ts";
@@ -37,9 +38,30 @@ const corsHeaders = {
 // ── Generic entity-based question generator ──────────────────
 
 const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id", "image"]);
+const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
-function generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string): any {
-   const qObj = _generateQuestion(seed, entity, allEntities, variantOverride, category);
+function pickVariants(weights: number[], rng: () => number, count: number): number[] {
+   const total = weights.reduce((a, b) => a + b, 0);
+   return Array.from({ length: count }, () => {
+      let roll = rng() * total;
+      for (let v = 0; v < weights.length; v++) {
+         roll -= weights[v];
+         if (roll <= 0) return v;
+      }
+      return weights.length - 1;
+   });
+}
+
+function buildVariantTryOrder(assignedVariant: number, weights: number[]): number[] {
+   const others = weights
+      .map((w, i) => ({ variant: i, weight: w }))
+      .filter((item) => item.variant !== assignedVariant)
+      .sort((a, b) => b.weight - a.weight);
+   return [assignedVariant, ...others.map((o) => o.variant)];
+}
+
+function generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
+   const qObj = _generateQuestion(seed, entity, allEntities, variantOverride, category, variantWeights);
    const meta = entity?.metadata || {};
    if (meta.image) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -48,7 +70,7 @@ function generateQuestion(seed: string, entity: any, allEntities: any[], variant
    return qObj;
 }
 
-function _generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string): any {
+function _generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
@@ -112,7 +134,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          .map((e) => String(e.metadata?.[chosenKey] ?? ""))
          .filter((v) => v && v !== correctValue);
       const uniqueOtherValues = [...new Set(otherValues)];
-      
+
       const peerDistractors = seededShuffle(uniqueOtherValues, rng);
       for (const dist of peerDistractors) {
          if (!distractors.includes(dist)) {
@@ -144,140 +166,240 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       .filter((l) => l);
 
    const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
-   const variant = variantOverride !== undefined ? variantOverride : Math.floor(rng() * 6); // 0-5
+   const weights = variantWeights ?? DEFAULT_WEIGHTS;
+   const assignedVariant = variantOverride !== undefined ? variantOverride : Math.floor(rng() * weights.length);
+   const tryOrder = buildVariantTryOrder(assignedVariant, weights);
 
-   // ── Variant 0: Forward ──────────────────────────────────
-   if (variant === 0 || distractors.length < 1) {
-      const q = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
-      return {
-         type: "definition",
-         prompt: q.prompt,
-         choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
-         answer: correctValue,
-      };
-   }
+   for (const v of tryOrder) {
+      let q: any = null;
 
-   // ── Variant 1: Reverse ──────────────────────────────────
-   if (variant === 1 && entitiesWithDifferentValue.length >= 3) {
-      const q = formatQuestionPrompt(1, label, chosenKey, correctValue, "", categoryType);
-      return {
-         type: "definition",
-         prompt: q.prompt,
-         choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
-         answer: label,
-      };
-   }
-
-   // ── Variant 2: Odd one out ─────────────────────────────
-   if (variant === 2 && distractors.length >= 1) {
-      const valueCounts = new Map<string, { count: number; labels: string[] }>();
-      for (const e of allEntities) {
-         if (e.id === entity?.id) continue;
-         const v = String(e.metadata?.[chosenKey] ?? "");
-         if (!v) continue;
-         if (!valueCounts.has(v)) valueCounts.set(v, { count: 0, labels: [] });
-         const entry = valueCounts.get(v)!;
-         entry.count++;
-         entry.labels.push(e.label);
-      }
-      const shared = Array.from(valueCounts.entries())
-         .filter(([v, info]) => v !== correctValue && info.count >= 3 && info.labels.length >= 3)
-         .sort(() => rng() - 0.5);
-      if (shared.length > 0) {
-         const [sharedValue, info] = shared[0];
-         return {
+      // ── Variant 0: Forward ──────────────────────────────────
+      if (v === 0 || distractors.length < 1) {
+         const prompt = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
+         q = {
             type: "definition",
-            prompt: `Which of these options does not share the same ${keyLabel} as the others?`,
-            choices: seededShuffle([...new Set([...seededShuffle(info.labels, rng).slice(0, 3), label])].slice(0, 4), rng),
-            answer: label,
-            subPrompt: `The others have the ${keyLabel} "${sharedValue}".`,
-         };
-      }
-   }
-
-   // ── Variant 3: True/False ─────────────────────────────
-   if (variant === 3 && distractors.length >= 1) {
-      const isTrue = Math.floor(rng() * 2) === 0;
-      const displayedValue = isTrue ? correctValue : distractors[0];
-      const q = formatQuestionPrompt(3, label, chosenKey, correctValue, displayedValue, categoryType);
-      return {
-         type: "definition",
-         prompt: q.prompt,
-         choices: ["True", "False"],
-         answer: isTrue ? "True" : "False",
-      };
-   }
-
-   // ── Variant 4: Multi-clue (What am I?) ────────────────
-   if (variant === 4 && metaKeys.length >= 2 && entitiesWithDifferentValue.length >= 3) {
-      const clueKeys = seededShuffle(metaKeys, rng).slice(0, Math.min(3, metaKeys.length));
-      const clueParts: string[] = [];
-      const usedKeys = new Set<string>();
-      
-      // Combine country and continent if both present
-      if (clueKeys.includes("country") && clueKeys.includes("continent")) {
-         const countryVal = meta["country"];
-         const continentVal = meta["continent"];
-         clueParts.push(`Located in ${countryVal} (${continentVal})`);
-         usedKeys.add("country");
-         usedKeys.add("continent");
-      }
-
-      clueKeys.forEach((key: string) => {
-         if (usedKeys.has(key)) return;
-         const v = String(meta[key] ?? "");
-         const keyLabel = key.replace(/_/g, " ").trim();
-         const capitalizedLabel = keyLabel.charAt(0).toUpperCase() + keyLabel.slice(1);
-         const k = key.toLowerCase();
-         const isTime = k.includes("year") || k.includes("date") || k.includes("founded") || k.includes("released") || k.includes("created") || k.includes("acquired");
-         
-         let verb = "done";
-         if (k.includes("founded")) verb = "founded";
-         else if (k.includes("established")) verb = "established";
-         else if (k.includes("released")) verb = "released";
-         else if (k.includes("published")) verb = "published";
-         else if (k.includes("created")) verb = "created";
-         else if (k.includes("acquired")) verb = "acquired";
-         else if (k.includes("born")) verb = "born";
-         else if (k.includes("died")) verb = "died";
-
-         if (isTime && verb !== "done") {
-            clueParts.push(`${verb.toUpperCase()} IN: ${v}`);
-         } else {
-            clueParts.push(`${capitalizedLabel}: ${v}`);
-         }
-      });
-      
-      const cluesStr = clueParts.map((p) => `• ${p}`).join("\n");
-      const isWordMatch = categoryType.includes("english") || categoryType.includes("language") || categoryType.includes("vocab");
-      const intro = isWordMatch 
-         ? "Find the word that fits these clues:" 
-         : "Identify the match that fits these clues:";
-
-      return {
-         type: "definition",
-         prompt: `${intro}\n${cluesStr}`,
-         choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
-         answer: label,
-      };
-   }
-
-   // ── Variant 5: Correct the error ──────────────────────
-   if (variant === 5 && distractors.length >= 1) {
-      const wrongValue = distractors[0];
-      const otherDistractors = distractors.filter((d) => d !== wrongValue);
-      if (otherDistractors.length >= 3) {
-         const q = formatQuestionPrompt(5, label, chosenKey, correctValue, wrongValue, categoryType);
-         return {
-            type: "definition",
-            prompt: q.prompt,
-            choices: seededShuffle([...new Set([correctValue, ...otherDistractors])].slice(0, 4), rng),
+            prompt: prompt.prompt,
+            choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
             answer: correctValue,
          };
+         return q;
+      }
+
+      // ── Variant 1: Reverse ──────────────────────────────────
+      if (v === 1 && entitiesWithDifferentValue.length >= 3) {
+         const prompt = formatQuestionPrompt(1, label, chosenKey, correctValue, "", categoryType);
+         q = {
+            type: "definition",
+            prompt: prompt.prompt,
+            choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
+            answer: label,
+         };
+         return q;
+      }
+
+      // ── Variant 2: Odd one out ─────────────────────────────
+      if (v === 2 && distractors.length >= 1) {
+         const valueCounts = new Map<string, { count: number; labels: string[] }>();
+         for (const e of allEntities) {
+            if (e.id === entity?.id) continue;
+            const val = String(e.metadata?.[chosenKey] ?? "");
+            if (!val) continue;
+            if (!valueCounts.has(val)) valueCounts.set(val, { count: 0, labels: [] });
+            const entry = valueCounts.get(val)!;
+            entry.count++;
+            entry.labels.push(e.label);
+         }
+         const shared = Array.from(valueCounts.entries())
+            .filter(([val, info]) => val !== correctValue && info.count >= 3 && info.labels.length >= 3)
+            .sort(() => rng() - 0.5);
+         if (shared.length > 0) {
+            const [sharedValue, info] = shared[0];
+            q = {
+               type: "definition",
+               prompt: `Which of these options does not share the same ${keyLabel} as the others?`,
+               choices: seededShuffle([...new Set([...seededShuffle(info.labels, rng).slice(0, 3), label])].slice(0, 4), rng),
+               answer: label,
+               subPrompt: `The others have the ${keyLabel} "${sharedValue}".`,
+            };
+            return q;
+         }
+      }
+
+      // ── Variant 3: True/False ─────────────────────────────
+      if (v === 3 && distractors.length >= 1) {
+         const isTrue = Math.floor(rng() * 2) === 0;
+         const displayedValue = isTrue ? correctValue : distractors[0];
+         const prompt = formatQuestionPrompt(3, label, chosenKey, correctValue, displayedValue, categoryType);
+         q = {
+            type: "definition",
+            prompt: prompt.prompt,
+            choices: ["True", "False"],
+            answer: isTrue ? "True" : "False",
+         };
+         return q;
+      }
+
+      // ── Variant 4: Multi-clue (What am I?) ────────────────
+      if (v === 4 && metaKeys.length >= 2 && entitiesWithDifferentValue.length >= 3) {
+         const clueKeys = seededShuffle(metaKeys, rng).slice(0, Math.min(3, metaKeys.length));
+         const clueParts: string[] = [];
+         const usedKeys = new Set<string>();
+
+         // Combine country and continent if both present
+         if (clueKeys.includes("country") && clueKeys.includes("continent")) {
+            const countryVal = meta["country"];
+            const continentVal = meta["continent"];
+            clueParts.push(`Located in ${countryVal} (${continentVal})`);
+            usedKeys.add("country");
+            usedKeys.add("continent");
+         }
+
+         clueKeys.forEach((key: string) => {
+            if (usedKeys.has(key)) return;
+            const v = String(meta[key] ?? "");
+            const kLabel = key.replace(/_/g, " ").trim();
+            const capitalizedLabel = kLabel.charAt(0).toUpperCase() + kLabel.slice(1);
+            const k = key.toLowerCase();
+            const isTime = k.includes("year") || k.includes("date") || k.includes("founded") || k.includes("released") || k.includes("created") || k.includes("acquired");
+
+            let verb = "done";
+            if (k.includes("founded")) verb = "founded";
+            else if (k.includes("established")) verb = "established";
+            else if (k.includes("released")) verb = "released";
+            else if (k.includes("published")) verb = "published";
+            else if (k.includes("created")) verb = "created";
+            else if (k.includes("acquired")) verb = "acquired";
+            else if (k.includes("born")) verb = "born";
+            else if (k.includes("died")) verb = "died";
+
+            if (isTime && verb !== "done") {
+               clueParts.push(`${verb.toUpperCase()} IN: ${v}`);
+            } else {
+               clueParts.push(`${capitalizedLabel}: ${v}`);
+            }
+         });
+
+         const cluesStr = clueParts.map((p) => `• ${p}`).join("\n");
+         const isWordMatch = categoryType.includes("english") || categoryType.includes("language") || categoryType.includes("vocab");
+         const intro = isWordMatch
+            ? "Find the word that fits these clues:"
+            : "Identify the match that fits these clues:";
+
+         q = {
+            type: "definition",
+            prompt: `${intro}\n${cluesStr}`,
+            choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
+            answer: label,
+         };
+         return q;
+      }
+
+      // ── Variant 5: Correct the error ──────────────────────
+      if (v === 5 && distractors.length >= 1) {
+         const wrongValue = distractors[0];
+         const otherDistractors = distractors.filter((d) => d !== wrongValue);
+         if (otherDistractors.length >= 3) {
+            const prompt = formatQuestionPrompt(5, label, chosenKey, correctValue, wrongValue, categoryType);
+            q = {
+               type: "definition",
+               prompt: prompt.prompt,
+               choices: seededShuffle([...new Set([correctValue, ...otherDistractors])].slice(0, 4), rng),
+               answer: correctValue,
+            };
+            return q;
+         }
+      }
+
+      // ── Variant 6: Tag Match ─────────────────────────────
+      if (v === 6 && entity.tags?.length > 0) {
+         const allTags = [...new Set(allEntities.flatMap((e: any) => e.tags || []))];
+         const myTags: string[] = entity.tags;
+         const otherTags = allTags.filter((t: string) => !myTags.includes(t));
+         if (otherTags.length >= 3) {
+            const tagCounts = new Map<string, number>();
+            for (const e of allEntities) {
+               for (const t of (e.tags || [])) {
+                  tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+               }
+            }
+            const sortedTags = seededShuffle([...myTags], rng)
+               .sort((a, b) => (tagCounts.get(a) || 0) - (tagCounts.get(b) || 0));
+            const chosenTag = sortedTags[0];
+            const tagDistractors = seededShuffle(otherTags, rng).slice(0, 3);
+            q = {
+               type: "definition",
+               prompt: `Which category best fits "${label}"?`,
+               choices: seededShuffle([chosenTag, ...tagDistractors], rng),
+               answer: chosenTag,
+            };
+            return q;
+         }
+      }
+
+      // ── Variant 7: Compare (Numeric) ─────────────────────
+      if (v === 7 && isNum) {
+         const validPeers = allEntities.filter(
+            (e: any) => e.id !== entity.id && e.metadata?.[chosenKey] !== undefined &&
+               isNumeric(String(e.metadata[chosenKey]))
+         );
+         if (validPeers.length >= 1) {
+            const peer = seededShuffle(validPeers, rng)[0];
+            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const peerNum = parseFloat(sanitize(String(peer.metadata[chosenKey])));
+            const correctNum = parseFloat(sanitize(correctValue));
+            if (!isNaN(correctNum) && !isNaN(peerNum) && correctNum !== peerNum) {
+               const isHigher = rng() > 0.5;
+               const winner = isHigher
+                  ? (correctNum > peerNum ? label : peer.label)
+                  : (correctNum < peerNum ? label : peer.label);
+               q = {
+                  type: "definition",
+                  prompt: isHigher
+                     ? `Which has a higher ${keyLabel}: "${label}" or "${peer.label}"?`
+                     : `Which has a lower ${keyLabel}: "${label}" or "${peer.label}"?`,
+                  choices: seededShuffle([label, peer.label], rng),
+                  answer: winner,
+               };
+               return q;
+            }
+         }
+      }
+
+      // ── Variant 8: Timeline ──────────────────────────────
+      if (v === 8 && isNum) {
+         const k = chosenKey.toLowerCase();
+         const isTime = k.includes("year") || k.includes("date") || k.includes("founded") ||
+            k.includes("released") || k.includes("created") || k.includes("acquired");
+         if (isTime) {
+            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const candidates: { label: string; value: number }[] = [];
+            for (const e of allEntities) {
+               const raw = String(e.metadata?.[chosenKey] ?? "");
+               const num = parseFloat(sanitize(raw));
+               if (!isNaN(num)) {
+                  candidates.push({ label: e.label, value: num });
+               }
+            }
+            if (candidates.length >= 4) {
+               candidates.sort((a, b) => a.value - b.value);
+               const askEarliest = rng() > 0.5;
+               const answer = askEarliest ? candidates[0] : candidates[candidates.length - 1];
+               const timelineDistractors = seededShuffle(
+                  candidates.filter((c) => c.label !== answer.label), rng
+               ).slice(0, 3).map((c) => c.label);
+               q = {
+                  type: "definition",
+                  prompt: askEarliest
+                     ? `Which of these happened earliest (${keyLabel})?`
+                     : `Which of these happened most recently (${keyLabel})?`,
+                  choices: seededShuffle([answer.label, ...timelineDistractors], rng),
+                  answer: answer.label,
+               };
+               return q;
+            }
+         }
       }
    }
-
-   // Fallback: forward
    const fallbackQ = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
    return {
       type: "definition",
@@ -356,47 +478,38 @@ serve(async (req) => {
       }
 
       const matchRng = createSeededRandom(hashSeed(seed));
+      const config = getQuestionConfig(category);
 
-      // 6 variants (0-5), 7 rounds → each variant at least once, 7th is random
-      const baseVariants = [0, 1, 2, 3, 4, 5];
-      const shuffledVariants = seededShuffle(baseVariants, matchRng);
-      const extraVariant = Math.floor(matchRng() * 6);
-      const variantSequence = [...shuffledVariants, extraVariant];
+      // Weighted variant selection from config
+      const variantSequence = pickVariants(config.variantWeights, matchRng, 7);
 
-      // Prepare progression pools
+      // Random difficulty — single shuffled pool, no progression
       const shuffledEntities = seededShuffle(entityList, matchRng);
-      const easy = shuffledEntities.filter((e) => (e.difficulty ?? 3) <= 2);
-      const medium = shuffledEntities.filter((e) => (e.difficulty ?? 3) === 3);
-      const hard = shuffledEntities.filter((e) => (e.difficulty ?? 3) >= 4);
+      let entityCursor = 0;
 
       const chosenEntities: any[] = [];
       const usedIds = new Set<string>();
       const questions: any[] = [];
 
-      const getNextEntity = (preferredPool: any[], fallbackPools: any[][]): any => {
-         for (const e of preferredPool) {
+      const getNextEntity = (): any => {
+         if (shuffledEntities.length === 0) return null;
+         const attempts = shuffledEntities.length * 2;
+         for (let attempt = 0; attempt < attempts; attempt++) {
+            const e = shuffledEntities[entityCursor % shuffledEntities.length];
+            entityCursor++;
             if (!usedIds.has(e.id)) {
                usedIds.add(e.id);
                return e;
             }
          }
-         for (const pool of fallbackPools) {
-            for (const e of pool) {
-               if (!usedIds.has(e.id)) {
-                  usedIds.add(e.id);
-                  return e;
-               }
-            }
-         }
-         if (shuffledEntities.length > 0) {
-            const idx = chosenEntities.length % shuffledEntities.length;
-            return shuffledEntities[idx];
-         }
-         return null;
+         // if all used, cycle anyway
+         const e = shuffledEntities[entityCursor % shuffledEntities.length];
+         entityCursor++;
+         return e;
       };
 
       console.log(`${logPrefix} Variant sequence: [${variantSequence.join(", ")}]`);
-      console.log(`${logPrefix} Easy=${easy.length} Medium=${medium.length} Hard=${hard.length}`);
+      console.log(`${logPrefix} Config: proceduralWeight=${config.proceduralWeight} variantWeights=[${config.variantWeights.join(", ")}]`);
 
       for (let i = 0; i < 7; i++) {
          const roundSeed = `${seed}-${i}`;
@@ -407,74 +520,55 @@ serve(async (req) => {
 
          // Route by category: hybrid algorithmic logic takes precedence
          if (category === "maths") {
-            let entity = null;
-            if (entityList.length > 0) {
-               if (i < 2) entity = getNextEntity(easy, [medium, hard]);
-               else if (i < 5) entity = getNextEntity(medium, [hard, easy]);
-               else entity = getNextEntity(hard, [medium, easy]);
-               chosenEntities.push(entity);
-            }
+            const entity = entityList.length > 0 ? getNextEntity() : null;
+            chosenEntities.push(entity);
             console.log(`${logPrefix} Round ${i} [maths]: entity=${entity?.label ?? "null"}`);
-            const q = generateMathsQuestion(roundSeed, entity, entityList, roundRng, variant);
+            const q = generateMathsQuestion(roundSeed, entity, entityList, roundRng, variant, config.proceduralWeight);
             if (q) {
                console.log(`${logPrefix} Round ${i} [maths]: generated procedural question type=${q.type}`);
                questions.push(q);
                continue;
             }
-            // Fallback to standard entity question
             if (entity) {
                console.log(`${logPrefix} Round ${i} [maths]: falling back to entity question for ${entity.label}`);
-               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
+               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
                continue;
             }
             console.warn(`${logPrefix} Round ${i} [maths]: no question generated at all!`);
          }
 
          if (category === "english_language") {
-            let entity = null;
-            if (entityList.length > 0) {
-               if (i < 2) entity = getNextEntity(easy, [medium, hard]);
-               else if (i < 5) entity = getNextEntity(medium, [hard, easy]);
-               else entity = getNextEntity(hard, [medium, easy]);
-               chosenEntities.push(entity);
-            }
+            const entity = entityList.length > 0 ? getNextEntity() : null;
+            chosenEntities.push(entity);
             console.log(`${logPrefix} Round ${i} [english]: entity=${entity?.label ?? "null"}`);
-            const q = generateEnglishQuestion(roundSeed, entity, entityList, roundRng, variant);
+            const q = generateEnglishQuestion(roundSeed, entity, entityList, roundRng, variant, config.proceduralWeight);
             if (q) {
                console.log(`${logPrefix} Round ${i} [english]: generated procedural question type=${q.type}`);
                questions.push(q);
                continue;
             }
-            // Fallback to standard entity question
             if (entity) {
                console.log(`${logPrefix} Round ${i} [english]: falling back to entity question for ${entity.label}`);
-               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
+               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
                continue;
             }
             console.warn(`${logPrefix} Round ${i} [english]: no question generated at all!`);
          }
 
-          // Standard entity-based procedural category logic
-          if (entityList.length === 0) {
-             console.log(`${logPrefix} Round ${i} [standard]: no entities — fallback to maths procedural`);
-             const q = generateMathsQuestion(roundSeed, null, [], roundRng, variant);
-             questions.push(q);
-          } else {
-             let entity = null;
-             if (i < 2) {
-                entity = getNextEntity(easy, [medium, hard]);
-             } else if (i < 5) {
-                entity = getNextEntity(medium, [hard, easy]);
-             } else {
-                entity = getNextEntity(hard, [medium, easy]);
-             }
-             chosenEntities.push(entity);
-             console.log(`${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`);
-             questions.push(generateQuestion(roundSeed, entity, entityList, variant, category));
-          }
+           // Standard entity-based procedural category logic
+           if (entityList.length === 0) {
+              console.log(`${logPrefix} Round ${i} [standard]: no entities — fallback to maths procedural`);
+              const q = generateMathsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+              questions.push(q);
+           } else {
+              const entity = getNextEntity();
+              chosenEntities.push(entity);
+              console.log(`${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`);
+              questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
+           }
 
-          console.log(`${logPrefix} Round ${i}: question generated successfully`);
-       }
+           console.log(`${logPrefix} Round ${i}: question generated successfully`);
+        }
 
        console.log(`${logPrefix} Generated ${questions.length} questions total`);
        console.log(`${logPrefix} Chosen entities:`, chosenEntities.filter(Boolean).map((e: any) => e.label));
@@ -523,13 +617,13 @@ serve(async (req) => {
                    p_entity_ids: validChosenEntityIds
                 });
 
-             if (historyError) {
-                console.error(`${logPrefix} Failed to record entity history:`, historyError);
-             } else {
-                console.log(`${logPrefix} Entity history recorded`);
-             }
-          }
-       }
+              if (historyError) {
+                 console.error(`${logPrefix} Failed to record entity history:`, historyError);
+              } else {
+                 console.log(`${logPrefix} Entity history recorded`);
+            }
+         }
+      }
 
        console.log(`${logPrefix} Returning success response`);
        return new Response(
