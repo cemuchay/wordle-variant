@@ -64,6 +64,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     // Sync conversation state to store so App.tsx can hide navigation
     useEffect(() => {
         setChatConversationOpen(!showSidebar);
+        return () => setChatConversationOpen(false);
     }, [showSidebar, setChatConversationOpen]);
 
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -483,7 +484,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92vh] max-h-[92vh]`}
+            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92dvh] max-h-[92dvh]`}
             style={{
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
             }}
