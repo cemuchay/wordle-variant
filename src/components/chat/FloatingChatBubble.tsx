@@ -1011,7 +1011,7 @@ export default function FloatingChatBubble() {
                       animate={{ opacity: 1, scale: 1, x: "-50%" }}
                       exit={{ opacity: 0, scale: 0.9, x: "-50%" }}
                       transition={{ type: "spring", duration: 0.3 }}
-                      className="fixed top-2 left-1/2 w-[92%] max-w-md h-[92vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                       className="fixed top-2 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
                   >
                      {/* Header */}
                      <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
@@ -1051,7 +1051,7 @@ export default function FloatingChatBubble() {
                      </div>
 
                       {/* Content List */}
-                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
+                       <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
                           {!selectedGroupId ? (
                              /* Screen A: Conversation List */
                              <div className="space-y-1">
