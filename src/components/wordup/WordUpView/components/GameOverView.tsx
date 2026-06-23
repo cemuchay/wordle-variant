@@ -6,7 +6,7 @@ import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor"
 
 interface GameOverViewProps {
    matchData: any;
-   setView: (view: "menu") => void;
+   setView: (view: "menu" | "matchmaking") => void;
    role: "player1" | "player2" | null;
    rematchState: "idle" | "sent" | "received" | "expired";
    rematchCountdown: number;
@@ -127,13 +127,21 @@ export const GameOverView = ({
             </div>
          )}
 
-         {/* Play Again / Lobby */}
-         <button
-            onClick={() => setView("menu")}
-            className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
-         >
-            Play Again
-         </button>
+          {/* Play Again / Lobby */}
+          <div className="grid grid-cols-2 gap-3">
+             <button
+                onClick={() => setView("matchmaking")}
+                className="bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
+             >
+                Play Again
+             </button>
+             <button
+                onClick={() => setView("menu")}
+                className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
+             >
+                Return to Lobby
+             </button>
+          </div>
 
          {/* Round Breakdown */}
          {questions && questions.length > 0 && (

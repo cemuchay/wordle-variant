@@ -952,7 +952,7 @@ export default function App() {
                         acceptChannel.send({
                           type: 'broadcast',
                           event: 'wordup_invite_accepted',
-                          payload: { matchId: newMatch.id }
+                          payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
                         }).then(() => {
                           // Update Zustand and navigate only after the broadcast has been sent
                           useWordUpStore.getState().setMatchId(newMatch.id);
@@ -1025,7 +1025,6 @@ export default function App() {
                 onClick={() => {
                   const matchId = opponentLaterInvite.matchId;
                   setOpponentLaterInvite(null);
-                  useWordUpStore.getState().setView("loading");
                   useWordUpStore.getState().setMatchId(matchId);
                   useWordUpStore.getState().setRole("player1");
                   handleNavigation("wordup");

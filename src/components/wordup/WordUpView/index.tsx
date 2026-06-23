@@ -588,13 +588,16 @@ export const WordUpView = () => {
             {view === "gameover" && (
                <GameOverView
                   matchData={matchData}
-                  setView={(newView) => {
-                     if (newView === "menu") {
-                        resetGame();
-                     } else {
-                        setView(newView);
-                     }
-                  }}
+               setView={(newView) => {
+                      if (newView === "menu") {
+                         resetGame();
+                       } else if (newView === "matchmaking") {
+                          cleanUpAll();
+                          resetGame();
+                          setView("connecting");
+                          startMatchmaking();
+                      }
+                   }}
                   role={role}
                   rematchState={rematchState}
                   rematchCountdown={rematchCountdown}
