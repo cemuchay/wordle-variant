@@ -14,6 +14,7 @@ import { ChatImage } from "./ChatMessage/ChatImage";
 import { VoiceControlBar } from "./VoiceControlBar";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
+import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
 
@@ -75,9 +76,10 @@ export default function FloatingChatBubble() {
    const timerRef = useRef<number | null>(null);
    const wavRecorderRef = useRef<any>(null);
 
-   // Reaction states
-   const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
-   const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
+    // Reaction states
+    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+    const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
+    const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
@@ -105,7 +107,7 @@ export default function FloatingChatBubble() {
        if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
        longPressTimeoutRef.current = setTimeout(() => {
           if (!hasDraggedRef.current && longPressMsgIdRef.current) {
-             setReactingMessageId(prev => prev === longPressMsgIdRef.current ? null : longPressMsgIdRef.current);
+             setReactingModalMessageId(prev => prev === longPressMsgIdRef.current ? null : longPressMsgIdRef.current);
              if (navigator.vibrate) navigator.vibrate(50);
           }
        }, 500);
@@ -718,10 +720,12 @@ export default function FloatingChatBubble() {
          } else {
             const textArea = document.createElement("textarea");
             textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-9999px";
-            textArea.style.top = "0";
-            textArea.style.opacity = "0";
+             textArea.style.position = "fixed";
+             textArea.style.top = "0";
+             textArea.style.left = "0";
+             textArea.style.width = "1px";
+             textArea.style.height = "1px";
+             textArea.style.opacity = "0";
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
@@ -1156,7 +1160,7 @@ export default function FloatingChatBubble() {
                                            onTouchEnd={handleTouchEnd}
                                            onTouchMove={handleTouchMove}
                                            onTouchCancel={handleTouchEnd}
-                                           className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
+                                            className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
                                        >
                                           {/* Unread divider */}
                                           {msg.id === visibleUnreadId && showUnreadLine && (
@@ -1508,7 +1512,28 @@ export default function FloatingChatBubble() {
             )}
          </AnimatePresence>
 
-         {/* Dismiss Zone overlay at the bottom center */}
+          {/* Reaction Modal (mobile long-press) */}
+          <AnimatePresence>
+             {reactingModalMessageId && (() => {
+                const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
+                if (!modalMsg) return null;
+                const isMe = modalMsg.user_id === user?.id;
+                const content = getDecryptedContent(modalMsg);
+                return (
+                   <ReactionModal
+                      isMe={isMe}
+                      onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
+                      currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
+                      onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
+                      onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
+                      onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                      onClose={() => setReactingModalMessageId(null)}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
+          {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>
             {isDragging && isVisible && (
                <motion.div
