@@ -12,6 +12,7 @@ import { useAppStore } from "../store/useAppStore";
 // Sub-components
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
+import { VoiceControlBar } from "./chat/VoiceControlBar";
 import MessageInput from "./chat/MessageInput";
 import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
@@ -63,6 +64,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
     // Sync conversation state to store so App.tsx can hide navigation
     useEffect(() => {
         setChatConversationOpen(!showSidebar);
+        return () => setChatConversationOpen(false);
     }, [showSidebar, setChatConversationOpen]);
 
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -482,7 +484,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
 
     return (
         <div
-            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92vh] max-h-[92vh]`}
+            className={`flex flex-col w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] relative h-[92dvh] max-h-[92dvh]`}
             style={{
                 fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
             }}
@@ -933,6 +935,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     onScroll={handleScroll}
                                     className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide z-10"
                                 >
+                                    <VoiceControlBar />
                                     <AnimatePresence initial={false}>
                                         {messages.map((msg: any) => {
                                             const isMe = msg.user_id === user.id;
@@ -996,6 +999,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         }}
                                                         dailyGuesses={dailyGuesses}
                                                         onResend={resendMessage}
+                                                        allMessageIds={messages.map((m: any) => m.id)}
+                                                        allMessages={messages}
                                                     />
                                                 </div>
                                             );

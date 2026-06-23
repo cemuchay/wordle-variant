@@ -2,14 +2,16 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
 import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
-import { AudioPlayer } from "./ChatMessage/AudioPlayer";
+import { ConnectedAudioPlayer } from "./ChatMessage/ConnectedAudioPlayer";
+import { ChatImage } from "./ChatMessage/ChatImage";
+import { VoiceControlBar } from "./VoiceControlBar";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
@@ -19,16 +21,15 @@ const CLOSE_DELAY = 10000;
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
-   const [dismissed, setDismissed] = useState(false);
-   const [isDragging, setIsDragging] = useState(false);
+    const [dismissed, setDismissed] = useState(false);
+    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
    const [isNearDismiss, setIsNearDismiss] = useState(false);
    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
    const overlayOpenedAtRef = useRef<number>(0);
    const prevOverlayOpenRef = useRef(false);
 
-   // Session activity: once true, bubble stays visible until dismissed by drag
-   const [hasSessionActivity, setHasSessionActivity] = useState(unreadCount > 0);
-   const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
 
    // Inactivity timer for auto-closing the overlay
    const inactivityTimerRef = useRef<number | null>(null);
@@ -61,29 +62,7 @@ export default function FloatingChatBubble() {
    const [groups, setGroups] = useState<any[]>([]);
    const [hasPlayedToday, setHasPlayedToday] = useState(false);
 
-   // Recent conversations (persisted) so the bubble never shows empty
-   const [recentGroupIds, setRecentGroupIds] = useState<string[]>(() => {
-      try {
-         const saved = safeLocalStorage.getItem('floating_bubble_recents');
-         if (saved) return JSON.parse(saved) as string[];
-      } catch { /* empty */ }
-      return [];
-   });
-   const addToRecents = (groupId: string) => {
-      setRecentGroupIds((prev) => {
-         const next = [groupId, ...prev.filter(id => id !== groupId)].slice(0, 10);
-         safeLocalStorage.setItem('floating_bubble_recents', JSON.stringify(next));
-         return next;
-      });
-   };
-   // Reload recents from storage when overlay opens
-   useEffect(() => {
-      if (!isOverlayOpen) return;
-      try {
-         const saved = safeLocalStorage.getItem('floating_bubble_recents');
-         if (saved) setRecentGroupIds(JSON.parse(saved) as string[]);
-      } catch { /* empty */ }
-   }, [isOverlayOpen]);
+
 
    const constraintsRef = useRef<HTMLDivElement>(null);
    const scrollRef = useRef<HTMLDivElement>(null);
@@ -276,11 +255,10 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-          setReplyText("");
-          addToRecents(selectedGroupId);
-          startInactivityTimer();
-       } catch (err) {
-          console.error("Failed to send voice note:", err);
+           setReplyText("");
+           startInactivityTimer();
+        } catch (err) {
+           console.error("Failed to send voice note:", err);
           useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
        } finally {
           setIsSending(false);
@@ -335,11 +313,10 @@ export default function FloatingChatBubble() {
              { onConflict: "user_id,group_id" }
           );
 
-          setReplyText("");
-          addToRecents(selectedGroupId);
-          startInactivityTimer();
-       } catch (err) {
-          console.error("Failed to send image:", err);
+           setReplyText("");
+           startInactivityTimer();
+        } catch (err) {
+           console.error("Failed to send image:", err);
           useAppStore.getState().triggerToast("Failed to send image.", 4000);
        } finally {
           setIsSending(false);
@@ -349,9 +326,8 @@ export default function FloatingChatBubble() {
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
-   const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
-   const setPreviewImage = useAppStore((s) => s.setPreviewImage);
-   const { user } = useAuth();
+    const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
+    const { user } = useAuth();
 
    // Profiles cache for reactor names
    const profilesCacheRef = useRef<Record<string, string>>({});
@@ -539,16 +515,15 @@ export default function FloatingChatBubble() {
       }
    }, [selectedGroupId, globalMessages]);
 
-   // Reset dismissal state on new unread message; track session activity
-   if (unreadCount !== prevUnreadCount) {
-      setPrevUnreadCount(unreadCount);
-      if (unreadCount > 0) setHasSessionActivity(true);
-      if (unreadCount > prevUnreadCount && dismissed) {
-         setDismissed(false);
-      }
-   }
+    // Re-show bubble on new unread after dismissal
+    if (unreadCount !== prevUnreadCount) {
+       setPrevUnreadCount(unreadCount);
+       if (unreadCount > prevUnreadCount && dismissed) {
+          setDismissed(false);
+       }
+    }
 
-   const isVisible = hasSessionActivity && !isChatOpen && !dismissed;
+    const isVisible = !isChatOpen && !dismissed;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -562,16 +537,45 @@ export default function FloatingChatBubble() {
       return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
    });
 
-   // Group unread messages by group_id
-   const groupedUnread = unreadMessages.reduce((acc: Record<string, typeof unreadMessages>, m) => {
-      if (!acc[m.group_id]) {
-         acc[m.group_id] = [];
-      }
-      acc[m.group_id].push(m);
-      return acc;
-   }, {});
 
-   // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
+
+    // Unified conversation list: all groups with messages, sorted by latest
+    const conversations = (() => {
+       const joinedSet = new Set(joinedGroupIds);
+       const groupMap = new Map<string, { group: any; lastMessage: any; unreadCount: number }>();
+       groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
+       globalMessages.forEach((m: any) => {
+          if (!user?.id) return;
+          if (!joinedSet.has(m.group_id)) return;
+          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+          const entry = groupMap.get(m.group_id);
+          if (!entry) return;
+          if (m.user_id !== user.id) {
+             const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+             if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+                entry.unreadCount++;
+             }
+          }
+          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
+             entry.lastMessage = m;
+          }
+       });
+       return Array.from(groupMap.values())
+          .filter(e => e.lastMessage)
+          .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
+    })();
+
+    // Filter conversations by search query
+    const filteredConversations = (() => {
+       if (!conversationSearchQuery.trim()) return conversations;
+       const q = conversationSearchQuery.toLowerCase();
+       return conversations.filter(({ group }) => {
+          const name = group?.name || CORE_GROUPS[group.id] || "";
+          return name.toLowerCase().includes(q);
+       });
+    })();
+
+    // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
    const getSmartInitials = (name: string) =>
       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
 
@@ -646,7 +650,6 @@ export default function FloatingChatBubble() {
 
           setReplyText("");
           setReplyingToMsg(null);
-          addToRecents(selectedGroupId);
           startInactivityTimer();
        } catch (err) {
           console.error("Failed to send reply:", err);
@@ -777,7 +780,6 @@ export default function FloatingChatBubble() {
 
       if (distance < 90) {
          setDismissed(true);
-         setHasSessionActivity(false);
          setIsOverlayOpen(false);
          setSelectedGroupId(null);
       }
@@ -1007,93 +1009,72 @@ export default function FloatingChatBubble() {
                         </div>
                      </div>
 
-                     {/* Content List */}
-                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
-                        {!selectedGroupId ? (
-                            /* Screen A: Conversation List */
-                            <div className="space-y-1">
-                               {Object.entries(groupedUnread).length > 0 && (
-                                  <>
-                                     {Object.entries(groupedUnread).map(([groupId, msgs]) => {
-                                        const groupObj = groups.find(g => g.id === groupId);
-                                        const name = groupObj?.name || CORE_GROUPS[groupId] || msgs[0]?.profiles?.username || "Room";
-                                        const avatar = groupObj?.dm_partner?.avatar_url || msgs[0]?.profiles?.avatar_url || "/default-avatar.png";
-                                        const latestMsg = msgs[msgs.length - 1];
-
-                                        return (
-                                           <button
-                                              key={groupId}
-                                              onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
-                                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                           >
-                                              <img
-                                                 src={avatar}
-                                                 alt={name}
-                                                 className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                              />
-                                              <div className="min-w-0 flex-1">
-                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                       {name}
-                                                    </span>
-                                                    <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
-                                                       {msgs.length} unread
-                                                    </span>
-                                                 </div>
-                                                 <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                    {latestMsg.profiles ? `${latestMsg.profiles.username}: ` : ""}
-                                                    {latestMsg.voice_url ? (
-                                                       <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
-                                                    ) : latestMsg.image_url ? (
-                                                       <span className="text-indigo-400 font-semibold">📷 Image</span>
-                                                    ) : (
-                                                       getDecryptedContent(latestMsg)
-                                                    )}
-                                                 </p>
-                                              </div>
-                                           </button>
-                                        );
-                                     })}
-                                     <div className="h-px bg-white/5 my-2" />
-                                  </>
-                               )}
-                               {/* Recent conversations (read or unread) */}
-                               {(() => {
-                                  const recentConvos = recentGroupIds.filter(id => !groupedUnread[id]);
-                                  if (recentConvos.length === 0 && Object.keys(groupedUnread).length === 0) {
-                                     return (
-                                        <div className="flex flex-col items-center justify-center h-full py-12">
-                                           <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
-                                           <p className="text-xs text-gray-500">No conversations yet</p>
-                                        </div>
-                                     );
-                                  }
-                                  return recentConvos.map((groupId) => {
-                                     const groupObj = groups.find(g => g.id === groupId);
-                                     const name = groupObj?.name || CORE_GROUPS[groupId] || "Room";
-                                     const avatar = groupObj?.dm_partner?.avatar_url || "/default-avatar.png";
-                                     return (
-                                        <button
-                                           key={groupId}
-                                           onClick={() => { setSelectedGroupId(groupId); addToRecents(groupId); }}
-                                           className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                        >
-                                           <img
-                                              src={avatar}
-                                              alt={name}
-                                              className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                           />
-                                           <div className="min-w-0 flex-1">
-                                              <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                 {name}
-                                              </span>
-                                           </div>
-                                        </button>
-                                     );
-                                  });
-                               })()}
-                             </div>
-                          ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
+                      {/* Content List */}
+                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
+                          {!selectedGroupId ? (
+                             /* Screen A: Conversation List */
+                             <div className="space-y-1">
+                                {/* Search input */}
+                                <div className="relative mb-1">
+                                   <input
+                                      type="text"
+                                      value={conversationSearchQuery}
+                                      onChange={(e) => setConversationSearchQuery(e.target.value)}
+                                      placeholder="Search conversations..."
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                   />
+                                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                                </div>
+                                {filteredConversations.length === 0 ? (
+                                   <div className="flex flex-col items-center justify-center h-full py-12">
+                                      <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
+                                      <p className="text-xs text-gray-500">
+                                         {conversationSearchQuery ? "No matching conversations" : "No conversations yet"}
+                                      </p>
+                                   </div>
+                                ) : (
+                                   filteredConversations.map(({ group, lastMessage, unreadCount }) => {
+                                      const name = group?.name || CORE_GROUPS[group.id] || "Room";
+                                      const avatar = group?.dm_partner?.avatar_url || "/default-avatar.png";
+                                      return (
+                                         <button
+                                            key={group.id}
+                                            onClick={() => { setSelectedGroupId(group.id); }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                         >
+                                            <img
+                                               src={avatar}
+                                               alt={name}
+                                               className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                               <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                     {name}
+                                                  </span>
+                                                  {unreadCount > 0 && (
+                                                     <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                                        {unreadCount} unread
+                                                     </span>
+                                                  )}
+                                               </div>
+                                               <p className="text-[11px] text-gray-400 truncate mt-1">
+                                                  {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
+                                                  {lastMessage.voice_url ? (
+                                                     <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
+                                                  ) : lastMessage.image_url ? (
+                                                     <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                  ) : (
+                                                     getDecryptedContent(lastMessage)
+                                                  )}
+                                               </p>
+                                            </div>
+                                         </button>
+                                      );
+                                   })
+                                )}
+                              </div>
+                           ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
                            /* Locked Game Analysis placeholder */
                            <div className="flex flex-col items-center justify-center h-full py-12 text-center px-6">
                               <ShieldAlert className="w-10 h-10 text-red-400 mb-3" />
@@ -1104,9 +1085,10 @@ export default function FloatingChatBubble() {
                            </div>
                         ) : (
                            (
-                              <div className="space-y-4">
-                                 {hasMoreMessages && (
-                                    <div className="flex flex-col items-center gap-2 pb-2">
+                               <div className="space-y-4">
+                                  <VoiceControlBar />
+                                  {hasMoreMessages && (
+                                     <div className="flex flex-col items-center gap-2 pb-2">
                                        <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
                                           {allRoomMessages.length - 20}+ older · View full chat
                                        </button>
@@ -1254,20 +1236,17 @@ export default function FloatingChatBubble() {
                                                              </div>
                                                           );
                                                        })()}
-                                                       {msg.voice_url ? (
-                                                         <AudioPlayer url={msg.voice_url} />
-                                                      ) : msg.image_url ? (
-                                                         <div
-                                                            className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full"
-                                                            onClick={() => setPreviewImage(msg.image_url)}
-                                                         >
-                                                            <img
-                                                               src={msg.image_url}
-                                                               className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                                                               alt="shared file"
-                                                            />
-                                                         </div>
-                                                      ) : (
+                                                        {msg.voice_url ? (
+                                                          <ConnectedAudioPlayer
+                                                             url={msg.voice_url}
+                                                             messageId={msg.id}
+                                                             allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                             allMessages={activeRoomMessages}
+                                                             userId={user?.id || ""}
+                                                          />
+                                                       ) : msg.image_url ? (
+                                                          <ChatImage url={msg.image_url} />
+                                                       ) : (
                                                          <motion.div
                                                             drag={!msg.is_deleted && !isEditing ? "x" : false}
                                                             dragDirectionLock

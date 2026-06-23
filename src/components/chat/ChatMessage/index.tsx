@@ -9,7 +9,8 @@ import type { ChatMessageProps } from './types';
 import { MENTION_COLORS } from './constants';
 import { ReactionPicker } from './ReactionPicker';
 import { ReactionBadge } from './ReactionBadge';
-import { AudioPlayer } from './AudioPlayer';
+import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
+import { ChatImage } from './ChatImage';
 import { MessageContent } from './MessageContent';
 
 const ChatMessage = memo(({
@@ -26,7 +27,9 @@ const ChatMessage = memo(({
     onEdit,
     onDelete,
     dailyGuesses,
-    onResend
+    onResend,
+    allMessageIds,
+    allMessages
 }: ChatMessageProps) => {
     const triggerToast = useAppStore(s => s.triggerToast);
     const time = useMemo(() => new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), [msg.created_at]);
@@ -37,7 +40,6 @@ const ChatMessage = memo(({
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
     const [showReactionDetails, setShowReactionDetails] = useState(false);
-    const setPreviewImage = useAppStore(s => s.setPreviewImage);
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
 
@@ -345,15 +347,15 @@ const ChatMessage = memo(({
                                 </div>
                             </div>
                         ) : msg.voice_url ? (
-                            <AudioPlayer url={msg.voice_url} />
+                            <ConnectedAudioPlayer
+                                url={msg.voice_url}
+                                messageId={msg.id}
+                                allMessageIds={allMessageIds}
+                                allMessages={allMessages}
+                                userId={currentUserId}
+                            />
                         ) : msg.image_url ? (
-                            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url as string)}>
-                                <img
-                                    src={msg.image_url}
-                                    className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                                    alt="shared file"
-                                />
-                            </div>
+                            <ChatImage url={msg.image_url} />
                         ) : (
                             <MessageContent
                                 content={msg.content}
