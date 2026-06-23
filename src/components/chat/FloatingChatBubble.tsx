@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
@@ -21,8 +21,9 @@ const CLOSE_DELAY = 10000;
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
-   const [dismissed, setDismissed] = useState(false);
-   const [isDragging, setIsDragging] = useState(false);
+    const [dismissed, setDismissed] = useState(false);
+    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
    const [isNearDismiss, setIsNearDismiss] = useState(false);
    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
    const overlayOpenedAtRef = useRef<number>(0);
@@ -564,6 +565,16 @@ export default function FloatingChatBubble() {
           .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
     })();
 
+    // Filter conversations by search query
+    const filteredConversations = (() => {
+       if (!conversationSearchQuery.trim()) return conversations;
+       const q = conversationSearchQuery.toLowerCase();
+       return conversations.filter(({ group }) => {
+          const name = group?.name || CORE_GROUPS[group.id] || "";
+          return name.toLowerCase().includes(q);
+       });
+    })();
+
     // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
    const getSmartInitials = (name: string) =>
       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
@@ -1000,16 +1011,29 @@ export default function FloatingChatBubble() {
 
                       {/* Content List */}
                       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
-                         {!selectedGroupId ? (
+                          {!selectedGroupId ? (
                              /* Screen A: Conversation List */
                              <div className="space-y-1">
-                                {conversations.length === 0 ? (
+                                {/* Search input */}
+                                <div className="relative mb-1">
+                                   <input
+                                      type="text"
+                                      value={conversationSearchQuery}
+                                      onChange={(e) => setConversationSearchQuery(e.target.value)}
+                                      placeholder="Search conversations..."
+                                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                   />
+                                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                                </div>
+                                {filteredConversations.length === 0 ? (
                                    <div className="flex flex-col items-center justify-center h-full py-12">
                                       <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
-                                      <p className="text-xs text-gray-500">No conversations yet</p>
+                                      <p className="text-xs text-gray-500">
+                                         {conversationSearchQuery ? "No matching conversations" : "No conversations yet"}
+                                      </p>
                                    </div>
                                 ) : (
-                                   conversations.map(({ group, lastMessage, unreadCount }) => {
+                                   filteredConversations.map(({ group, lastMessage, unreadCount }) => {
                                       const name = group?.name || CORE_GROUPS[group.id] || "Room";
                                       const avatar = group?.dm_partner?.avatar_url || "/default-avatar.png";
                                       return (
