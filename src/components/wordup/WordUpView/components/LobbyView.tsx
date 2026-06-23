@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send, Volume2, VolumeX, RotateCcw, ChevronLeft } from "lucide-react";
+import { Swords, Play, HelpCircle, ChevronDown, ChevronUp, Loader2, Send, Volume2, VolumeX, RotateCcw, } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { type ProfileStats } from "../types";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -43,13 +43,13 @@ export const LobbyView = ({
    soundEnabled,
    onToggleSound,
    onPurgeAndReset,
-   onBack
 }: LobbyViewProps) => {
    const { triggerToast } = useApp();
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const timeoutRef = useRef<number | null>(null);
+   const inviteResolvedRef = useRef(false);
 
    // New states for tabs and challenge matching
    const [activeTab, setActiveTab] = useState<"play" | "rankings" | "pending" | "history">("play");
@@ -60,15 +60,13 @@ export const LobbyView = ({
 
    useEffect(() => {
       const handleRejected = (e: Event) => {
+         if (inviteResolvedRef.current) return;
+         inviteResolvedRef.current = true;
          const detail = (e as CustomEvent)?.detail;
-         setOutgoingInvite((prev) => {
-            if (prev) {
-               window.dispatchEvent(new CustomEvent("MascoChanged", {
-                  detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
-               }));
-            }
-            return null;
-         });
+         setOutgoingInvite(null);
+         window.dispatchEvent(new CustomEvent("MascoChanged", {
+            detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
+         }));
          if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
@@ -76,14 +74,9 @@ export const LobbyView = ({
       };
 
       const handleBusy = () => {
-         setOutgoingInvite((prev) => {
-            if (prev) {
-               window.dispatchEvent(new CustomEvent("MascoChanged", {
-                  detail: { mascotFace: "(•_•)", mascotLabel: `${prev.targetUsername} is currently busy.` }
-               }));
-            }
-            return null;
-         });
+         if (inviteResolvedRef.current) return;
+         inviteResolvedRef.current = true;
+         setOutgoingInvite(null);
          if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
@@ -91,12 +84,16 @@ export const LobbyView = ({
       };
 
       const handleAccepted = (e: Event) => {
+         if (inviteResolvedRef.current) return;
+         inviteResolvedRef.current = true;
          const detail = (e as CustomEvent)?.detail;
          setOutgoingInvite(null);
+         setIncomingOfflineOrTimeout(null);
          if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
          }
+         triggerToast(`${detail.senderName || "Opponent"} accepted! Starting match...`, 3000);
          // Transition to match
          useWordUpStore.getState().setMatchId(detail.matchId);
          useWordUpStore.getState().setRole("player1");
@@ -112,6 +109,7 @@ export const LobbyView = ({
          window.removeEventListener("wordup-invite-accepted", handleAccepted);
          if (timeoutRef.current) clearTimeout(timeoutRef.current);
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    // Track completed match IDs to avoid duplicate notifications
@@ -200,7 +198,7 @@ export const LobbyView = ({
                const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
                const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
 
-                if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
+               if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
                   markNotified(m.id);
                   triggerToast("Your opponent completed their turn! Check the results.", 6000);
                }
@@ -326,9 +324,9 @@ export const LobbyView = ({
          const iPlayed = isP1 ? match.p1_answered : match.p2_answered;
          const oppPlayed = isP1 ? match.p2_answered : match.p1_answered;
 
-          if (iPlayed && oppPlayed && match.status === "completed" && !match.is_bot_match) {
-             triggerToast("Your opponent completed their turn! Check the results.", 6000);
-          }
+         if (iPlayed && oppPlayed && match.status === "completed" && !match.is_bot_match) {
+            triggerToast("Your opponent completed their turn! Check the results.", 6000);
+         }
 
          fetchPendingMatches();
       };
@@ -369,6 +367,18 @@ export const LobbyView = ({
          return null;
       }
       try {
+         // Dedup: check if a match already exists between these two users
+         const { data: existing } = await supabase
+            .from("wordup_matches")
+            .select("id")
+            .or(`and(player1_id.eq.${currentUser.id},player2_id.eq.${targetUser.id}),and(player1_id.eq.${targetUser.id},player2_id.eq.${currentUser.id})`)
+            .in("status", ["waiting", "countdown"])
+            .limit(1);
+
+         if (existing && existing.length > 0) {
+            return existing[0].id;
+         }
+
          const { data: newMatch, error } = await supabase
             .from("wordup_matches")
             .insert({
@@ -378,17 +388,18 @@ export const LobbyView = ({
                status: "waiting",
                game_type: "async",
                p1_answered: false,
-               p2_answered: false
+               p2_answered: false,
+               question_started_at: new Date().toISOString()
             })
             .select()
             .single();
 
-          if (error || !newMatch) throw error || new Error("Failed to create match");
+         if (error || !newMatch) throw error || new Error("Failed to create match");
 
-          // Generate questions — await so they're ready before caller navigates to the match
-          await generateMatchQuestions(newMatch.id, category);
+         // Generate questions — await so they're ready before caller navigates to the match
+         await generateMatchQuestions(newMatch.id, category);
 
-          return newMatch.id;
+         return newMatch.id;
       } catch (e) {
          console.error("Failed to create pending match/notification:", e);
          return null;
@@ -435,6 +446,7 @@ export const LobbyView = ({
       // 15 seconds ring timeout
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = window.setTimeout(() => {
+         if (inviteResolvedRef.current) return;
          setOutgoingInvite((prev) => {
             if (prev) {
                setIncomingOfflineOrTimeout({ targetUser, type: "timeout" });
@@ -455,24 +467,12 @@ export const LobbyView = ({
          initial={{ opacity: 0, y: 15 }}
          animate={{ opacity: 1, y: 0 }}
          exit={{ opacity: 0, y: -15 }}
-         className="flex flex-col gap-4 md:gap-6 flex-1 justify-center py-4 md:py-6"
+         className="flex flex-col gap-4 md:gap-6 flex-1 justify-center py-1 md:py-2"
       >
          <div className="space-y-1 relative text-center">
             <div className="flex items-center justify-between gap-4 px-2 shrink-0">
-               {/* Left side Back button */}
-               <div className="flex items-center gap-2 w-[84px] justify-start">
-                  {onBack && (
-                     <button
-                        onClick={onBack}
-                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1 shadow-md active:scale-95"
-                        title="Back to Lobby"
-                     >
-                        <ChevronLeft size={15} />
-                        <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">Back</span>
-                     </button>
-                  )}
-               </div>
 
+               <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles (Beta)</h2>
                {/* Right side Sound & Reset controls */}
                <div className="flex items-center gap-2 w-[84px] justify-end">
                   <button
@@ -491,10 +491,7 @@ export const LobbyView = ({
                   </button>
                </div>
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles (Beta)</h2>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto">
-               Test your word speed & pattern skills in a head-to-head 7-question rapid match!
-            </p>
+
          </div>
 
          {/* Segmented Tab Bar */}
@@ -504,8 +501,8 @@ export const LobbyView = ({
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
-                        ? "bg-correct text-black shadow-md font-black"
-                        : "text-gray-400 hover:text-white"
+                     ? "bg-correct text-black shadow-md font-black"
+                     : "text-gray-400 hover:text-white"
                      }`}
                >
                   {tab === "play" ? "Play" : tab === "rankings" ? "Rankings" : tab === "pending" ? `Pending (${pendingMatches.length})` : "History"}
@@ -544,41 +541,41 @@ export const LobbyView = ({
                   )}
 
                   <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Active Arena Category</p>
-                      {(() => {
-                          const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
-                          const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
-                          const borderCol = style.border.split(" ")[0];
-                          return (
-                             <div className={`bg-gradient-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-white/10`}>
-                                <div className="flex items-center gap-3">
-                                   <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
-                                      {style.emoji}
-                                   </div>
-                                   <div className="min-w-0">
-                                      <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
-                                      <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{activeCatObj.name}</p>
-                                   </div>
-                                </div>
-                                <p className="text-xs text-gray-300 leading-relaxed font-bold">{activeCatObj.desc}</p>
-                                <button
-                                   onClick={() => setShowCategoryModal(true)}
-                                   className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
-                                >
-                                   Change Category / Select Modes
-                                </button>
-                             </div>
-                          );
-                       })()}
+                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Active Arena Category</p>
+                     {(() => {
+                        const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
+                        const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
+                        const borderCol = style.border.split(" ")[0];
+                        return (
+                           <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-white/10`}>
+                              <div className="flex items-center gap-3">
+                                 <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
+                                    {style.emoji}
+                                 </div>
+                                 <div className="min-w-0">
+                                    <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
+                                    <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{activeCatObj.name}</p>
+                                 </div>
+                              </div>
+                              <p className="text-xs text-gray-300 leading-relaxed font-bold">{activeCatObj.desc}</p>
+                              <button
+                                 onClick={() => setShowCategoryModal(true)}
+                                 className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
+                              >
+                                 Change Category / Select Modes
+                              </button>
+                           </div>
+                        );
+                     })()}
 
-                      <CategorySelectModal
-                         isOpen={showCategoryModal}
-                         onClose={() => setShowCategoryModal(false)}
-                         category={category}
-                         setCategory={setCategory}
-                         startMatchmaking={startMatchmaking}
-                      />
-                   </div>
+                     <CategorySelectModal
+                        isOpen={showCategoryModal}
+                        onClose={() => setShowCategoryModal(false)}
+                        category={category}
+                        setCategory={setCategory}
+                        startMatchmaking={startMatchmaking}
+                     />
+                  </div>
 
                   <button
                      onClick={startMatchmaking}
@@ -633,8 +630,8 @@ export const LobbyView = ({
                                                 onClick={() => handleSendInvite(opp)}
                                                 disabled={outgoingInvite !== null}
                                                 className={`flex items-center gap-1.5 border text-[10px] font-black uppercase px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${isOnline
-                                                      ? "bg-correct/10 hover:bg-correct text-correct hover:text-black border-correct/20"
-                                                      : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"
+                                                   ? "bg-correct/10 hover:bg-correct text-correct hover:text-black border-correct/20"
+                                                   : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-white/10"
                                                    }`}
                                              >
                                                 {isOnline ? <Send size={10} /> : <Swords size={10} />}
@@ -693,11 +690,11 @@ export const LobbyView = ({
                               <div key={match.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
                                  <div className="flex items-center gap-3 min-w-0">
                                     <ProtectedAvatar
-                                        userId={match.is_bot_match ? undefined : (isP1 ? match.player2_id : match.player1_id)}
-                                        src={match.is_bot_match ? undefined : oppProfile?.avatar_url}
-                                        username={oppName}
-                                        className="w-9 h-9 rounded-full border border-white/10 shrink-0"
-                                     />
+                                       userId={match.is_bot_match ? undefined : (isP1 ? match.player2_id : match.player1_id)}
+                                       src={match.is_bot_match ? undefined : oppProfile?.avatar_url}
+                                       username={oppName}
+                                       className="w-9 h-9 rounded-full border border-white/10 shrink-0"
+                                    />
                                     <div className="min-w-0">
                                        <p className="text-xs font-black text-white truncate">vs {oppName}</p>
                                        <div className="flex items-center gap-1.5 mt-1">
@@ -754,9 +751,9 @@ export const LobbyView = ({
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const myScore = isP1 ? match.p1_score || 0 : match.p2_score || 0;
                            const oppScore = isP1 ? match.p2_score || 0 : match.p1_score || 0;
-                            const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
+                           const oppName = match.is_bot_match ? (BOT_PROFILES[match.bot_profile]?.name || "Word Bot") : (oppProfile?.username || "Opponent");
 
-                            let outcome = "DRAW";
+                           let outcome = "DRAW";
                            let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
                            if (myScore > oppScore) {
                               outcome = "WIN";
@@ -828,6 +825,7 @@ export const LobbyView = ({
                   </div>
                   <button
                      onClick={() => {
+                        inviteResolvedRef.current = true;
                         setOutgoingInvite(null);
                         if (timeoutRef.current) clearTimeout(timeoutRef.current);
                      }}
@@ -865,6 +863,11 @@ export const LobbyView = ({
                   <div className="grid grid-cols-2 gap-3 w-full">
                      <button
                         onClick={async () => {
+                           if (inviteResolvedRef.current) {
+                              setIncomingOfflineOrTimeout(null);
+                              return;
+                           }
+                           inviteResolvedRef.current = true;
                            const target = incomingOfflineOrTimeout.targetUser;
                            useWordUpStore.getState().setView("loading");
                            const mId = await createPendingMatchAndNotification(target);
@@ -882,6 +885,11 @@ export const LobbyView = ({
                      </button>
                      <button
                         onClick={async () => {
+                           if (inviteResolvedRef.current) {
+                              setIncomingOfflineOrTimeout(null);
+                              return;
+                           }
+                           inviteResolvedRef.current = true;
                            const target = incomingOfflineOrTimeout.targetUser;
                            await createPendingMatchAndNotification(target);
                            setIncomingOfflineOrTimeout(null);
