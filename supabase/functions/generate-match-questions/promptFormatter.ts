@@ -127,7 +127,8 @@ export function formatQuestionPrompt(
          if (verb !== "done") return { prompt: `In what year was ${label} ${verb}?` };
          return { prompt: `What is the historical year/date associated with ${label}''s ${keyLabel}?` };
       }
-      return { prompt: `What is the ${keyLabel} of ${label}?` };
+      const verb2 = keyLabel.endsWith('s') ? 'are' : 'is';
+      return { prompt: `What ${verb2} the ${keyLabel} of ${label}?` };
    }
 
    if (variant === 1) {
@@ -163,5 +164,6 @@ export function formatQuestionPrompt(
       return { prompt: `The statement "${label}'s ${keyLabel} is ${displayOrWrongValue}" is incorrect. What is the correct ${keyLabel}?` };
    }
 
-   return { prompt: `What is the ${keyLabel} of ${label}?` };
+   const fallbackVerb = keyLabel.endsWith('s') ? 'are' : 'is';
+   return { prompt: `What ${fallbackVerb} the ${keyLabel} of ${label}?` };
 }

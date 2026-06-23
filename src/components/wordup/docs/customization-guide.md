@@ -43,7 +43,7 @@ define("flag_bearer", {
     trueFalse: 3,     // "True or False: ..."
     multiClue: 0.5,   // "Identify from clues"
     correctError: 1,  // "X is NOT Y. What is correct?"
-    tagMatch: 1.5,    // "Which tag best describes France?"
+    tagMatch: 1.5,    // "Which category best fits France?"
     compare: 0,       // "Which has a higher atomic number: H or He?"
     timeline: 0,      // "Which happened earliest?"
   },

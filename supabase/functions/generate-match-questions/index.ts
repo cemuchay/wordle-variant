@@ -328,7 +328,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             const tagDistractors = seededShuffle(otherTags, rng).slice(0, 3);
             q = {
                type: "definition",
-               prompt: `Which tag best describes "${label}"?`,
+               prompt: `Which category best fits "${label}"?`,
                choices: seededShuffle([chosenTag, ...tagDistractors], rng),
                answer: chosenTag,
             };

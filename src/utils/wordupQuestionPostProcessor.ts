@@ -204,17 +204,31 @@ export function postProcessQuestions(
          }
 
          // Look for code mentioned in prompt (e.g. 'ng' or 'fr')
-         let mentionedCode = countryCode;
-         const codeMatches = q.prompt.match(/'([a-z]{2})'/i);
-         if (codeMatches && codeMatches[1]) {
-            mentionedCode = codeMatches[1].toLowerCase();
-         }
+          let mentionedCode = countryCode;
+          const codeMatches = q.prompt.match(/'([a-z]{2})'/i);
+          if (codeMatches && codeMatches[1]) {
+             mentionedCode = codeMatches[1].toLowerCase();
+          }
 
-         if (countryName && mentionedCode) {
-            processed.prompt = `True or False: This is the flag of ${countryName}.`;
-            processed.imageUrl = mentionedCode;
-            return processed;
-         }
+          // Fallback: try extracting country name directly from prompt text
+          if (!countryName) {
+             const nounMatch = q.prompt.match(
+                /\b(?:of|about|regarding)\s+(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/,
+             );
+             if (nounMatch) {
+                const rawName = nounMatch[1];
+                const lowerName = rawName.toLowerCase();
+                countryName = rawName;
+                 mentionedCode = FLAG_MAP[lowerName] || null;
+             }
+          }
+
+          if (countryName && mentionedCode) {
+             processed.prompt = `True or False: This is the flag of ${countryName}.`;
+             processed.imageUrl = mentionedCode;
+             processed.answer = "True";
+             return processed;
+          }
       }
 
       // 3. Choices are country names (Variant 1 for flag_code, or general matching)

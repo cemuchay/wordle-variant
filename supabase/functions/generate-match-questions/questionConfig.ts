@@ -66,7 +66,7 @@ function padWeights(base: number[], override: number[]): number[] {
 | `[3]` | True/False | "True or False: The capital of France is London." | ≥1 distractor |
 | `[4]` | Multi-clue | "Identify from clues" | ≥2 metadata keys + ≥3 different-value peers |
 | `[5]` | Correct the Error | "X is NOT Y. What is correct?" | ≥1 distractor + ≥3 other distractors |
-| `[6]` | Tag Match | "Which tag best describes France?" | Entity has tags + ≥3 other tags in pool |
+ | `[6]` | Tag Match | "Which category best fits France?" | Entity has tags + ≥3 other tags in pool |
 | `[7]` | Compare (Numeric) | "Which has a higher atomic number: H or He?" | Numeric value + a peer with the same key |
 | `[8]` | Timeline | "Which happened earliest?" | Year-like key + ≥4 entities with numeric values |
 

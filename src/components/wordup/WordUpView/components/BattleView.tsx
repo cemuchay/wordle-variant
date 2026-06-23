@@ -387,7 +387,7 @@ export const BattleView = ({
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
                      animate={{ opacity: 1, scale: 1 }}
-                     className="w-full max-w-[200px] sm:max-w-[280px] h-[90px] sm:h-[140px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
+                      className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
                      <img
                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
@@ -400,8 +400,8 @@ export const BattleView = ({
             )}
 
             {/* Choices Grid */}
-            {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-               <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0">
+             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto">
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
