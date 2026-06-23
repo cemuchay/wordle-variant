@@ -9,7 +9,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
-import { AudioPlayer } from "./ChatMessage/AudioPlayer";
+import { ConnectedAudioPlayer } from "./ChatMessage/ConnectedAudioPlayer";
+import { ChatImage } from "./ChatMessage/ChatImage";
+import { VoiceControlBar } from "./VoiceControlBar";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
@@ -349,9 +351,8 @@ export default function FloatingChatBubble() {
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
-   const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
-   const setPreviewImage = useAppStore((s) => s.setPreviewImage);
-   const { user } = useAuth();
+    const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
+    const { user } = useAuth();
 
    // Profiles cache for reactor names
    const profilesCacheRef = useRef<Record<string, string>>({});
@@ -1104,9 +1105,10 @@ export default function FloatingChatBubble() {
                            </div>
                         ) : (
                            (
-                              <div className="space-y-4">
-                                 {hasMoreMessages && (
-                                    <div className="flex flex-col items-center gap-2 pb-2">
+                               <div className="space-y-4">
+                                  <VoiceControlBar />
+                                  {hasMoreMessages && (
+                                     <div className="flex flex-col items-center gap-2 pb-2">
                                        <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
                                           {allRoomMessages.length - 20}+ older · View full chat
                                        </button>
@@ -1254,20 +1256,17 @@ export default function FloatingChatBubble() {
                                                              </div>
                                                           );
                                                        })()}
-                                                       {msg.voice_url ? (
-                                                         <AudioPlayer url={msg.voice_url} />
-                                                      ) : msg.image_url ? (
-                                                         <div
-                                                            className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full"
-                                                            onClick={() => setPreviewImage(msg.image_url)}
-                                                         >
-                                                            <img
-                                                               src={msg.image_url}
-                                                               className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                                                               alt="shared file"
-                                                            />
-                                                         </div>
-                                                      ) : (
+                                                        {msg.voice_url ? (
+                                                          <ConnectedAudioPlayer
+                                                             url={msg.voice_url}
+                                                             messageId={msg.id}
+                                                             allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                             allMessages={activeRoomMessages}
+                                                             userId={user?.id || ""}
+                                                          />
+                                                       ) : msg.image_url ? (
+                                                          <ChatImage url={msg.image_url} />
+                                                       ) : (
                                                          <motion.div
                                                             drag={!msg.is_deleted && !isEditing ? "x" : false}
                                                             dragDirectionLock

@@ -16,4 +16,6 @@ export interface ChatMessageProps {
     onDelete: () => Promise<void>;
     dailyGuesses?: any[];
     onResend?: (id: string) => void;
+    allMessageIds?: string[];
+    allMessages?: Message[];
 }

@@ -12,6 +12,7 @@ import { useAppStore } from "../store/useAppStore";
 // Sub-components
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
+import { VoiceControlBar } from "./chat/VoiceControlBar";
 import MessageInput from "./chat/MessageInput";
 import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
@@ -933,6 +934,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                     onScroll={handleScroll}
                                     className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide z-10"
                                 >
+                                    <VoiceControlBar />
                                     <AnimatePresence initial={false}>
                                         {messages.map((msg: any) => {
                                             const isMe = msg.user_id === user.id;
@@ -996,6 +998,8 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                                                         }}
                                                         dailyGuesses={dailyGuesses}
                                                         onResend={resendMessage}
+                                                        allMessageIds={messages.map((m: any) => m.id)}
+                                                        allMessages={messages}
                                                     />
                                                 </div>
                                             );
