@@ -8,6 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { ChatMessageProps } from './types';
 import { MENTION_COLORS } from './constants';
 import { ReactionPicker } from './ReactionPicker';
+import { ReactionModal } from './ReactionModal';
 import { ReactionBadge } from './ReactionBadge';
 import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
 import { ChatImage } from './ChatImage';
@@ -39,6 +40,7 @@ const ChatMessage = memo(({
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(msg.content);
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
+    const [showReactionsModal, setShowReactionsModal] = useState(false);
     const [showReactionDetails, setShowReactionDetails] = useState(false);
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
@@ -71,8 +73,10 @@ const ChatMessage = memo(({
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
                 textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
                 textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.width = "1px";
+                textArea.style.height = "1px";
                 textArea.style.opacity = "0";
                 document.body.appendChild(textArea);
                 textArea.focus();
@@ -118,7 +122,7 @@ const ChatMessage = memo(({
         if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
         longPressTimeoutRef.current = setTimeout(() => {
             if (!hasDraggedRef.current) {
-                setShowReactionsMenu(prev => !prev);
+                setShowReactionsModal(prev => !prev);
                 if (navigator.vibrate) {
                     navigator.vibrate(50);
                 }
@@ -142,7 +146,27 @@ const ChatMessage = memo(({
     };
 
     return (
-        <div className={`relative group ${showReactionsMenu ? 'z-50' : 'z-auto'} overflow-visible`} data-message-id={msg.id}>
+        <div className={`relative group ${showReactionsMenu || showReactionsModal ? 'z-50' : 'z-auto'} overflow-visible`} data-message-id={msg.id}>
+            <AnimatePresence>
+                {showReactionsModal && (
+                    <ReactionModal
+                        isMe={isMe}
+                        onReact={(emoji) => {
+                            onReact(emoji);
+                            setShowReactionsModal(false);
+                        }}
+                        currentReaction={msg.reactions?.[currentUserId]}
+                        onCopy={() => {
+                            copyToClipboard(msg.content);
+                            setShowReactionsModal(false);
+                        }}
+                        onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsModal(false); } : undefined}
+                        onDelete={isEditable ? () => { onDelete(); setShowReactionsModal(false); } : undefined}
+                        onClose={() => setShowReactionsModal(false)}
+                    />
+                )}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {showReactionsMenu && (
                     <motion.div
@@ -169,6 +193,8 @@ const ChatMessage = memo(({
                             copyToClipboard(msg.content);
                             setShowReactionsMenu(false);
                         }}
+                        onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsMenu(false); } : undefined}
+                        onDelete={isEditable ? () => { onDelete(); setShowReactionsMenu(false); } : undefined}
                     />
                 )}
             </AnimatePresence>
@@ -233,7 +259,7 @@ const ChatMessage = memo(({
                                     setShowReactionsMenu(!showReactionsMenu);
                                 }}
                                 onPointerDown={(e) => e.stopPropagation()}
-                                className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer relative"
+                                className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer relative hidden sm:inline-flex"
                                 title="React"
                             >
                                 <Smile size={13} className="text-white" />
@@ -248,7 +274,7 @@ const ChatMessage = memo(({
                                             setIsEditing(true);
                                         }}
                                         onPointerDown={(e) => e.stopPropagation()}
-                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer hidden sm:inline-flex"
                                         title="Edit message"
                                     >
                                         <Pencil size={13} className="text-blue-400" />
@@ -260,7 +286,7 @@ const ChatMessage = memo(({
                                             onDelete()
                                         }}
                                         onPointerDown={(e) => e.stopPropagation()}
-                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer"
+                                        className="p-1 hover:bg-white/10 rounded-md transition-all cursor-pointer hidden sm:inline-flex"
                                         title="Delete message"
                                     >
                                         <Trash2 size={13} className="text-red-400" />

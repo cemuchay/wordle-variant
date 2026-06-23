@@ -10,6 +10,16 @@ export async function editMessage(
 ) {
   if (!userId || !newContent.trim()) return;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const msg = (useAppStore.getState().globalMessages as any[]).find((m: any) => m.id === messageId);
+  if (msg) {
+    const elapsed = Date.now() - new Date(msg.created_at).getTime();
+    if (elapsed > 15 * 60 * 1000) {
+      useAppStore.getState().triggerToast("Editing window expired (15 min)", 2000);
+      return;
+    }
+  }
+
   let finalContent = newContent;
   if (group?.type === "dm" && group.dm_partner) {
     const key = getDMRoomKey(userId, group.dm_partner.id);

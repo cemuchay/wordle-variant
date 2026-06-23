@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply } from "lucide-react";
+import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
@@ -14,6 +14,7 @@ import { ChatImage } from "./ChatMessage/ChatImage";
 import { VoiceControlBar } from "./VoiceControlBar";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
+import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
 
@@ -75,9 +76,10 @@ export default function FloatingChatBubble() {
    const timerRef = useRef<number | null>(null);
    const wavRecorderRef = useRef<any>(null);
 
-   // Reaction states
-   const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
-   const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
+    // Reaction states
+    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+    const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
+    const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
@@ -86,10 +88,47 @@ export default function FloatingChatBubble() {
    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
    const [showUnreadLine, setShowUnreadLine] = useState(true);
 
-   const reactionsRef = useRef<HTMLDivElement>(null);
-   const detailsRef = useRef<HTMLDivElement>(null);
+    const reactionsRef = useRef<HTMLDivElement>(null);
+    const detailsRef = useRef<HTMLDivElement>(null);
+    const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasDraggedRef = useRef(false);
+    const longPressMsgIdRef = useRef<string | null>(null);
 
-   // Inactivity timer for auto-closing the overlay (not the bubble)
+    // Cleanup long press timeout
+    useEffect(() => {
+       return () => {
+          if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+       };
+    }, []);
+
+    const handleTouchStart = (msgId: string) => {
+       hasDraggedRef.current = false;
+       longPressMsgIdRef.current = msgId;
+       if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+       longPressTimeoutRef.current = setTimeout(() => {
+          if (!hasDraggedRef.current && longPressMsgIdRef.current) {
+             setReactingModalMessageId(prev => prev === longPressMsgIdRef.current ? null : longPressMsgIdRef.current);
+             if (navigator.vibrate) navigator.vibrate(50);
+          }
+       }, 500);
+    };
+
+    const handleTouchEnd = () => {
+       if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+          longPressTimeoutRef.current = null;
+       }
+    };
+
+    const handleTouchMove = () => {
+       hasDraggedRef.current = true;
+       if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+          longPressTimeoutRef.current = null;
+       }
+    };
+
+    // Inactivity timer for auto-closing the overlay (not the bubble)
    const clearInactivityTimer = () => {
       if (inactivityTimerRef.current !== null) {
          clearTimeout(inactivityTimerRef.current);
@@ -681,10 +720,12 @@ export default function FloatingChatBubble() {
          } else {
             const textArea = document.createElement("textarea");
             textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-9999px";
-            textArea.style.top = "0";
-            textArea.style.opacity = "0";
+             textArea.style.position = "fixed";
+             textArea.style.top = "0";
+             textArea.style.left = "0";
+             textArea.style.width = "1px";
+             textArea.style.height = "1px";
+             textArea.style.opacity = "0";
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
@@ -965,12 +1006,12 @@ export default function FloatingChatBubble() {
                   />
 
                   {/* Centered Modal Card */}
-                  <motion.div
-                     initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "-40%" }}
-                     animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                     exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-40%" }}
-                     transition={{ type: "spring", duration: 0.3 }}
-                     className="fixed top-1/2 left-1/2 w-[92%] max-w-md h-[80vh] max-h-[550px] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                   <motion.div
+                      initial={{ opacity: 0, scale: 0.9, x: "-50%" }}
+                      animate={{ opacity: 1, scale: 1, x: "-50%" }}
+                      exit={{ opacity: 0, scale: 0.9, x: "-50%" }}
+                      transition={{ type: "spring", duration: 0.3 }}
+                       className="fixed top-2 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
                   >
                      {/* Header */}
                      <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
@@ -1010,7 +1051,7 @@ export default function FloatingChatBubble() {
                      </div>
 
                       {/* Content List */}
-                      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar" ref={scrollRef} onScroll={handleScroll}>
+                       <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
                           {!selectedGroupId ? (
                              /* Screen A: Conversation List */
                              <div className="space-y-1">
@@ -1033,20 +1074,32 @@ export default function FloatingChatBubble() {
                                       </p>
                                    </div>
                                 ) : (
-                                   filteredConversations.map(({ group, lastMessage, unreadCount }) => {
-                                      const name = group?.name || CORE_GROUPS[group.id] || "Room";
-                                      const avatar = group?.dm_partner?.avatar_url || "/default-avatar.png";
-                                      return (
-                                         <button
-                                            key={group.id}
-                                            onClick={() => { setSelectedGroupId(group.id); }}
-                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
-                                         >
-                                            <img
-                                               src={avatar}
-                                               alt={name}
-                                               className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                            />
+                                    filteredConversations.map(({ group, lastMessage, unreadCount }) => {
+                                       const name = group?.name || CORE_GROUPS[group.id] || "Room";
+                                       const isCore = CORE_GROUPS[group.id] !== undefined;
+                                       const isDM = group?.type === "dm" && !!group?.dm_partner?.avatar_url;
+                                       return (
+                                          <button
+                                             key={group.id}
+                                             onClick={() => { setSelectedGroupId(group.id); }}
+                                             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                          >
+                                              {isDM ? (
+                                                 <ProtectedAvatar
+                                                    userId={group.dm_partner!.id}
+                                                    src={group.dm_partner!.avatar_url}
+                                                    username={name}
+                                                    className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                                 />
+                                              ) : isCore ? (
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0 text-sm">
+                                                   #
+                                                </div>
+                                             ) : (
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
+                                                   <Users size={18} />
+                                                </div>
+                                             )}
                                             <div className="min-w-0 flex-1">
                                                <div className="flex items-center justify-between">
                                                   <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
@@ -1101,10 +1154,14 @@ export default function FloatingChatBubble() {
                                     const content = getDecryptedContent(msg);
 
                                     return (
-                                       <div
-                                          key={msg.id}
-                                          onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
-                                          className={`relative ${reactingMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
+                                        <div
+                                           key={msg.id}
+                                           onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                           onTouchStart={() => handleTouchStart(msg.id)}
+                                           onTouchEnd={handleTouchEnd}
+                                           onTouchMove={handleTouchMove}
+                                           onTouchCancel={handleTouchEnd}
+                                            className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
                                        >
                                           {/* Unread divider */}
                                           {msg.id === visibleUnreadId && showUnreadLine && (
@@ -1132,16 +1189,18 @@ export default function FloatingChatBubble() {
                                                       onClick={() => setReactingMessageId(null)}
                                                       className="fixed inset-0 bg-black/20 z-40"
                                                    />
-                                                   <ReactionPicker
-                                                      ref={reactionsRef}
-                                                      isMe={isMe}
-                                                      onReact={(emoji) => handleReact(msg.id, emoji)}
-                                                      currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
-                                                      onCopy={() => {
-                                                         copyToClipboard(content);
-                                                         setReactingMessageId(null);
-                                                      }}
-                                                   />
+                                                    <ReactionPicker
+                                                       ref={reactionsRef}
+                                                       isMe={isMe}
+                                                       onReact={(emoji) => handleReact(msg.id, emoji)}
+                                                       currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
+                                                       onCopy={() => {
+                                                          copyToClipboard(content);
+                                                          setReactingMessageId(null);
+                                                       }}
+                                                       onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
+                                                       onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
+                                                    />
                                                 </>
                                              )}
                                           </AnimatePresence>
@@ -1171,12 +1230,13 @@ export default function FloatingChatBubble() {
                                              )}
                                           </AnimatePresence>
 
-                                          <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-                                             <img
-                                                src={msg.profiles?.avatar_url || "/default-avatar.png"}
-                                                alt={msg.profiles?.username}
-                                                className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                             />
+                                           <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                              <ProtectedAvatar
+                                                 userId={msg.user_id}
+                                                 src={msg.profiles?.avatar_url}
+                                                 username={msg.profiles?.username}
+                                                 className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                              />
                                              <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
                                                 <div className="flex items-baseline gap-1.5 flex-wrap">
                                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
@@ -1259,7 +1319,7 @@ export default function FloatingChatBubble() {
                                                                }
                                                             }}
                                                          >
-                                                            <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed break-words px-3 py-2 rounded-2xl bg-white/5 border border-white/5`}>
+                                                             <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
@@ -1454,7 +1514,28 @@ export default function FloatingChatBubble() {
             )}
          </AnimatePresence>
 
-         {/* Dismiss Zone overlay at the bottom center */}
+          {/* Reaction Modal (mobile long-press) */}
+          <AnimatePresence>
+             {reactingModalMessageId && (() => {
+                const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
+                if (!modalMsg) return null;
+                const isMe = modalMsg.user_id === user?.id;
+                const content = getDecryptedContent(modalMsg);
+                return (
+                   <ReactionModal
+                      isMe={isMe}
+                      onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
+                      currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
+                      onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
+                      onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
+                      onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                      onClose={() => setReactingModalMessageId(null)}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
+          {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>
             {isDragging && isVisible && (
                <motion.div
