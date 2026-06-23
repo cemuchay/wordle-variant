@@ -169,6 +169,8 @@ const ChatMessage = memo(({
                             copyToClipboard(msg.content);
                             setShowReactionsMenu(false);
                         }}
+                        onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsMenu(false); } : undefined}
+                        onDelete={isEditable ? () => { onDelete(); setShowReactionsMenu(false); } : undefined}
                     />
                 )}
             </AnimatePresence>

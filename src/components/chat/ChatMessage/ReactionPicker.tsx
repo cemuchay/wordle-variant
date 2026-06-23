@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { Copy } from "lucide-react";
+import { Copy, Edit2, Trash2 } from "lucide-react";
 import { EMOJIS } from './constants';
 
 interface ReactionPickerProps {
@@ -7,9 +7,11 @@ interface ReactionPickerProps {
     currentReaction?: string;
     onCopy: () => void;
     isMe: boolean;
+    onEdit?: () => void;
+    onDelete?: () => void;
 }
 
-export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({ onReact, currentReaction, onCopy, isMe }, ref) => (
+export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({ onReact, currentReaction, onCopy, isMe, onEdit, onDelete }, ref) => (
     <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
@@ -31,6 +33,34 @@ export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({
                 </button>
             ))}
         </div>
+        {onEdit && (
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-500/20 text-blue-400 rounded-xl transition-all cursor-pointer"
+                title="Edit"
+            >
+                <Edit2 size={14} />
+                <span className="text-[10px] font-black uppercase tracking-wider">Edit</span>
+            </button>
+        )}
+        {onDelete && (
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all cursor-pointer"
+                title="Delete"
+            >
+                <Trash2 size={14} />
+                <span className="text-[10px] font-black uppercase tracking-wider">Delete</span>
+            </button>
+        )}
         <button
             type="button"
             onClick={(e) => {
