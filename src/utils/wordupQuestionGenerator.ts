@@ -1260,11 +1260,41 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
    };
 };
 
+const DOUBLE_LETTER_PATTERNS = ["LL", "SS", "EE", "OO", "TT"];
+
+const scanWordlistForDoubleLetter = (wordlist: string[], patterns: string[]): string | null => {
+   if (wordlist.length === 0) return null;
+   const start = Math.floor(Math.random() * wordlist.length);
+   for (let i = 0; i < wordlist.length; i++) {
+      const word = wordlist[(start + i) % wordlist.length];
+      if (patterns.some((p) => word.includes(p))) return word;
+   }
+   return null;
+};
+
 const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = getWordLists(length);
-   const word = official[Math.floor(Math.random() * official.length)];
+
+   // Pick a word with at least one adjacent repeated letter
+   let word: string;
+   let attempts = 0;
+   do {
+      word = official[Math.floor(Math.random() * official.length)];
+      attempts++;
+   } while (attempts < 50 && !/([A-Z])\1/.test(word));
+
+   if (!/([A-Z])\1/.test(word)) {
+      const scanned = scanWordlistForDoubleLetter(official, DOUBLE_LETTER_PATTERNS);
+      if (scanned) word = scanned;
+   }
+
+   // Identify double-letter positions for distractor filtering
+   const doublePositions: number[] = [];
+   for (let i = 0; i < word.length - 1; i++) {
+      if (word[i] === word[i + 1]) doublePositions.push(i);
+   }
 
    // Build a random substitution cipher (A->X, B->Y, etc.)
    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -1280,16 +1310,23 @@ const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
 
    const choices = new Set<string>();
    choices.add(word);
-   let attempts = 0;
-   while (choices.size < 4 && attempts < 100) {
-      attempts++;
+   let choiceAttempts = 0;
+   while (choices.size < 4 && choiceAttempts < 100) {
+      choiceAttempts++;
       const dummy = official[Math.floor(Math.random() * official.length)];
-      if (dummy !== word && valid.has(dummy)) {
+      if (dummy === word || !valid.has(dummy)) continue;
+      const hasDoubleAtCorrectPos = doublePositions.some(
+         (pos) => dummy[pos] === dummy[pos + 1],
+      );
+      if (!hasDoubleAtCorrectPos) {
          choices.add(dummy);
       }
    }
    while (choices.size < 4) {
-      choices.add(official[Math.floor(Math.random() * official.length)]);
+      const dummy = official[Math.floor(Math.random() * official.length)];
+      if (dummy !== word) {
+         choices.add(dummy);
+      }
    }
    return {
       type: "cryptogram",
@@ -1535,14 +1572,14 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       }
       const typeWeights: { type: WordUpQuestion["type"]; weight: number }[] = [
          { type: "anagram", weight: 0.6 },
-         { type: "anagram_scrambled", weight: 0.6 },
+         { type: "anagram_scrambled", weight: 0.5 },
          { type: "real_fake", weight: 0.9 },
          { type: "pattern", weight: 0.9 },
          { type: "length", weight: 1.0 },
          { type: "missing_letter", weight: 1.0 },
-         { type: "reverse_wordle", weight: 1.0 },
+         { type: "reverse_wordle", weight: 0.5 },
          { type: "definition", weight: 1.0 },
-         { type: "math", weight: 0.8 },
+         { type: "math", weight: 0.5 },
          { type: "odd_one_out", weight: 0.8 },
          { type: "vowel_drop", weight: 0.8 },
          { type: "rhyme_match", weight: 0.8 },
@@ -1552,9 +1589,9 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          { type: "word_chain", weight: 0.8 },
          { type: "letter_shift", weight: 0.8 },
          { type: "compound_break", weight: 0.7 },
-         { type: "word_within", weight: 0.8 },
+         { type: "word_within", weight: 0.5 },
          { type: "cryptogram", weight: 0.7 },
-         { type: "category_sort", weight: 0.8 },
+         { type: "category_sort", weight: 0.3 },
          { type: "letter_add_remove", weight: 0.7 },
       ];
       const totalWeight = typeWeights.reduce(
@@ -1572,8 +1609,13 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
    };
 
    for (let i = 0; i < 7; i++) {
-      // Pick type
-      const type = getTypeByWeight();
+      // Pick type — avoid same type as previous question
+      let type: WordUpQuestion["type"];
+      let attempts = 0;
+      do {
+         type = getTypeByWeight();
+         attempts++;
+      } while (i > 0 && type === questions[i - 1].type && attempts < 10);
       const length = pickWeightedLength(
          type === "anagram" || type === "anagram_scrambled"
             ? [3, 4, 5, 6, 7, 8, 9, 10]

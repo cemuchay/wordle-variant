@@ -42,14 +42,22 @@ const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
 function pickVariants(weights: number[], rng: () => number, count: number): number[] {
    const total = weights.reduce((a, b) => a + b, 0);
-   return Array.from({ length: count }, () => {
-      let roll = rng() * total;
-      for (let v = 0; v < weights.length; v++) {
-         roll -= weights[v];
-         if (roll <= 0) return v;
-      }
-      return weights.length - 1;
-   });
+   const result: number[] = [];
+   for (let i = 0; i < count; i++) {
+      let variant: number;
+      let attempts = 0;
+      do {
+         let roll = rng() * total;
+         variant = 0;
+         for (let v = 0; v < weights.length; v++) {
+            roll -= weights[v];
+            if (roll <= 0) { variant = v; break; }
+         }
+         attempts++;
+      } while (i > 0 && variant === result[i - 1] && attempts < 10);
+      result.push(variant);
+   }
+   return result;
 }
 
 function buildVariantTryOrder(assignedVariant: number, weights: number[]): number[] {
