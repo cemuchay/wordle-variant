@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState, memo, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, MessageSquare, Pencil, Trash2, Play, Pause, Smile } from "lucide-react";
+import { Send, MessageSquare, Pencil, Trash2, Smile } from "lucide-react";
 import { type ChallengeMessage } from "../../hooks/useChallengeChat";
 import { type ChallengeParticipant } from "../../hooks/useChallenge";
 import { useConfirmation } from "../../hooks/useConfirmation";
 import { CHALLENGE_LIMITS, CHALLENGE_TIMEOUT } from "../../constants/challenge";
-import { useAppStore } from "../../store/useAppStore";
 import { ProtectedAvatar } from "../chat/ProtectedAvatar";
+import { ChatImage } from "../chat/ChatMessage/ChatImage";
+import { ConnectedAudioPlayer } from "../chat/ChatMessage/ConnectedAudioPlayer";
+import { VoiceControlBar } from "../chat/VoiceControlBar";
 
 interface ChallengeChatProps {
   messages: ChallengeMessage[];
@@ -28,6 +30,8 @@ interface ChallengeChatMessageProps {
   usernames: string[];
   avatarUrl?: string;
   senderColor: string;
+  allMessageIds?: string[];
+  allMessages?: ChallengeMessage[];
   onEdit: (newContent: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onReact: (emoji: string | null) => void;
@@ -92,55 +96,6 @@ const ReactionBadge = React.forwardRef<HTMLDivElement, {
     </div>
   );
 });
-const ChallengeAudioPlayer = ({ url }: { url: string }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  return (
-    <div className="flex items-center gap-3 bg-black/20 rounded-xl p-2 pr-4 border border-white/5 min-w-[160px]">
-      <audio
-        ref={audioRef}
-        src={url}
-        onEnded={() => setIsPlaying(false)}
-        className="hidden"
-      />
-      <button
-        type="button"
-        onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-correct flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-transform"
-      >
-        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-      </button>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] font-black uppercase text-correct tracking-widest">Voice Note</span>
-        <div className="flex gap-1">
-          {[...Array(12)].map((_, i) => (
-            <div
-              key={i}
-              className={`w-0.5 h-3 rounded-full ${isPlaying ? 'bg-correct animate-pulse' : 'bg-white/20'}`}
-              style={{
-                // eslint-disable-next-line react-hooks/purity
-                height: `${2 + Math.random() * 10}px`,
-                animationDelay: `${i * 0.1}s`
-              }}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ChallengeChatMessage = memo(function ChallengeChatMessage({
   msg,
   isMe,
@@ -151,7 +106,9 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
   onDelete,
   onReact,
   currentUserId,
-  participants
+  participants,
+  allMessageIds,
+  allMessages
 }: ChallengeChatMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
@@ -159,8 +116,6 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
   const [showReactionDetails, setShowReactionDetails] = useState(false);
   const reactionsRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
-  const setPreviewImage = useAppStore(s => s.setPreviewImage);
-
   // Outside click to close menus
   useEffect(() => {
     if (!showReactionsMenu && !showReactionDetails) return;
@@ -332,15 +287,15 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
               </div>
             </div>
           ) : msg.voice_url ? (
-            <ChallengeAudioPlayer url={msg.voice_url} />
+            <ConnectedAudioPlayer
+              url={msg.voice_url}
+              messageId={msg.id}
+              allMessageIds={allMessageIds}
+              allMessages={allMessages}
+              userId={currentUserId}
+            />
           ) : msg.image_url ? (
-            <div className="mt-1 relative overflow-hidden rounded-xl border border-white/10 group cursor-pointer max-w-full" onClick={() => setPreviewImage(msg.image_url!)}>
-              <img
-                src={msg.image_url}
-                className="max-h-60 w-auto rounded-xl hover:scale-102 transition-transform duration-300"
-                alt="shared file"
-              />
-            </div>
+            <ChatImage url={msg.image_url} />
           ) : (
             formatMessageContent(msg.content, isMe, usernames)
           )}
@@ -623,7 +578,9 @@ export const ChallengeChat = memo(function ChallengeChat({
             </div>
           </div>
         ) : (
-          messages.map((msg) => {
+          <>
+            <VoiceControlBar />
+            {messages.map((msg) => {
             const isMe = !!(
               (msg.sender_id && msg.sender_id === effectiveUser?.id) ||
               (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id)
@@ -658,9 +615,12 @@ export const ChallengeChat = memo(function ChallengeChat({
                 onReact={(emoji) => reactToMessage(msg.id, emoji)}
                 currentUserId={effectiveUser?.id}
                 participants={participants}
+                allMessageIds={messages.map((m) => m.id)}
+                allMessages={messages}
               />
             );
-          })
+          })}
+          </>
         )}
       </div>
 
