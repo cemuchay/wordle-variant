@@ -1084,13 +1084,14 @@ export default function FloatingChatBubble() {
                                              onClick={() => { setSelectedGroupId(group.id); }}
                                              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
                                           >
-                                             {isDM ? (
-                                                <img
-                                                   src={group.dm_partner!.avatar_url}
-                                                   alt={name}
-                                                   className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                                />
-                                             ) : isCore ? (
+                                              {isDM ? (
+                                                 <ProtectedAvatar
+                                                    userId={group.dm_partner!.id}
+                                                    src={group.dm_partner!.avatar_url}
+                                                    username={name}
+                                                    className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                                 />
+                                              ) : isCore ? (
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0 text-sm">
                                                    #
                                                 </div>
@@ -1229,12 +1230,13 @@ export default function FloatingChatBubble() {
                                              )}
                                           </AnimatePresence>
 
-                                          <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-                                             <img
-                                                src={msg.profiles?.avatar_url || "/default-avatar.png"}
-                                                alt={msg.profiles?.username}
-                                                className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 object-cover shrink-0"
-                                             />
+                                           <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                              <ProtectedAvatar
+                                                 userId={msg.user_id}
+                                                 src={msg.profiles?.avatar_url}
+                                                 username={msg.profiles?.username}
+                                                 className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                              />
                                              <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
                                                 <div className="flex items-baseline gap-1.5 flex-wrap">
                                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
