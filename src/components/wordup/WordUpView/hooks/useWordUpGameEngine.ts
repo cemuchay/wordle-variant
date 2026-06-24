@@ -715,11 +715,14 @@ export function useWordUpGameEngine(props: EngineProps) {
    const abortMatch = useCallback(async () => {
       cleanup();
       if (matchId) {
-         try { await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", matchId); }
-         catch (e) { console.error("Failed to abort match:", e); }
+         await wordupNetworkGate.enqueue("put", "abort match", async () => {
+            const { error } = await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", matchId);
+            if (error) throw error;
+         }).catch((e) => console.error("Failed to abort match:", e));
       }
       safeLocalStorage.removeItem("wordup_active_game");
       dispatch({ type: "RESET" });
+      useWordUpStore.getState().resetGame();
       triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
    }, [matchId, triggerToast, cleanup]);
 
