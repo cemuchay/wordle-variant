@@ -166,48 +166,72 @@ export const WordUpView = () => {
        onMatchFound(newMId, newRole);
      });
 
-     // Accidental refresh recovery
-     useEffect(() => {
-        const activeGameStr = safeLocalStorage.getItem("wordup_active_game");
-        if (activeGameStr) {
-           try {
-              const activeGame = JSON.parse(activeGameStr);
-              if (activeGame && activeGame.matchId && activeGame.matchData?.status !== "completed") {
-                 console.log("[WordUp Logs] Restoring active game from localStorage:", activeGame.matchId);
-                 
-                 const store = useWordUpStore.getState();
-                 store.setMatchId(activeGame.matchId);
-                 store.setRole(activeGame.role);
-                 store.setCategory(activeGame.category || "mixed");
-                 store.setQuestions(activeGame.questions || []);
-                 store.setCurrentIdx(activeGame.currentIdx || 0);
-                 store.setMatchData(activeGame.matchData);
-                 store.setOpponentStats(activeGame.opponentStats);
-                 store.setRevealAnswers(activeGame.revealAnswers || false);
-                 store.setSelectedAnswer(activeGame.selectedAnswer || null);
-                  
-                  launchedMatchIdRef.current = activeGame.matchId;
-                  store.setView("loading");
-                  
-                  setTimeout(async () => {
-                     const match = await loadAndSubscribeMatchRef.current(activeGame.matchId, activeGame.role);
-                     const loadedQuestions = useWordUpStore.getState().questions;
-                     if (!match || !loadedQuestions || loadedQuestions.length === 0) {
-                        console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
-                        triggerToast("Failed to restore game.", 3000);
-                        resetGame();
-                        setView("menu");
-                        return;
-                     }
-                     startQuestionRoundRef.current(match, activeGame.currentIdx || 0);
-                 }, 100); // brief yield for state settling
-              }
-           } catch (err) {
-              console.error("[WordUp Logs] Failed to restore active game:", err);
-           }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-     }, []);
+      // Accidental refresh recovery
+      useEffect(() => {
+         const activeGameStr = safeLocalStorage.getItem("wordup_active_game");
+         if (!activeGameStr) return;
+
+         let mounted = true;
+         let recoveryTimer: number | null = null;
+
+         try {
+            const activeGame = JSON.parse(activeGameStr);
+            // Validate recovered role to prevent downstream crashes from corrupt state.
+            // All game hooks assume role is "player1" | "player2" — anything else
+            // causes silent failures in score/answer lookups.
+            if (!activeGame || !activeGame.matchId || activeGame.matchData?.status === "completed") return;
+            if (activeGame.role && !["player1", "player2"].includes(activeGame.role)) {
+               console.warn("[WordUp Recovery] Invalid role in saved state — discarding.");
+               safeLocalStorage.removeItem("wordup_active_game");
+               return;
+            }
+
+            console.log("[WordUp Logs] Restoring active game from localStorage:", activeGame.matchId);
+
+            const store = useWordUpStore.getState();
+            store.setMatchId(activeGame.matchId);
+            store.setRole(activeGame.role);
+            store.setCategory(activeGame.category || "mixed");
+            store.setQuestions(activeGame.questions || []);
+            store.setCurrentIdx(activeGame.currentIdx || 0);
+            store.setMatchData(activeGame.matchData);
+            store.setOpponentStats(activeGame.opponentStats);
+            store.setRevealAnswers(activeGame.revealAnswers || false);
+            store.setSelectedAnswer(activeGame.selectedAnswer || null);
+
+            launchedMatchIdRef.current = activeGame.matchId;
+            store.setView("loading");
+
+            // This setTimeout fires async and calls store methods/refs that survive
+            // unmount (zustand stores and refs are module-scoped). However, if the
+            // component unmounts before it fires (user navigates away immediately),
+            // the callback would execute with a stale `triggerToast` and call
+            // `setView`/`resetGame` on an unmounted tree. The `mounted` guard and
+            // `clearTimeout` in the cleanup ensure this is a no-op after unmount.
+            recoveryTimer = window.setTimeout(async () => {
+               if (!mounted) return;
+               const match = await loadAndSubscribeMatchRef.current(activeGame.matchId, activeGame.role);
+               if (!mounted) return;
+               const loadedQuestions = useWordUpStore.getState().questions;
+               if (!match || !loadedQuestions || loadedQuestions.length === 0) {
+                  console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
+                  triggerToast("Failed to restore game.", 3000);
+                  resetGame();
+                  setView("menu");
+                  return;
+               }
+               startQuestionRoundRef.current(match, activeGame.currentIdx || 0);
+            }, 100); // brief yield for state settling
+         } catch (err) {
+            console.error("[WordUp Logs] Failed to restore active game:", err);
+         }
+
+         return () => {
+            mounted = false;
+            if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+         };
+         // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
 
       // Reactive sync: If matchData status changes to active externally, jump to battle
       const startQuestionRoundRef = useRef(startQuestionRound);
@@ -241,24 +265,24 @@ export const WordUpView = () => {
               setView("battle");
 
               // Set match status to active in database (only for real-time matches)
-              if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
-                 supabase
-                    .from("wordup_matches")
-                    .update({ status: "active" })
-                    .eq("id", match.id)
-                    .then(({ error }: any) => {
-                       if (error) console.error("Failed to set match status to active:", error);
-                    });
-              }
+               if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-")) {
+                  supabase
+                     .from("wordup_matches")
+                     .update({ status: "active" })
+                     .eq("id", match.id)
+                      .then(({ error }: any) => {
+                         if (error) console.error("Failed to set match status to active:", error);
+                      }, console.error);
+               }
 
-              // Broadcast game_active over WebSocket to transition peer immediately
-              if (matchChannelRef?.current) {
-                 matchChannelRef.current.send({
-                    type: "broadcast",
-                    event: "game_active",
-                    payload: {}
-                 });
-              }
+               // Broadcast game_active over WebSocket to transition peer immediately
+               if (matchChannelRef?.current) {
+                  matchChannelRef.current.send({
+                     type: "broadcast",
+                     event: "game_active",
+                     payload: {}
+                  }).catch(console.error);
+               }
 
               startQuestionRound(match, 0);
            } else {
@@ -266,25 +290,6 @@ export const WordUpView = () => {
            }
          }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
      }, [startQuestionRound, role, cleanUpCountdown, setView, matchChannelRef]);
-
-   const handleAbortMatch = useCallback(async () => {
-      if (matchId) {
-         try {
-            await supabase
-               .from("wordup_matches")
-               .update({
-                  status: "completed",
-                  completed_at: new Date().toISOString(),
-               })
-               .eq("id", matchId);
-         } catch (e) {
-            console.error("Failed to mark match as completed on abort:", e);
-         }
-      }
-      safeLocalStorage.removeItem("wordup_active_game");
-      resetGame();
-      triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
-   }, [matchId, resetGame, triggerToast]);
 
    const launchedMatchIdRef = useRef<string | null>(null);
 
@@ -310,13 +315,13 @@ export const WordUpView = () => {
           triggerToast("Failed to load match questions. Aborting game.", 5000);
           const storeMatchData = useWordUpStore.getState().matchData;
           if (storeMatchData && storeMatchData.id && !storeMatchData.id.startsWith("bot-match-") && storeMatchData.status !== "completed") {
-             supabase
-                .from("wordup_matches")
-                .update({ status: "completed", completed_at: new Date().toISOString() })
-                .eq("id", storeMatchData.id)
-                .then(({ error }) => {
-                   if (error) console.error("Failed to set match status on load failure:", error);
-                });
+              supabase
+                 .from("wordup_matches")
+                 .update({ status: "completed", completed_at: new Date().toISOString() })
+                 .eq("id", storeMatchData.id)
+                 .then(({ error }) => {
+                    if (error) console.error("Failed to set match status on load failure:", error);
+                 }, console.error);
           }
           resetGame();
           setView("menu");
@@ -331,9 +336,71 @@ export const WordUpView = () => {
       }
    }, [matchId, role, view, onMatchFound]);
 
-   const cleanUpAll = useCallback(() => {
-      cleanUpGameLoop();
-   }, [cleanUpGameLoop]);
+    // Safety timeout: if stuck in loading or countdown for too long, abort to lobby
+    const safetyTimerRef = useRef<number | null>(null);
+    const clearSafetyTimer = useCallback(() => {
+       if (safetyTimerRef.current) {
+          clearTimeout(safetyTimerRef.current);
+          safetyTimerRef.current = null;
+       }
+    }, []);
+    // Guards against the safety timer firing after the game has already
+    // transitioned to battle (React effect cleanup is async and a queued
+    // timer callback could fire before the cleanup effect runs).
+    const gameActiveRef = useRef(false);
+    const startSafetyTimer = useCallback(() => {
+       clearSafetyTimer();
+       safetyTimerRef.current = window.setTimeout(() => {
+          if (gameActiveRef.current) return;
+          console.warn("[WordUp Logs] Safety timeout triggered — game failed to start. Aborting to lobby.");
+          triggerToast("Game creation timed out. Please try again.", WORDUP_TIMEOUT.TOAST_DURATION);
+          cleanUpGameLoop();
+          cleanUpCountdown();
+          safeLocalStorage.removeItem("wordup_active_game");
+          resetGame();
+          setView("menu");
+          clearSafetyTimer();
+       }, WORDUP_TIMEOUT.SAFETY);
+    }, [triggerToast, cleanUpGameLoop, cleanUpCountdown, resetGame, setView, clearSafetyTimer]);
+
+    useEffect(() => {
+       if (view === "loading" || view === "countdown") {
+          gameActiveRef.current = false;
+          startSafetyTimer();
+       } else if (view === "battle") {
+          gameActiveRef.current = true;
+          clearSafetyTimer();
+       } else {
+          gameActiveRef.current = false;
+          clearSafetyTimer();
+       }
+    }, [view, startSafetyTimer, clearSafetyTimer]);
+
+    const cleanUpAll = useCallback(() => {
+       cleanUpGameLoop();
+       cleanUpCountdown();
+       clearSafetyTimer();
+    }, [cleanUpGameLoop, cleanUpCountdown, clearSafetyTimer]);
+
+   const handleAbortMatch = useCallback(async () => {
+      cleanUpAll();
+      if (matchId) {
+         try {
+            await supabase
+               .from("wordup_matches")
+               .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString(),
+               })
+               .eq("id", matchId);
+         } catch (e) {
+            console.error("Failed to mark match as completed on abort:", e);
+         }
+      }
+      safeLocalStorage.removeItem("wordup_active_game");
+      resetGame();
+      triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
+   }, [cleanUpAll, matchId, resetGame, triggerToast]);
 
    const {
       countdownSecs,
@@ -343,6 +410,9 @@ export const WordUpView = () => {
 
    const handlePurgeAndReset = useCallback(async () => {
       if (!effectiveUser) return;
+      cleanUpCountdown();
+      clearSafetyTimer();
+      cleanUpGameLoop();
       try {
          await supabase.from("wordup_queue").delete().eq("user_id", effectiveUser.id);
          const { data: staleMatches } = await supabase
@@ -375,37 +445,7 @@ export const WordUpView = () => {
       resetGame();
       cancelMatchmaking();
       triggerToast("Local data purged and stale matches cleaned.", WORDUP_TIMEOUT.TOAST_DURATION);
-   }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast]);
-
-    // Safety timeout: if stuck in loading or countdown for too long, abort to lobby
-    const safetyTimerRef = useRef<number | null>(null);
-    const clearSafetyTimer = useCallback(() => {
-       if (safetyTimerRef.current) {
-          clearTimeout(safetyTimerRef.current);
-          safetyTimerRef.current = null;
-       }
-    }, []);
-    const startSafetyTimer = useCallback(() => {
-       clearSafetyTimer();
-       safetyTimerRef.current = window.setTimeout(() => {
-          console.warn("[WordUp Logs] Safety timeout triggered — game failed to start. Aborting to lobby.");
-          triggerToast("Game creation timed out. Please try again.", WORDUP_TIMEOUT.TOAST_DURATION);
-          cleanUpAll();
-          cleanUpCountdown();
-          safeLocalStorage.removeItem("wordup_active_game");
-          resetGame();
-          setView("menu");
-          clearSafetyTimer();
-       }, WORDUP_TIMEOUT.SAFETY);
-    }, [triggerToast, cleanUpAll, cleanUpCountdown, resetGame, setView, clearSafetyTimer]);
-
-    useEffect(() => {
-       if (view === "loading" || view === "countdown") {
-          startSafetyTimer();
-       } else {
-          clearSafetyTimer();
-       }
-    }, [view, startSafetyTimer, clearSafetyTimer]);
+   }, [effectiveUser, resetGame, cancelMatchmaking, triggerToast, cleanUpCountdown, clearSafetyTimer, cleanUpGameLoop]);
 
     const cancelMatchmakingRef = useRef(cancelMatchmaking);
     useEffect(() => {

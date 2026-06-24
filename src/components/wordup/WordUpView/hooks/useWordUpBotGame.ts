@@ -68,9 +68,13 @@ export const useWordUpBotGame = ({
    const revealAnswersRef = useRef(revealAnswers);
    const timeLeftRef = useRef(timeLeft);
    const roleRef = useRef(role);
-   const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
+   // Refs are initialised as null-safe (optional call pattern below) because
+   // they are wired by a useEffect after the first render. Channel events or
+   // timers that fire before that effect runs would crash on `null()`. The
+   // `?.()` guard on every call site makes this timing-safe.
+   const handleMatchUpdateRef = useRef<((newMatch: any) => void) | null>(null);
    const onRematchAcceptedRef = useRef(onRematchAccepted);
-   const handleAnswerSelectRef = useRef<any>(null);
+   const handleAnswerSelectRef = useRef<((choice: string) => void) | null>(null);
 
    useEffect(() => {
       onRematchAcceptedRef.current = onRematchAccepted;
@@ -219,15 +223,18 @@ export const useWordUpBotGame = ({
          };
 
          setMaxTime(nextDur);
-         setTimeLeft(nextDur);
-         handleMatchUpdateRef.current(updatedMatch);
+          setTimeLeft(nextDur);
+          // Null-guard: the ref starts as null and is wired by a useEffect after first
+          // render. advanceRound is only called from timeouts/callbacks that fire after
+          // the effect, but the `?.()` makes the timing guarantee explicit.
+          handleMatchUpdateRef.current?.(updatedMatch);
 
-         isAdvancingRef.current = false;
-      },
-      [getSyncedNow, setTimeLeft],
-   );
+          isAdvancingRef.current = false;
+       },
+       [getSyncedNow, setTimeLeft],
+    );
 
-   const handleAnswerSelect = useCallback(
+    const handleAnswerSelect = useCallback(
       async (choice: string) => {
          if (
             isSubmittingAnswerRef.current ||
@@ -315,7 +322,10 @@ export const useWordUpBotGame = ({
                p2_score: (latestMatch.p2_score || 0) + botPoints,
             };
 
-            handleMatchUpdateRef.current(updatedMatch);
+            // Null-guard: the ref starts as null and is wired by a useEffect after first
+            // render. This runs inside handleAnswerSelect which is called from user input
+            // (always after the effect), but the `?.()` makes the timing guarantee explicit.
+            handleMatchUpdateRef.current?.(updatedMatch);
          } catch (err) {
             console.error("[WordUp Logs] Local bot update failed:", err);
          } finally {
@@ -380,7 +390,11 @@ export const useWordUpBotGame = ({
                 stopRoundTimer();
                 const latestSelected = useWordUpStore.getState().selectedAnswer;
                 if (latestSelected === null) {
-                   handleAnswerSelectRef.current("");
+                   // Null-guard: the ref is wired by a useEffect after first render.
+                   // The interval fires 50ms after mount, which is almost certainly
+                   // after the effect, but the `?.()` makes the timing guarantee
+                   // explicit and prevents a crash if render timing ever changes.
+                   handleAnswerSelectRef.current?.("");
                 }
              }
           }, 50);
@@ -393,7 +407,11 @@ export const useWordUpBotGame = ({
             botActionRef.current = { ...botAction, time_taken: botTime };
 
             botTimerRef.current = window.setTimeout(async () => {
-               handleMatchUpdateRef.current({ p2_answered: true });
+                // Null-guard: the ref starts as null and is wired by a useEffect after first
+                // render. The bot timeout fires after a delay (typically >500ms), so the ref
+                // is almost certainly set — but the `?.()` makes the guarantee explicit and
+                // prevents a crash if timing ever changes (e.g. 0-delay bot response).
+                handleMatchUpdateRef.current?.({ p2_answered: true });
             }, botTime * 1000);
          }
       },
@@ -404,9 +422,12 @@ export const useWordUpBotGame = ({
       (newMatch: any) => {
          if (!isActive) return;
          const currentMatch = matchDataRef.current;
+         // Spreading `null` throws TypeError. `matchDataRef.current` starts as
+         // `null` and is only populated after the store hydrates. If this callback
+         // fires before hydration (e.g. a bot timeout during initial setup), the
+         // spread crashes. Guard early so the function is a no-op instead.
+         if (!currentMatch) return;
          const mergedMatch = { ...currentMatch, ...newMatch };
-
-         if (currentMatch) {
               if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
                  mergedMatch.p1_answers = currentMatch.p1_answers;
                  mergedMatch.p1_score = currentMatch.p1_score;
@@ -417,13 +438,12 @@ export const useWordUpBotGame = ({
                 mergedMatch.p2_score = currentMatch.p2_score;
                 mergedMatch.p2_answered = currentMatch.p2_answered;
              }
-            mergedMatch.current_question_index = Math.max(
-               currentMatch.current_question_index || 0,
-               newMatch.current_question_index || 0,
-            );
-         }
+             mergedMatch.current_question_index = Math.max(
+                currentMatch.current_question_index || 0,
+                newMatch.current_question_index || 0,
+             );
 
-         console.log(`[WordUp Logs] Bot handleMatchUpdate: Merged state index: ${mergedMatch.current_question_index}, status: ${mergedMatch.status}`);
+          console.log(`[WordUp Logs] Bot handleMatchUpdate: Merged state index: ${mergedMatch.current_question_index}, status: ${mergedMatch.status}`);
          setMatchData(mergedMatch);
 
          const bothAnswered = mergedMatch.p1_answered && mergedMatch.p2_answered;
@@ -717,7 +737,7 @@ export const useWordUpBotGame = ({
 
          return match;
       },
-      [setMatchData, setQuestions, setOpponentStats],
+      [setMatchData, setQuestions, setOpponentStats, triggerToast],
    );
 
    const sendRematch = useCallback(() => {

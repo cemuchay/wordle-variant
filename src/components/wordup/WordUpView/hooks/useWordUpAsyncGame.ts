@@ -57,8 +57,12 @@ export const useWordUpAsyncGame = ({
    const revealAnswersRef = useRef(revealAnswers);
    const timeLeftRef = useRef(timeLeft);
    const roleRef = useRef(role);
-   const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
-   const handleAnswerSelectRef = useRef<any>(null);
+   // Refs are initialised as null-safe (optional call pattern below) because
+   // they are wired by a useEffect after the first render. Channel events or
+   // timers that fire before that effect runs would crash on `null()`. The
+   // `?.()` guard on every call site makes this timing-safe.
+   const handleMatchUpdateRef = useRef<((newMatch: any) => void) | null>(null);
+   const handleAnswerSelectRef = useRef<((choice: string) => void) | null>(null);
 
    useEffect(() => {
       currentIdxRef.current = currentIdx;
@@ -86,11 +90,18 @@ export const useWordUpAsyncGame = ({
        }
     }, []);
 
+    // `isRevealingRef` is set to `true` when a reveal starts and only reset to
+    // `false` inside the reveal timeout callback. If the timeout is cleared
+    // (cleanup, abort, deactivation) before it fires, the ref stays `true`
+    // permanently — blocking ALL future reveals and freezing the game.
+    // Resetting it here ensures the next reveal can proceed regardless of why
+    // the timeout was stopped.
     const stopRoundTimeout = useCallback(() => {
        if (roundTimeoutRef.current) {
           clearTimeout(roundTimeoutRef.current);
           roundTimeoutRef.current = null;
        }
+       isRevealingRef.current = false;
     }, []);
 
     const cleanUpIntervals = useCallback(() => {
@@ -212,16 +223,19 @@ export const useWordUpAsyncGame = ({
              question_started_at: new Date(getSyncedNow()).toISOString(),
           };
 
-         setMaxTime(nextDur);
-         setTimeLeft(nextDur);
-         handleMatchUpdateRef.current(updatedMatch);
+          setMaxTime(nextDur);
+          setTimeLeft(nextDur);
+          // Null-guard: the ref starts as null and is wired by a useEffect after first
+          // render. advanceRound is only called from timeouts/callbacks that fire after
+          // the effect, but the `?.()` makes the timing guarantee explicit.
+          handleMatchUpdateRef.current?.(updatedMatch);
 
-         isAdvancingRef.current = false;
-      },
-      [getSyncedNow, setTimeLeft],
-   );
+          isAdvancingRef.current = false;
+       },
+       [getSyncedNow, setTimeLeft],
+    );
 
-   const handleAnswerSelect = useCallback(
+    const handleAnswerSelect = useCallback(
       async (choice: string) => {
          if (
             isSubmittingAnswerRef.current ||
@@ -271,9 +285,15 @@ export const useWordUpAsyncGame = ({
             if (!latestMatch) throw new Error("Match data not found");
 
             const isP1 = roleRef.current === "player1";
-            const answers = [...(isP1 ? latestMatch.p1_answers : latestMatch.p2_answers || [])];
+            // Spread `null` throws TypeError. The `|| []` fallback only covers the
+            // `p2_answers` branch due to JS operator precedence (`||` binds tighter
+            // than `?:`). Wrapping the whole ternary in parens ensures BOTH branches
+            // get the fallback, preventing a crash on the very first answer of a fresh match.
+            const answers = [...((isP1 ? latestMatch.p1_answers : latestMatch.p2_answers) || [])];
             answers.push(submission);
-            const newScore = (isP1 ? latestMatch.p1_score : latestMatch.p2_score || 0) + points;
+            // Same precedence bug: without outer parens `p1_score` gets no `|| 0`,
+            // so `undefined + points` produces `NaN`, corrupting the score write.
+            const newScore = ((isP1 ? latestMatch.p1_score : latestMatch.p2_score) ?? 0) + points;
 
             const updatedMatch = {
                ...latestMatch,
@@ -282,7 +302,11 @@ export const useWordUpAsyncGame = ({
                [isP1 ? "p1_score" : "p2_score"]: newScore,
             };
 
-            handleMatchUpdateRef.current(updatedMatch);
+            // Guard with `?.()` because the ref is wired by a useEffect that runs
+            // after the first render. If handleAnswerSelect fires synchronously before
+            // that effect (e.g. the interval ticks on the very first frame), calling
+            // `null()` would crash. The `?.` makes this timing-safe.
+            handleMatchUpdateRef.current?.(updatedMatch);
          } catch (err) {
             console.error("[WordUp Logs] Local update failed:", err);
          } finally {
@@ -345,9 +369,13 @@ export const useWordUpAsyncGame = ({
                console.log(`[WordUp Logs] Async Timer expired for round ${index + 1}`);
                stopRoundTimer();
                const latestSelected = useWordUpStore.getState().selectedAnswer;
-               if (latestSelected === null) {
-                  handleAnswerSelectRef.current("");
-               }
+                if (latestSelected === null) {
+                   // Null-guard: the ref is wired by a useEffect after first render.
+                   // The interval fires 50ms after mount, which is almost certainly
+                   // after the effect, but the `?.()` makes the timing guarantee
+                   // explicit and prevents a crash if render timing ever changes.
+                   handleAnswerSelectRef.current?.("");
+                }
             }
           }, 50);
       },
@@ -532,21 +560,33 @@ export const useWordUpAsyncGame = ({
               return null;
            }
 
-           // If questions aren't ready yet (edge function may have been called but not completed),
-           // poll briefly or generate them on the spot
-           if (!match.questions && !match.encrypted_questions) {
-              console.log("[WordUp Async] Questions not ready yet, generating now...");
-              const { generateMatchQuestions } = await import("../../../../services/wordup/questionService");
-              await generateMatchQuestions(match.id, match.category);
+            // If questions aren't ready yet (edge function may have been called but not completed),
+            // poll briefly or generate them on the spot
+            if (!match.questions && !match.encrypted_questions) {
+               console.log("[WordUp Async] Questions not ready yet, generating now...");
+               try {
+                  // Dynamic import can fail (chunk load error), and generateMatchQuestions can
+                  // throw on network/DB errors. Without try-catch, the whole loadAndSubscribeMatch
+                  // Promise rejects — unhandled in the recovery path (setTimeout without rejection
+                  // handler), causing a silent hang with no toast feedback.
+                  const { generateMatchQuestions } = await import("../../../../services/wordup/questionService");
+                  await generateMatchQuestions(match.id, match.category);
+               } catch (genErr) {
+                  console.error("[WordUp Async] Failed to generate questions:", genErr);
+                  triggerToast("Failed to load questions. Please try again.", 3000);
+                  useWordUpStore.getState().resetGame();
+                  useWordUpStore.getState().setView("menu");
+                  return null;
+               }
 
-              const { data: refreshed } = await supabase
-                 .from("wordup_matches")
-                 .select("*")
-                 .eq("id", match.id)
-                 .single();
+               const { data: refreshed } = await supabase
+                  .from("wordup_matches")
+                  .select("*")
+                  .eq("id", match.id)
+                  .single();
 
-              if (refreshed) {
-                 match = refreshed;
+               if (refreshed) {
+                  match = refreshed;
                  setMatchData(match);
               }
            }
@@ -613,7 +653,7 @@ export const useWordUpAsyncGame = ({
 
          return match;
       },
-      [setMatchData, setQuestions, setOpponentStats],
+      [setMatchData, setQuestions, setOpponentStats, triggerToast],
    );
 
     useEffect(() => {

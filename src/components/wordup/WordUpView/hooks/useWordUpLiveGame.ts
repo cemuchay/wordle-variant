@@ -69,10 +69,15 @@ export const useWordUpLiveGame = ({
    const revealAnswersRef = useRef(revealAnswers);
    const timeLeftRef = useRef(timeLeft);
    const roleRef = useRef(role);
-   const handleMatchUpdateRef = useRef<(newMatch: any) => void>(null as any);
+   // Refs are initialised as null-safe (optional call pattern below) because
+   // they are wired by a useEffect after the first render. Channel events or
+   // timers that fire before that effect runs would crash on `null()`. The
+   // `?.()` guard on every call site makes this timing-safe.
+   const handleMatchUpdateRef = useRef<((newMatch: any) => void) | null>(null);
    const onRematchAcceptedRef = useRef(onRematchAccepted);
    const rematchStateRef = useRef(rematchState);
-   const handleAnswerSelectRef = useRef<any>(null);
+   const handleAnswerSelectRef = useRef<((choice: string) => void) | null>(null);
+   const maxTimeRef = useRef(maxTime);
 
    useEffect(() => {
       onRematchAcceptedRef.current = onRematchAccepted;
@@ -100,6 +105,9 @@ export const useWordUpLiveGame = ({
    useEffect(() => {
       roleRef.current = role;
    }, [role]);
+   useEffect(() => {
+      maxTimeRef.current = maxTime;
+   }, [maxTime]);
 
    const stopRoundTimer = useCallback(() => {
       if (timerRef.current) {
@@ -108,11 +116,18 @@ export const useWordUpLiveGame = ({
       }
    }, []);
 
+   // `isRevealingRef` is set to `true` when a reveal starts and only reset to
+   // `false` inside the reveal timeout callback. If the timeout is cleared
+   // (cleanup, abort, deactivation, matchId change) before it fires, the ref
+   // stays `true` permanently — blocking ALL future reveals and freezing the
+   // game. Resetting it here ensures the next reveal can proceed regardless
+   // of why the timeout was stopped.
    const stopRoundTimeout = useCallback(() => {
       if (roundTimeoutRef.current) {
          clearTimeout(roundTimeoutRef.current);
          roundTimeoutRef.current = null;
       }
+      isRevealingRef.current = false;
    }, []);
 
    const cleanUpIntervals = useCallback(() => {
@@ -202,7 +217,7 @@ export const useWordUpLiveGame = ({
             type: "broadcast",
             event: "advance_round",
             payload: { nextIdx },
-         });
+         }).catch(console.error);
 
          const updatedMatch = {
             ...matchDataRef.current,
@@ -212,16 +227,19 @@ export const useWordUpLiveGame = ({
             question_started_at: new Date(getSyncedNow()).toISOString(),
          };
 
-         setMaxTime(nextDur);
-         setTimeLeft(nextDur);
-         handleMatchUpdateRef.current(updatedMatch);
+          setMaxTime(nextDur);
+          setTimeLeft(nextDur);
+          // Null-guard: the ref starts as null and is wired by a useEffect after first
+          // render. advanceRound is only called from timeouts/callbacks that fire after
+          // the effect, but the `?.()` makes the timing guarantee explicit.
+          handleMatchUpdateRef.current?.(updatedMatch);
 
-         isAdvancingRef.current = false;
-      },
-      [getSyncedNow, setTimeLeft],
-   );
+          isAdvancingRef.current = false;
+       },
+       [getSyncedNow, setTimeLeft],
+    );
 
-   const handleAnswerSelect = useCallback(
+    const handleAnswerSelect = useCallback(
       async (choice: string) => {
          if (
             isSubmittingAnswerRef.current ||
@@ -271,9 +289,15 @@ export const useWordUpLiveGame = ({
             if (!latestMatch) throw new Error("Match data not found");
 
             const isP1 = roleRef.current === "player1";
-            const answers = [...(isP1 ? latestMatch.p1_answers : latestMatch.p2_answers || [])];
+            // Spread `null` throws TypeError. The `|| []` fallback only covers the
+            // `p2_answers` branch due to JS operator precedence (`||` binds tighter
+            // than `?:`). Wrapping the whole ternary in parens ensures BOTH branches
+            // get the fallback, preventing a crash on the very first answer of a fresh match.
+            const answers = [...((isP1 ? latestMatch.p1_answers : latestMatch.p2_answers) || [])];
             answers.push(submission);
-            const newScore = (isP1 ? latestMatch.p1_score : latestMatch.p2_score || 0) + points;
+            // Same precedence bug: without outer parens `p1_score` gets no `|| 0`,
+            // so `undefined + points` produces `NaN`, corrupting the score write.
+            const newScore = ((isP1 ? latestMatch.p1_score : latestMatch.p2_score) ?? 0) + points;
 
             const updatedMatch = {
                ...latestMatch,
@@ -282,7 +306,11 @@ export const useWordUpLiveGame = ({
                [isP1 ? "p1_score" : "p2_score"]: newScore,
             };
 
-            handleMatchUpdateRef.current(updatedMatch);
+            // Guard with `?.()` because the ref is wired by a useEffect that runs
+            // after the first render. If handleAnswerSelect fires synchronously before
+            // that effect (e.g. the interval ticks on the very first frame), calling
+            // `null()` would crash. The `?.` makes this timing-safe.
+            handleMatchUpdateRef.current?.(updatedMatch);
 
             matchChannelRef.current?.send({
                type: "broadcast",
@@ -292,7 +320,7 @@ export const useWordUpLiveGame = ({
                   answers: answers,
                   score: newScore,
                },
-            });
+            }).catch(console.error);
          } catch (err) {
             console.error("[WordUp Logs] Local update failed:", err);
          } finally {
@@ -359,8 +387,12 @@ export const useWordUpLiveGame = ({
                stopRoundTimer();
                const latestSelected = useWordUpStore.getState().selectedAnswer;
                if (latestSelected === null) {
-                  handleAnswerSelectRef.current("");
-               }
+                   // Null-guard: the ref is wired by a useEffect after first render.
+                   // The interval fires 50ms after mount, which is almost certainly
+                   // after the effect, but the `?.()` makes the timing guarantee
+                   // explicit and prevents a crash if render timing ever changes.
+                   handleAnswerSelectRef.current?.("");
+                }
             }
          }, 50);
       },
@@ -492,7 +524,7 @@ export const useWordUpLiveGame = ({
                type: "broadcast",
                event: "rematch_accepted",
                payload: { newMatchId: newMatch.id },
-            });
+            }).catch(console.error);
 
             const myRole = roleRef.current || "player1";
             onMatchFoundCallback(newMatch.id, myRole);
@@ -671,12 +703,15 @@ export const useWordUpLiveGame = ({
                   table: "wordup_matches",
                   filter: `id=eq.${mId}`,
                },
-               (payload) => {
-                  console.log("[WordUp Logs] Live Postgres Update received:", payload.new.current_question_index);
-                  handleMatchUpdateRef.current(payload.new);
-               },
-            )
-            .on("broadcast", { event: "player_answered" }, ({ payload }) => {
+                (payload) => {
+                   console.log("[WordUp Logs] Live Postgres Update received:", payload.new.current_question_index);
+                   // Null-guard: the ref starts as null and is wired by a useEffect after
+                   // first render. Realtime events can fire synchronously during subscribe,
+                   // before the effect runs. The `?.()` prevents a crash on that race.
+                   handleMatchUpdateRef.current?.(payload.new);
+                },
+             )
+             .on("broadcast", { event: "player_answered" }, ({ payload }) => {
                const currentMatch = matchDataRef.current;
                if (!currentMatch) return;
 
@@ -686,31 +721,36 @@ export const useWordUpLiveGame = ({
                   updatedMatch.p1_answers = payload.answers;
                   updatedMatch.p1_score = payload.score;
                } else {
-                  updatedMatch.p2_answered = true;
-                  updatedMatch.p2_answers = payload.answers;
-                  updatedMatch.p2_score = payload.score;
-               }
-               handleMatchUpdateRef.current(updatedMatch);
-            })
-            .on("broadcast", { event: "advance_round" }, ({ payload }) => {
-               const currentMatch = matchDataRef.current;
-               if (!currentMatch) return;
+               updatedMatch.p2_answered = true;
+                   updatedMatch.p2_answers = payload.answers;
+                   updatedMatch.p2_score = payload.score;
+                }
+                // Null-guard: the ref starts as null and is wired by a useEffect after
+                // first render. Broadcasts can arrive immediately after subscribe, before
+                // the effect runs. The `?.()` prevents a crash on that race.
+                handleMatchUpdateRef.current?.(updatedMatch);
+             })
+             .on("broadcast", { event: "advance_round" }, ({ payload }) => {
+                const currentMatch = matchDataRef.current;
+                if (!currentMatch) return;
 
-               const updatedMatch = {
-                  ...currentMatch,
-                  current_question_index: payload.nextIdx,
-                  p1_answered: false,
-                  p2_answered: false,
-               };
-               handleMatchUpdateRef.current(updatedMatch);
-            })
-            .on("broadcast", { event: "game_active" }, () => {
-               const currentMatch = matchDataRef.current;
-               if (!currentMatch) return;
-               handleMatchUpdateRef.current({
-                  ...currentMatch,
-                  status: "active",
-               });
+                const updatedMatch = {
+                   ...currentMatch,
+                   current_question_index: payload.nextIdx,
+                   p1_answered: false,
+                   p2_answered: false,
+                };
+                // Null-guard (see above for reasoning).
+                handleMatchUpdateRef.current?.(updatedMatch);
+             })
+             .on("broadcast", { event: "game_active" }, () => {
+                const currentMatch = matchDataRef.current;
+                if (!currentMatch) return;
+                // Null-guard (see above for reasoning).
+                handleMatchUpdateRef.current?.({
+                   ...currentMatch,
+                   status: "active",
+                });
             })
             .on("broadcast", { event: "rematch_request" }, () => {
                const currentView = useWordUpStore.getState().view;
@@ -783,9 +823,13 @@ export const useWordUpLiveGame = ({
                          .select("*")
                          .eq("id", mId)
                          .single();
-                      if (data) {
-                         handleMatchUpdateRef.current(data);
-                      }
+                       if (data) {
+                          // Null-guard: the ref starts as null and is wired by a useEffect
+                          // after first render. This reconcile timer fires after a delay,
+                          // so the ref is almost certainly set — but the `?.()` makes the
+                          // guarantee explicit and prevents a crash if timing ever changes.
+                          handleMatchUpdateRef.current?.(data);
+                       }
                    } catch (e) {
                       console.warn('[WordUp Live] Failed to reconcile on reconnect:', e);
                    }
@@ -814,6 +858,7 @@ export const useWordUpLiveGame = ({
                console.log("[WordUp Logs] Live Watchdog: Round timer expired. Forcing local player...");
                const forcedState = { ...current };
                const isP1 = roleRef.current === "player1";
+               const mt = maxTimeRef.current;
 
                if (isP1 && !forcedState.p1_answered) {
                   forcedState.p1_answered = true;
@@ -822,7 +867,7 @@ export const useWordUpLiveGame = ({
                      forcedState.p1_answers.push({
                         question_idx: currentIdxRef.current,
                         correct: false,
-                        time_taken: maxTime,
+                        time_taken: mt,
                         points: 0,
                      });
                   }
@@ -833,65 +878,65 @@ export const useWordUpLiveGame = ({
                      forcedState.p2_answers.push({
                         question_idx: currentIdxRef.current,
                         correct: false,
-                        time_taken: maxTime,
+                        time_taken: mt,
                         points: 0,
                      });
                   }
                }
-               handleMatchUpdate(forcedState);
+               handleMatchUpdateRef.current?.(forcedState);
 
-                // If opponent still hasn't answered after 30s total, force them too
-                if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
-                opponentWatchdogRef.current = window.setTimeout(async () => {
-                  const latest = matchDataRef.current;
-                  if (!latest || revealAnswersRef.current) return;
-                  const oppAnswered = isP1 ? latest.p2_answered : latest.p1_answered;
-                  if (!oppAnswered) {
-                     try {
-                        const { data } = await supabase
-                           .from("wordup_matches")
-                           .select("p1_answered, p2_answered")
-                           .eq("id", latest.id)
-                           .single();
-                        if (data) {
-                           const dbOppAnswered = isP1 ? data.p2_answered : data.p1_answered;
-                           if (!dbOppAnswered) {
-                              const forceState = { ...latest };
-                              if (isP1) {
-                                 forceState.p2_answered = true;
-                                 forceState.p2_answers = [...(forceState.p2_answers || [])];
-                                 if (forceState.p2_answers.length <= currentIdxRef.current) {
-                                    forceState.p2_answers.push({
-                                       question_idx: currentIdxRef.current,
-                                       correct: false, time_taken: maxTime, points: 0,
-                                    });
-                                 }
-                              } else {
-                                 forceState.p1_answered = true;
-                                 forceState.p1_answers = [...(forceState.p1_answers || [])];
-                                 if (forceState.p1_answers.length <= currentIdxRef.current) {
-                                    forceState.p1_answers.push({
-                                       question_idx: currentIdxRef.current,
-                                       correct: false, time_taken: maxTime, points: 0,
-                                    });
-                                 }
-                              }
-                              handleMatchUpdate(forceState);
-                           }
-                        }
-                     } catch (e) {
-                        console.warn('[WordUp Live] Failed to check opponent status:', e);
-                     }
-                  }
-                 }, maxTime * 1000 + 10000);
-             }
-          }, 1500);
-          return () => {
-             clearTimeout(watchdog);
-             if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
-          };
-      }
-   }, [timeLeft, revealAnswers, matchData?.status, handleMatchUpdate, maxTime, isActive]);
+                 // If opponent still hasn't answered after 30s total, force them too
+                 if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
+                 opponentWatchdogRef.current = window.setTimeout(async () => {
+                   const latest = matchDataRef.current;
+                   if (!latest || revealAnswersRef.current) return;
+                   const oppAnswered = isP1 ? latest.p2_answered : latest.p1_answered;
+                   if (!oppAnswered) {
+                      try {
+                         const { data } = await supabase
+                            .from("wordup_matches")
+                            .select("p1_answered, p2_answered")
+                            .eq("id", latest.id)
+                            .single();
+                         if (data) {
+                            const dbOppAnswered = isP1 ? data.p2_answered : data.p1_answered;
+                            if (!dbOppAnswered) {
+                               const forceState = { ...latest };
+                               if (isP1) {
+                                  forceState.p2_answered = true;
+                                  forceState.p2_answers = [...(forceState.p2_answers || [])];
+                                  if (forceState.p2_answers.length <= currentIdxRef.current) {
+                                     forceState.p2_answers.push({
+                                        question_idx: currentIdxRef.current,
+                                        correct: false, time_taken: mt, points: 0,
+                                     });
+                                  }
+                               } else {
+                                  forceState.p1_answered = true;
+                                  forceState.p1_answers = [...(forceState.p1_answers || [])];
+                                  if (forceState.p1_answers.length <= currentIdxRef.current) {
+                                     forceState.p1_answers.push({
+                                        question_idx: currentIdxRef.current,
+                                        correct: false, time_taken: mt, points: 0,
+                                     });
+                                  }
+                               }
+                               handleMatchUpdateRef.current?.(forceState);
+                            }
+                         }
+                      } catch (e) {
+                         console.warn('[WordUp Live] Failed to check opponent status:', e);
+                      }
+                   }
+                  }, mt * 1000 + 10000);
+              }
+           }, 1500);
+           return () => {
+              clearTimeout(watchdog);
+              if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
+           };
+       }
+   }, [timeLeft, revealAnswers, matchData?.status, isActive]);
 
    const sendRematch = useCallback(() => {
       const match = matchDataRef.current;
@@ -905,7 +950,7 @@ export const useWordUpLiveGame = ({
          type: "broadcast",
          event: "rematch_request",
          payload: {},
-      });
+      }).catch(console.error);
 
       if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
       let count = 20;
@@ -926,7 +971,7 @@ export const useWordUpLiveGame = ({
          type: "broadcast",
          event: "quick_chat",
          payload: { text, senderRole: roleRef.current }
-      });
+      }).catch(console.error);
       window.dispatchEvent(new CustomEvent("wordup-quick-chat", {
          detail: { text, senderRole: roleRef.current }
       }));
