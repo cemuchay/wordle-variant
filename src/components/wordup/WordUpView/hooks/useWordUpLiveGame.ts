@@ -58,6 +58,8 @@ export const useWordUpLiveGame = ({
    const isAdvancingRef = useRef(false);
     const isRevealingRef = useRef(false);
     const rematchHideRef = useRef<number | null>(null);
+    const rematchFallbackRef = useRef<number | null>(null);
+    const opponentWatchdogRef = useRef<number | null>(null);
    const matchChannelRef = useRef<any>(null);
    const rematchTimerRef = useRef<number | null>(null);
 
@@ -372,12 +374,12 @@ export const useWordUpLiveGame = ({
          const mergedMatch = { ...currentMatch, ...newMatch };
 
          if (currentMatch) {
-            if ((currentMatch.p1_answers?.length || 0) >= (newMatch.p1_answers?.length || 0)) {
-                mergedMatch.p1_answers = currentMatch.p1_answers;
-                mergedMatch.p1_score = currentMatch.p1_score;
-                mergedMatch.p1_answered = currentMatch.p1_answered;
-             }
-             if ((currentMatch.p2_answers?.length || 0) >= (newMatch.p2_answers?.length || 0)) {
+             if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
+                 mergedMatch.p1_answers = currentMatch.p1_answers;
+                 mergedMatch.p1_score = currentMatch.p1_score;
+                 mergedMatch.p1_answered = currentMatch.p1_answered;
+              }
+              if ((currentMatch.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)) {
                 mergedMatch.p2_answers = currentMatch.p2_answers;
                 mergedMatch.p2_score = currentMatch.p2_score;
                 mergedMatch.p2_answered = currentMatch.p2_answered;
@@ -409,7 +411,8 @@ export const useWordUpLiveGame = ({
                triggerToast("⚡ FINAL ROUND: DOUBLE POINTS! ⚡", 3000);
             }
 
-            roundTimeoutRef.current = window.setTimeout(
+             if (roundTimeoutRef.current) clearTimeout(roundTimeoutRef.current);
+             roundTimeoutRef.current = window.setTimeout(
                async () => {
                   isRevealingRef.current = false;
                   roundTimeoutRef.current = null;
@@ -713,19 +716,35 @@ export const useWordUpLiveGame = ({
                const currentView = useWordUpStore.getState().view;
                if (currentView !== "gameover") return;
 
-               if (rematchStateRef.current === "sent") {
-                  const latestMatch = matchDataRef.current;
-                  if (latestMatch) {
-                     const myId = activeRole === "player1" ? latestMatch.player1_id : latestMatch.player2_id;
-                     const oppId = activeRole === "player1" ? latestMatch.player2_id : latestMatch.player1_id;
-                     if (myId && oppId) {
-                        if (myId < oppId) {
-                           acceptRematch(onRematchAcceptedRef.current);
-                        }
-                     }
-                  }
-                  return;
-               }
+                if (rematchStateRef.current === "sent") {
+                   const latestMatch = matchDataRef.current;
+                   if (latestMatch) {
+                      const myId = activeRole === "player1" ? latestMatch.player1_id : latestMatch.player2_id;
+                      const oppId = activeRole === "player1" ? latestMatch.player2_id : latestMatch.player1_id;
+                      if (myId && oppId) {
+                         if (myId < oppId) {
+                            acceptRematch(onRematchAcceptedRef.current);
+                         } else {
+                            // Higher UUID: fallback if rematch_accepted broadcast is lost
+                            if (rematchFallbackRef.current) clearTimeout(rematchFallbackRef.current);
+                            rematchFallbackRef.current = window.setTimeout(async () => {
+                               if (rematchStateRef.current === "expired" || useWordUpStore.getState().view !== "gameover") return;
+                               const { data } = await supabase
+                                  .from("wordup_matches")
+                                  .select("id")
+                                  .or(`and(player1_id.eq.${myId},player2_id.eq.${oppId}),and(player1_id.eq.${oppId},player2_id.eq.${myId})`)
+                                  .in("status", ["countdown", "active"])
+                                  .order("created_at", { ascending: false })
+                                  .limit(1);
+                               if (data?.[0]) {
+                                  onRematchAcceptedRef.current?.(data[0].id, activeRole);
+                               }
+                            }, 3000);
+                         }
+                      }
+                   }
+                   return;
+                }
 
                setRematchState("received");
                setRematchCountdown(20);
@@ -821,8 +840,9 @@ export const useWordUpLiveGame = ({
                }
                handleMatchUpdate(forcedState);
 
-               // If opponent still hasn't answered after 30s total, force them too
-               void setTimeout(async () => {
+                // If opponent still hasn't answered after 30s total, force them too
+                if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
+                opponentWatchdogRef.current = window.setTimeout(async () => {
                   const latest = matchDataRef.current;
                   if (!latest || revealAnswersRef.current) return;
                   const oppAnswered = isP1 ? latest.p2_answered : latest.p1_answered;
@@ -863,11 +883,13 @@ export const useWordUpLiveGame = ({
                         console.warn('[WordUp Live] Failed to check opponent status:', e);
                      }
                   }
-               }, 30000);
-               // eslint-disable-next-line
-            }
-         }, 1500);
-         return () => clearTimeout(watchdog);
+                 }, maxTime * 1000 + 10000);
+             }
+          }, 1500);
+          return () => {
+             clearTimeout(watchdog);
+             if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
+          };
       }
    }, [timeLeft, revealAnswers, matchData?.status, handleMatchUpdate, maxTime, isActive]);
 
@@ -912,13 +934,15 @@ export const useWordUpLiveGame = ({
 
    useEffect(() => {
        return () => {
-          cleanUpIntervals();
-          if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
-          if (rematchHideRef.current) clearTimeout(rematchHideRef.current);
-          if (matchChannelRef.current) {
-            supabase.removeChannel(matchChannelRef.current);
-         }
-      };
+           cleanUpIntervals();
+           if (rematchTimerRef.current) clearInterval(rematchTimerRef.current);
+           if (rematchHideRef.current) clearTimeout(rematchHideRef.current);
+           if (rematchFallbackRef.current) clearTimeout(rematchFallbackRef.current);
+           if (opponentWatchdogRef.current) clearTimeout(opponentWatchdogRef.current);
+           if (matchChannelRef.current) {
+             supabase.removeChannel(matchChannelRef.current);
+          }
+       };
    }, [cleanUpIntervals]);
 
    return {

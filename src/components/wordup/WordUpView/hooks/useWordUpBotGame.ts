@@ -241,6 +241,7 @@ export const useWordUpBotGame = ({
           isSubmittingAnswerRef.current = true;
           setSelectedAnswer(choice);
           stopBotTimer();
+          stopRoundTimer();
 
          const q = questionsRef.current[currentIdxRef.current];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
@@ -406,12 +407,12 @@ export const useWordUpBotGame = ({
          const mergedMatch = { ...currentMatch, ...newMatch };
 
          if (currentMatch) {
-             if ((currentMatch.p1_answers?.length || 0) >= (newMatch.p1_answers?.length || 0)) {
-                mergedMatch.p1_answers = currentMatch.p1_answers;
-                mergedMatch.p1_score = currentMatch.p1_score;
-                mergedMatch.p1_answered = currentMatch.p1_answered;
-             }
-             if ((currentMatch.p2_answers?.length || 0) >= (newMatch.p2_answers?.length || 0)) {
+              if ((currentMatch.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)) {
+                 mergedMatch.p1_answers = currentMatch.p1_answers;
+                 mergedMatch.p1_score = currentMatch.p1_score;
+                 mergedMatch.p1_answered = currentMatch.p1_answered;
+              }
+              if ((currentMatch.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)) {
                 mergedMatch.p2_answers = currentMatch.p2_answers;
                 mergedMatch.p2_score = currentMatch.p2_score;
                 mergedMatch.p2_answered = currentMatch.p2_answered;
@@ -721,7 +722,7 @@ export const useWordUpBotGame = ({
 
    const sendRematch = useCallback(() => {
       console.log("[WordUp Logs] Sending bot rematch request...");
-      setRematchState("received");
+      setRematchState("sent");
       setRematchCountdown(20);
    }, []);
 

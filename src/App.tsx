@@ -957,6 +957,7 @@ export default function App() {
                           // Update Zustand and navigate only after the broadcast has been sent
                           useWordUpStore.getState().setMatchId(newMatch.id);
                           useWordUpStore.getState().setRole("player2");
+                          useWordUpStore.getState().setView("loading");
                           handleNavigation("wordup");
                         });
                         // Remove channel after broadcast

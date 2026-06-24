@@ -133,7 +133,7 @@ export const WordUpView = () => {
       let eloGain = baseEloChange + accuracyBonus;
       // Safety bounds to prevent losing points on a win, or gaining on a loss
       if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
-      if (!won && !tied && eloGain > RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
+       if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
 
       try {
          await updateStats(eloGain, xpReward, won, tied);
@@ -185,20 +185,21 @@ export const WordUpView = () => {
                  store.setOpponentStats(activeGame.opponentStats);
                  store.setRevealAnswers(activeGame.revealAnswers || false);
                  store.setSelectedAnswer(activeGame.selectedAnswer || null);
-                 
+                  
+                  launchedMatchIdRef.current = activeGame.matchId;
                   store.setView("loading");
-                 
-                 setTimeout(async () => {
-                    const match = await loadAndSubscribeMatch(activeGame.matchId, activeGame.role);
-                    const loadedQuestions = useWordUpStore.getState().questions;
-                    if (!match || !loadedQuestions || loadedQuestions.length === 0) {
-                       console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
-                       triggerToast("Failed to restore game.", 3000);
-                       resetGame();
-                       setView("menu");
-                       return;
-                    }
-                    startQuestionRound(match, activeGame.currentIdx || 0);
+                  
+                  setTimeout(async () => {
+                     const match = await loadAndSubscribeMatchRef.current(activeGame.matchId, activeGame.role);
+                     const loadedQuestions = useWordUpStore.getState().questions;
+                     if (!match || !loadedQuestions || loadedQuestions.length === 0) {
+                        console.warn("[WordUp Recovery] Failed to load match or questions on recovery.");
+                        triggerToast("Failed to restore game.", 3000);
+                        resetGame();
+                        setView("menu");
+                        return;
+                     }
+                     startQuestionRoundRef.current(match, activeGame.currentIdx || 0);
                  }, 100); // brief yield for state settling
               }
            } catch (err) {
@@ -213,6 +214,10 @@ export const WordUpView = () => {
       useEffect(() => {
          startQuestionRoundRef.current = startQuestionRound;
       }, [startQuestionRound]);
+      const loadAndSubscribeMatchRef = useRef(loadAndSubscribeMatch);
+      useEffect(() => {
+         loadAndSubscribeMatchRef.current = loadAndSubscribeMatch;
+      }, [loadAndSubscribeMatch]);
 
       useEffect(() => {
          if (matchData?.status === "active" && view === "countdown") {
@@ -320,7 +325,7 @@ export const WordUpView = () => {
 
    // Reactive sync for direct invites and rematch transitions
    useEffect(() => {
-      if (matchId && role && matchId !== launchedMatchIdRef.current && (view === "menu" || view === "matchmaking" || view === "gameover")) {
+      if (matchId && role && matchId !== launchedMatchIdRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading")) {
          console.log("[WordUp Logs] Direct matchId set in store. Launching match...", matchId, role);
          onMatchFound(matchId, role);
       }

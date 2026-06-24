@@ -226,7 +226,7 @@ export const LobbyView = ({
       } finally {
          setIsLoadingData(false);
       }
-   }, [currentUser, triggerToast, markNotified]);
+   }, [currentUser, markNotified]);
 
    const fetchHistory = useCallback(async () => {
       if (!currentUser) return;
