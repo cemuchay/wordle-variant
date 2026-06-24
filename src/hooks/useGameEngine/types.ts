@@ -9,6 +9,7 @@ export interface GameEngineConfig {
 export interface GameEngineState {
     guesses: any[];
     currentGuess: string;
+    cursorIndex: number;
     isGameOver: boolean;
     isWon: boolean;
     isLost: boolean;
