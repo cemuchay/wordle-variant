@@ -81,7 +81,7 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
    Partial<CategoryQuestionConfig>
 >([
    define("maths", {
-      proceduralWeight: 0.3,
+      proceduralWeight: 0.8,
       weights: {
          forward: 3,
          reverse: 1,

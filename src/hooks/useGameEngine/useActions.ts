@@ -47,9 +47,26 @@ export const useActions = ({
       [dispatch, config.length],
    );
 
-   const onDelete = useCallback(() => {
+    const onDelete = useCallback(() => {
       dispatch({ type: "DELETE_LETTER" });
-   }, [dispatch]);
+    }, [dispatch]);
+
+    const onSetCursor = useCallback(
+      (index: number) => {
+        dispatch({ type: "SET_CURSOR", index });
+      },
+      [dispatch],
+    );
+
+    const onCursorLeft = useCallback(() => {
+      const newIdx = Math.max(0, state.cursorIndex - 1);
+      dispatch({ type: "SET_CURSOR", index: newIdx });
+    }, [state.cursorIndex, dispatch]);
+
+    const onCursorRight = useCallback(() => {
+      const newIdx = Math.min(state.currentGuess.length, state.cursorIndex + 1);
+      dispatch({ type: "SET_CURSOR", index: newIdx });
+    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
    const onEnter = useCallback(async () => {
       if (state.isGameOver || state.currentGuess.length !== config.length)
@@ -321,14 +338,17 @@ export const useActions = ({
       dispatch({ type: "LOAD_STATE", payload });
    }, [dispatch]);
 
-   return {
+    return {
       onChar,
       onDelete,
       onEnter,
       handleHint,
       setGameOverModalOpen,
       loadState,
-   };
+      onSetCursor,
+      onCursorLeft,
+      onCursorRight,
+    };
 };
 
 import { supabase } from '../../lib/supabaseClient';

@@ -13,6 +13,7 @@ interface GameAreaProps {
     maxAttempts: number;
     guesses: GuessResult[][];
     currentGuess: string;
+    cursorIndex?: number;
     letterStatuses: Record<string, LetterStatus>;
     hintRecord: { letter: string; index: number; row?: number } | null;
     isGameOver: boolean;
@@ -21,6 +22,7 @@ interface GameAreaProps {
     onChar: (char: string) => void;
     onDelete: () => void;
     onEnter: () => void;
+    onSetCursor?: (index: number) => void;
     activeDailyMarathons: any[];
     setIsChallengeOpen: any;
     setSelectedChallengeId: any;
@@ -32,6 +34,7 @@ export const GameArea = ({
     maxAttempts,
     guesses,
     currentGuess,
+    cursorIndex,
     letterStatuses,
     hintRecord,
     isGameOver,
@@ -40,6 +43,7 @@ export const GameArea = ({
     onChar,
     onDelete,
     onEnter,
+    onSetCursor,
     activeDailyMarathons,
     setIsChallengeOpen,
     setSelectedChallengeId,
@@ -117,11 +121,13 @@ export const GameArea = ({
                         maxAttempts={maxAttempts}
                         guesses={guesses}
                         currentGuess={currentGuess}
+                        cursorIndex={cursorIndex}
                         hintRecord={hintRecord}
                         isShake={isShake}
                         isSaving={isSaving}
                         compact={preferences.compactMode}
                         gameplayType="regular"
+                        onSetCursor={onSetCursor}
                     />
 
                     {/* Help Icon Popover Nudge */}

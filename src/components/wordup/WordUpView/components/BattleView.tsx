@@ -8,7 +8,7 @@ import { useConfirmation } from "../../../../hooks/useConfirmation";
 import { type ProfileStats } from "../types";
 
 
-import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
+import { getQuestionDuration } from "../hooks/useWordUpGameEngine";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
 import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
@@ -99,11 +99,10 @@ export const BattleView = ({
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
 
-   const [prevIdx, setPrevIdx] = useState(currentIdx);
-   if (currentIdx !== prevIdx) {
-      setPrevIdx(currentIdx);
-      setParticles([]);
-   }
+    useEffect(() => {
+        setParticles([]);
+        setScorePopups([]);
+    }, [currentIdx]);
 
    const [showLastRound, setShowLastRound] = useState(false);
    const lastRoundShownRef = useRef(false);

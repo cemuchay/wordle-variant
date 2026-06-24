@@ -753,6 +753,7 @@ export default function App() {
                   maxAttempts={config.maxAttempts}
                   guesses={state.guesses}
                   currentGuess={state.currentGuess}
+                  cursorIndex={state.cursorIndex}
                   letterStatuses={state.letterStatuses}
                   hintRecord={state.hintRecord}
                   isGameOver={state.isGameOver}
@@ -761,6 +762,7 @@ export default function App() {
                   onChar={actions.onChar}
                   onDelete={actions.onDelete}
                   onEnter={actions.onEnter}
+                  onSetCursor={actions.onSetCursor}
                   activeDailyMarathons={activeDailyMarathons}
                   setSelectedChallengeId={setSelectedChallengeId}
                   setIsChallengeOpen={setIsChallengeOpen}
@@ -957,6 +959,7 @@ export default function App() {
                           // Update Zustand and navigate only after the broadcast has been sent
                           useWordUpStore.getState().setMatchId(newMatch.id);
                           useWordUpStore.getState().setRole("player2");
+                          useWordUpStore.getState().setView("loading");
                           handleNavigation("wordup");
                         });
                         // Remove channel after broadcast

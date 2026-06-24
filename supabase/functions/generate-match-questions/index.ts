@@ -42,14 +42,22 @@ const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
 function pickVariants(weights: number[], rng: () => number, count: number): number[] {
    const total = weights.reduce((a, b) => a + b, 0);
-   return Array.from({ length: count }, () => {
-      let roll = rng() * total;
-      for (let v = 0; v < weights.length; v++) {
-         roll -= weights[v];
-         if (roll <= 0) return v;
-      }
-      return weights.length - 1;
-   });
+   const result: number[] = [];
+   for (let i = 0; i < count; i++) {
+      let variant: number;
+      let attempts = 0;
+      do {
+         let roll = rng() * total;
+         variant = 0;
+         for (let v = 0; v < weights.length; v++) {
+            roll -= weights[v];
+            if (roll <= 0) { variant = v; break; }
+         }
+         attempts++;
+      } while (i > 0 && variant === result[i - 1] && attempts < 10);
+      result.push(variant);
+   }
+   return result;
 }
 
 function buildVariantTryOrder(assignedVariant: number, weights: number[]): number[] {
@@ -82,6 +90,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          prompt: `Identify: ${label}`,
          choices: [label, "Unknown", "None", "All"],
          answer: label,
+         explanation: `The correct answer is "${label}".`,
       };
    }
 
@@ -92,7 +101,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          allEntities.filter((e) => e.label !== label).map((e) => e.label), rng,
       ).slice(0, 3);
       const choices = seededShuffle([...new Set([label, ...distractors])].slice(0, 4), rng);
-      return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label };
+      return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label, explanation: `The entity described is "${label}".` };
    }
 
    const shuffledKeys = seededShuffle(availableKeys, rng);
@@ -181,6 +190,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             prompt: prompt.prompt,
             choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
             answer: correctValue,
+            explanation: `"${label}" has a ${keyLabel} of "${correctValue}".`,
          };
          return q;
       }
@@ -193,6 +203,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             prompt: prompt.prompt,
             choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
             answer: label,
+            explanation: `"${label}" is the one with a ${keyLabel} of "${correctValue}".`,
          };
          return q;
       }
@@ -220,6 +231,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                choices: seededShuffle([...new Set([...seededShuffle(info.labels, rng).slice(0, 3), label])].slice(0, 4), rng),
                answer: label,
                subPrompt: `The others have the ${keyLabel} "${sharedValue}".`,
+               explanation: `"${label}" is the odd one out — the others share ${keyLabel}: "${sharedValue}".`,
             };
             return q;
          }
@@ -235,6 +247,9 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             prompt: prompt.prompt,
             choices: ["True", "False"],
             answer: isTrue ? "True" : "False",
+            explanation: isTrue
+               ? `"${label}" indeed has a ${keyLabel} of "${correctValue}".`
+               : `"${label}" does not have a ${keyLabel} of "${displayedValue}" — its actual ${keyLabel} is "${correctValue}".`,
          };
          return q;
       }
@@ -290,6 +305,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             prompt: `${intro}\n${cluesStr}`,
             choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
             answer: label,
+            explanation: `The clues describe "${label}" (${keyLabel}: "${correctValue}").`,
          };
          return q;
       }
@@ -305,6 +321,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                prompt: prompt.prompt,
                choices: seededShuffle([...new Set([correctValue, ...otherDistractors])].slice(0, 4), rng),
                answer: correctValue,
+               explanation: `"${label}" actually has a ${keyLabel} of "${correctValue}", not "${wrongValue}".`,
             };
             return q;
          }
@@ -331,6 +348,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                prompt: `Which category best fits "${label}"?`,
                choices: seededShuffle([chosenTag, ...tagDistractors], rng),
                answer: chosenTag,
+               explanation: `"${label}" belongs to the "${chosenTag}" category.`,
             };
             return q;
          }
@@ -352,6 +370,9 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                const winner = isHigher
                   ? (correctNum > peerNum ? label : peer.label)
                   : (correctNum < peerNum ? label : peer.label);
+               const loser = winner === label ? peer.label : label;
+               const winnerVal = winner === label ? correctValue : String(peer.metadata[chosenKey] ?? "");
+               const loserVal = loser === label ? correctValue : String(peer.metadata[chosenKey] ?? "");
                q = {
                   type: "definition",
                   prompt: isHigher
@@ -359,6 +380,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                      : `Which has a lower ${keyLabel}: "${label}" or "${peer.label}"?`,
                   choices: seededShuffle([label, peer.label], rng),
                   answer: winner,
+                  explanation: `"${winner}" has a ${keyLabel} of ${winnerVal}, while "${loser}" has ${loserVal}.`,
                };
                return q;
             }
@@ -394,6 +416,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                      : `Which of these happened most recently (${keyLabel})?`,
                   choices: seededShuffle([answer.label, ...timelineDistractors], rng),
                   answer: answer.label,
+                  explanation: `"${answer.label}" is the ${askEarliest ? "earliest" : "most recent"} (${keyLabel}: ${answer.value}).`,
                };
                return q;
             }
@@ -406,6 +429,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       prompt: fallbackQ.prompt,
       choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
       answer: correctValue,
+      explanation: `"${label}" has a ${keyLabel} of "${correctValue}".`,
    };
 }
 

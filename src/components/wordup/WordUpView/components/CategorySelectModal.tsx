@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "../constants";
 import { safeLocalStorage } from "../../../../utils/storage";
+import { useWordUpStore } from "../../../../store/useWordUpStore";
 
 const RECENTS_KEY = "wordup_recent_categories";
 const MAX_RECENTS = 5;
@@ -245,11 +246,12 @@ export const CategorySelectModal = ({
       onClose();
    };
 
-   const handleSelectAndPlay = () => {
-      recordRecent(category);
-      startMatchmaking();
-      onClose();
-   };
+    const handleSelectAndPlay = () => {
+       const currentCategory = useWordUpStore.getState().category;
+       recordRecent(currentCategory);
+       startMatchmaking();
+       onClose();
+    };
 
    return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]">

@@ -18,6 +18,7 @@ interface CellProps {
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
   wordLength: number;
+  isCursor?: boolean;
 }
 
 // Sizing config supporting different widths/heights for mobile and desktop (sm)
@@ -74,7 +75,7 @@ const TILE_SIZES = [
 
 
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
   const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
   const isPWA = useAppStore(s => s.isPWAInstalled)
@@ -125,6 +126,7 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   else if (status === 'present') statusClass = 'bg-present border-present';
   else if (status === 'absent') statusClass = 'bg-absent border-absent';
   else if (letter) statusClass = 'border-gray-500';
+  if (isCursor) statusClass += ' ring-2 ring-blue-400 border-blue-400';
 
   if (isRevealing) {
     if (status === 'correct') animationClass = 'animate-reveal-correct';
@@ -171,9 +173,11 @@ interface GridProps {
   isSaving?: boolean;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
+  cursorIndex?: number;
+  onSetCursor?: (index: number) => void;
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType }) => {
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, onSetCursor }) => {
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
@@ -367,16 +371,22 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                   const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
 
                   return (
-                    <Cell
+                    <div
                       key={`current-${i}`}
-                      letter={letter}
-                      isPop={!!currentGuess[i]}
-                      isShake={isShake}
-                      isHinted={isHinted}
-                      compact={compact}
-                      gameplayType={gameplayType}
-                      wordLength={wordLength}
-                    />
+                      onClick={() => onSetCursor?.(i)}
+                      className="cursor-pointer"
+                    >
+                      <Cell
+                        letter={letter}
+                        isPop={!!currentGuess[i]}
+                        isShake={isShake}
+                        isHinted={isHinted}
+                        compact={compact}
+                        gameplayType={gameplayType}
+                        wordLength={wordLength}
+                        isCursor={wordLength > 6 && !isWon && !isLost && cursorIndex === i}
+                      />
+                    </div>
                   );
                 })}
               </div>

@@ -95,12 +95,13 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
+      const state = useWordUpStore.getState();
       set({
          isBattlePlaying: false,
          view: "menu",
          matchId: null,
          role: null,
-         questions: [],
+         questions: state.questions.length > 0 ? [] : state.questions,
          currentIdx: 0,
          matchData: null,
          opponentStats: null,

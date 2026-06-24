@@ -202,9 +202,14 @@ export const GameOverView = ({
                                   ))}
                                </div>
                             )}
-                            <p className="text-[10px] text-gray-400 mt-1">
-                               Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
-                            </p>
+                             <p className="text-[10px] text-gray-400 mt-1">
+                                Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
+                             </p>
+                             {q.explanation && (
+                                <p className="text-[10px] text-gray-300 bg-white/5 px-2 py-1 rounded italic mt-1 leading-relaxed">
+                                   💡 {q.explanation}
+                                </p>
+                             )}
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
                                  <p className="font-black text-gray-500 uppercase">You</p>
