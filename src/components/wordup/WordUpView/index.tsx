@@ -164,13 +164,13 @@ export const WordUpView = () => {
       countdownSecs,
       startMatchmaking,
       cancelMatchmaking
-   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); resetGame(); });
+   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); });
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
-      safeLocalStorage.removeItem("wordup_active_game");
+      resetGame();
       setView("menu");
-   }, [cancelMatchmaking, setView]);
+   }, [cancelMatchmaking, resetGame, setView]);
 
    const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
 

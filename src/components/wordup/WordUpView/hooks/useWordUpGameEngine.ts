@@ -419,6 +419,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       clearT("countdownInterval");
       let c = 3;
       useWordUpStore.getState().setView("countdown");
+      dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
       T.current.countdownInterval = window.setInterval(() => {
          c--;
          if (c === 0) {
@@ -428,7 +429,10 @@ export function useWordUpGameEngine(props: EngineProps) {
                supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id).then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
             if (gameType === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
             cb.current.startQuestionRound?.(match, 0);
-         } else useWordUpStore.getState().setView("countdown");
+         } else {
+            useWordUpStore.getState().setView("countdown");
+            dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
+         }
       }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
    }, [role, gameType]);
 

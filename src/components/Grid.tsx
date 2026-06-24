@@ -384,7 +384,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                         compact={compact}
                         gameplayType={gameplayType}
                         wordLength={wordLength}
-                        isCursor={cursorIndex === i}
+                        isCursor={wordLength > 6 && !isWon && !isLost && cursorIndex === i}
                       />
                     </div>
                   );
