@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc -b --noEmit
+
+      - name: Vitest integration + unit tests
+        run: npx vitest run
+
+      - name: Playwright install
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright E2E smoke tests
+        run: npx playwright test --project=chromium
+        working-directory: e2e
+
+      - name: Build
+        run: npm run build
