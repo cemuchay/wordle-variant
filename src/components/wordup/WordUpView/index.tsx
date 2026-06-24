@@ -138,6 +138,8 @@ export const WordUpView = () => {
    const launchedMatchRef = useRef<string | null>(null);
    const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
    const engineCleanupRef = useRef<(() => void) | null>(null);
+   startMatchRef.current = engine.startMatch;
+   engineCleanupRef.current = engine.cleanup;
 
    const onMatchFound = useCallback((mId: string, mRole: "player1" | "player2") => {
       launchedMatchRef.current = mId;
@@ -146,9 +148,9 @@ export const WordUpView = () => {
       startMatchRef.current?.(mId, mRole);
    }, [setMatchId, setRole]);
 
-   // Reactive sync for direct invites and rematch transitions
+   // Reactive sync for direct invites, rematch transitions, and loading state
    useEffect(() => {
-      if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover")) {
+      if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading")) {
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }

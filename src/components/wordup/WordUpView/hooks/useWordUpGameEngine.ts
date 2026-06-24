@@ -512,17 +512,21 @@ export function useWordUpGameEngine(props: EngineProps) {
 
          if (!match) throw new Error("Match not found");
 
-         if (match.status === "completed" || safeSessionStorage.getItem("wordup_completed_" + mId) === "true") {
-            safeSessionStorage.setItem("wordup_completed_" + mId, "true");
-            triggerToast("This match has already been completed.", 4000);
-            dispatch({ type: "RESET" }); return;
-         }
-         const mt = match.created_at ? new Date(match.created_at).getTime() : 0;
-         if (match.status !== "completed" && match.status !== "waiting" && Date.now() - mt > 300000) {
-            await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", mId);
-            triggerToast("This match has expired.", 5000);
-            dispatch({ type: "RESET" }); return;
-         }
+          if (match.status === "completed" || safeSessionStorage.getItem("wordup_completed_" + mId) === "true") {
+             safeSessionStorage.setItem("wordup_completed_" + mId, "true");
+             triggerToast("This match has already been completed.", 4000);
+             dispatch({ type: "RESET" });
+             useWordUpStore.getState().resetGame();
+             return;
+          }
+          const mt = match.created_at ? new Date(match.created_at).getTime() : 0;
+          if (match.status !== "completed" && match.status !== "waiting" && Date.now() - mt > 300000) {
+             await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", mId);
+             triggerToast("This match has expired.", 5000);
+             dispatch({ type: "RESET" });
+             useWordUpStore.getState().resetGame();
+             return;
+          }
 
          dispatch({ type: "SET_MATCH_DATA", data: match });
 

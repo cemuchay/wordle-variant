@@ -72,6 +72,7 @@ describe('Integration: async game flow (real hooks)', () => {
       view: 'loading',
       matchId: match.id,
       role: 'player1',
+      matchData: match,
     });
 
     renderWordUp();
@@ -102,6 +103,7 @@ describe('Integration: async game flow (real hooks)', () => {
       view: 'loading',
       matchId: match.id,
       role: 'player1',
+      matchData: match,
     });
 
     renderWordUp();
