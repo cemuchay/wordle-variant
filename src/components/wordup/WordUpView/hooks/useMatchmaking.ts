@@ -39,7 +39,6 @@ export const useWordUpMatchmaking = (
 
    const triggerBotFallback = useCallback(async () => {
       if (!user) return;
-      cleanUpMatchmaking();
 
       try {
          await wordupNetworkGate.enqueue(
@@ -53,6 +52,8 @@ export const useWordUpMatchmaking = (
       } catch (e) {
          console.warn("Queue purge failed, continuing:", e);
       }
+
+      cleanUpMatchmaking();
 
       const localMatchId = `bot-match-${crypto.randomUUID()}`;
 
@@ -112,7 +113,26 @@ export const useWordUpMatchmaking = (
                }
             }
          )
-         .subscribe();
+         .subscribe(async (status) => {
+            if (status === "SUBSCRIBED" && user?.id) {
+               const { data } = await supabase
+                  .from("wordup_matches")
+                  .select("*")
+                  .eq("player1_id", user.id)
+                  .in("status", ["waiting", "countdown"])
+                  .order("created_at", { ascending: false })
+                  .limit(1);
+               if (data?.[0]) {
+                  const match = data[0] as any;
+                  if (match.status === "countdown" || match.status === "waiting") {
+                     cleanUpMatchmaking();
+                     setMatchId(match.id);
+                     setRole("player1");
+                     onMatchFound(match.id, "player1");
+                  }
+               }
+            }
+         });
 
       matchmakingChannelRef.current = channel;
    }, [user, cleanUpMatchmaking, onMatchFound]);
