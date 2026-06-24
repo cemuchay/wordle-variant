@@ -30,6 +30,7 @@ export interface WordUpQuestion {
    subPrompt?: string; // Additional context (e.g., target word in reverse Wordle)
    choices: string[];
    answer: string;
+   explanation?: string; // Shown after the game to explain why the correct answer is right
    imageUrl?: string; // Optional URL pointing to the Supabase Storage bucket asset
    imageUrls?: string[]; // Optional array of image codes/urls for multi-image questions
 }
@@ -829,6 +830,7 @@ export const generateMathQuestion = (): WordUpQuestion => {
          prompt: def.question,
          choices,
          answer: String(def.answer),
+         explanation: `${def.question} = ${def.answer}.`,
       };
    } else {
       const template =
@@ -846,6 +848,7 @@ export const generateMathQuestion = (): WordUpQuestion => {
          prompt: q.question,
          choices,
          answer: String(q.answer),
+         explanation: `${q.question} = ${q.answer}.`,
       };
    }
 };
@@ -893,6 +896,7 @@ export const generateOddOneOutQuestion = (
          prompt: "ALL OF THESE ARE VALID WORDS EXCEPT:",
          choices,
          answer: fake,
+         explanation: `"${fake}" is not a real word — it was created by altering a real word.`,
       };
    } else if (subType === 1) {
       const choicesSet = new Set<string>();
@@ -935,6 +939,7 @@ export const generateOddOneOutQuestion = (
          prompt: `ALL OF THESE ARE VALID ${length}-LETTER WORDS EXCEPT:`,
          choices,
          answer: wrongOption,
+         explanation: `"${wrongOption}" does not belong — it is not a valid ${length}-letter word.`,
       };
    } else if (subType === 2) {
       const realWord = randomWord({ official });
@@ -959,6 +964,7 @@ export const generateOddOneOutQuestion = (
          prompt: "WHICH OF THE FOLLOWING IS A VALID WORD?",
          choices,
          answer: realWord,
+         explanation: `"${realWord}" is the only real English word among the options.`,
       };
    } else {
       const realWord = randomWord({ official });
@@ -1004,6 +1010,7 @@ export const generateOddOneOutQuestion = (
          prompt: `WHICH OF THE FOLLOWING IS A VALID ${length}-LETTER WORD?`,
          choices,
          answer: realWord,
+         explanation: `"${realWord}" is the only valid ${length}-letter word among the options.`,
       };
    }
 };
@@ -1055,6 +1062,7 @@ const generateSynonymMatch = (): WordUpQuestion => {
       prompt: `Which word is related to ${displayWord}?`,
       choices: shuffle(Array.from(choices)),
       answer: correctWord,
+      explanation: `"${displayWord}" and "${correctWord}" are related (theme: ${theme}).`,
    };
 };
 
@@ -1119,6 +1127,7 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
       subPrompt: `Last 2 letters: "${fallbackSuffix}"`,
       choices: shuffle(Array.from(choices)),
       answer: correct,
+      explanation: `"${correct}" starts with "${fallbackSuffix}", the last 2 letters of "${fallbackWord}".`,
    };
 };
 
@@ -1155,6 +1164,7 @@ const generateLetterShift = (allowedLengths: number[]): WordUpQuestion => {
       subPrompt: shifted,
       choices: shuffle(Array.from(choices)),
       answer: word,
+      explanation: `"${word}" shifted by ${shift} letter(s) gives "${shifted}".`,
    };
 };
 
@@ -1187,6 +1197,7 @@ const generateCompoundBreak = (): WordUpQuestion => {
       prompt: `Which word combines with "${otherPart}" to form "${compound}"?`,
       choices: shuffle(Array.from(choices)),
       answer: correct,
+      explanation: `"${otherPart}" + "${correct}" = "${compound}".`,
    };
 };
 
@@ -1199,6 +1210,7 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
          prompt: "Which word can be found inside SUNFLOWER?",
          choices: shuffle(["SUN", "MOON", "STAR", "SKY"]),
          answer: "SUN",
+         explanation: `"SUN" is hidden inside "SUNFLOWER".`,
       };
    }
    const longLen = longLengths[Math.floor(Math.random() * longLengths.length)];
@@ -1259,6 +1271,7 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
       prompt: `Which word can be found inside "${fallbackWord}"?`,
       choices: shuffle(Array.from(choices)),
       answer: correct,
+      explanation: `"${correct}" is hidden inside "${fallbackWord}".`,
    };
 };
 
@@ -1336,6 +1349,7 @@ const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
       subPrompt: `Coded: ${encoded}`,
       choices: shuffle(Array.from(choices)),
       answer: word,
+      explanation: `"${word}" encoded as "${encoded}" using a substitution cipher.`,
    };
 };
 
@@ -1358,6 +1372,7 @@ const generateCategorySort = (): WordUpQuestion => {
       prompt: `Which word does NOT belong with the others?`,
       choices: shuffle(Array.from(choices)),
       answer: oddWord,
+      explanation: `"${oddWord}" belongs to "${otherTheme}", while the others belong to "${mainTheme}".`,
    };
 };
 
@@ -1509,6 +1524,9 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
       prompt,
       choices: shuffle(Array.from(choices)),
       answer: correctAnswer,
+      explanation: isRemove
+         ? `Remove a letter from "${pair.base}" to get "${pair.result}".`
+         : `Add a letter to "${pair.base}" to get "${pair.result}".`,
    };
 };
 
@@ -1637,6 +1655,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                prompt: word,
                choices: ["Real", "Fake"],
                answer: "Real",
+               explanation: `"${word}" is a real English word.`,
             });
          } else {
             const fake = mutateToFakeWord(word, valid);
@@ -1645,6 +1664,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
                prompt: fake,
                choices: ["Real", "Fake"],
                answer: "Fake",
+               explanation: `"${fake}" is not a real English word — it was created by altering "${word}".`,
             });
          }
       } else if (type === "length") {
@@ -1666,6 +1686,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: word,
             choices: Array.from(choices).sort((a, b) => Number(a) - Number(b)),
             answer: String(correctLen),
+            explanation: `The word "${word}" has ${correctLen} letters.`,
          });
       } else if (type === "missing_letter") {
          const word = randomWord();
@@ -1705,6 +1726,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: promptStr,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: correctLetter,
+            explanation: `The missing letter is "${correctLetter}". The full word is "${word}".`,
          });
       } else if (type === "reverse_wordle") {
          // Target word
@@ -1759,6 +1781,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             subPrompt: `Target: ${target}`,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: guess,
+            explanation: `The guess "${guess}" produces this pattern for the target "${target}".`,
          });
       } else if (type === "definition") {
          // Find a word in our definition list
@@ -1779,6 +1802,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: definition,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: chosenWord,
+            explanation: `The word "${chosenWord}" means: ${definition}`,
          });
       } else if (type === "anagram") {
          const word = randomWord();
@@ -1808,6 +1832,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: scrambled,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: word,
+            explanation: `"${scrambled}" unscrambled is "${word}".`,
          });
       } else if (type === "anagram_scrambled") {
          const word = randomWord();
@@ -1878,6 +1903,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: word,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: scrambled,
+            explanation: `"${scrambled}" is a valid scrambled version of "${word}".`,
          });
       } else if (type === "pattern") {
          // type === "pattern"
@@ -1947,6 +1973,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             subPrompt: p.query,
             choices: ["True", "False"],
             answer: answerBool ? "True" : "False",
+            explanation: `The word "${word}" ${answerBool ? 'does' : 'does not'} satisfy: ${p.query}`,
          });
       } else if (type === "math") {
          questions.push(generateMathQuestion());
@@ -1975,6 +2002,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: word,
+            explanation: `"${word}" with vowels removed is "${prompt}".`,
          });
       } else if (type === "rhyme_match") {
          const word = randomWord();
@@ -2052,6 +2080,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: `Which word rhymes with ${currentWord}?`,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: currentRhymingWord,
+            explanation: `"${currentRhymingWord}" rhymes with "${currentWord}" (both end with "${currentSuffix}").`,
          });
       } else if (type === "letter_count") {
          const word = randomWord();
@@ -2088,6 +2117,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt,
             choices: Array.from(choices).sort((a, b) => Number(a) - Number(b)),
             answer: String(count),
+            explanation: `The word "${word}" has ${count} ${isVowelCount ? 'vowel' : 'consonant'}${count !== 1 ? 's' : ''}.`,
          });
       } else if (type === "word_ladder") {
          const word = randomWord();
@@ -2148,6 +2178,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             prompt: `Which word is exactly one letter edit away from ${currentWord}?`,
             choices: Array.from(choices).sort(() => Math.random() - 0.5),
             answer: correctWord,
+            explanation: `Change one letter in "${currentWord}" to get "${correctWord}".`,
          });
       } else if (type === "synonym_match") {
          questions.push(generateSynonymMatch());
