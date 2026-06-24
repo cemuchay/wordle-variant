@@ -8,7 +8,7 @@ import { useConfirmation } from "../../../../hooks/useConfirmation";
 import { type ProfileStats } from "../types";
 
 
-import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
+import { getQuestionDuration } from "../hooks/useWordUpGameEngine";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
 import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
