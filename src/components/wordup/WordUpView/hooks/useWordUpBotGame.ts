@@ -58,8 +58,9 @@ export const useWordUpBotGame = ({
    const botActionRef = useRef<any>(null);
    const isSubmittingAnswerRef = useRef(false);
     const isAdvancingRef = useRef(false);
-    const isRevealingRef = useRef(false);
-    const rematchHideRef = useRef<number | null>(null);
+     const isRevealingRef = useRef(false);
+     const isEndingRef = useRef(false);
+     const rematchHideRef = useRef<number | null>(null);
    const rematchTimerRef = useRef<number | null>(null);
 
    const currentIdxRef = useRef(currentIdx);
@@ -114,12 +115,19 @@ export const useWordUpBotGame = ({
       }
    }, []);
 
-   const stopRoundTimeout = useCallback(() => {
-      if (roundTimeoutRef.current) {
-         clearTimeout(roundTimeoutRef.current);
-         roundTimeoutRef.current = null;
-      }
-   }, []);
+    // `isRevealingRef` is set to `true` when a reveal starts and only reset to
+    // `false` inside the reveal timeout callback. If the timeout is cleared
+    // (cleanup, abort, deactivation) before it fires, the ref stays `true`
+    // permanently — blocking ALL future reveals and freezing the game.
+    // Resetting it here ensures the next reveal can proceed regardless of why
+    // the timeout was stopped.
+    const stopRoundTimeout = useCallback(() => {
+       if (roundTimeoutRef.current) {
+          clearTimeout(roundTimeoutRef.current);
+          roundTimeoutRef.current = null;
+       }
+       isRevealingRef.current = false;
+    }, []);
 
    const cleanUpIntervals = useCallback(() => {
       stopRoundTimer();
@@ -133,10 +141,12 @@ export const useWordUpBotGame = ({
       }
    }, [isActive, cleanUpIntervals]);
 
-   const endGame = useCallback(
-      async (match: any) => {
-         try {
-            console.log("[WordUp Logs] Bot endGame: Pushing final consolidated match state to DB...");
+    const endGame = useCallback(
+       async (match: any) => {
+          if (isEndingRef.current) return;
+          isEndingRef.current = true;
+          try {
+             console.log("[WordUp Logs] Bot endGame: Pushing final consolidated match state to DB...");
             const completedAt = new Date().toISOString();
             const isLocalBotMatch = match.id.startsWith("bot-match-");
             
@@ -328,6 +338,9 @@ export const useWordUpBotGame = ({
             handleMatchUpdateRef.current?.(updatedMatch);
          } catch (err) {
             console.error("[WordUp Logs] Local bot update failed:", err);
+            // Reset selectedAnswer so the user can retry — the async error
+            // left the answer locked without a valid submission.
+            setSelectedAnswer(null);
          } finally {
             isSubmittingAnswerRef.current = false;
          }
@@ -563,10 +576,12 @@ export const useWordUpBotGame = ({
          opponentStats,
          revealAnswers,
          selectedAnswer,
+         timeLeft,
+         maxTime,
          gameType: "live-bot"
       };
       safeLocalStorage.setItem("wordup_active_game", JSON.stringify(activeState));
-   }, [isActive, matchId, role, questions, currentIdx, matchData, opponentStats, revealAnswers, selectedAnswer]);
+   }, [isActive, matchId, role, questions, currentIdx, matchData, opponentStats, revealAnswers, selectedAnswer, timeLeft, maxTime]);
 
    useEffect(() => {
       handleMatchUpdateRef.current = handleMatchUpdate;

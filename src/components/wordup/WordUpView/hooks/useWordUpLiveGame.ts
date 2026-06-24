@@ -52,11 +52,12 @@ export const useWordUpLiveGame = ({
    const [rematchCountdown, setRematchCountdown] = useState(10);
    const [showRematchButton, setShowRematchButton] = useState(true);
 
-   const timerRef = useRef<number | null>(null);
-   const roundTimeoutRef = useRef<number | null>(null);
-   const isSubmittingAnswerRef = useRef(false);
-   const isAdvancingRef = useRef(false);
+    const timerRef = useRef<number | null>(null);
+    const roundTimeoutRef = useRef<number | null>(null);
+    const isSubmittingAnswerRef = useRef(false);
+    const isAdvancingRef = useRef(false);
     const isRevealingRef = useRef(false);
+    const isEndingRef = useRef(false);
     const rematchHideRef = useRef<number | null>(null);
     const rematchFallbackRef = useRef<number | null>(null);
     const opponentWatchdogRef = useRef<number | null>(null);
@@ -155,6 +156,8 @@ export const useWordUpLiveGame = ({
 
     const endGame = useCallback(
        async (match: any) => {
+          if (isEndingRef.current) return;
+          isEndingRef.current = true;
           // Transition to gameover locally first — don't wait for Postgres trigger
           const finalMatch = {
              ...match,
@@ -323,11 +326,14 @@ export const useWordUpLiveGame = ({
             }).catch(console.error);
          } catch (err) {
             console.error("[WordUp Logs] Local update failed:", err);
+            // Reset selectedAnswer so the user can retry — the async error
+            // left the answer locked without a valid submission.
+            setSelectedAnswer(null);
          } finally {
             isSubmittingAnswerRef.current = false;
          }
       },
-      [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
+       [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
    );
 
    useEffect(() => {

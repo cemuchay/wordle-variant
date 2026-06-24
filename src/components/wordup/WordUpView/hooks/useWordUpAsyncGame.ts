@@ -49,6 +49,7 @@ export const useWordUpAsyncGame = ({
    const isSubmittingAnswerRef = useRef(false);
    const isAdvancingRef = useRef(false);
     const isRevealingRef = useRef(false);
+    const isEndingRef = useRef(false);
     const matchChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
    const currentIdxRef = useRef(currentIdx);
@@ -156,9 +157,11 @@ export const useWordUpAsyncGame = ({
        };
     }, [isActive, matchId, onGameOver, triggerToast]);
 
-   const endGame = useCallback(
-      async (match: any) => {
-         try {
+    const endGame = useCallback(
+       async (match: any) => {
+          if (isEndingRef.current) return;
+          isEndingRef.current = true;
+          try {
             console.log("[WordUp Logs] Async endGame: Pushing final consolidated match state to DB...");
             const completedAt = new Date().toISOString();
             await wordupNetworkGate.enqueue(
@@ -309,11 +312,14 @@ export const useWordUpAsyncGame = ({
             handleMatchUpdateRef.current?.(updatedMatch);
          } catch (err) {
             console.error("[WordUp Logs] Local update failed:", err);
+            // Reset selectedAnswer so the user can retry — the async error
+            // left the answer locked without a valid submission.
+            setSelectedAnswer(null);
          } finally {
             isSubmittingAnswerRef.current = false;
          }
       },
-      [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
+       [matchId, stopRoundTimer, setSelectedAnswer, selectedAnswer, isActive],
    );
 
    useEffect(() => {

@@ -85,9 +85,9 @@ export const WordUpView = () => {
       } else {
          wordupAudio.stopAmbient();
       }
-      return () => {
-      wordupAudio.stopAmbient();
-      }
+       return () => {
+          wordupAudio.stopAmbient();
+       }
    }, [view]);
 
    // Hide global headers during battle
@@ -140,7 +140,7 @@ export const WordUpView = () => {
       } catch {
          triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION);
       }
-   }, [effectiveUser, view, updateStats, triggerToast, role, userStats, setView]);
+    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
    const {
       questions,
