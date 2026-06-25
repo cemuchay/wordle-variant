@@ -176,6 +176,7 @@ export const WordUpView = () => {
 
     const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
+   const phase = engine.state.phase;
 
    // Read game state from store (synced by engine)
    const questions = useWordUpStore((s) => s.questions);
@@ -186,6 +187,8 @@ export const WordUpView = () => {
    const selectedAnswer = useWordUpStore((s) => s.selectedAnswer);
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const { rematchState, rematchCountdown, showRematchButton } = engine.state;
+
+   const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing";
 
    // ── Recovery from refresh ─────────────────────────────────────────────
    useEffect(() => {
@@ -346,6 +349,7 @@ export const WordUpView = () => {
                    revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
                    role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
                    onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
+                   waitingForOpponent={waitingForOpponent}
                 />
              )}
             {view === "gameover" && (
