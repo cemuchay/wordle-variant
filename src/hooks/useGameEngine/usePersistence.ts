@@ -16,9 +16,31 @@ interface UsePersistenceProps {
 
 export const usePersistence = ({ user, date, dispatch, config, triggerToast }: UsePersistenceProps) => {
    const performSync = useCallback(
-      async (gamePayload: { status: string }) => {
+      async (gamePayload: { status: string; guesses?: any[] }) => {
          if (!user || !date) return false;
          dispatch({ type: "SET_SYNC_STATUS", status: "syncing" });
+
+         // Lightweight pre-sync check: only push if local is ahead of cloud
+         try {
+            const { data: cloudData } = await supabase
+               .from("scores")
+               .select("guesses")
+               .eq("user_id", user.id)
+               .eq("game_date", date)
+               .maybeSingle();
+
+            if (cloudData?.guesses && gamePayload.guesses && cloudData.guesses.length >= gamePayload.guesses.length) {
+               dispatch({ type: "SET_SYNC_STATUS", status: "synced" });
+               setTimeout(
+                  () => dispatch({ type: "SET_SYNC_STATUS", status: "idle" }),
+                  TOAST_DURATION.DEFAULT,
+               );
+               return true;
+            }
+         } catch (e) {
+            console.warn("Pre-sync check failed, proceeding with sync:", e);
+         }
+
          try {
             await syncWithRetry(user.id, date, gamePayload);
             dispatch({ type: "SET_SYNC_STATUS", status: "synced" });
@@ -133,7 +155,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
       try {
          const { data, error } = await supabase
             .from("scores")
-            .select("*")
+            .select("guesses, status, hints_used, hint_record, game_message")
             .eq("user_id", user.id)
             .eq("game_date", date)
             .maybeSingle();

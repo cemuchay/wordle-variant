@@ -2314,11 +2314,11 @@ export const getRandomBotProfile = (): string => {
 export const simulateBotResponse = (
    _question: WordUpQuestion,
    profileKey: string,
+   duration: number = 10.0,
 ): { correct: boolean; time_taken: number; points: number } => {
    const profile = BOT_PROFILES[profileKey] || BOT_PROFILES.average;
    const correct = Math.random() < profile.accuracy;
 
-   // Random delay
    const time_taken = parseFloat(
       (
          Math.random() * (profile.maxDelay - profile.minDelay) +
@@ -2328,13 +2328,9 @@ export const simulateBotResponse = (
 
    let points = 0;
    if (correct) {
-      // Correct = 100 points
-      // Speed bonus = up to +50 points (linearly scales from 0s to 10s)
-      const speedBonus = Math.max(
-         0,
-         Math.round((1.0 - time_taken / 10.0) * 50),
-      );
-      points = 100 + speedBonus;
+      const eff = Math.max(0, time_taken - 1.5);
+      const denom = duration - 1.5;
+      points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
    }
 
    return { correct, time_taken, points };

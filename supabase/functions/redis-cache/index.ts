@@ -118,14 +118,20 @@ serve(async (req) => {
       const isDailyView = timeframe === "today" || timeframe === "yesterday";
       const baseSelect = "username, avatar_url, total_points, user_id";
       const selectStr = isDailyView
-        ? `${baseSelect}, word_length, attempts, status`
+        ? `${baseSelect}, word_length, attempts, status, first_played_at`
         : `${baseSelect}, days_active`;
 
-      const { data, error } = await supabaseClient
+      const query = supabaseClient
         .from(viewName)
         .select(selectStr)
         .order("total_points", { ascending: false })
         .limit(20);
+
+      if (timeframe === "today") {
+        query.order("first_played_at", { ascending: true });
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

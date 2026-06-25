@@ -149,8 +149,8 @@ export const WordUpView = () => {
    }, [setMatchId, setRole]);
 
    // Reactive sync for direct invites, rematch transitions, and loading state
-   useEffect(() => {
-      if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading")) {
+    useEffect(() => {
+      if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
@@ -174,7 +174,9 @@ export const WordUpView = () => {
       setView("menu");
    }, [cancelMatchmaking, resetGame, setView]);
 
-   const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+    const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+   const lastRoundPopup = engine.state.lastRoundPopup;
+   const phase = engine.state.phase;
 
    // Read game state from store (synced by engine)
    const questions = useWordUpStore((s) => s.questions);
@@ -185,6 +187,8 @@ export const WordUpView = () => {
    const selectedAnswer = useWordUpStore((s) => s.selectedAnswer);
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const { rematchState, rematchCountdown, showRematchButton } = engine.state;
+
+   const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing" && currentIdx === 6;
 
    // ── Recovery from refresh ─────────────────────────────────────────────
    useEffect(() => {
@@ -244,8 +248,8 @@ export const WordUpView = () => {
       return () => {
          cancelMatchmakingRef.current();
          engineCleanupRef.current?.();
-         const state = useWordUpStore.getState();
-         if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover") || !state.matchId) resetGame();
+        const state = useWordUpStore.getState();
+        if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
       };
    // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [resetGame]);
@@ -333,20 +337,21 @@ export const WordUpView = () => {
             {view === "matchmaking" && (
                <MatchmakingView category={category} cancelMatchmaking={handleCancelMatchmaking} countdownSecs={countdownSecs} />
             )}
-            {view === "connecting" && <ConnectingView />}
+            {view === "connecting" && <ConnectingView message={matchId ? "Connecting to opponent..." : undefined} />}
             {view === "countdown" && (
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
             {view === "loading" && <LoadingView onCancel={abortMatch} />}
-            {view === "battle" && (
-               <BattleView
-                  questions={questions} currentIdx={currentIdx} matchData={matchData}
-                  opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
-                  revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                  role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
-                  onAbort={abortMatch}
-               />
-            )}
+             {view === "battle" && (
+                <BattleView
+                   questions={questions} currentIdx={currentIdx} matchData={matchData}
+                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
+                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
+                   role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
+                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
+                   waitingForOpponent={waitingForOpponent}
+                />
+             )}
             {view === "gameover" && (
                <GameOverView
                   matchData={matchData}

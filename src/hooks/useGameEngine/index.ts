@@ -38,20 +38,19 @@ export const useGameEngine = (date: string) => {
       triggerToast,
    });
 
-   const actionsProps = useActions({
-      state,
-      dispatch,
-      config,
-      date,
-      user,
-      preferences,
-      triggerToast,
-      ask,
-      performSync,
-      updateOptimistically,
-      refresh,
-      loadFromCloud,
-   });
+    const actionsProps = useActions({
+       state,
+       dispatch,
+       config,
+       date,
+       user,
+       preferences,
+       triggerToast,
+       ask,
+       performSync,
+       updateOptimistically,
+       refresh,
+    });
 
    // Hydration & Authentication Swap Logic
    const [rehydrateTrigger, setRehydrateTrigger] = useState(0);

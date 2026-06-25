@@ -47,6 +47,8 @@ interface BattleViewProps {
    playerProfile: PlayerProfile | null;
    sendQuickChat: (text: string) => void;
    onAbort: () => void;
+   lastRoundPopup: boolean;
+   waitingForOpponent: boolean;
 }
 
 const PREFILLED_MESSAGES = [
@@ -89,7 +91,9 @@ export const BattleView = ({
    role,
    playerProfile,
    sendQuickChat,
-   onAbort
+   onAbort,
+   lastRoundPopup,
+   waitingForOpponent
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
@@ -106,8 +110,7 @@ export const BattleView = ({
       setScorePopups([]);
    }, [currentIdx]);
 
-   const [showLastRound, setShowLastRound] = useState(false);
-   const lastRoundShownRef = useRef(false);
+
 
    const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
    const prevMyScoreRef = useRef(0);
@@ -136,16 +139,6 @@ export const BattleView = ({
       window.addEventListener("wordup-quick-chat", handleChat);
       return () => window.removeEventListener("wordup-quick-chat", handleChat);
    }, []);
-
-   // Show "Last Round" transition when entering final round
-   useEffect(() => {
-      if (currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && !revealAnswers && !lastRoundShownRef.current) {
-         lastRoundShownRef.current = true;
-         setShowLastRound(true);
-         const t = setTimeout(() => setShowLastRound(false), 1200);
-         return () => clearTimeout(t);
-      }
-   }, [currentIdx, revealAnswers]);
 
    const activeQuestion = questions[currentIdx];
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
@@ -292,6 +285,55 @@ export const BattleView = ({
          animate={{ opacity: 1 }}
          className="flex flex-col flex-1 justify-between h-full pt-4 pb-3 relative overflow-hidden"
       >
+         {lastRoundPopup && (
+            <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               transition={{ duration: 0.4 }}
+               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-dark pointer-events-none select-none"
+            >
+               <motion.p
+                  initial={{ scale: 2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="text-3xl sm:text-4xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]"
+               >
+                  ⚡ LAST ROUND ⚡
+               </motion.p>
+               <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.4 }}
+                  className="text-sm sm:text-base font-black text-pink-500 mt-2 animate-pulse tracking-wider"
+               >
+                  DOUBLE POINTS
+               </motion.p>
+            </motion.div>
+         )}
+         {waitingForOpponent && (
+            <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-dark/90 backdrop-blur-sm pointer-events-none select-none"
+            >
+               <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  className="flex flex-col items-center text-center max-w-xs px-6"
+               >
+                  <div className="w-12 h-12 border-4 border-correct/30 border-t-correct rounded-full animate-spin mb-4" />
+                  <p className="text-lg font-black text-white tracking-wider">Waiting for opponent...</p>
+                  <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                     Your answer is locked in. The match will auto-finalize shortly if the opponent doesn't respond.
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-3 font-bold">
+                     Your score is safe — opponent keeps their last score.
+                  </p>
+               </motion.div>
+            </motion.div>
+         )}
          {/* Top Control Bar */}
          <div className="flex justify-between items-center px-1 pb-2 shrink-0 z-40">
             <button
@@ -671,39 +713,6 @@ export const BattleView = ({
             </div>
          )}
 
-         {/* Last Round Transition Overlay */}
-         <AnimatePresence>
-            {showLastRound && (
-               <motion.div
-                  key="last-round-overlay"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none select-none"
-               >
-                  <motion.div
-                     initial={{ scale: 2, opacity: 0 }}
-                     animate={{ scale: 1, opacity: 1 }}
-                     exit={{ scale: 0.8, opacity: 0 }}
-                     transition={{ duration: 0.5, ease: "easeOut" }}
-                     className="text-center"
-                  >
-                     <p className="text-4xl sm:text-5xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
-                        ⚡ LAST ROUND ⚡
-                     </p>
-                     <motion.p
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3, duration: 0.4 }}
-                        className="text-sm sm:text-base font-black text-pink-500 mt-3 animate-pulse tracking-wider"
-                     >
-                        DOUBLE POINTS
-                     </motion.p>
-                  </motion.div>
-               </motion.div>
-            )}
-         </AnimatePresence>
       </motion.div>
    );
 };

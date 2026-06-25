@@ -538,6 +538,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 addRecentChallenge(challenge.id);
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
 
+                // Wait for refetch to get fresh participation data (especially marathon_progress)
+                await queryClient.refetchQueries({ queryKey: ['my-challenges'] });
+
                 cleanupSubscription();
                 setSelectedChallenge(challenge);
                 setActiveTab('join');
@@ -562,6 +565,18 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                             participation = await participationPromise;
                         } else if (isExpired) {
                             participation = challenge.participants?.find((p: any) => p.user_id === currentUser.id || p.guest_id === currentUser.id) || null;
+                        }
+
+                        // Override with fresh data from refetched my-challenges if available
+                        const freshData = queryClient.getQueryData(['my-challenges', currentUser.id]) as any[];
+                        if (freshData) {
+                            const freshMatch = freshData.find(
+                                (item: any) => item.challenge_id === id || item.challenge?.id === id
+                            );
+                            if (freshMatch && freshMatch.marathon_progress?.length >= (participation?.marathon_progress?.length || 0)) {
+                                participation = freshMatch;
+                                myChallengesRef.current = freshData;
+                            }
                         }
 
                         const normalizedPart = normalizeParticipation(participation, challenge);
