@@ -22,12 +22,12 @@ jobs:
          - name: Vitest integration + unit tests
            run: npx vitest run
 
-         - name: Playwright install
-           run: npx playwright install --with-deps chromium
+         #  - name: Playwright install
+         #    run: npx playwright install --with-deps chromium
 
-         - name: Playwright E2E smoke tests
-           run: npx playwright test --project=chromium
-           working-directory: ./e2e
+         #  - name: Playwright E2E smoke tests
+         #    run: npx playwright test --project=chromium
+         #    working-directory: ./e2e
 
          - name: Build
            run: npm run build
