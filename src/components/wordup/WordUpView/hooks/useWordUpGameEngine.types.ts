@@ -1,7 +1,7 @@
 import { type WordUpQuestion } from "../../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../types";
 
-export type GamePhase = "idle" | "loading" | "countdown" | "playing" | "reveal" | "gameover";
+export type GamePhase = "idle" | "loading" | "countdown" | "playing" | "reveal" | "gameover" | "turn_submitted";
 
 export type GameType = "live" | "live-bot" | "async";
 

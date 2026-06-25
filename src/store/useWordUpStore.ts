@@ -8,14 +8,15 @@ import { postProcessQuestions } from "../utils/wordupQuestionPostProcessor";
 
 interface WordUpState {
    isBattlePlaying: boolean;
-   view:
-      | "menu"
-      | "connecting"
-      | "matchmaking"
-      | "countdown"
-      | "battle"
-      | "gameover"
-      | "loading";
+    view:
+       | "menu"
+       | "connecting"
+       | "matchmaking"
+       | "countdown"
+       | "battle"
+       | "gameover"
+       | "loading"
+       | "turn_submitted";
    category: string;
    matchId: string | null;
    role: "player1" | "player2" | null;

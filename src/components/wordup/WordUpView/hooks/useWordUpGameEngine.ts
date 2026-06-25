@@ -101,10 +101,11 @@ export function useWordUpGameEngine(props: EngineProps) {
    });
 
    // ── Sync engine state to Zustand store ────────────────────────────────
-   const phaseToView: Record<string, string> = {
-      loading: "loading", countdown: "countdown",
-      playing: "battle", reveal: "battle", gameover: "gameover",
-   };
+    const phaseToView: Record<string, string> = {
+       loading: "loading", countdown: "countdown",
+       playing: "battle", reveal: "battle", gameover: "gameover",
+       turn_submitted: "turn_submitted",
+    };
 
    useEffect(() => {
       const store = useWordUpStore.getState();
@@ -187,10 +188,12 @@ export function useWordUpGameEngine(props: EngineProps) {
          clearT("revealTimeout");
          T.current.revealTimeout = window.setTimeout(() => {
             G.current.isRevealing = false; clearT("revealTimeout");
-            if (nextIdx >= 7) {
-               const latest = S.current.matchData;
-               if (latest) cb.current.endGame?.(latest);
-            } else {
+             if (nextIdx >= 7) {
+                if (gameType !== "async") {
+                   const latest = S.current.matchData;
+                   if (latest) cb.current.endGame?.(latest);
+                }
+             } else {
                cb.current.advanceRound?.(merged.id, nextIdx);
             }
          }, nextIdx === 6 ? 3200 : 1800);
@@ -320,11 +323,9 @@ export function useWordUpGameEngine(props: EngineProps) {
             safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
             dispatch({ type: "SET_PHASE", phase: "gameover" });
             onGameOver(upd);
-         } else if (myDone) {
-            triggerToast("Turn submitted! Waiting for opponent...", 4000);
-            dispatch({ type: "SET_PHASE", phase: "idle" });
-            useWordUpStore.getState().resetGame();
-         }
+          } else if (myDone) {
+             dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
+          }
       } catch (e) { console.error("[WordUp] Async persist failed:", e); triggerToast("Failed to save progress.", 5000); }
    }, [triggerToast, onGameOver]);
 
