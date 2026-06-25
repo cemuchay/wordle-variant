@@ -208,21 +208,21 @@ export function useWordUpGameEngine(props: EngineProps) {
    }, [gameType, triggerToast, onGameOver]);
    cb.current.handleMatchUpdate = handleMatchUpdate;
 
-   const advanceRound = useCallback((_mId: string, nextIdx: number) => {
-      if (G.current.isAdvancing) return;
-      G.current.isAdvancing = true;
-      const nextQ = S.current.questions[nextIdx];
-      const nextDur = nextQ ? getQuestionDuration(nextQ.type) : 10.0;
-          if (gameType === "live")
-             channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx, question_started_at: upd.question_started_at } }).catch(console.error);
-      const isP1 = S.current.role === "player1";
-      const upd: any = { ...S.current.matchData, current_question_index: nextIdx, question_started_at: new Date(getSyncedNow()).toISOString() };
-      if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
-      else { upd.p1_answered = false; upd.p2_answered = false; }
-      dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
-      cb.current.handleMatchUpdate?.(upd);
-      G.current.isAdvancing = false;
-   }, [gameType, getSyncedNow]);
+    const advanceRound = useCallback((_mId: string, nextIdx: number) => {
+       if (G.current.isAdvancing) return;
+       G.current.isAdvancing = true;
+       const nextQ = S.current.questions[nextIdx];
+       const nextDur = nextQ ? getQuestionDuration(nextQ.type) : 10.0;
+       const isP1 = S.current.role === "player1";
+       const upd: any = { ...S.current.matchData, current_question_index: nextIdx, question_started_at: new Date(getSyncedNow()).toISOString() };
+       if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
+       else { upd.p1_answered = false; upd.p2_answered = false; }
+       if (gameType === "live")
+          channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx, question_started_at: upd.question_started_at } }).catch(console.error);
+       dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
+       cb.current.handleMatchUpdate?.(upd);
+       G.current.isAdvancing = false;
+    }, [gameType, getSyncedNow]);
    cb.current.advanceRound = advanceRound;
 
    const handleAnswerSelect = useCallback(async (choice: string) => {
