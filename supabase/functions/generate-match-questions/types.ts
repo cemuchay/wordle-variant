@@ -6,6 +6,7 @@ export interface Question {
    choices: string[];
    answer: string;
    subPrompt?: string;
+   explanation?: string;
    imageUrl?: string;
 }
 

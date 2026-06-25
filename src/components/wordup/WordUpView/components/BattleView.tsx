@@ -8,7 +8,7 @@ import { useConfirmation } from "../../../../hooks/useConfirmation";
 import { type ProfileStats } from "../types";
 
 
-import { getQuestionDuration } from "../hooks/useWordUpGameLoop";
+import { getQuestionDuration } from "../hooks/useWordUpGameEngine";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
 import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
@@ -99,11 +99,12 @@ export const BattleView = ({
    const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
 
-   const [prevIdx, setPrevIdx] = useState(currentIdx);
-   if (currentIdx !== prevIdx) {
-      setPrevIdx(currentIdx);
+   useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParticles([]);
-   }
+      // eslint-disable-next-line react-hooks/immutability
+      setScorePopups([]);
+   }, [currentIdx]);
 
    const [showLastRound, setShowLastRound] = useState(false);
    const lastRoundShownRef = useRef(false);
@@ -196,6 +197,7 @@ export const BattleView = ({
    const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);
 
    // Detect score changes and create +points popups
+   // eslint-disable-next-line react-hooks/rules-of-hooks
    useEffect(() => {
       if (myScore > prevMyScoreRef.current) {
          const diff = myScore - prevMyScoreRef.current;
@@ -338,55 +340,55 @@ export const BattleView = ({
             </AnimatePresence>
          </div>
 
-          {/* Players Panel */}
-          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
-             <div className="flex items-center gap-2 min-w-0 relative">
-                <ProtectedAvatar
-                   userId={playerProfile?.id || undefined}
-                   src={playerProfile?.avatar_url || undefined}
-                   username={playerProfile?.username || "You"}
-                   className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
-                />
-                <div className="truncate">
-                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                   <p className="text-base font-black text-white">{myScore} pts</p>
-                </div>
-                {scorePopups.filter((p) => p.side === "my").map((p) => (
-                   <motion.span
-                      key={p.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                   >
-                      +{p.points}
-                   </motion.span>
-                ))}
-             </div>
-             <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
-                <div className="truncate">
-                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">
-                      {opponentName}
-                   </p>
-                   <p className="text-base font-black text-white">{oppScore} pts</p>
-                </div>
-                {scorePopups.filter((p) => p.side === "opp").map((p) => (
-                   <motion.span
-                      key={p.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
-                   >
-                      +{p.points}
-                   </motion.span>
-                ))}
-                <ProtectedAvatar
-                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                   src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
-                   username={opponentName}
-                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
-                />
+         {/* Players Panel */}
+         <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
+            <div className="flex items-center gap-2 min-w-0 relative">
+               <ProtectedAvatar
+                  userId={playerProfile?.id || undefined}
+                  src={playerProfile?.avatar_url || undefined}
+                  username={playerProfile?.username || "You"}
+                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+               />
+               <div className="truncate">
+                  <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                  <p className="text-base font-black text-white">{myScore} pts</p>
+               </div>
+               {scorePopups.filter((p) => p.side === "my").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+            </div>
+            <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
+               <div className="truncate">
+                  <p className="text-[9px] text-gray-400 font-bold uppercase truncate">
+                     {opponentName}
+                  </p>
+                  <p className="text-base font-black text-white">{oppScore} pts</p>
+               </div>
+               {scorePopups.filter((p) => p.side === "opp").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+               <ProtectedAvatar
+                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  username={opponentName}
+                  className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
+               />
             </div>
          </div>
 
@@ -447,7 +449,7 @@ export const BattleView = ({
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
                      animate={{ opacity: 1, scale: 1 }}
-                      className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
+                     className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
                      <img
                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
@@ -460,8 +462,8 @@ export const BattleView = ({
             )}
 
             {/* Choices Grid */}
-             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto">
+            {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
+               <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto">
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
@@ -638,70 +640,70 @@ export const BattleView = ({
             </div>
          </div>
 
-          {/* Celebratory Confetti Splash */}
-          {particles.length > 0 && (
-             <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-50">
-                {particles.map((p) => (
-                   <motion.div
-                      key={p.id}
-                      initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
-                      animate={{
-                         x: p.targetX,
-                         y: p.targetY,
-                         scale: [0, 1.2, 0.8, 0],
-                         opacity: [1, 1, 0.8, 0],
-                         rotate: p.rotation + 360
-                      }}
-                      transition={{
-                         duration: p.duration,
-                         ease: "easeOut"
-                      }}
-                      style={{
-                         position: "absolute",
-                         width: p.size,
-                         height: p.size,
-                         backgroundColor: p.color,
-                         borderRadius: p.shape === "circle" ? "50%" : p.shape === "triangle" ? "0" : "2px",
-                         clipPath: p.shape === "triangle" ? "polygon(50% 0%, 0% 100%, 100% 100%)" : undefined
-                      }}
-                   />
-                ))}
-             </div>
-          )}
+         {/* Celebratory Confetti Splash */}
+         {particles.length > 0 && (
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-50">
+               {particles.map((p) => (
+                  <motion.div
+                     key={p.id}
+                     initial={{ x: 0, y: 0, scale: 0, opacity: 1, rotate: 0 }}
+                     animate={{
+                        x: p.targetX,
+                        y: p.targetY,
+                        scale: [0, 1.2, 0.8, 0],
+                        opacity: [1, 1, 0.8, 0],
+                        rotate: p.rotation + 360
+                     }}
+                     transition={{
+                        duration: p.duration,
+                        ease: "easeOut"
+                     }}
+                     style={{
+                        position: "absolute",
+                        width: p.size,
+                        height: p.size,
+                        backgroundColor: p.color,
+                        borderRadius: p.shape === "circle" ? "50%" : p.shape === "triangle" ? "0" : "2px",
+                        clipPath: p.shape === "triangle" ? "polygon(50% 0%, 0% 100%, 100% 100%)" : undefined
+                     }}
+                  />
+               ))}
+            </div>
+         )}
 
-          {/* Last Round Transition Overlay */}
-          <AnimatePresence>
-             {showLastRound && (
-                <motion.div
-                   key="last-round-overlay"
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   exit={{ opacity: 0 }}
-                   transition={{ duration: 0.4 }}
-                    className="absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none select-none"
-                >
-                   <motion.div
-                      initial={{ scale: 2, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.8, opacity: 0 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="text-center"
-                   >
-                      <p className="text-4xl sm:text-5xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
-                         ⚡ LAST ROUND ⚡
-                      </p>
-                      <motion.p
-                         initial={{ opacity: 0, y: 10 }}
-                         animate={{ opacity: 1, y: 0 }}
-                         transition={{ delay: 0.3, duration: 0.4 }}
-                         className="text-sm sm:text-base font-black text-pink-500 mt-3 animate-pulse tracking-wider"
-                      >
-                         DOUBLE POINTS
-                      </motion.p>
-                   </motion.div>
-                </motion.div>
-             )}
-          </AnimatePresence>
-       </motion.div>
+         {/* Last Round Transition Overlay */}
+         <AnimatePresence>
+            {showLastRound && (
+               <motion.div
+                  key="last-round-overlay"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none select-none"
+               >
+                  <motion.div
+                     initial={{ scale: 2, opacity: 0 }}
+                     animate={{ scale: 1, opacity: 1 }}
+                     exit={{ scale: 0.8, opacity: 0 }}
+                     transition={{ duration: 0.5, ease: "easeOut" }}
+                     className="text-center"
+                  >
+                     <p className="text-4xl sm:text-5xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
+                        ⚡ LAST ROUND ⚡
+                     </p>
+                     <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3, duration: 0.4 }}
+                        className="text-sm sm:text-base font-black text-pink-500 mt-3 animate-pulse tracking-wider"
+                     >
+                        DOUBLE POINTS
+                     </motion.p>
+                  </motion.div>
+               </motion.div>
+            )}
+         </AnimatePresence>
+      </motion.div>
    );
 };

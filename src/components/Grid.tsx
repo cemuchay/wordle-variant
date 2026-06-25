@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
 import { ANIMATION_DURATION } from '../constants/ui';
 import returnAnimationTime from '../utils/returnAnimationTime';
@@ -18,6 +18,8 @@ interface CellProps {
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
   wordLength: number;
+  isCursor?: boolean;
+  isEditMode?: boolean;
 }
 
 // Sizing config supporting different widths/heights for mobile and desktop (sm)
@@ -74,7 +76,7 @@ const TILE_SIZES = [
 
 
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength }: CellProps) => {
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor, isEditMode }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
   const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
   const isPWA = useAppStore(s => s.isPWAInstalled)
@@ -125,6 +127,8 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   else if (status === 'present') statusClass = 'bg-present border-present';
   else if (status === 'absent') statusClass = 'bg-absent border-absent';
   else if (letter) statusClass = 'border-gray-500';
+  if (isCursor && wordLength > 6) statusClass += ' ring-2 ring-blue-400 border-blue-400';
+  if (isEditMode && wordLength > 6) statusClass += ' ring-2 ring-yellow-400 border-yellow-400 bg-yellow-400/10';
 
   if (isRevealing) {
     if (status === 'correct') animationClass = 'animate-reveal-correct';
@@ -171,9 +175,42 @@ interface GridProps {
   isSaving?: boolean;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
+  cursorIndex?: number;
+  editIndex?: number | null;
+  onSetCursor?: (index: number) => void;
+  onSetEditIndex?: (index: number | null) => void;
 }
 
-export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType }) => {
+const LONG_PRESS_MS = 400;
+
+export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, editIndex, onSetCursor, onSetEditIndex }) => {
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlePointerDown = useCallback((i: number) => {
+     if (wordLength <= 6) return;
+     longPressTimerRef.current = setTimeout(() => {
+        onSetEditIndex?.(i);
+        longPressTimerRef.current = null;
+     }, LONG_PRESS_MS);
+  }, [wordLength, onSetEditIndex]);
+  const handlePointerUp = useCallback(() => {
+     if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+     }
+  }, []);
+  useEffect(() => () => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }, []);
+  const lastClickRef = useRef<{ time: number; index: number } | null>(null);
+  const handleCellClick = useCallback((i: number) => {
+     const now = Date.now();
+     const prev = lastClickRef.current;
+     if (wordLength > 6 && prev && prev.index === i && now - prev.time < 300) {
+        onSetEditIndex?.(i);
+        lastClickRef.current = null;
+        return;
+     }
+     lastClickRef.current = { time: now, index: i };
+     onSetCursor?.(i);
+  }, [wordLength, onSetCursor, onSetEditIndex]);
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
   useEffect(() => {
@@ -364,19 +401,31 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
               <div className={`flex justify-center ${rowGapClass}`}>
                 {Array.from({ length: wordLength }).map((_, i) => {
                   const isHinted = hintRecord?.index === i;
-                  const letter = currentGuess[i] || (isHinted ? hintRecord?.letter : '');
+                  const raw = currentGuess[i];
+                  const letter = raw === '\0' ? '' : (raw || (isHinted ? hintRecord?.letter : ''));
+                  const isEditMode = editIndex === i;
 
                   return (
-                    <Cell
+                    <div
                       key={`current-${i}`}
-                      letter={letter}
-                      isPop={!!currentGuess[i]}
-                      isShake={isShake}
-                      isHinted={isHinted}
-                      compact={compact}
-                      gameplayType={gameplayType}
-                      wordLength={wordLength}
-                    />
+                      onClick={() => handleCellClick(i)}
+                      onPointerDown={() => handlePointerDown(i)}
+                      onPointerUp={handlePointerUp}
+                      onPointerLeave={handlePointerUp}
+                      className="cursor-pointer"
+                    >
+                      <Cell
+                        letter={letter}
+                        isPop={!!raw && raw !== '\0'}
+                        isShake={isShake}
+                        isHinted={isHinted}
+                        compact={compact}
+                        gameplayType={gameplayType}
+                        wordLength={wordLength}
+                        isCursor={!isWon && !isLost && !isEditMode && cursorIndex === i}
+                        isEditMode={isEditMode}
+                      />
+                    </div>
                   );
                 })}
               </div>

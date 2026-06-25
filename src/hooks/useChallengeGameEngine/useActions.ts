@@ -77,12 +77,36 @@ export const useActions = ({
       [isGameOver, dispatch, wordLength],
    );
 
-   const onDelete = useCallback(() => {
+    const onDelete = useCallback(() => {
       if (isGameOver) return;
       dispatch({ type: "DELETE_CHAR" });
-   }, [isGameOver, dispatch]);
+    }, [isGameOver, dispatch]);
 
-   const onEnter = useCallback(async () => {
+    const onSetCursor = useCallback(
+      (index: number) => {
+        dispatch({ type: "SET_CURSOR", index });
+      },
+      [dispatch],
+    );
+
+    const onSetEditIndex = useCallback(
+      (index: number | null) => {
+        dispatch({ type: "SET_EDIT_INDEX", index });
+      },
+      [dispatch],
+    );
+
+    const onCursorLeft = useCallback(() => {
+      const newIdx = Math.max(0, state.cursorIndex - 1);
+      dispatch({ type: "SET_CURSOR", index: newIdx });
+    }, [state.cursorIndex, dispatch]);
+
+    const onCursorRight = useCallback(() => {
+      const newIdx = Math.min(state.currentGuess.length, state.cursorIndex + 1);
+      dispatch({ type: "SET_CURSOR", index: newIdx });
+    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
+
+    const onEnter = useCallback(async () => {
       if (isGameOver || isSaving || state.currentGuess.length !== wordLength) return;
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -410,16 +434,20 @@ export const useActions = ({
       wrappedSubmitResult,
    ]);
 
-   const actions = useMemo(
+    const actions = useMemo(
       () => ({
          onChar,
          onDelete,
          onEnter,
          handleHint,
          retrySync,
+         onSetCursor,
+         onSetEditIndex,
+         onCursorLeft,
+         onCursorRight,
       }),
-      [onChar, onDelete, onEnter, handleHint, retrySync],
-   );
+      [onChar, onDelete, onEnter, handleHint, retrySync, onSetCursor, onSetEditIndex, onCursorLeft, onCursorRight],
+    );
 
    return { actions };
 };

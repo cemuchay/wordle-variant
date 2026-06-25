@@ -9,7 +9,7 @@ export function generateLegacyWordQuestion(category: string, seed: string): Base
       question: q.prompt,
       options: q.choices,
       answer: q.answer,
-      explanation: q.subPrompt,
+      explanation: q.explanation || q.subPrompt,
       metadata: { generatorId: "legacy", entityId: seed },
    };
 }
@@ -21,7 +21,7 @@ export function generateLegacyBatch(category: string, seed: string): BaseQuestio
       question: q.prompt,
       options: q.choices,
       answer: q.answer,
-      explanation: q.subPrompt,
+      explanation: q.explanation || q.subPrompt,
       metadata: { generatorId: "legacy", entityId: `${seed}-${i}` },
    }));
 }

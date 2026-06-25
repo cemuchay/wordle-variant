@@ -95,8 +95,9 @@ export const LobbyView = ({
          }
          triggerToast(`${detail.senderName || "Opponent"} accepted! Starting match...`, 3000);
          // Transition to match
-         useWordUpStore.getState().setMatchId(detail.matchId);
-         useWordUpStore.getState().setRole("player1");
+          useWordUpStore.getState().setMatchId(detail.matchId);
+          useWordUpStore.getState().setRole("player1");
+          useWordUpStore.getState().setView("loading");
       };
 
       window.addEventListener("wordup-invite-rejected", handleRejected);
@@ -198,10 +199,9 @@ export const LobbyView = ({
                const iPlayed = isP1 ? m.p1_answered : m.p2_answered;
                const oppPlayed = isP1 ? m.p2_answered : m.p1_answered;
 
-               if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
-                  markNotified(m.id);
-                  triggerToast("Your opponent completed their turn! Check the results.", 6000);
-               }
+                if (iPlayed && oppPlayed && !m.is_bot_match && !notifiedCompletedRef.current.has(m.id)) {
+                   markNotified(m.id);
+                }
                continue;
             }
 
@@ -226,7 +226,7 @@ export const LobbyView = ({
       } finally {
          setIsLoadingData(false);
       }
-   }, [currentUser, triggerToast, markNotified]);
+   }, [currentUser, markNotified]);
 
    const fetchHistory = useCallback(async () => {
       if (!currentUser) return;
@@ -456,11 +456,12 @@ export const LobbyView = ({
       }, 15000);
    };
 
-   const handlePlayMyTurn = (match: any) => {
-      const role = match.player1_id === currentUser.id ? "player1" : "player2";
-      useWordUpStore.getState().setMatchId(match.id);
-      useWordUpStore.getState().setRole(role);
-   };
+    const handlePlayMyTurn = (match: any) => {
+       const role = match.player1_id === currentUser.id ? "player1" : "player2";
+       useWordUpStore.getState().setMatchId(match.id);
+       useWordUpStore.getState().setRole(role);
+       useWordUpStore.getState().setView("loading");
+    };
 
    return (
       <motion.div
@@ -585,19 +586,21 @@ export const LobbyView = ({
                   </button>
 
                   <div className="space-y-3">
-                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                        {onlineUsers && onlineUsers.filter((u) => u.id !== currentUser?.id).length > 0
-                           ? "Invite Online Players"
-                           : "Challenge Players"}
-                     </p>
-                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-                        {(() => {
-                           const otherOnline = (onlineUsers || []).filter((u) => u.id !== currentUser?.id);
-                           const displayUsers = otherOnline.length > 0
-                              ? otherOnline
-                              : (allProfiles || [])
+                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                           Challenge Players
+                        </p>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+                           {(() => {
+                              const otherOnline = (onlineUsers || []).filter((u) => u.id !== currentUser?.id);
+                              const displayUsers = (allProfiles || [])
                                  .filter((u) => u.id !== currentUser?.id)
-                                 .sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime())
+                                 .sort((a, b) => {
+                                    const aOnline = otherOnline.some(u => u.id === a.id);
+                                    const bOnline = otherOnline.some(u => u.id === b.id);
+                                    if (aOnline && !bOnline) return -1;
+                                    if (!aOnline && bOnline) return 1;
+                                    return new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime();
+                                 })
                                  .slice(0, 10);
 
                            if (displayUsers.length > 0) {
