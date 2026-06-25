@@ -60,7 +60,7 @@ interface WordUpState {
 export const useWordUpStore = create<WordUpState>((set) => ({
    isBattlePlaying: false,
    view: "menu",
-   category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
+    category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
    role: null,
    questions: [],
@@ -75,10 +75,10 @@ export const useWordUpStore = create<WordUpState>((set) => ({
 
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
-   setCategory: (category) => {
-      safeSessionStorage.setItem("wordup_selected_category", category);
-      set({ category });
-   },
+    setCategory: (category) => {
+       safeSessionStorage.setItem("wordup_selected_category", category);
+       set({ category });
+    },
    setMatchId: (matchId) => set({ matchId }),
    setRole: (role) => set({ role }),
    setQuestions: (questions) => {
