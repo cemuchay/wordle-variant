@@ -218,7 +218,7 @@ export function useWordUpGameEngine(props: EngineProps) {
        if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
        else { upd.p1_answered = false; upd.p2_answered = false; }
        if (gameType === "live")
-          channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx, question_started_at: upd.question_started_at } }).catch(console.error);
+           channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx } }).catch(console.error);
        dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
        cb.current.handleMatchUpdate?.(upd);
        G.current.isAdvancing = false;
@@ -394,9 +394,7 @@ export function useWordUpGameEngine(props: EngineProps) {
        dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
        G.current.isSubmitting = false;
 
-       const startTime = _match.question_started_at
-          ? new Date(_match.question_started_at).getTime()
-          : getSyncedNow();
+        const startTime = getSyncedNow();
        let lastTicked = Math.ceil(duration) + 1;
        T.current.roundInterval = window.setInterval(() => {
           const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
@@ -599,9 +597,9 @@ export function useWordUpGameEngine(props: EngineProps) {
                   else { u.p2_answered = true; u.p2_answers = payload.answers; u.p2_score = payload.score; }
                   cb.current.handleMatchUpdate?.(u);
                })
-                .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
-                   const cur = S.current.matchData; if (!cur) return;
-                   cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false, question_started_at: payload.question_started_at || cur.question_started_at });
+                 .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
+                    const cur = S.current.matchData; if (!cur) return;
+                    cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });
                 })
                .on("broadcast", { event: "game_active" }, () => {
                   const cur = S.current.matchData; if (!cur) return;
