@@ -1028,7 +1028,7 @@ export default function App() {
                   const matchId = opponentLaterInvite.matchId;
                   setOpponentLaterInvite(null);
                   useWordUpStore.getState().setMatchId(matchId);
-                  useWordUpStore.getState().setRole("player1");
+                   useWordUpStore.getState().setRole("player2");
                   handleNavigation("wordup");
                 }}
                 className="bg-correct hover:bg-correct/90 text-black text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"

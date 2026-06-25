@@ -197,7 +197,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       }
 
       if (merged.current_question_index !== S.current.currentRound
-         && (merged.status === "active" || merged.status === "countdown")) {
+         && (merged.status === "active" || merged.status === "countdown" || merged.status === "waiting")) {
          if (merged.current_question_index === 6 && !T.current.lastRoundPopupTimeout) {
             dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
             clearT("lastRoundPopupTimeout");
