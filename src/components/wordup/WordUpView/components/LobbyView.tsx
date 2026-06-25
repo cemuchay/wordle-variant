@@ -49,9 +49,10 @@ export const LobbyView = ({
    const [showCategoryModal, setShowCategoryModal] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
    const [inviteCountdown, setInviteCountdown] = useState(15);
-   const timeoutRef = useRef<number | null>(null);
-   const inviteIntervalRef = useRef<number | null>(null);
-   const inviteResolvedRef = useRef(false);
+    const timeoutRef = useRef<number | null>(null);
+    const inviteIntervalRef = useRef<number | null>(null);
+    const inviteResolvedRef = useRef(false);
+    const lastCategoryRef = useRef<string>(category || "mixed");
 
    // New states for tabs and challenge matching
    const [activeTab, setActiveTab] = useState<"play" | "rankings" | "pending" | "history">("play");
@@ -585,21 +586,21 @@ export const LobbyView = ({
                         );
                      })()}
 
-                     <CategorySelectModal
-                        isOpen={showCategoryModal}
-                        onClose={() => setShowCategoryModal(false)}
-                        category={category}
-                        setCategory={setCategory}
-                        startMatchmaking={startMatchmaking}
-                     />
+                      <CategorySelectModal
+                         isOpen={showCategoryModal}
+                         onClose={() => setShowCategoryModal(false)}
+                         category={category}
+                         setCategory={(id: string) => { lastCategoryRef.current = id; setCategory(id); }}
+                         startMatchmaking={startMatchmaking}
+                      />
                   </div>
 
-                  <button
-                     onClick={startMatchmaking}
-                     className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
-                  >
-                     <Play size={16} fill="black" /> Search Opponent
-                  </button>
+                   <button
+                      onClick={() => { useWordUpStore.getState().setCategory(lastCategoryRef.current); startMatchmaking(); }}
+                      className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
+                   >
+                      <Play size={16} fill="black" /> Search Opponent
+                   </button>
 
                   <div className="space-y-3">
                       <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">

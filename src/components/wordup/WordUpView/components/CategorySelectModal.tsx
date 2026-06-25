@@ -240,18 +240,18 @@ export const CategorySelectModal = ({
       });
    };
 
-   const handleCategoryClick = (id: string) => {
-      setCategory(id);
-      recordRecent(id);
-      onClose();
-   };
-
-    const handleSelectAndPlay = () => {
-       const currentCategory = useWordUpStore.getState().category;
-       recordRecent(currentCategory);
-       startMatchmaking();
+    const handleCategoryClick = (id: string) => {
+       setCategory(id);
+       recordRecent(id);
        onClose();
     };
+
+    const handleSelectAndPlay = () => {
+        const currentCategory = useWordUpStore.getState().category;
+        recordRecent(currentCategory);
+        startMatchmaking();
+        onClose();
+     };
 
    return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
