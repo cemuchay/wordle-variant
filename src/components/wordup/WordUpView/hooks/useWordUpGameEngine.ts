@@ -12,6 +12,7 @@ import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../../utils/storage";
 import { wordupNetworkGate } from "../services/wordupNetworkGate";
 import { QUESTION_DURATION, WORDUP_TIMEOUT } from "../../../../constants/wordup";
+import { isProceduralCategory } from "../../../../services/wordup/generatorRegistry";
 import { gameEngineReducer, initialState, type GameType } from "./useWordUpGameEngine.types";
 
 export function getQuestionDuration(type: string): number {
@@ -101,10 +102,11 @@ export function useWordUpGameEngine(props: EngineProps) {
    });
 
    // ── Sync engine state to Zustand store ────────────────────────────────
-   const phaseToView: Record<string, string> = {
-      loading: "loading", countdown: "countdown",
-      playing: "battle", reveal: "battle", gameover: "gameover",
-   };
+    const phaseToView: Record<string, string> = {
+       loading: "loading", countdown: "countdown",
+       playing: "battle", reveal: "battle", gameover: "gameover",
+       turn_submitted: "turn_submitted",
+    };
 
    useEffect(() => {
       const store = useWordUpStore.getState();
@@ -187,10 +189,12 @@ export function useWordUpGameEngine(props: EngineProps) {
          clearT("revealTimeout");
          T.current.revealTimeout = window.setTimeout(() => {
             G.current.isRevealing = false; clearT("revealTimeout");
-            if (nextIdx >= 7) {
-               const latest = S.current.matchData;
-               if (latest) cb.current.endGame?.(latest);
-            } else {
+             if (nextIdx >= 7) {
+                if (gameType !== "async") {
+                   const latest = S.current.matchData;
+                   if (latest) cb.current.endGame?.(latest);
+                }
+             } else {
                cb.current.advanceRound?.(merged.id, nextIdx);
             }
          }, nextIdx === 6 ? 3200 : 1800);
@@ -320,11 +324,9 @@ export function useWordUpGameEngine(props: EngineProps) {
             safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
             dispatch({ type: "SET_PHASE", phase: "gameover" });
             onGameOver(upd);
-         } else if (myDone) {
-            triggerToast("Turn submitted! Waiting for opponent...", 4000);
-            dispatch({ type: "SET_PHASE", phase: "idle" });
-            useWordUpStore.getState().resetGame();
-         }
+          } else if (myDone) {
+             dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
+          }
       } catch (e) { console.error("[WordUp] Async persist failed:", e); triggerToast("Failed to save progress.", 5000); }
    }, [triggerToast, onGameOver]);
 
@@ -530,38 +532,68 @@ export function useWordUpGameEngine(props: EngineProps) {
 
       try {
          // ── Bot match ──
-          if (mId.startsWith("bot-match-")) {
-            const category = useWordUpStore.getState().category || "mixed";
-            let match: any;
+           if (mId.startsWith("bot-match-")) {
+              const category = useWordUpStore.getState().category || "mixed";
+              let uid = "guest-player";
+              try {
+                 const { data: { session } } = await supabase.auth.getSession();
+                 uid = session?.user?.id || localStorage.getItem("wordle_anon_id") || "guest-player";
+              } catch { uid = localStorage.getItem("wordle_anon_id") || "guest-player"; }
 
-            const raw = generateWordUpQuestions(category);
-            const sk = generateSecretKey();
-            const enc = encryptQuestions(raw, sk);
-            let uid = "guest-player";
-            try {
-               const { data: { session } } = await supabase.auth.getSession();
-               uid = session?.user?.id || localStorage.getItem("wordle_anon_id") || "guest-player";
-            } catch { uid = localStorage.getItem("wordle_anon_id") || "guest-player"; }
+              let raw: any[];
+              let sk: string;
+              let enc: string;
 
-            match = {
-               id: mId, category, player1_id: uid, player2_id: "00000000-0000-0000-0000-000000000b0b",
-               is_bot_match: true, game_type: "live-bot",
-               bot_profile: S.current.matchData?.bot_profile || getRandomBotProfile(),
-               status: "countdown", current_question_index: 0,
-               p1_answers: [], p2_answers: [], p1_score: 0, p2_score: 0,
-               p1_answered: false, p2_answered: false,
-               questions: enc, encryption_key: sk,
-            };
+              if (isProceduralCategory(category)) {
+                 const tempId = crypto.randomUUID();
+                 try {
+                    await supabase.from("wordup_matches").insert({
+                       id: tempId, category, player1_id: uid,
+                       player2_id: "00000000-0000-0000-0000-000000000b0b",
+                       status: "generating", game_type: "live-bot", p1_answered: false, p2_answered: false,
+                    });
+                    await generateMatchQuestions(tempId, category);
+                    const { data } = await supabase.from("wordup_matches")
+                       .select("questions, encryption_key").eq("id", tempId).single();
+                    await supabase.from("wordup_matches").delete().eq("id", tempId);
+                    if (data && data.questions && data.encryption_key) {
+                       raw = await decryptMatchQuestions(data);
+                       sk = data.encryption_key;
+                       enc = data.questions;
+                    } else {
+                       throw new Error("No questions returned from edge function");
+                    }
+                 } catch (e) {
+                    console.error("[WordUp] Edge function for bot match failed, using local fallback:", e);
+                    raw = generateWordUpQuestions(category);
+                    sk = generateSecretKey();
+                    enc = encryptQuestions(raw, sk);
+                 }
+              } else {
+                 raw = generateWordUpQuestions(category);
+                 sk = generateSecretKey();
+                 enc = encryptQuestions(raw, sk);
+              }
 
-            if (category === "flag_bearer") {
-               try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); return; }
-            }
-            dispatch({ type: "SET_QUESTIONS", questions: raw });
-            dispatch({ type: "SET_MATCH_DATA", data: match });
-            setBotStats(match);
-            startCountdown(match);
-            return;
-         }
+              const match: any = {
+                 id: mId, category, player1_id: uid, player2_id: "00000000-0000-0000-0000-000000000b0b",
+                 is_bot_match: true, game_type: "live-bot",
+                 bot_profile: S.current.matchData?.bot_profile || getRandomBotProfile(),
+                 status: "countdown", current_question_index: 0,
+                 p1_answers: [], p2_answers: [], p1_score: 0, p2_score: 0,
+                 p1_answered: false, p2_answered: false,
+                 questions: enc, encryption_key: sk,
+              };
+
+              if (category === "flag_bearer") {
+                 try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); return; }
+              }
+              dispatch({ type: "SET_QUESTIONS", questions: raw });
+              dispatch({ type: "SET_MATCH_DATA", data: match });
+              setBotStats(match);
+              startCountdown(match);
+              return;
+          }
 
          // ── Live / Async match ──
          let match: any;
