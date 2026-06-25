@@ -89,7 +89,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                     editIndex: null,
                 };
             }
-            const afterDelete = state.currentGuess.substring(0, state.cursorIndex) + state.currentGuess.substring(state.cursorIndex + 1);
+            const atEnd = state.cursorIndex >= state.currentGuess.length;
+            const afterDelete = atEnd
+                ? state.currentGuess.slice(0, -1)
+                : state.currentGuess.substring(0, state.cursorIndex) + state.currentGuess.substring(state.cursorIndex + 1);
             return {
                 ...state,
                 currentGuess: afterDelete,
