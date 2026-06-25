@@ -1,7 +1,12 @@
 import { motion } from "framer-motion";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Zap, Swords } from "lucide-react";
 
-export const ConnectingView = () => {
+interface ConnectingViewProps {
+   message?: string;
+}
+
+export const ConnectingView = ({ message }: ConnectingViewProps) => {
+   const isInvite = message === "Connecting to opponent...";
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -27,8 +32,8 @@ export const ConnectingView = () => {
                transition={{ delay: 0.1 }}
                className="text-xs font-black uppercase tracking-widest text-correct flex items-center justify-center gap-1.5"
             >
-               <Zap size={12} className="animate-pulse" />
-               Entering Arena
+               {isInvite ? <Swords size={12} className="animate-pulse" /> : <Zap size={12} className="animate-pulse" />}
+               {isInvite ? "Opponent Found" : "Entering Arena"}
             </motion.h3>
             <motion.p 
                initial={{ y: 10, opacity: 0 }}
@@ -36,7 +41,7 @@ export const ConnectingView = () => {
                transition={{ delay: 0.2 }}
                className="text-sm font-bold text-white tracking-wide uppercase"
             >
-               Connecting to Server...
+               {message || "Connecting to Server..."}
             </motion.p>
             <motion.p 
                initial={{ y: 10, opacity: 0 }}
@@ -44,7 +49,7 @@ export const ConnectingView = () => {
                transition={{ delay: 0.3 }}
                className="text-[10px] text-gray-500 font-bold uppercase tracking-wider"
             >
-               Setting up match database
+               {isInvite ? "Starting match" : "Setting up match database"}
             </motion.p>
          </div>
       </motion.div>

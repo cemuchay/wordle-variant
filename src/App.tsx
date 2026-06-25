@@ -925,14 +925,17 @@ export default function App() {
                   const invite = incomingWordUpInvite;
                   setIncomingWordUpInvite(null);
                   try {
-                    // Insert match (questions generated server-side)
+                    // Insert match as LIVE (both users online)
                     const { data: newMatch, error } = await supabase
                       .from("wordup_matches")
                       .insert({
                         category: invite.category,
                         player1_id: invite.senderId,
                         player2_id: user?.id,
-                        status: "waiting",
+                        status: "countdown",
+                        game_type: "live",
+                        p1_answered: false,
+                        p2_answered: false,
                         question_started_at: new Date().toISOString()
                       })
                       .select()
@@ -944,12 +947,7 @@ export default function App() {
                     const { generateMatchQuestions } = await import("./services/wordup/questionService");
                     await generateMatchQuestions(newMatch.id, invite.category);
 
-                    // Update match status to countdown once questions are successfully stored
-                    await supabase
-                      .from("wordup_matches")
-                      .update({ status: "countdown" })
-                      .eq("id", newMatch.id);
-
+                    // Send accepted broadcast to challenger
                     const acceptChannel = supabase.channel(`user_signals_${invite.senderId}`);
                     acceptChannel.subscribe((status: string) => {
                       if (status === 'SUBSCRIBED') {
@@ -958,13 +956,12 @@ export default function App() {
                           event: 'wordup_invite_accepted',
                           payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
                         }).then(() => {
-                          // Update Zustand and navigate only after the broadcast has been sent
+                          // Show connecting screen, then navigate
                           useWordUpStore.getState().setMatchId(newMatch.id);
                           useWordUpStore.getState().setRole("player2");
-                          useWordUpStore.getState().setView("loading");
+                          useWordUpStore.getState().setView("connecting");
                           handleNavigation("wordup");
                         });
-                        // Remove channel after broadcast
                         setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
                       }
                     });
