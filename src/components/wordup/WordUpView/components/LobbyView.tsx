@@ -48,7 +48,9 @@ export const LobbyView = ({
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
    const [outgoingInvite, setOutgoingInvite] = useState<{ targetUserId: string; targetUsername: string } | null>(null);
+   const [inviteCountdown, setInviteCountdown] = useState(15);
    const timeoutRef = useRef<number | null>(null);
+   const inviteIntervalRef = useRef<number | null>(null);
    const inviteResolvedRef = useRef(false);
 
    // New states for tabs and challenge matching
@@ -59,29 +61,28 @@ export const LobbyView = ({
    const [incomingOfflineOrTimeout, setIncomingOfflineOrTimeout] = useState<{ targetUser: any; type: "offline" | "timeout" } | null>(null);
 
    useEffect(() => {
-      const handleRejected = (e: Event) => {
-         if (inviteResolvedRef.current) return;
-         inviteResolvedRef.current = true;
-         const detail = (e as CustomEvent)?.detail;
-         setOutgoingInvite(null);
-         window.dispatchEvent(new CustomEvent("MascoChanged", {
-            detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
-         }));
-         if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-         }
-      };
+       const clearInviteTimers = () => {
+          if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+          if (inviteIntervalRef.current) { clearInterval(inviteIntervalRef.current); inviteIntervalRef.current = null; }
+       };
 
-      const handleBusy = () => {
-         if (inviteResolvedRef.current) return;
-         inviteResolvedRef.current = true;
-         setOutgoingInvite(null);
-         if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-         }
-      };
+       const handleRejected = (e: Event) => {
+          if (inviteResolvedRef.current) return;
+          inviteResolvedRef.current = true;
+          const detail = (e as CustomEvent)?.detail;
+          setOutgoingInvite(null);
+          window.dispatchEvent(new CustomEvent("MascoChanged", {
+             detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
+          }));
+          clearInviteTimers();
+       };
+
+       const handleBusy = () => {
+          if (inviteResolvedRef.current) return;
+          inviteResolvedRef.current = true;
+          setOutgoingInvite(null);
+          clearInviteTimers();
+       };
 
        const handleAccepted = (e: Event) => {
           if (inviteResolvedRef.current) return;
@@ -89,10 +90,7 @@ export const LobbyView = ({
           const detail = (e as CustomEvent)?.detail;
           setOutgoingInvite(null);
           setIncomingOfflineOrTimeout(null);
-          if (timeoutRef.current) {
-             clearTimeout(timeoutRef.current);
-             timeoutRef.current = null;
-          }
+          clearInviteTimers();
           // Transition to connecting screen, then game
            useWordUpStore.getState().setMatchId(detail.matchId);
            useWordUpStore.getState().setRole("player1");
@@ -103,10 +101,7 @@ export const LobbyView = ({
           if (inviteResolvedRef.current) return;
           inviteResolvedRef.current = true;
           setOutgoingInvite(null);
-          if (timeoutRef.current) {
-             clearTimeout(timeoutRef.current);
-             timeoutRef.current = null;
-          }
+          clearInviteTimers();
        };
 
        window.addEventListener("wordup-invite-rejected", handleRejected);
@@ -120,6 +115,7 @@ export const LobbyView = ({
           window.removeEventListener("wordup-invite-accepted", handleAccepted);
           window.removeEventListener("wordup-invite-later", handleLater);
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          if (inviteIntervalRef.current) clearInterval(inviteIntervalRef.current);
        };
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
@@ -454,18 +450,27 @@ export const LobbyView = ({
          }
       });
 
-      // 15 seconds ring timeout
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = window.setTimeout(() => {
-         if (inviteResolvedRef.current) return;
-         setOutgoingInvite((prev) => {
-            if (prev) {
-               setIncomingOfflineOrTimeout({ targetUser, type: "timeout" });
-            }
-            return null;
-         });
-      }, 15000);
-   };
+      // 15 seconds ring timeout + countdown display
+       setInviteCountdown(15);
+       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+       timeoutRef.current = window.setTimeout(() => {
+          if (inviteResolvedRef.current) return;
+          if (inviteIntervalRef.current) { clearInterval(inviteIntervalRef.current); inviteIntervalRef.current = null; }
+          setOutgoingInvite((prev) => {
+             if (prev) {
+                setIncomingOfflineOrTimeout({ targetUser, type: "timeout" });
+             }
+             return null;
+          });
+       }, 15000);
+       if (inviteIntervalRef.current) clearInterval(inviteIntervalRef.current);
+       inviteIntervalRef.current = window.setInterval(() => {
+          setInviteCountdown((prev) => {
+             if (prev <= 1) { if (inviteIntervalRef.current) { clearInterval(inviteIntervalRef.current); inviteIntervalRef.current = null; } return 0; }
+             return prev - 1;
+          });
+       }, 1000);
+    };
 
     const handlePlayMyTurn = (match: any) => {
        const role = match.player1_id === currentUser.id ? "player1" : "player2";
@@ -827,24 +832,28 @@ export const LobbyView = ({
             )}
          </AnimatePresence>
 
-         {outgoingInvite && (
-            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-               <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4 flex flex-col items-center">
-                  <Loader2 className="w-8 h-8 text-correct animate-spin" />
-                  <div>
-                     <h3 className="text-sm font-black uppercase tracking-wider text-white">Challenging Player</h3>
-                     <p className="text-[10px] text-gray-400 mt-1">
-                        Waiting for <strong className="text-white">{outgoingInvite.targetUsername}</strong> to accept your invite...
-                     </p>
-                  </div>
-                  <button
-                     onClick={() => {
-                        inviteResolvedRef.current = true;
-                        setOutgoingInvite(null);
-                        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-                     }}
-                     className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer"
-                  >
+          {outgoingInvite && (
+             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4 flex flex-col items-center">
+                   <Loader2 className="w-8 h-8 text-correct animate-spin" />
+                   <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-white">Challenging Player</h3>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                         Waiting for <strong className="text-white">{outgoingInvite.targetUsername}</strong> to accept your invite...
+                      </p>
+                      <p className="text-[9px] text-gray-500 mt-2 font-bold">
+                         ⏳ {inviteCountdown}s remaining
+                      </p>
+                   </div>
+                   <button
+                      onClick={() => {
+                         inviteResolvedRef.current = true;
+                         setOutgoingInvite(null);
+                         if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                         if (inviteIntervalRef.current) { clearInterval(inviteIntervalRef.current); inviteIntervalRef.current = null; }
+                      }}
+                      className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer"
+                   >
                      Cancel Challenge
                   </button>
                </div>
