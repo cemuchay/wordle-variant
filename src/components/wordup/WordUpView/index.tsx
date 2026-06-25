@@ -188,7 +188,7 @@ export const WordUpView = () => {
    const revealAnswers = useWordUpStore((s) => s.revealAnswers);
    const { rematchState, rematchCountdown, showRematchButton } = engine.state;
 
-   const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing";
+   const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing" && currentIdx === 6;
 
    // ── Recovery from refresh ─────────────────────────────────────────────
    useEffect(() => {
