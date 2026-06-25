@@ -4,6 +4,7 @@ export interface GameState {
     guesses: GuessResult[][];
     currentGuess: string;
     cursorIndex: number;
+    editIndex: number | null;
     letterStatuses: Record<string, LetterStatus>;
     status: 'playing' | 'won' | 'lost';
     usedHint: boolean;
@@ -23,6 +24,7 @@ export type GameAction =
     | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string; index: number; row?: number } }
     | { type: 'SET_CURSOR'; index: number }
+    | { type: 'SET_EDIT_INDEX'; index: number | null }
     | { type: 'LOAD_STATE'; payload: Partial<GameState> }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
     | { type: 'RESET_CURRENT_GUESS' }
@@ -34,6 +36,7 @@ export const initialState: GameState = {
     guesses: [],
     currentGuess: '',
     cursorIndex: 0,
+    editIndex: null,
     letterStatuses: {},
     status: 'playing',
     usedHint: false,
@@ -55,6 +58,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             };
         case 'ADD_LETTER':
             if (state.isGameOver || state.currentGuess.length >= action.maxLength) return state;
+            if (state.editIndex !== null) {
+                const ei = state.editIndex;
+                const filled = state.currentGuess.substring(0, ei) + action.char + state.currentGuess.substring(ei + 1);
+                return {
+                    ...state,
+                    currentGuess: filled,
+                    editIndex: null,
+                };
+            }
             const cursorAtEnd = state.cursorIndex >= state.currentGuess.length;
             const newGuess = cursorAtEnd
                 ? state.currentGuess + action.char
@@ -68,7 +80,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         case 'DELETE_LETTER':
             if (state.isGameOver) return state;
             if (state.currentGuess.length === 0) return state;
-            const afterDelete = state.currentGuess.slice(0, -1);
+            if (state.editIndex !== null) {
+                const ei = state.editIndex;
+                const cleared = state.currentGuess.substring(0, ei) + '\0' + state.currentGuess.substring(ei + 1);
+                return {
+                    ...state,
+                    currentGuess: cleared,
+                    editIndex: null,
+                };
+            }
+            const atEnd = state.cursorIndex >= state.currentGuess.length;
+            const afterDelete = atEnd
+                ? state.currentGuess.slice(0, -1)
+                : state.currentGuess.substring(0, state.cursorIndex) + state.currentGuess.substring(state.cursorIndex + 1);
             return {
                 ...state,
                 currentGuess: afterDelete,
@@ -79,6 +103,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             return {
                 ...state,
                 cursorIndex: Math.max(0, Math.min(action.index, state.currentGuess.length)),
+                editIndex: null,
+            };
+
+        case 'SET_EDIT_INDEX':
+            return {
+                ...state,
+                editIndex: action.index,
             };
 
         case 'SUBMIT_GUESS': {
@@ -91,6 +122,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 guesses: newGuesses,
                 currentGuess: '',
                 cursorIndex: 0,
+                editIndex: null,
                 status: newStatus,
                 isGameOver: isFinished,
                 isRevealing: true,
