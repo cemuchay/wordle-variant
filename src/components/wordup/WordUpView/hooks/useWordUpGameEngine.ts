@@ -44,6 +44,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       rematchFallback: null as number | null,
       opponentWatchdog: null as number | null,
       recoveryDelay: null as number | null,
+      lastRoundPopupTimeout: null as number | null,
    });
 
    const G = useRef({
@@ -195,8 +196,22 @@ export function useWordUpGameEngine(props: EngineProps) {
       }
 
       if (merged.current_question_index !== S.current.currentRound
-         && (merged.status === "active" || merged.status === "countdown"))
-         cb.current.startQuestionRound?.(merged, merged.current_question_index);
+         && (merged.status === "active" || merged.status === "countdown")) {
+         if (merged.current_question_index === 6 && !T.current.lastRoundPopupTimeout) {
+            dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
+            clearT("lastRoundPopupTimeout");
+            T.current.lastRoundPopupTimeout = window.setTimeout(() => {
+               dispatch({ type: "SET_LAST_ROUND_POPUP", show: false });
+               clearT("lastRoundPopupTimeout");
+               const nq = S.current.questions[6];
+               const nd = nq ? getQuestionDuration(nq.type) : 10.0;
+               dispatch({ type: "SET_ROUND", round: 6, timeLeft: nd, maxTime: nd });
+               cb.current.startQuestionRound?.(S.current.matchData, 6);
+            }, 1500);
+         } else {
+            cb.current.startQuestionRound?.(merged, merged.current_question_index);
+         }
+      }
 
       if (merged.status === "completed") {
          safeSessionStorage.setItem("wordup_completed_" + merged.id, "true");
@@ -218,8 +233,10 @@ export function useWordUpGameEngine(props: EngineProps) {
        if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
        else { upd.p1_answered = false; upd.p2_answered = false; }
        if (gameType === "live")
-          channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx, question_started_at: upd.question_started_at } }).catch(console.error);
-       dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
+          channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx } }).catch(console.error);
+       if (nextIdx < 6) {
+          dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
+       }
        cb.current.handleMatchUpdate?.(upd);
        G.current.isAdvancing = false;
     }, [gameType, getSyncedNow]);
@@ -235,7 +252,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
       const correct = choice === q?.answer;
       let points = 0;
-      if (correct) { const sb = Math.max(0, Math.round((1.0 - elapsed / duration) * 50)); points = 100 + sb; }
+      if (correct) { const eff = Math.max(0, elapsed - 1.5); const denom = duration - 1.5; points = Math.max(0, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
       if (S.current.currentRound === 6) points *= 2;
       if (choice !== "") { if (correct) wordupAudio.playCorrect(); else wordupAudio.playIncorrect(); }
       const sub = { question_idx: S.current.currentRound, correct, time_taken: elapsed, points, choice };
@@ -249,7 +266,7 @@ export function useWordUpGameEngine(props: EngineProps) {
             clearT("botTimeout");
             const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
             let bp = 0;
-            if (ba.correct) { const sb = Math.max(0, Math.round((1.0 - ba.time_taken / duration) * 50)); bp = 100 + sb; }
+            if (ba.correct) { const eff = Math.max(0, ba.time_taken - 1.5); const denom = duration - 1.5; bp = Math.max(0, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
             if (S.current.currentRound === 6) bp *= 2;
             let bc = q?.answer;
             if (!ba.correct && q?.choices) { const w = q.choices.filter((c: any) => c !== q.answer); bc = w[Math.floor(Math.random() * w.length)] || "WRONG"; }
@@ -394,9 +411,7 @@ export function useWordUpGameEngine(props: EngineProps) {
        dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
        G.current.isSubmitting = false;
 
-       const startTime = _match.question_started_at
-          ? new Date(_match.question_started_at).getTime()
-          : getSyncedNow();
+        const startTime = getSyncedNow();
        let lastTicked = Math.ceil(duration) + 1;
        T.current.roundInterval = window.setInterval(() => {
           const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
@@ -408,7 +423,7 @@ export function useWordUpGameEngine(props: EngineProps) {
 
       if (gameType === "live-bot" && q) {
          const bp = _match.bot_profile || "average";
-         const br = simulateBotResponse(q, bp);
+          const br = simulateBotResponse(q, bp, duration);
          const bt = Math.min(br.time_taken, duration - 0.5);
          botAction.current = { ...br, time_taken: bt };
          T.current.botTimeout = window.setTimeout(() => cb.current.handleMatchUpdate?.({ p2_answered: true }), bt * 1000);
@@ -599,9 +614,9 @@ export function useWordUpGameEngine(props: EngineProps) {
                   else { u.p2_answered = true; u.p2_answers = payload.answers; u.p2_score = payload.score; }
                   cb.current.handleMatchUpdate?.(u);
                })
-                .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
-                   const cur = S.current.matchData; if (!cur) return;
-                   cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false, question_started_at: payload.question_started_at || cur.question_started_at });
+                 .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
+                    const cur = S.current.matchData; if (!cur) return;
+                    cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });
                 })
                .on("broadcast", { event: "game_active" }, () => {
                   const cur = S.current.matchData; if (!cur) return;
