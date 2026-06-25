@@ -48,6 +48,7 @@ interface BattleViewProps {
    sendQuickChat: (text: string) => void;
    onAbort: () => void;
    lastRoundPopup: boolean;
+   waitingForOpponent: boolean;
 }
 
 const PREFILLED_MESSAGES = [
@@ -91,7 +92,8 @@ export const BattleView = ({
    playerProfile,
    sendQuickChat,
    onAbort,
-   lastRoundPopup
+   lastRoundPopup,
+   waitingForOpponent
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
@@ -307,6 +309,29 @@ export const BattleView = ({
                >
                   DOUBLE POINTS
                </motion.p>
+            </motion.div>
+         )}
+         {waitingForOpponent && (
+            <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-dark/90 backdrop-blur-sm pointer-events-none select-none"
+            >
+               <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  className="flex flex-col items-center text-center max-w-xs px-6"
+               >
+                  <div className="w-12 h-12 border-4 border-correct/30 border-t-correct rounded-full animate-spin mb-4" />
+                  <p className="text-lg font-black text-white tracking-wider">Waiting for opponent...</p>
+                  <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                     Your answer is locked in. The match will auto-finalize shortly if the opponent doesn't respond.
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-3 font-bold">
+                     Your score is safe — opponent keeps their last score.
+                  </p>
+               </motion.div>
             </motion.div>
          )}
          {/* Top Control Bar */}

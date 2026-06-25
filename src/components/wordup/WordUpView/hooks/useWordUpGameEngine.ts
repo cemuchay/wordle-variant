@@ -45,6 +45,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       opponentWatchdog: null as number | null,
       recoveryDelay: null as number | null,
       lastRoundPopupTimeout: null as number | null,
+      opponentInactivityTimeout: null as number | null,
    });
 
    const G = useRef({
@@ -286,7 +287,7 @@ export function useWordUpGameEngine(props: EngineProps) {
          cb.current.handleMatchUpdate?.(upd);
 
          if (gameType === "live") {
-            channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers, score: upd.p1_score || upd.p2_score } }).catch(console.error);
+             channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers, my_score: upd.p1_score || upd.p2_score, opp_score: upd.p2_score || upd.p1_score } }).catch(console.error);
          }
          if (gameType === "async") await persistTurn(upd);
       } catch (err) {
@@ -327,9 +328,10 @@ export function useWordUpGameEngine(props: EngineProps) {
       } catch (e) { console.error("[WordUp] Async persist failed:", e); triggerToast("Failed to save progress.", 5000); }
    }, [triggerToast, onGameOver]);
 
-   const endGame = useCallback(async (match: any) => {
-      if (G.current.isEnding) return;
-      G.current.isEnding = true;
+    const endGame = useCallback(async (match: any) => {
+       if (G.current.isEnding) return;
+       G.current.isEnding = true;
+       clearT("opponentInactivityTimeout");
       const completedAt = new Date().toISOString();
       const finalMatch = { ...match, status: "completed", p1_answered: true, p2_answered: true, completed_at: completedAt };
 
@@ -496,6 +498,21 @@ export function useWordUpGameEngine(props: EngineProps) {
       return () => clearTimeout(wd);
    }, [gameType, state.timeLeft, state.revealAnswers, state.matchData?.status]);
 
+   // ── Opponent inactivity watchdog (45s → auto-forfeit) ──────────────
+   const INACTIVITY_TIMEOUT = 45000;
+   function resetInactivityWatchdog() {
+      clearT("opponentInactivityTimeout");
+      if (gameType !== "live") return;
+      T.current.opponentInactivityTimeout = window.setTimeout(() => {
+         const cur = S.current.matchData;
+         if (!cur || G.current.isEnding || (S.current.matchData?.status !== "active")) return;
+         console.log("[WordUp] Opponent inactive for 45s — auto-forfeiting");
+         triggerToast("Opponent disconnected. Match completed.", 5000);
+         const final = { ...cur, status: "completed", p1_answered: true, p2_answered: true, completed_at: new Date().toISOString() };
+         cb.current.endGame?.(final);
+      }, INACTIVITY_TIMEOUT);
+   }
+
    // ── Persist active game state ─────────────────────────────────────────
    useEffect(() => {
       if (state.phase !== "playing" && state.phase !== "reveal") return;
@@ -607,21 +624,29 @@ export function useWordUpGameEngine(props: EngineProps) {
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase.channel(`wordup_match_${mId}`, { config: { broadcast: { self: false } } })
                .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wordup_matches", filter: `id=eq.${mId}` }, (p: any) => cb.current.handleMatchUpdate?.(p.new))
-               .on("broadcast", { event: "player_answered" }, ({ payload }: any) => {
-                  const cur = S.current.matchData; if (!cur) return;
-                  const u: any = { ...cur };
-                  if (payload.role === "player1") { u.p1_answered = true; u.p1_answers = payload.answers; u.p1_score = payload.score; }
-                  else { u.p2_answered = true; u.p2_answers = payload.answers; u.p2_score = payload.score; }
-                  cb.current.handleMatchUpdate?.(u);
-               })
-                 .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
-                    const cur = S.current.matchData; if (!cur) return;
-                    cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });
+                .on("broadcast", { event: "player_answered" }, ({ payload }: any) => {
+                   const cur = S.current.matchData; if (!cur) return;
+                   const u: any = { ...cur };
+                   if (payload.role === "player1" || payload.role === "player2") {
+                      const role = payload.role;
+                      u[role === "player1" ? "p1_answered" : "p2_answered"] = true;
+                      u[role === "player1" ? "p1_answers" : "p2_answers"] = payload.answers;
+                      u.p1_score = role === "player1" ? payload.my_score : payload.opp_score;
+                      u.p2_score = role === "player2" ? payload.my_score : payload.opp_score;
+                   }
+                   cb.current.handleMatchUpdate?.(u);
+                   resetInactivityWatchdog();
                 })
-               .on("broadcast", { event: "game_active" }, () => {
-                  const cur = S.current.matchData; if (!cur) return;
-                  cb.current.handleMatchUpdate?.({ ...cur, status: "active" });
-               })
+                  .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
+                     const cur = S.current.matchData; if (!cur) return;
+                     cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });
+                     resetInactivityWatchdog();
+                 })
+                .on("broadcast", { event: "game_active" }, () => {
+                   const cur = S.current.matchData; if (!cur) return;
+                   cb.current.handleMatchUpdate?.({ ...cur, status: "active" });
+                   resetInactivityWatchdog();
+                })
                .on("broadcast", { event: "rematch_request" }, () => {
                   if (useWordUpStore.getState().view !== "gameover") return;
                   if (state.rematchState === "sent") {
@@ -657,10 +682,13 @@ export function useWordUpGameEngine(props: EngineProps) {
                   onRematchAccepted(payload.newMatchId, activeRole);
                })
                .on("broadcast", { event: "quick_chat" }, ({ payload }: any) => window.dispatchEvent(new CustomEvent("wordup-quick-chat", { detail: payload })))
-               .subscribe((status) => {
-                  if (status === "SUBSCRIBED") supabase.from("wordup_matches").select("*").eq("id", mId).single().then(({ data }) => { if (data) cb.current.handleMatchUpdate?.(data); }, () => {});
-                  if (status === "CHANNEL_ERROR") triggerToast("Connection lost. Attempting to reconnect...", 3000);
-               });
+                .subscribe((status) => {
+                   if (status === "SUBSCRIBED") {
+                      supabase.from("wordup_matches").select("*").eq("id", mId).single().then(({ data }) => { if (data) cb.current.handleMatchUpdate?.(data); }, () => {});
+                      resetInactivityWatchdog();
+                   }
+                   if (status === "CHANNEL_ERROR") triggerToast("Connection lost. Attempting to reconnect...", 3000);
+                });
             channel.current = ch;
           } else if (actualGameType === "async") {
             if (channel.current) supabase.removeChannel(channel.current);
