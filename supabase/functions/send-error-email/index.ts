@@ -2,48 +2,57 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const ALERT_EMAIL = "cemuchay@gmail.com";
-const FROM_EMAIL = (Deno.env.get("FROM_EMAIL") || "Wordle Variant Alerts <updates@wordle-variant.xyz>").replace(/^["']|["']$/g, "");
+const FROM_EMAIL = (
+   Deno.env.get("FROM_EMAIL") || "variant Alerts <updates@wordle-variant.xyz>"
+).replace(/^["']|["']$/g, "");
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+   "Access-Control-Allow-Origin": "*",
+   "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+   if (req.method === "OPTIONS") {
+      return new Response("ok", { headers: corsHeaders });
+   }
 
-  try {
-    const { record } = await req.json();
+   try {
+      const { record } = await req.json();
 
-    if (!record || record.level !== "fatal") {
-      return new Response(JSON.stringify({ message: "Not a fatal log, skipping." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      if (!record || record.level !== "fatal") {
+         return new Response(
+            JSON.stringify({ message: "Not a fatal log, skipping." }),
+            {
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+         );
+      }
 
-    if (!RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "Email service not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      if (!RESEND_API_KEY) {
+         console.error("RESEND_API_KEY not configured");
+         return new Response(
+            JSON.stringify({ error: "Email service not configured" }),
+            {
+               status: 500,
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+         );
+      }
 
-    const { message, context, session_id, user_id, created_at } = record;
+      const { message, context, session_id, user_id, created_at } = record;
 
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [ALERT_EMAIL],
-        subject: `🚨 CRITICAL CRASH: ${message}`,
-        html: `
+      const emailResponse = await fetch("https://api.resend.com/emails", {
+         method: "POST",
+         headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+         },
+         body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [ALERT_EMAIL],
+            subject: `🚨 CRITICAL CRASH: ${message}`,
+            html: `
           <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
             <h2 style="color: #e11d48; margin-bottom: 20px;">Critical System Error Detected</h2>
             
@@ -61,18 +70,18 @@ serve(async (req) => {
             </p>
           </div>
         `,
-      }),
-    });
+         }),
+      });
 
-    const result = await emailResponse.json();
+      const result = await emailResponse.json();
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+      return new Response(JSON.stringify(result), {
+         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+   } catch (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+         status: 500,
+         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+   }
 });
