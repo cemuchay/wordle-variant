@@ -58,6 +58,13 @@ export const useActions = ({
       [dispatch],
     );
 
+    const onSetEditIndex = useCallback(
+      (index: number | null) => {
+        dispatch({ type: "SET_EDIT_INDEX", index });
+      },
+      [dispatch],
+    );
+
     const onCursorLeft = useCallback(() => {
       const newIdx = Math.max(0, state.cursorIndex - 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
@@ -346,6 +353,7 @@ export const useActions = ({
       setGameOverModalOpen,
       loadState,
       onSetCursor,
+      onSetEditIndex,
       onCursorLeft,
       onCursorRight,
     };

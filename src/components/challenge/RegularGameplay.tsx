@@ -38,7 +38,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         onLengthComplete: onBack || onFinish
     });
 
-    const { guesses, currentGuess, cursorIndex, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
+    const { guesses, currentGuess, cursorIndex, editIndex, letterStatuses, isGameOver, isShake, usedHint, hintRecord } = state;
 
     // Stabilize UI state to wait for reveal animations
     const [stableGuessesCount, setStableGuessesCount] = useState(guesses.length);
@@ -196,6 +196,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                     guesses={guesses}
                     currentGuess={currentGuess}
                     cursorIndex={cursorIndex}
+                    editIndex={editIndex}
                     hintRecord={hintRecord}
                     isChallengeMode={true}
                     isShake={isShake}
@@ -203,6 +204,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                     compact={true}
                     gameplayType="challenge"
                     onSetCursor={actions.onSetCursor}
+                    onSetEditIndex={actions.onSetEditIndex}
                 />
             </div>
 

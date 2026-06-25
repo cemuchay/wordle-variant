@@ -427,14 +427,14 @@ export function useWordUpGameEngine(props: EngineProps) {
             dispatch({ type: "SET_PHASE", phase: "playing" });
             if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-"))
                supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id).then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
-            if (gameType === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
+            if (match.game_type === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
             cb.current.startQuestionRound?.(match, 0);
          } else {
             useWordUpStore.getState().setView("countdown");
             dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
          }
       }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
-   }, [role, gameType]);
+   }, [role]);
 
    // ── Live watchdog ─────────────────────────────────────────────────────
    useEffect(() => {
@@ -468,7 +468,7 @@ export function useWordUpGameEngine(props: EngineProps) {
 
       try {
          // ── Bot match ──
-         if (gameType === "live-bot" || mId.startsWith("bot-match-")) {
+          if (mId.startsWith("bot-match-")) {
             const category = useWordUpStore.getState().category || "mixed";
             let match: any;
 
@@ -529,8 +529,9 @@ export function useWordUpGameEngine(props: EngineProps) {
           }
 
          dispatch({ type: "SET_MATCH_DATA", data: match });
+         const actualGameType = match.game_type || "live";
 
-         if (!match.questions && !match.encrypted_questions) {
+          if (!match.questions && !match.encrypted_questions) {
             await generateMatchQuestions(match.id, match.category);
             const { data: ref } = await supabase.from("wordup_matches").select("*").eq("id", match.id).single();
             if (ref) { match = ref; dispatch({ type: "SET_MATCH_DATA", data: match }); }
@@ -540,8 +541,8 @@ export function useWordUpGameEngine(props: EngineProps) {
          if (match.category === "flag_bearer") await preloadMatchImages(dec);
          dispatch({ type: "SET_QUESTIONS", questions: dec });
 
-         // Load opponent profile (live only)
-         if (gameType === "live") {
+          // Load opponent profile (live only)
+          if (actualGameType === "live") {
             const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
             if (oppId) {
                const mp = await wordupNetworkGate.enqueue("get", "load opp profile", async () => {
@@ -556,8 +557,8 @@ export function useWordUpGameEngine(props: EngineProps) {
             }
          }
 
-         // Channel subscription
-         if (gameType === "live") {
+          // Channel subscription
+          if (actualGameType === "live") {
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase.channel(`wordup_match_${mId}`, { config: { broadcast: { self: false } } })
                .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wordup_matches", filter: `id=eq.${mId}` }, (p: any) => cb.current.handleMatchUpdate?.(p.new))
@@ -616,7 +617,7 @@ export function useWordUpGameEngine(props: EngineProps) {
                   if (status === "CHANNEL_ERROR") triggerToast("Connection lost. Attempting to reconnect...", 3000);
                });
             channel.current = ch;
-         } else if (gameType === "async") {
+          } else if (actualGameType === "async") {
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase.channel(`async-match-${mId}`)
                .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wordup_matches", filter: `id=eq.${mId}` }, (p: any) => {
@@ -648,7 +649,7 @@ export function useWordUpGameEngine(props: EngineProps) {
          }
          dispatch({ type: "RESET" });
       }
-   }, [gameType, triggerToast, startCountdown, onGameOver, onRematchAccepted]);
+   }, [triggerToast, startCountdown, onGameOver, onRematchAccepted]);
 
    function setBotStats(match: any) {
       const bp = match.bot_profile || "average";

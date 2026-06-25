@@ -754,6 +754,7 @@ export default function App() {
                   guesses={state.guesses}
                   currentGuess={state.currentGuess}
                   cursorIndex={state.cursorIndex}
+                  editIndex={state.editIndex}
                   letterStatuses={state.letterStatuses}
                   hintRecord={state.hintRecord}
                   isGameOver={state.isGameOver}
@@ -763,6 +764,7 @@ export default function App() {
                   onDelete={actions.onDelete}
                   onEnter={actions.onEnter}
                   onSetCursor={actions.onSetCursor}
+                  onSetEditIndex={actions.onSetEditIndex}
                   activeDailyMarathons={activeDailyMarathons}
                   setSelectedChallengeId={setSelectedChallengeId}
                   setIsChallengeOpen={setIsChallengeOpen}

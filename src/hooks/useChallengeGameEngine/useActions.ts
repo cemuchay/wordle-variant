@@ -89,6 +89,13 @@ export const useActions = ({
       [dispatch],
     );
 
+    const onSetEditIndex = useCallback(
+      (index: number | null) => {
+        dispatch({ type: "SET_EDIT_INDEX", index });
+      },
+      [dispatch],
+    );
+
     const onCursorLeft = useCallback(() => {
       const newIdx = Math.max(0, state.cursorIndex - 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
@@ -99,7 +106,7 @@ export const useActions = ({
       dispatch({ type: "SET_CURSOR", index: newIdx });
     }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
-   const onEnter = useCallback(async () => {
+    const onEnter = useCallback(async () => {
       if (isGameOver || isSaving || state.currentGuess.length !== wordLength) return;
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -435,10 +442,11 @@ export const useActions = ({
          handleHint,
          retrySync,
          onSetCursor,
+         onSetEditIndex,
          onCursorLeft,
          onCursorRight,
       }),
-      [onChar, onDelete, onEnter, handleHint, retrySync, onSetCursor, onCursorLeft, onCursorRight],
+      [onChar, onDelete, onEnter, handleHint, retrySync, onSetCursor, onSetEditIndex, onCursorLeft, onCursorRight],
     );
 
    return { actions };
