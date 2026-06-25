@@ -174,7 +174,8 @@ export const WordUpView = () => {
       setView("menu");
    }, [cancelMatchmaking, resetGame, setView]);
 
-   const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+    const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+   const lastRoundPopup = engine.state.lastRoundPopup;
 
    // Read game state from store (synced by engine)
    const questions = useWordUpStore((s) => s.questions);
@@ -338,15 +339,15 @@ export const WordUpView = () => {
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
             {view === "loading" && <LoadingView onCancel={abortMatch} />}
-            {view === "battle" && (
-               <BattleView
-                  questions={questions} currentIdx={currentIdx} matchData={matchData}
-                  opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
-                  revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                  role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
-                  onAbort={abortMatch}
-               />
-            )}
+             {view === "battle" && (
+                <BattleView
+                   questions={questions} currentIdx={currentIdx} matchData={matchData}
+                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
+                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
+                   role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
+                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
+                />
+             )}
             {view === "gameover" && (
                <GameOverView
                   matchData={matchData}

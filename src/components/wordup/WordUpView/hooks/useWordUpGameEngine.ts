@@ -44,6 +44,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       rematchFallback: null as number | null,
       opponentWatchdog: null as number | null,
       recoveryDelay: null as number | null,
+      lastRoundPopupTimeout: null as number | null,
    });
 
    const G = useRef({
@@ -195,8 +196,22 @@ export function useWordUpGameEngine(props: EngineProps) {
       }
 
       if (merged.current_question_index !== S.current.currentRound
-         && (merged.status === "active" || merged.status === "countdown"))
-         cb.current.startQuestionRound?.(merged, merged.current_question_index);
+         && (merged.status === "active" || merged.status === "countdown")) {
+         if (merged.current_question_index === 6 && !T.current.lastRoundPopupTimeout) {
+            dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
+            clearT("lastRoundPopupTimeout");
+            T.current.lastRoundPopupTimeout = window.setTimeout(() => {
+               dispatch({ type: "SET_LAST_ROUND_POPUP", show: false });
+               clearT("lastRoundPopupTimeout");
+               const nq = S.current.questions[6];
+               const nd = nq ? getQuestionDuration(nq.type) : 10.0;
+               dispatch({ type: "SET_ROUND", round: 6, timeLeft: nd, maxTime: nd });
+               cb.current.startQuestionRound?.(S.current.matchData, 6);
+            }, 1500);
+         } else {
+            cb.current.startQuestionRound?.(merged, merged.current_question_index);
+         }
+      }
 
       if (merged.status === "completed") {
          safeSessionStorage.setItem("wordup_completed_" + merged.id, "true");
@@ -218,8 +233,10 @@ export function useWordUpGameEngine(props: EngineProps) {
        if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
        else { upd.p1_answered = false; upd.p2_answered = false; }
        if (gameType === "live")
-           channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx } }).catch(console.error);
-       dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
+          channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx } }).catch(console.error);
+       if (nextIdx < 6) {
+          dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
+       }
        cb.current.handleMatchUpdate?.(upd);
        G.current.isAdvancing = false;
     }, [gameType, getSyncedNow]);
