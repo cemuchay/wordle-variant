@@ -142,7 +142,7 @@ export const BattleView = ({
       if (currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && !revealAnswers && !lastRoundShownRef.current) {
          lastRoundShownRef.current = true;
          setShowLastRound(true);
-         const t = setTimeout(() => setShowLastRound(false), 1200);
+         const t = setTimeout(() => setShowLastRound(false), 700);
          return () => clearTimeout(t);
       }
    }, [currentIdx, revealAnswers]);
@@ -689,14 +689,14 @@ export const BattleView = ({
                      transition={{ duration: 0.5, ease: "easeOut" }}
                      className="text-center"
                   >
-                     <p className="text-4xl sm:text-5xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
+                     <p className="text-3xl sm:text-4xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
                         ⚡ LAST ROUND ⚡
                      </p>
                      <motion.p
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3, duration: 0.4 }}
-                        className="text-sm sm:text-base font-black text-pink-500 mt-3 animate-pulse tracking-wider"
+                        className="text-sm sm:text-base font-black text-pink-500 mt-2 animate-pulse tracking-wider"
                      >
                         DOUBLE POINTS
                      </motion.p>

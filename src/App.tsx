@@ -936,7 +936,7 @@ export default function App() {
                         game_type: "live",
                         p1_answered: false,
                         p2_answered: false,
-                        question_started_at: new Date().toISOString()
+                        question_started_at: new Date(Date.now() + 4500).toISOString()
                       })
                       .select()
                       .single();
