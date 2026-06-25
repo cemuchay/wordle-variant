@@ -2330,7 +2330,7 @@ export const simulateBotResponse = (
    if (correct) {
       const eff = Math.max(0, time_taken - 1.5);
       const denom = duration - 1.5;
-      points = Math.max(0, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
+      points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
    }
 
    return { correct, time_taken, points };

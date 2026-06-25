@@ -252,7 +252,7 @@ export function useWordUpGameEngine(props: EngineProps) {
       const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
       const correct = choice === q?.answer;
       let points = 0;
-      if (correct) { const eff = Math.max(0, elapsed - 1.5); const denom = duration - 1.5; points = Math.max(0, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
+      if (correct) { const eff = Math.max(0, elapsed - 1.5); const denom = duration - 1.5; points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
       if (S.current.currentRound === 6) points *= 2;
       if (choice !== "") { if (correct) wordupAudio.playCorrect(); else wordupAudio.playIncorrect(); }
       const sub = { question_idx: S.current.currentRound, correct, time_taken: elapsed, points, choice };
@@ -266,7 +266,7 @@ export function useWordUpGameEngine(props: EngineProps) {
             clearT("botTimeout");
             const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
             let bp = 0;
-            if (ba.correct) { const eff = Math.max(0, ba.time_taken - 1.5); const denom = duration - 1.5; bp = Math.max(0, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
+            if (ba.correct) { const eff = Math.max(0, ba.time_taken - 1.5); const denom = duration - 1.5; bp = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
             if (S.current.currentRound === 6) bp *= 2;
             let bc = q?.answer;
             if (!ba.correct && q?.choices) { const w = q.choices.filter((c: any) => c !== q.answer); bc = w[Math.floor(Math.random() * w.length)] || "WRONG"; }

@@ -83,32 +83,44 @@ export const LobbyView = ({
          }
       };
 
-      const handleAccepted = (e: Event) => {
-         if (inviteResolvedRef.current) return;
-         inviteResolvedRef.current = true;
-         const detail = (e as CustomEvent)?.detail;
-         setOutgoingInvite(null);
-         setIncomingOfflineOrTimeout(null);
-         if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-         }
-         // Transition to connecting screen, then game
-          useWordUpStore.getState().setMatchId(detail.matchId);
-          useWordUpStore.getState().setRole("player1");
-          useWordUpStore.getState().setView("connecting");
-      };
+       const handleAccepted = (e: Event) => {
+          if (inviteResolvedRef.current) return;
+          inviteResolvedRef.current = true;
+          const detail = (e as CustomEvent)?.detail;
+          setOutgoingInvite(null);
+          setIncomingOfflineOrTimeout(null);
+          if (timeoutRef.current) {
+             clearTimeout(timeoutRef.current);
+             timeoutRef.current = null;
+          }
+          // Transition to connecting screen, then game
+           useWordUpStore.getState().setMatchId(detail.matchId);
+           useWordUpStore.getState().setRole("player1");
+           useWordUpStore.getState().setView("connecting");
+       };
 
-      window.addEventListener("wordup-invite-rejected", handleRejected);
-      window.addEventListener("wordup-invite-busy", handleBusy);
-      window.addEventListener("wordup-invite-accepted", handleAccepted);
+       const handleLater = () => {
+          if (inviteResolvedRef.current) return;
+          inviteResolvedRef.current = true;
+          setOutgoingInvite(null);
+          if (timeoutRef.current) {
+             clearTimeout(timeoutRef.current);
+             timeoutRef.current = null;
+          }
+       };
 
-      return () => {
-         window.removeEventListener("wordup-invite-rejected", handleRejected);
-         window.removeEventListener("wordup-invite-busy", handleBusy);
-         window.removeEventListener("wordup-invite-accepted", handleAccepted);
-         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      };
+       window.addEventListener("wordup-invite-rejected", handleRejected);
+       window.addEventListener("wordup-invite-busy", handleBusy);
+       window.addEventListener("wordup-invite-accepted", handleAccepted);
+       window.addEventListener("wordup-invite-later", handleLater);
+
+       return () => {
+          window.removeEventListener("wordup-invite-rejected", handleRejected);
+          window.removeEventListener("wordup-invite-busy", handleBusy);
+          window.removeEventListener("wordup-invite-accepted", handleAccepted);
+          window.removeEventListener("wordup-invite-later", handleLater);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
@@ -936,8 +948,8 @@ export const LobbyView = ({
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
                         <ul className="list-disc pl-4 space-y-1">
-                           <li><strong className="text-correct">Correct answer</strong>: Base 100 points + up to 50 points speed bonus.</li>
-                           <li><strong className="text-correct">Speed Bonus</strong>: Faster submissions receive more bonus points (decaying from +50 to +0 over the question duration).</li>
+                            <li><strong className="text-correct">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays over time with a 1.5s grace period).</li>
+                            <li><strong className="text-correct">Speed Bonus</strong>: Faster answers earn more — the 20-point max drops to 11 at the time limit.</li>
                            <li><strong className="text-pink-500">Round 7 (Final Round)</strong>: All points are <strong className="text-pink-500">DOUBLED</strong>! Make it count!</li>
                         </ul>
                      </div>
