@@ -1,10 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useMemo, useRef } from 'react';
-import { getWordLists } from '../../data/words';
-import { checkGuess, getLetterStatuses, calculateSkillIndex, getShapeShifterFeedbackAndWord, isHintDisabled, getHint } from '../../lib/game-logic';
-import { ANIMATION_DURATION } from '../../constants/ui';
-import { logger } from '../../lib/logger';
-import returnAnimationTime from '../../utils/returnAnimationTime';
+import { useCallback, useMemo, useRef } from "react";
+import { getWordLists } from "../../data/words";
+import {
+   checkGuess,
+   getLetterStatuses,
+   calculateSkillIndex,
+   getShapeShifterFeedbackAndWord,
+   isHintDisabled,
+   getHint,
+} from "../../lib/game-logic";
+import { ANIMATION_DURATION } from "../../constants/ui";
+import { logger } from "../../lib/logger";
+import returnAnimationTime from "../../utils/returnAnimationTime";
 
 interface UseActionsProps {
    state: any;
@@ -27,7 +34,12 @@ interface UseActionsProps {
    effectiveMaxTime: number | null;
    isMarathon: boolean;
    gameIndex: number | null | undefined;
-   wrappedSubmitResult: (payload: any, wordLen?: number, gIdx?: number) => Promise<boolean>;
+   wrappedSubmitResult: (
+      payload: any,
+      wordLen?: number,
+      gIdx?: number,
+   ) => Promise<boolean>;
+   saveToLocal: (payload: any, needsSync?: boolean) => void;
    onLengthComplete?: () => void;
    onFinish: () => void;
    setSyncFailed: (val: boolean) => void;
@@ -59,6 +71,7 @@ export const useActions = ({
    isMarathon,
    gameIndex,
    wrappedSubmitResult,
+   saveToLocal,
    onLengthComplete,
    onFinish,
    setSyncFailed,
@@ -66,7 +79,7 @@ export const useActions = ({
    usedHint,
    hintRecord,
    retrySync,
- }: UseActionsProps) => {
+}: UseActionsProps) => {
    const isSubmittingRef = useRef(false);
 
    const onChar = useCallback(
@@ -77,37 +90,38 @@ export const useActions = ({
       [isGameOver, dispatch, wordLength],
    );
 
-    const onDelete = useCallback(() => {
+   const onDelete = useCallback(() => {
       if (isGameOver) return;
       dispatch({ type: "DELETE_CHAR" });
-    }, [isGameOver, dispatch]);
+   }, [isGameOver, dispatch]);
 
-    const onSetCursor = useCallback(
+   const onSetCursor = useCallback(
       (index: number) => {
-        dispatch({ type: "SET_CURSOR", index });
+         dispatch({ type: "SET_CURSOR", index });
       },
       [dispatch],
-    );
+   );
 
-    const onSetEditIndex = useCallback(
+   const onSetEditIndex = useCallback(
       (index: number | null) => {
-        dispatch({ type: "SET_EDIT_INDEX", index });
+         dispatch({ type: "SET_EDIT_INDEX", index });
       },
       [dispatch],
-    );
+   );
 
-    const onCursorLeft = useCallback(() => {
+   const onCursorLeft = useCallback(() => {
       const newIdx = Math.max(0, state.cursorIndex - 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
-    }, [state.cursorIndex, dispatch]);
+   }, [state.cursorIndex, dispatch]);
 
-    const onCursorRight = useCallback(() => {
+   const onCursorRight = useCallback(() => {
       const newIdx = Math.min(state.currentGuess.length, state.cursorIndex + 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
-    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
+   }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
-    const onEnter = useCallback(async () => {
-      if (isGameOver || isSaving || state.currentGuess.length !== wordLength) return;
+   const onEnter = useCallback(async () => {
+      if (isGameOver || isSaving || state.currentGuess.length !== wordLength)
+         return;
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
 
@@ -118,7 +132,10 @@ export const useActions = ({
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });
-            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), ANIMATION_DURATION.SHAKE);
+            setTimeout(
+               () => dispatch({ type: "STOP_SHAKE" }),
+               ANIMATION_DURATION.SHAKE,
+            );
             return;
          }
 
@@ -151,7 +168,7 @@ export const useActions = ({
                targetWord,
                guesses,
                wordLength,
-               hintRecord
+               hintRecord,
             );
             result = shiftResult.feedback;
             finalTargetWord = shiftResult.nextWord;
@@ -182,7 +199,11 @@ export const useActions = ({
          setRetryCount(0);
 
          let timeTaken: number | null = null;
-         if (challenge.mode === "LIVE" && effectiveMaxTime && state.timeLeft !== null) {
+         if (
+            challenge.mode === "LIVE" &&
+            effectiveMaxTime &&
+            state.timeLeft !== null
+         ) {
             timeTaken = effectiveMaxTime * 60 - state.timeLeft;
          }
 
@@ -258,6 +279,9 @@ export const useActions = ({
             }
          }
 
+         // Save to localStorage immediately for robustness
+         saveToLocal(resultPayload);
+
          let success = false;
          let attempt = 0;
          const maxSyncAttempts = 3;
@@ -322,6 +346,7 @@ export const useActions = ({
       } finally {
          isSubmittingRef.current = false;
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [
       isGameOver,
       state.currentGuess,
@@ -337,6 +362,7 @@ export const useActions = ({
       usedHint,
       hintRecord,
       wrappedSubmitResult,
+      saveToLocal,
       onLengthComplete,
       onFinish,
       ask,
@@ -392,7 +418,9 @@ export const useActions = ({
                attempts: guesses.length,
                hints_used: true,
                hint_record: hintWithRow,
-               ...(challenge.is_shapeshifter ? { target_words: targetWords } : {}),
+               ...(challenge.is_shapeshifter
+                  ? { target_words: targetWords }
+                  : {}),
             };
          } else {
             resultPayload = {
@@ -402,7 +430,9 @@ export const useActions = ({
                guesses: guesses,
                hints_used: true,
                hint_record: hintWithRow,
-               ...(challenge.is_shapeshifter ? { target_words: targetWords } : {}),
+               ...(challenge.is_shapeshifter
+                  ? { target_words: targetWords }
+                  : {}),
             };
          }
          try {
@@ -434,7 +464,7 @@ export const useActions = ({
       wrappedSubmitResult,
    ]);
 
-    const actions = useMemo(
+   const actions = useMemo(
       () => ({
          onChar,
          onDelete,
@@ -446,8 +476,18 @@ export const useActions = ({
          onCursorLeft,
          onCursorRight,
       }),
-      [onChar, onDelete, onEnter, handleHint, retrySync, onSetCursor, onSetEditIndex, onCursorLeft, onCursorRight],
-    );
+      [
+         onChar,
+         onDelete,
+         onEnter,
+         handleHint,
+         retrySync,
+         onSetCursor,
+         onSetEditIndex,
+         onCursorLeft,
+         onCursorRight,
+      ],
+   );
 
    return { actions };
 };

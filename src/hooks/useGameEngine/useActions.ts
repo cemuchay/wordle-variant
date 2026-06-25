@@ -18,10 +18,9 @@ interface UseActionsProps {
    preferences: any;
    triggerToast: (msg: string, duration?: number) => void;
    ask: (params: any) => Promise<boolean>;
-   performSync: (payload: any) => Promise<boolean>;
-   updateOptimistically: (stats: any) => void;
-   refresh: () => Promise<void>;
-   loadFromCloud: () => Promise<any>;
+    performSync: (payload: any) => Promise<boolean>;
+    updateOptimistically: (stats: any) => void;
+    refresh: () => Promise<void>;
 }
 
 export const useActions = ({
@@ -33,10 +32,9 @@ export const useActions = ({
    preferences,
    triggerToast,
    ask,
-   performSync,
-   updateOptimistically,
-   refresh,
-   loadFromCloud,
+    performSync,
+    updateOptimistically,
+    refresh,
 }: UseActionsProps) => {
    const isSubmittingRef = useRef(false);
 
@@ -83,49 +81,6 @@ export const useActions = ({
       isSubmittingRef.current = true;
 
       try {
-         // Prevent submission if the game is already completed on the cloud (e.g. from another tab/device)
-         if (user && date) {
-            try {
-               const { data: cloudScore } = await supabase
-                  .from("scores")
-                  .select("status")
-                  .eq("user_id", user.id)
-                  .eq("game_date", date)
-                  .maybeSingle();
-
-               if (
-                  cloudScore &&
-                  (cloudScore.status === "won" || cloudScore.status === "lost")
-               ) {
-                  triggerToast("Game already completed.");
-
-                  // Fetch complete cloud state and override local
-                  const cloudPayload = await loadFromCloud();
-                  if (cloudPayload) {
-                     dispatch({ type: "LOAD_STATE", payload: cloudPayload });
-                     const localSalt = getLocalSalt(date, user.id);
-                     const savedPayload = {
-                        ...cloudPayload,
-                        config: {
-                           ...cloudPayload.config,
-                           word: obfuscateWord(
-                              cloudPayload.config.word,
-                              localSalt,
-                           ),
-                        },
-                     };
-                     safeLocalStorage.setItem(
-                        `wordle-${date}`,
-                        JSON.stringify(savedPayload),
-                     );
-                  }
-                  return;
-               }
-            } catch (e) {
-               console.error("Failed to verify cloud score state:", e);
-            }
-         }
-
          const upperGuess = state.currentGuess.toUpperCase();
          const { valid } = getWordLists(config.length);
 
@@ -197,23 +152,7 @@ export const useActions = ({
          };
          safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
 
-         if (user) {
-            const success = await performSync(payload);
-            if (!success) {
-               triggerToast(
-                  "Cloud sync failed after 3 attempts. Progress saved locally.",
-                  TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
-               );
-            }
-         }
-
-         // Stabilization Delay: Wait after sync attempt before triggering reveal
-         await new Promise((r) => setTimeout(r, ANIMATION.STABILIZATION_DELAY));
-
-         // Calculate delay: use returnAnimationTime + extra buffer for safety
-          const revealDelay = returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
-
-         // 2. Update UI (flips row)
+         // 2. Update UI immediately (flips row) — show result instantly
          dispatch({
             type: "SUBMIT_GUESS",
             result,
@@ -222,11 +161,29 @@ export const useActions = ({
             message,
          });
 
+         // 3. Update local stats immediately on game over
          if (won || lost) {
             const updatedStats = updateStats(won, newGuesses.length);
             updateOptimistically(updatedStats);
-            await refresh();
+            refresh();
+         }
 
+         // 4. Sync to cloud in background (not awaited)
+         if (user) {
+            performSync(payload).then((success) => {
+               if (!success) {
+                  triggerToast(
+                     "Cloud sync failed after 3 attempts. Progress saved locally.",
+                     TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
+                  );
+               }
+            });
+         }
+
+         // 5. Handle game over modal and reveal timing
+         const revealDelay = returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
+
+         if (won || lost) {
             if (lost) {
                triggerToast(
                   `The word is: ${config.word}`,
@@ -269,7 +226,6 @@ export const useActions = ({
       refresh,
       performSync,
       ask,
-      loadFromCloud,
       dispatch,
    ]);
 
@@ -358,5 +314,3 @@ export const useActions = ({
       onCursorRight,
     };
 };
-
-import { supabase } from '../../lib/supabaseClient';

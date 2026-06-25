@@ -9,6 +9,9 @@ import { useWordUpStore } from '../store/useWordUpStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
 import { useQueryClient } from '@tanstack/react-query';
+import { syncWithRetry } from '../lib/game-logic';
+import { safeLocalStorage } from '../utils/storage';
+import { logger } from '../lib/logger';
 
 interface AppContextType {
     profile: any | null;
@@ -700,6 +703,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('focus', handleOnline);
+        };
+    }, [user?.id]);
+
+    // Background sync for pending game states when connectivity is restored
+    useEffect(() => {
+        const syncPendingGames = async (userId: string) => {
+            const keys = safeLocalStorage.getAllKeys();
+            for (const key of keys) {
+                if (!key.startsWith('wordle-')) continue;
+                const date = key.replace('wordle-', '');
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+                try {
+                    const raw = safeLocalStorage.getItem(key);
+                    if (!raw) continue;
+                    const payload = JSON.parse(raw);
+                    if (!payload.needsSync || !payload.guesses?.length) continue;
+
+                    const result = await syncWithRetry(userId, date, payload);
+                    if (result.success) {
+                        delete payload.needsSync;
+                        safeLocalStorage.setItem(key, JSON.stringify(payload));
+                        logger.info(`Background sync successful for ${date}`);
+                    }
+                } catch (e) {
+                    logger.warn(`Background sync failed for ${key}`, { error: e });
+                }
+            }
+        };
+
+        const handleOnline = () => {
+            if (user?.id) syncPendingGames(user.id);
+        };
+
+        window.addEventListener('online', handleOnline);
+
+        // Also retry pending syncs on visibility change (app coming to foreground)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && user?.id) {
+                syncPendingGames(user.id);
+            }
+        };
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [user?.id]);
 
