@@ -57,7 +57,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 syncStatus: action.status,
             };
         case 'ADD_LETTER':
-            if (state.isGameOver || state.currentGuess.length >= action.maxLength) return state;
+            if (state.isGameOver) return state;
             if (state.editIndex !== null) {
                 const ei = state.editIndex;
                 const filled = state.currentGuess.substring(0, ei) + action.char + state.currentGuess.substring(ei + 1);
@@ -67,6 +67,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                     editIndex: null,
                 };
             }
+            if (state.currentGuess.length >= action.maxLength) return state;
             const cursorAtEnd = state.cursorIndex >= state.currentGuess.length;
             const newGuess = cursorAtEnd
                 ? state.currentGuess + action.char
@@ -86,7 +87,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 return {
                     ...state,
                     currentGuess: cleared,
-                    editIndex: null,
+                    editIndex: ei,
                 };
             }
             const atEnd = state.cursorIndex >= state.currentGuess.length;
