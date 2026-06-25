@@ -197,7 +197,7 @@ export const useWordUpMatchmaking = (
             await generateMatchQuestions(newMatchId, category);
 
             // Set match status to countdown for PvP
-            await supabase.from("wordup_matches").update({ status: "countdown" }).eq("id", newMatchId);
+            await supabase.from("wordup_matches").update({ status: "countdown", question_started_at: new Date(Date.now() + 4500).toISOString() }).eq("id", newMatchId);
 
             onMatchFound(newMatchId, "player2");
          }

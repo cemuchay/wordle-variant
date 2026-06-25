@@ -213,8 +213,8 @@ export function useWordUpGameEngine(props: EngineProps) {
       G.current.isAdvancing = true;
       const nextQ = S.current.questions[nextIdx];
       const nextDur = nextQ ? getQuestionDuration(nextQ.type) : 10.0;
-      if (gameType === "live")
-         channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx } }).catch(console.error);
+          if (gameType === "live")
+             channel.current?.send({ type: "broadcast", event: "advance_round", payload: { nextIdx, question_started_at: upd.question_started_at } }).catch(console.error);
       const isP1 = S.current.role === "player1";
       const upd: any = { ...S.current.matchData, current_question_index: nextIdx, question_started_at: new Date(getSyncedNow()).toISOString() };
       if (gameType === "async") upd[isP1 ? "p1_answered" : "p2_answered"] = false;
@@ -381,28 +381,30 @@ export function useWordUpGameEngine(props: EngineProps) {
    }, [gameType, triggerToast, onGameOver]);
    cb.current.endGame = endGame;
 
-   // ── Start question round ──────────────────────────────────────────────
-   const startQuestionRound = useCallback((_match: any, index: number) => {
-      if (S.current.currentRound >= index && T.current.roundInterval !== null && gameType !== "live") return;
-      if (S.current.currentRound > index) return;
-      S.current.currentRound = index;
-      clearT("roundInterval"); clearT("botTimeout");
-      const q = S.current.questions[index];
-      const duration = q ? getQuestionDuration(q.type) : 10.0;
-      botAction.current = null;
-      dispatch({ type: "SET_ROUND", round: index, timeLeft: duration, maxTime: duration });
-      dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
-      G.current.isSubmitting = false;
+    // ── Start question round ──────────────────────────────────────────────
+    const startQuestionRound = useCallback((_match: any, index: number) => {
+       if (S.current.currentRound >= index && T.current.roundInterval !== null && gameType !== "live") return;
+       if (S.current.currentRound > index) return;
+       S.current.currentRound = index;
+       clearT("roundInterval"); clearT("botTimeout");
+       const q = S.current.questions[index];
+       const duration = q ? getQuestionDuration(q.type) : 10.0;
+       botAction.current = null;
+       dispatch({ type: "SET_ROUND", round: index, timeLeft: duration, maxTime: duration });
+       dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
+       G.current.isSubmitting = false;
 
-      const startTime = getSyncedNow();
-      let lastTicked = Math.ceil(duration) + 1;
-      T.current.roundInterval = window.setInterval(() => {
-         const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-         dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
-         const cs = Math.ceil(remaining);
-         if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-         if (remaining <= 0) { clearT("roundInterval"); if (useWordUpStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.(""); }
-      }, 50);
+       const startTime = _match.question_started_at
+          ? new Date(_match.question_started_at).getTime()
+          : getSyncedNow();
+       let lastTicked = Math.ceil(duration) + 1;
+       T.current.roundInterval = window.setInterval(() => {
+          const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+          dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
+          const cs = Math.ceil(remaining);
+          if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
+          if (remaining <= 0) { clearT("roundInterval"); if (useWordUpStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.(""); }
+       }, 50);
 
       if (gameType === "live-bot" && q) {
          const bp = _match.bot_profile || "average";
@@ -414,27 +416,55 @@ export function useWordUpGameEngine(props: EngineProps) {
    }, [gameType, getSyncedNow]);
    cb.current.startQuestionRound = startQuestionRound;
 
-   // ── Countdown (3-2-1 → battle) ────────────────────────────────────────
-   const startCountdown = useCallback((match: any) => {
-      clearT("countdownInterval");
-      let c = 3;
-      useWordUpStore.getState().setView("countdown");
-      dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
-      T.current.countdownInterval = window.setInterval(() => {
-         c--;
-         if (c === 0) {
-            clearT("countdownInterval");
-            dispatch({ type: "SET_PHASE", phase: "playing" });
-            if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-"))
-               supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id).then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
-            if (match.game_type === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
-            cb.current.startQuestionRound?.(match, 0);
-         } else {
-            useWordUpStore.getState().setView("countdown");
-            dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
-         }
-      }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
-   }, [role]);
+    // ── Countdown (3-2-1 → battle) ────────────────────────────────────────
+    const startCountdown = useCallback((match: any) => {
+       clearT("countdownInterval");
+       useWordUpStore.getState().setView("countdown");
+
+       if (match.game_type === "live" && match.question_started_at) {
+          const startTime = new Date(match.question_started_at).getTime();
+          let lastDisplayed = -1;
+
+          T.current.countdownInterval = window.setInterval(() => {
+             const remaining = startTime - getSyncedNow();
+             const secs = Math.ceil(remaining / 1000);
+             const display = Math.min(3, Math.max(0, secs));
+
+             if (display !== lastDisplayed) {
+                lastDisplayed = display;
+                dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(display || "0") });
+             }
+
+             if (remaining <= 0) {
+                clearT("countdownInterval");
+                dispatch({ type: "SET_PHASE", phase: "playing" });
+                if (role === "player2" && !match.id?.startsWith("bot-match-"))
+                   supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id)
+                      .then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
+                channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
+                cb.current.startQuestionRound?.(match, 0);
+             }
+          }, 200);
+       } else {
+          let c = 3;
+          dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
+          T.current.countdownInterval = window.setInterval(() => {
+             c--;
+             if (c === 0) {
+                clearT("countdownInterval");
+                dispatch({ type: "SET_PHASE", phase: "playing" });
+                if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-"))
+                   supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id)
+                      .then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
+                if (match.game_type === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
+                cb.current.startQuestionRound?.(match, 0);
+             } else {
+                useWordUpStore.getState().setView("countdown");
+                dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
+             }
+          }, WORDUP_TIMEOUT.COUNTDOWN_INTERVAL);
+       }
+    }, [role, getSyncedNow]);
 
    // ── Live watchdog ─────────────────────────────────────────────────────
    useEffect(() => {
@@ -569,10 +599,10 @@ export function useWordUpGameEngine(props: EngineProps) {
                   else { u.p2_answered = true; u.p2_answers = payload.answers; u.p2_score = payload.score; }
                   cb.current.handleMatchUpdate?.(u);
                })
-               .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
-                  const cur = S.current.matchData; if (!cur) return;
-                  cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });
-               })
+                .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
+                   const cur = S.current.matchData; if (!cur) return;
+                   cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false, question_started_at: payload.question_started_at || cur.question_started_at });
+                })
                .on("broadcast", { event: "game_active" }, () => {
                   const cur = S.current.matchData; if (!cur) return;
                   cb.current.handleMatchUpdate?.({ ...cur, status: "active" });
