@@ -112,6 +112,14 @@ export const BattleView = ({
    const prevOppScoreRef = useRef(0);
    const popupIdRef = useRef(0);
 
+   const [showLastRound, setShowLastRound] = useState(false);
+   const lastRoundShownRef = useRef(false);
+
+   const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
+   const prevMyScoreRef = useRef(0);
+   const prevOppScoreRef = useRef(0);
+   const popupIdRef = useRef(0);
+
    // Listen to in-game chat events
    useEffect(() => {
       const handleChat = (e: Event) => {
