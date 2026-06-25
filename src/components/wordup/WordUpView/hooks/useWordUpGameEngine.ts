@@ -582,7 +582,7 @@ export function useWordUpGameEngine(props: EngineProps) {
              return;
           }
           const mt = match.created_at ? new Date(match.created_at).getTime() : 0;
-          if (match.status !== "completed" && match.status !== "waiting" && Date.now() - mt > 300000) {
+           if (match.status !== "completed" && match.game_type !== "async" && Date.now() - mt > 300000) {
              await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", mId);
              triggerToast("This match has expired.", 5000);
              dispatch({ type: "RESET" });
