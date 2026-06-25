@@ -67,7 +67,7 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
             };
 
         case 'TYPE_CHAR':
-            if (state.isGameOver || state.currentGuess.length >= action.wordLength) return state;
+            if (state.isGameOver) return state;
             if (state.editIndex !== null) {
                 const ei = state.editIndex;
                 const filled = state.currentGuess.substring(0, ei) + action.char + state.currentGuess.substring(ei + 1);
@@ -77,6 +77,7 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
                     editIndex: null,
                 };
             }
+            if (state.currentGuess.length >= action.wordLength) return state;
             const cursorAtEnd = state.cursorIndex >= state.currentGuess.length;
             const newGuess = cursorAtEnd
                 ? state.currentGuess + action.char
@@ -96,7 +97,7 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
                 return {
                     ...state,
                     currentGuess: cleared,
-                    editIndex: null,
+                    editIndex: ei,
                 };
             }
             const atEnd = state.cursorIndex >= state.currentGuess.length;

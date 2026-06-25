@@ -99,7 +99,7 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
       scale = { h: 0.85, w: 0.85 }
     }
 
-    if (!isChallenge && wordLength > 6) {
+    if (!isChallenge && wordLength > 5) {
       scale = { h: 1.2, w: 1.2 }
     }
   } else if (!isPWA && !isDesktop) {
@@ -127,8 +127,8 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   else if (status === 'present') statusClass = 'bg-present border-present';
   else if (status === 'absent') statusClass = 'bg-absent border-absent';
   else if (letter) statusClass = 'border-gray-500';
-  if (isCursor && wordLength > 6) statusClass += ' ring-2 ring-blue-400 border-blue-400';
-  if (isEditMode && wordLength > 6) statusClass += ' ring-2 ring-yellow-400 border-yellow-400 bg-yellow-400/10';
+  if (isCursor && wordLength > 5) statusClass += ' ring-2 ring-blue-400 border-blue-400';
+  if (isEditMode && wordLength > 5) statusClass += ' ring-2 ring-yellow-400 border-yellow-400 bg-yellow-400/10';
 
   if (isRevealing) {
     if (status === 'correct') animationClass = 'animate-reveal-correct';
@@ -186,7 +186,7 @@ const LONG_PRESS_MS = 400;
 export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, editIndex, onSetCursor, onSetEditIndex }) => {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlePointerDown = useCallback((i: number) => {
-     if (wordLength <= 6) return;
+     if (wordLength <= 5) return;
      longPressTimerRef.current = setTimeout(() => {
         onSetEditIndex?.(i);
         longPressTimerRef.current = null;
@@ -203,7 +203,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   const handleCellClick = useCallback((i: number) => {
      const now = Date.now();
      const prev = lastClickRef.current;
-     if (wordLength > 6 && prev && prev.index === i && now - prev.time < 300) {
+     if (wordLength > 5 && prev && prev.index === i && now - prev.time < 300) {
         onSetEditIndex?.(i);
         lastClickRef.current = null;
         return;
@@ -345,9 +345,39 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   }, [guesses.length, currentGuess.length, maxAttempts, isWon, isLost, isCurrentRevealing, wordLength]);
 
   const rowGapClass = compact ? 'gap-1 sm:gap-1.5' : 'gap-1.5 sm:gap-2';
+  const [showEditHelp, setShowEditHelp] = useState(false);
 
   return (
     <div className="relative mx-auto w-fit select-none shrink-0">
+      {wordLength > 5 && (
+        <div className="flex justify-end mb-1.5 relative">
+          <button
+            onClick={() => setShowEditHelp(!showEditHelp)}
+            className="w-5 h-5 flex items-center justify-center rounded-full bg-white/10 text-white/50 hover:bg-white/20 hover:text-white/80 text-[10px] font-bold transition-all cursor-pointer"
+            title="Edit controls help"
+          >
+            ?
+          </button>
+          {showEditHelp && (
+            <>
+              <div className="absolute top-full right-0 mt-1 z-50 w-64 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5">
+                <div className="font-bold text-white/90 text-xs mb-1.5">Editing Controls</div>
+                <p><span className="text-blue-400 font-bold">Tap</span> a cell to move the cursor there.</p>
+                <p><span className="text-red-400 font-bold">Backspace</span> deletes the letter at cursor and shifts remaining left.</p>
+                <p><span className="text-yellow-400 font-bold">Double-click</span> or <span className="text-yellow-400 font-bold">long-press</span> a cell to enter <span className="text-yellow-400">edit mode</span>.</p>
+                <p>In edit mode, <span className="text-red-400 font-bold">Backspace</span> clears that cell without shifting. Type a letter to fill it.</p>
+                <button
+                  onClick={() => setShowEditHelp(false)}
+                  className="mt-2 w-full text-center text-[10px] text-white/40 hover:text-white/70 uppercase tracking-wider font-bold cursor-pointer"
+                >
+                  Got it
+                </button>
+              </div>
+              <div className="fixed inset-0 z-40" onClick={() => setShowEditHelp(false)} />
+            </>
+          )}
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className={maxAttempts > 6 ? "overflow-y-auto overflow-hidden py-6 scrollbar-thin pr-1.5" : ""}
