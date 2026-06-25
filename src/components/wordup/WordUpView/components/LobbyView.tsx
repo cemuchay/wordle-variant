@@ -93,11 +93,10 @@ export const LobbyView = ({
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
          }
-         triggerToast(`${detail.senderName || "Opponent"} accepted! Starting match...`, 3000);
-         // Transition to match
+         // Transition to connecting screen, then game
           useWordUpStore.getState().setMatchId(detail.matchId);
           useWordUpStore.getState().setRole("player1");
-          useWordUpStore.getState().setView("loading");
+          useWordUpStore.getState().setView("connecting");
       };
 
       window.addEventListener("wordup-invite-rejected", handleRejected);

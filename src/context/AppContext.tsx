@@ -469,6 +469,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             })
             .on('broadcast', { event: 'wordup_invite_accepted' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-accepted', { detail: payload }));
+                // Direct store update so the transition survives tab switches
+                const store = useWordUpStore.getState();
+                if (payload?.matchId && !store.matchId) {
+                    store.setMatchId(payload.matchId);
+                    store.setRole("player1");
+                    store.setView("connecting");
+                }
             })
             .on('broadcast', { event: 'wordup_invite_later' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-later', { detail: payload }));
