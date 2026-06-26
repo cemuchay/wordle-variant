@@ -19,7 +19,7 @@ interface KeyProps {
   wordLength?: number
 }
 
-const Key = memo(({ char, status, onClick, compact, gameplayType, wordLength }: KeyProps) => {
+const Key = memo(({ char, status, onClick, compact, gameplayType, wordLength = 5 }: KeyProps) => {
   const { isSuperTiny, isDesktop } = useIsResponsive(); // Detect responsive state
   const isPWA = useAppStore(s => s.isPWAInstalled)
 
