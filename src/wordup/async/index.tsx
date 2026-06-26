@@ -330,7 +330,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
+          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-indigo-950/40 to-dark p-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -376,7 +376,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-gradient-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView

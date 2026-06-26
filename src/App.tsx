@@ -745,7 +745,7 @@ export default function App() {
       <div className="flex-1 min-h-0 relative overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={activeNavigationItem}
+            key={activeNavigationItem === "wordup" ? `wordup-${wordupMode || "select"}` : activeNavigationItem}
             variants={fadeVariants}
             initial="initial"
             animate="animate"

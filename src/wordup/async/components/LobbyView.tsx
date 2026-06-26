@@ -89,14 +89,14 @@ export const LobbyView = ({
                    <div className="flex items-center gap-2 w-[84px] justify-end">
                   <button
                      onClick={onToggleSound}
-                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                     className="p-2 rounded-xl bg-indigo-950/30 hover:bg-indigo-950/40 border border-indigo-500/10 text-gray-400 hover:text-white transition-all cursor-pointer"
                      title="Toggle Sound"
                   >
                      {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
                   </button>
                   <button
                      onClick={onPurgeAndReset}
-                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
+                     className="p-2 rounded-xl bg-indigo-950/30 hover:bg-indigo-950/40 border border-indigo-500/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
                      title="Reset Game State"
                   >
                      <RotateCcw size={15} />
@@ -106,13 +106,13 @@ export const LobbyView = ({
              </div>
           </div>
 
-          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+          <div className="flex bg-indigo-950/30 p-1 rounded-2xl border border-indigo-500/10 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.08)]">
              {(["play", "pending", "history"] as const).map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
-                     ? "bg-indigo-500 text-white shadow-md font-black"
+                      ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30 font-black"
                      : "text-gray-400 hover:text-white"
                      }`}
                >
@@ -131,7 +131,7 @@ export const LobbyView = ({
                   className="space-y-6"
                >
                   {userStats && (
-                     <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                      <div className="grid grid-cols-3 bg-indigo-950/30 border border-indigo-500/10 rounded-2xl p-4 text-center">
                         <div>
                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>
                            <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
@@ -158,7 +158,7 @@ export const LobbyView = ({
                         const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
                         const borderCol = style.border.split(" ")[0];
                         return (
-                           <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-white/10`}>
+                            <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-indigo-500/15`}>
                               <div className="flex items-center gap-3">
                                  <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
                                     {style.emoji}
@@ -190,7 +190,7 @@ export const LobbyView = ({
 
                   <div className="space-y-3">
                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Challenge Players</p>
-                     <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex items-center gap-2">
+                      <div className="bg-indigo-950/30 border border-indigo-500/10 rounded-2xl p-3 flex items-center gap-2">
                         <Search size={16} className="text-gray-500 shrink-0" />
                         <input
                            type="text"
@@ -210,7 +210,7 @@ export const LobbyView = ({
                            filteredPlayers.map((profile: any) => (
                               <div
                                  key={profile.id}
-                                 className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-2.5 hover:bg-white/10 transition-all"
+                                  className="flex items-center justify-between bg-indigo-950/30 border border-indigo-500/10 rounded-xl p-2.5 hover:bg-indigo-950/40 transition-all"
                               >
                                  <div className="flex items-center gap-2.5 min-w-0">
                                     <ProtectedAvatar
@@ -274,7 +274,7 @@ export const LobbyView = ({
                            return (
                               <div
                                  key={match.id}
-                                 className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs"
+                                  className="bg-indigo-950/30 border border-indigo-500/10 rounded-2xl p-3.5 flex items-center justify-between text-xs"
                               >
                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
@@ -346,7 +346,7 @@ export const LobbyView = ({
                               <div
                                  key={match.id}
                                  onClick={() => onSelectHistoryMatch?.(match)}
-                                 className="bg-white/5 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer hover:bg-white/10 active:scale-98 transition-all"
+                                  className="bg-indigo-950/30 border border-indigo-500/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer hover:bg-indigo-950/40 active:scale-98 transition-all"
                               >
                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export const LobbyView = ({
             )}
          </AnimatePresence>
 
-         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
+          <div className="bg-indigo-950/30 border border-indigo-500/10 rounded-2xl overflow-hidden transition-all duration-300">
             <button
                onClick={() => setShowHelp(!showHelp)}
                className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
@@ -409,22 +409,22 @@ export const LobbyView = ({
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Question Types</p>
                         <div className="grid grid-cols-2 gap-2 mt-1">
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Anagrams</strong> Scramble letters back into a word.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Definitions</strong> Match the word to its dictionary definition.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Reverse Wordle</strong> Guess the word that generated the pattern.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Real / Fake</strong> Spot authentic words vs fake mutations.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Missing Letter</strong> Complete the blank to spell a valid word.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
                            </div>
                         </div>

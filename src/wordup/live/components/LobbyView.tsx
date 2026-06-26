@@ -96,7 +96,7 @@ export const LobbyView = ({
           <div className="space-y-1 relative text-center">
               <div className="flex items-center justify-between gap-4 px-2 shrink-0">
                  <div className="flex items-center gap-2 min-w-0">
-                    <button onClick={onBack} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer shrink-0">
+                     <button onClick={onBack} className="p-2 rounded-xl bg-correct/5 hover:bg-correct/10 border border-correct/10 text-gray-400 hover:text-white transition-all cursor-pointer shrink-0">
                        <ChevronLeft size={15} />
                     </button>
                     <h2 className="text-2xl font-black uppercase tracking-wider text-white truncate">WordUp Battles (Beta)</h2>
@@ -109,17 +109,17 @@ export const LobbyView = ({
                        </button>
                     )}
                     <div className="flex items-center gap-2 w-[84px] justify-end">
-                  <button
-                     onClick={onToggleSound}
-                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-                     title="Toggle Sound"
+                   <button
+                      onClick={onToggleSound}
+                      className="p-2 rounded-xl bg-correct/5 hover:bg-correct/10 border border-correct/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                      title="Toggle Sound"
                   >
                      {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
                   </button>
-                  <button
-                     onClick={onPurgeAndReset}
-                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
-                     title="Reset Game State"
+                   <button
+                      onClick={onPurgeAndReset}
+                      className="p-2 rounded-xl bg-correct/5 hover:bg-correct/10 border border-correct/10 text-gray-400 hover:text-red-400 transition-all cursor-pointer"
+                      title="Reset Game State"
                   >
                      <RotateCcw size={15} />
                   </button>
@@ -128,13 +128,13 @@ export const LobbyView = ({
              </div>
           </div>
 
-          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+          <div className="flex bg-correct/5 p-1 rounded-2xl border border-correct/10 shrink-0 shadow-[0_0_15px_rgba(106,170,100,0.08)]">
              {(["play", "rankings", "history"] as const).map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
-                     ? "bg-correct text-black shadow-md font-black"
+                      ? "bg-correct text-black shadow-md shadow-correct/30 font-black"
                      : "text-gray-400 hover:text-white"
                      }`}
                >
@@ -153,7 +153,7 @@ export const LobbyView = ({
                   className="space-y-6"
                >
                   {userStats && (
-                     <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                      <div className="grid grid-cols-3 bg-correct/5 border border-correct/10 rounded-2xl p-4 text-center">
                         <div>
                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>
                            <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
@@ -180,7 +180,7 @@ export const LobbyView = ({
                         const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
                         const borderCol = style.border.split(" ")[0];
                         return (
-                           <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-white/10`}>
+                            <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-correct/15`}>
                               <div className="flex items-center gap-3">
                                  <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
                                     {style.emoji}
@@ -280,7 +280,7 @@ export const LobbyView = ({
                               <div
                                  key={match.id}
                                  onClick={() => onSelectHistoryMatch?.(match)}
-                                 className={`hover:bg-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all ${isNew ? "bg-correct/5 border border-correct/30 shadow-[0_0_12px_rgba(46,204,113,0.1)] hover:border-correct/50" : "bg-white/5 border border-white/10 hover:border-white/20"}`}
+                                  className={`hover:bg-correct/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all ${isNew ? "bg-correct/10 border border-correct/30 shadow-[0_0_12px_rgba(46,204,113,0.1)] hover:border-correct/50" : "bg-correct/5 border border-correct/10 hover:border-correct/20"}`}
                               >
                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export const LobbyView = ({
             )}
          </AnimatePresence>
 
-         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
+          <div className="bg-correct/5 border border-correct/10 rounded-2xl overflow-hidden transition-all duration-300">
             <button
                onClick={() => setShowHelp(!showHelp)}
                className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
@@ -348,22 +348,22 @@ export const LobbyView = ({
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Question Types</p>
                         <div className="grid grid-cols-2 gap-2 mt-1">
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Anagrams</strong> Scramble letters back into a word.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Definitions</strong> Match the word to its dictionary definition.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Reverse Wordle</strong> Guess the word that generated the pattern.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Real / Fake</strong> Spot authentic words vs fake mutations.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Missing Letter</strong> Complete the blank to spell a valid word.
                            </div>
-                           <div className="bg-white/5 p-2 rounded-lg">
+                            <div className="bg-correct/5 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
                            </div>
                         </div>

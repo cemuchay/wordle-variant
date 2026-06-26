@@ -167,16 +167,24 @@ export function useGameEngine(props: EngineProps) {
          dispatch({ type: "REVEAL" });
          const nextIdx = merged.current_question_index + 1;
          if (nextIdx === 6) triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+      clearT("revealTimeout");
+      T.current.revealTimeout = window.setTimeout(() => {
+         G.current.isRevealing = false;
          clearT("revealTimeout");
-         T.current.revealTimeout = window.setTimeout(() => {
-            G.current.isRevealing = false;
-            clearT("revealTimeout");
-            if (nextIdx >= WORDUP_GAME.TOTAL_ROUNDS) {
-               // All answered — persistTurn in handleAnswerSelect handles phase
-            } else {
+         if (nextIdx >= WORDUP_GAME.TOTAL_ROUNDS) {
+            // All answered — persistTurn in handleAnswerSelect handles phase
+         } else if (nextIdx === 6) {
+            dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
+            clearT("lastRoundPopupTimeout");
+            T.current.lastRoundPopupTimeout = window.setTimeout(() => {
+               dispatch({ type: "SET_LAST_ROUND_POPUP", show: false });
+               clearT("lastRoundPopupTimeout");
                cb.current.advanceRound?.(merged.id, nextIdx);
-            }
-         }, nextIdx === 6 ? 3200 : 1800);
+            }, 1500);
+         } else {
+            cb.current.advanceRound?.(merged.id, nextIdx);
+         }
+      }, nextIdx === 6 ? 3200 : 1800);
       }
    }, [triggerToast]);
    cb.current.handleMatchUpdate = handleMatchUpdate;

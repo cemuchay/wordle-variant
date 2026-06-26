@@ -281,7 +281,7 @@ export const BattleView = ({
          </div>
 
          {/* Question Container */}
-         <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
+          <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 pt-4 sm:pt-8 md:pt-10 pb-2 sm:pb-6 md:pb-8 overflow-y-auto scrollbar-hide min-h-0">
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
