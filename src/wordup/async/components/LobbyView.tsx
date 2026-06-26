@@ -267,7 +267,7 @@ export const LobbyView = ({
                            const isP1 = match.player1_id === currentUser?.id;
                            const oppProfile = isP1 ? match.player2 : match.player1;
                            const oppName = oppProfile?.username || "Opponent";
-                           const hasPlayed = isP1 ? match.p1_played : match.p2_played;
+                           const hasPlayed = isP1 ? match.p1_answered : match.p2_answered;
                            const myTurn = !hasPlayed;
                            const statusText = myTurn ? "Your Turn" : "Waiting for Opponent";
 

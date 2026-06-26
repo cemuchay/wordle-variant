@@ -86,7 +86,7 @@ export const useAsyncMatchmaking = (
             .from("wordup_async_matches")
             .select("*")
             .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-            .in("status", ["pending", "active"])
+            .in("status", ["pending", "active", "turn_submitted"])
             .order("created_at", { ascending: false });
          if (error) throw error;
          return data || [];
