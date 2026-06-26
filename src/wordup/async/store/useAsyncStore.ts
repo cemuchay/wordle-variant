@@ -4,7 +4,7 @@ import { type ProfileStats } from "../../shared/types";
 import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 import { postProcessQuestions } from "../../../utils/wordupQuestionPostProcessor";
 
-type AsyncView = "menu" | "loading" | "battle" | "turn_submitted" | "gameover";
+type AsyncView = "menu" | "loading" | "countdown" | "battle" | "turn_submitted" | "gameover";
 
 interface AsyncState {
    isBattlePlaying: boolean;

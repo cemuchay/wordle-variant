@@ -27,9 +27,10 @@ import { useLiveStore } from "./store/useLiveStore";
 
 interface LiveViewProps {
    onBack?: () => void;
+   onSwitchMode?: (mode: "live" | "async") => void;
 }
 
-export const LiveView = ({ onBack }: LiveViewProps) => {
+export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
    const { user: authUser } = useAuth();
    const { triggerToast, realtimeStatus, profile } = useApp();
 
@@ -222,7 +223,7 @@ export const LiveView = ({ onBack }: LiveViewProps) => {
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
+          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-correct/15 to-dark p-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -269,7 +270,7 @@ export const LiveView = ({ onBack }: LiveViewProps) => {
    }
 
    return (
-      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
+      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-gradient-to-b from-correct/15 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
@@ -279,6 +280,7 @@ export const LiveView = ({ onBack }: LiveViewProps) => {
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
+                  onSwitchMode={() => onSwitchMode?.("async")}
                    onBack={() => onBack?.()}
                />
             )}

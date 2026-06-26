@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Swords } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
@@ -11,17 +11,21 @@ import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { useAsyncStore } from "./store/useAsyncStore";
 import { LobbyView } from "./components/LobbyView";
+import { InvitePopup } from "./components/InvitePopup";
+import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
 import { ConnectingView } from "./components/ConnectingView";
+import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
 
 interface AsyncViewProps {
    onBack?: () => void;
+   onSwitchMode?: (mode: "live" | "async") => void;
 }
 
-export const AsyncView = ({ onBack }: AsyncViewProps) => {
+export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const { user: authUser } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
@@ -59,6 +63,12 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);
    const [soundEnabled, setSoundEnabled] = useState(wordupAudio.isEnabled());
+   const [incomingInvite, setIncomingInvite] = useState<any | null>(null);
+   const [pendingChallenge, setPendingChallenge] = useState<{ matchId: string; targetUser: any } | null>(null);
+   const [connectingMsg, setConnectingMsg] = useState("Loading...");
+   const challengeResolvedRef = useRef(false);
+   const challengeChannelsRef = useRef<any[]>([]);
+   const challengeTimersRef = useRef<number[]>([]);
 
    const { getSyncedNow } = useServerTime();
    const { userStats, getRankColor, updateStats } = useWordUpProfile(effectiveUser);
@@ -102,10 +112,109 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
       }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]),
    });
 
-   const { handleAnswerSelect } = engine;
+   const { handleAnswerSelect, startMatch } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
+   const countdownText = engine.state.countdownText;
 
-   const matchmaking = useAsyncMatchmaking(effectiveUser, category, triggerToast);
+   const { loadPendingMatches, loadHistoryMatches, createMatch } = useAsyncMatchmaking(effectiveUser, category, triggerToast);
+
+   const clearChallengeResources = useCallback(() => {
+      challengeResolvedRef.current = true;
+      challengeChannelsRef.current.forEach((ch) => supabase.removeChannel(ch));
+      challengeChannelsRef.current = [];
+      challengeTimersRef.current.forEach((t) => clearTimeout(t));
+      challengeTimersRef.current = [];
+   }, []);
+
+   const handleChallengePlayer = useCallback(async (targetUser: any) => {
+      if (!effectiveUser) return;
+      clearChallengeResources();
+      challengeResolvedRef.current = false;
+
+      const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
+
+      if (!isOnline) {
+         setConnectingMsg("Creating challenge...");
+         setView("loading");
+         const mId = await createMatch(targetUser);
+         if (mId) {
+            setPendingChallenge({ matchId: mId, targetUser });
+            setView("menu");
+         } else {
+            setView("menu");
+            triggerToast("Failed to create challenge.", 4000);
+         }
+         return;
+      }
+
+      setConnectingMsg("Sending challenge...");
+      setView("loading");
+
+      const myName = effectiveUser.user_metadata?.username || effectiveUser.email?.split("@")[0] || "Someone";
+
+      const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
+      challengeChannelsRef.current.push(targetChannel);
+      targetChannel.subscribe((status) => {
+         if (status === "SUBSCRIBED") {
+            targetChannel.send({
+               type: "broadcast",
+               event: "wordup_async_invite",
+               payload: {
+                  senderId: effectiveUser.id,
+                  senderName: myName,
+                  category,
+               },
+            });
+            setTimeout(() => supabase.removeChannel(targetChannel), 1000);
+         }
+      });
+
+      const responseChannel = supabase.channel(`user_signals_${effectiveUser.id}`);
+      challengeChannelsRef.current.push(responseChannel);
+      responseChannel
+         .on("broadcast", { event: "wordup_async_invite_accepted" }, async () => {
+            if (challengeResolvedRef.current) return;
+            challengeResolvedRef.current = true;
+            clearChallengeResources();
+            setConnectingMsg("Creating challenge...");
+            setView("loading");
+            const mId = await createMatch(targetUser);
+            if (mId) {
+               setView("loading");
+               setMatchId(mId);
+               setRole("player1");
+               startMatch?.(mId, "player1");
+            } else {
+               setView("menu");
+               triggerToast("Failed to create match.", 4000);
+            }
+         })
+         .on("broadcast", { event: "wordup_async_invite_later" }, () => {
+            if (challengeResolvedRef.current) return;
+            challengeResolvedRef.current = true;
+            clearChallengeResources();
+            setView("menu");
+            triggerToast("Challenge saved as pending.", 3000);
+         })
+         .on("broadcast", { event: "wordup_async_invite_declined" }, ({ payload }: any) => {
+            if (challengeResolvedRef.current) return;
+            challengeResolvedRef.current = true;
+            clearChallengeResources();
+            setView("menu");
+            triggerToast(`${payload?.senderName || "They"} declined your challenge.`, 3000);
+         })
+         .subscribe();
+
+      setConnectingMsg("Waiting for response...");
+
+      challengeTimersRef.current.push(window.setTimeout(() => {
+         if (challengeResolvedRef.current) return;
+         challengeResolvedRef.current = true;
+         clearChallengeResources();
+         setView("menu");
+         triggerToast("No response. Challenge saved as pending.", 3000);
+      }, 15000));
+   }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
 
    // Hide global headers during battle
    useEffect(() => {
@@ -115,17 +224,17 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
    // Load pending and history matches
    const refreshPending = useCallback(async () => {
       setIsLoadingData(true);
-      const pending = await matchmaking.loadPendingMatches();
+      const pending = await loadPendingMatches();
       setPendingMatches(pending);
       setIsLoadingData(false);
-   }, [matchmaking]);
+   }, [loadPendingMatches]);
 
    const refreshHistory = useCallback(async () => {
       setIsLoadingData(true);
-      const history = await matchmaking.loadHistoryMatches();
+      const history = await loadHistoryMatches();
       setHistoryMatches(history);
       setIsLoadingData(false);
-   }, [matchmaking]);
+   }, [loadHistoryMatches]);
 
    useEffect(() => {
       if (effectiveUser) refreshPending();
@@ -142,13 +251,70 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
       return () => { supabase.removeChannel(channel); };
    }, [effectiveUser?.id, refreshPending]);
 
+   // Listen for incoming async invites
+   useEffect(() => {
+      if (!effectiveUser?.id) return;
+      const channel = supabase
+         .channel(`user_signals_${effectiveUser.id}`)
+         .on("broadcast", { event: "wordup_async_invite" }, ({ payload }: any) => {
+            setIncomingInvite(payload);
+         })
+         .subscribe();
+      return () => { supabase.removeChannel(channel); };
+   }, [effectiveUser?.id]);
+
+   const handleAcceptInvite = useCallback(async () => {
+      const invite = incomingInvite;
+      if (!invite || !effectiveUser) return;
+      setIncomingInvite(null);
+      const targetUser = { id: invite.senderId, username: invite.senderName };
+      const mId = await createMatch(targetUser);
+      if (mId) {
+         triggerToast("Challenge accepted! Starting game...", 3000);
+         const mRole = "player2";
+         setMatchId(mId);
+         setRole(mRole);
+         setView("loading");
+         startMatch?.(mId, mRole);
+      }
+   }, [incomingInvite, effectiveUser, createMatch, triggerToast, setMatchId, setRole, setView, startMatch]);
+
+   const handleLaterInvite = useCallback(async () => {
+      const invite = incomingInvite;
+      if (!invite || !effectiveUser) return;
+      setIncomingInvite(null);
+      const targetUser = { id: invite.senderId, username: invite.senderName };
+      const mId = await createMatch(targetUser);
+      if (mId) {
+         triggerToast("Challenge saved! Play when you're ready.", 3000);
+         refreshPending();
+      }
+   }, [incomingInvite, effectiveUser, createMatch, triggerToast, refreshPending]);
+
+   const handleDeclineInvite = useCallback(() => {
+      const invite = incomingInvite;
+      if (!invite) return;
+      setIncomingInvite(null);
+      const declineChannel = supabase.channel(`user_signals_${invite.senderId}`);
+      declineChannel.subscribe((status) => {
+         if (status === "SUBSCRIBED") {
+            declineChannel.send({
+               type: "broadcast",
+               event: "wordup_async_invite_declined",
+               payload: { senderName: effectiveUser?.user_metadata?.username || "Your opponent" },
+            });
+            setTimeout(() => supabase.removeChannel(declineChannel), 1000);
+         }
+      });
+   }, [incomingInvite, effectiveUser]);
+
    const handlePlayTurn = useCallback((match: any) => {
       const mRole = match.player1_id === effectiveUser?.id ? "player1" : "player2";
       setMatchId(match.id);
       setRole(mRole);
       setView("loading");
-      engine.startMatch?.(match.id, mRole);
-   }, [effectiveUser, setMatchId, setRole, setView, engine]);
+      startMatch?.(match.id, mRole);
+   }, [effectiveUser, setMatchId, setRole, setView, startMatch]);
 
    const handleSelectHistoryMatch = useCallback(async (match: any) => {
       if (!effectiveUser) return;
@@ -164,7 +330,7 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
+          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-indigo-950/40 to-dark p-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -210,12 +376,12 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-gradient-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
                   userStats={userStats} category={category} setCategory={setCategory}
-                   getRankColor={getRankColor} onlineUsers={onlineUsers} allProfiles={allProfiles}
+                   getRankColor={getRankColor} allProfiles={allProfiles}
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
@@ -223,19 +389,15 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
                   pendingMatches={pendingMatches} historyMatches={historyMatches}
                   isLoadingData={isLoadingData}
                   onPlayTurn={handlePlayTurn}
-                  onSendInvite={async (targetUser) => {
-                     const mId = await matchmaking.createMatch(targetUser);
-                     if (mId) {
-                        triggerToast("Challenge sent!", 3000);
-                        refreshPending();
-                     }
-                  }}
+                  onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
+                  onSwitchMode={() => onSwitchMode?.("live")}
                    onBack={() => onBack?.()}
                />
             )}
-            {view === "loading" && <ConnectingView message="Loading your challenge..." />}
+            {view === "loading" && <ConnectingView message={connectingMsg} />}
+            {view === "countdown" && <CountdownView countdownText={String(countdownText || "3")} />}
             {view === "battle" && (
                <BattleView
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
@@ -246,10 +408,9 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
             )}
             {view === "turn_submitted" && (
                <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                  <div className="w-12 h-12 border-4 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin mb-6" />
-                  <h2 className="text-xl font-black text-white tracking-wider">Turn Submitted!</h2>
+                  <h2 className="text-xl font-black text-white tracking-wider">Game Complete!</h2>
                   <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
-                     Your answers have been saved. Waiting for opponent to play their turn...
+                     All questions answered. Waiting for your opponent to finish their turn.
                   </p>
                   <button onClick={resetGame} className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer">
                      Back to Lobby
@@ -266,6 +427,35 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
                />
             )}
          </AnimatePresence>
+
+         {incomingInvite && (
+            <InvitePopup
+               invite={incomingInvite}
+               onAccept={handleAcceptInvite}
+               onLater={handleLaterInvite}
+               onDecline={handleDeclineInvite}
+            />
+         )}
+         {pendingChallenge && (
+            <PlayNowLaterPopup
+               opponentName={pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name || "Opponent"}
+               category={category}
+               onPlayNow={() => {
+                  const pc = pendingChallenge;
+                  setPendingChallenge(null);
+                  setView("loading");
+                  setMatchId(pc.matchId);
+                  setRole("player1");
+                  startMatch?.(pc.matchId, "player1");
+               }}
+               onLater={() => {
+                  setPendingChallenge(null);
+                  setView("menu");
+                  triggerToast("Challenge saved. Play when you're ready!", 3000);
+                  refreshPending();
+               }}
+            />
+         )}
       </div>
    );
 };

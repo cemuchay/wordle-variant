@@ -24,10 +24,16 @@ ON public.wordup_async_matches FOR SELECT
 TO authenticated, anon
 USING (true);
 
-CREATE POLICY "Users can insert async matches"
+DROP POLICY IF EXISTS "Users can insert async matches" ON public.wordup_async_matches;
+
+CREATE POLICY "Anyone can insert async matches"
 ON public.wordup_async_matches FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = player1_id OR auth.uid() = player2_id);
+TO authenticated, anon
+WITH CHECK (
+  auth.uid() = player1_id OR
+  auth.uid() = player2_id OR
+  (player1_id IN (SELECT id FROM guest_profiles))
+);
 
 CREATE POLICY "Users can update async matches they participate in"
 ON public.wordup_async_matches FOR UPDATE
