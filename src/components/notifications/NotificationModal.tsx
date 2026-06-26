@@ -122,13 +122,24 @@ export const NotificationModal = memo(() => {
         }
 
         if (n.type === 'CHALLENGE_INVITE' || n.type === 'CHALLENGE_COMPLETED' || n.type === 'MARATHON_GAME_COMPLETED') {
-            const challengeId = n.data?.challenge_id;
-            if (challengeId) {
-                const url = new URL(window.location.href);
-                url.searchParams.set('challenge', challengeId);
-                window.history.pushState({}, '', url.pathname + url.search);
-                setIsChallengeOpen(true);
-                setIsNotificationsOpen(false);
+            if (n.data?.mode === 'wordup_async') {
+                const matchId = n.data?.matchId;
+                if (matchId) {
+                    const { setWordupMode, setWordUpOpen, setPendingAsyncMatchId } = useAppStore.getState();
+                    setWordupMode('async');
+                    setWordUpOpen(true);
+                    setPendingAsyncMatchId(matchId);
+                    setIsNotificationsOpen(false);
+                }
+            } else {
+                const challengeId = n.data?.challenge_id;
+                if (challengeId) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('challenge', challengeId);
+                    window.history.pushState({}, '', url.pathname + url.search);
+                    setIsChallengeOpen(true);
+                    setIsNotificationsOpen(false);
+                }
             }
         } else if (n.type === 'LEADERBOARD_OVERTAKEN') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
