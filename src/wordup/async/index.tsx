@@ -174,21 +174,29 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       const responseChannel = supabase.channel(`user_signals_${effectiveUser.id}`);
       challengeChannelsRef.current.push(responseChannel);
       responseChannel
-         .on("broadcast", { event: "wordup_async_invite_accepted" }, async () => {
+         .on("broadcast", { event: "wordup_async_invite_accepted" }, async ({ payload }: any) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
-            setConnectingMsg("Creating challenge...");
-            setView("loading");
-            const mId = await createMatch(targetUser);
-            if (mId) {
-               setView("loading");
+            const mId = payload?.matchId;
+            if (mId && effectiveUser) {
+               let match: any = null;
+               try {
+                  const { data } = await supabase
+                     .from("wordup_async_matches")
+                     .select("player1_id, player2_id")
+                     .eq("id", mId)
+                     .single();
+                  match = data;
+               } catch {}
+               const role = match?.player1_id === effectiveUser.id ? "player1" : "player2";
                setMatchId(mId);
-               setRole("player1");
-               startMatch?.(mId, "player1");
+               setRole(role);
+               setView("loading");
+               startMatch?.(mId, role);
             } else {
                setView("menu");
-               triggerToast("Failed to create match.", 4000);
+               triggerToast("Failed to start match.", 4000);
             }
          })
          .on("broadcast", { event: "wordup_async_invite_later" }, () => {
@@ -272,8 +280,19 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!invite || !effectiveUser) return;
       setIncomingInvite(null);
       const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser);
+      const mId = await createMatch(targetUser, invite.category);
       if (mId) {
+         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
+         ackChannel.subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+               ackChannel.send({
+                  type: "broadcast",
+                  event: "wordup_async_invite_accepted",
+                  payload: { matchId: mId },
+               });
+               setTimeout(() => supabase.removeChannel(ackChannel), 1000);
+            }
+         });
          triggerToast("Challenge accepted! Starting game...", 3000);
          const mRole = "player2";
          setMatchId(mId);
@@ -288,8 +307,19 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!invite || !effectiveUser) return;
       setIncomingInvite(null);
       const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser);
+      const mId = await createMatch(targetUser, invite.category);
       if (mId) {
+         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
+         ackChannel.subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+               ackChannel.send({
+                  type: "broadcast",
+                  event: "wordup_async_invite_later",
+                  payload: { matchId: mId },
+               });
+               setTimeout(() => supabase.removeChannel(ackChannel), 1000);
+            }
+         });
          triggerToast("Challenge saved! Play when you're ready.", 3000);
          refreshPending();
       }

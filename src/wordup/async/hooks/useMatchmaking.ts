@@ -3,6 +3,8 @@ import { useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAsyncStore } from "../store/useAsyncStore";
 import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../utils/wordupQuestionGenerator";
+import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
+import { generateMatchQuestions } from "../../../services/wordup/questionService";
 
 export const useAsyncMatchmaking = (
    user: any,
@@ -11,13 +13,14 @@ export const useAsyncMatchmaking = (
 ) => {
    const effectiveCategory = category || useAsyncStore.getState().category || "mixed";
 
-   const createMatch = useCallback(async (targetUser: any) => {
+   const createMatch = useCallback(async (targetUser: any, overrideCategory?: string) => {
+      const cat = overrideCategory || effectiveCategory;
       if (!user?.id || !targetUser?.id) return null;
       try {
          const { data, error } = await supabase
             .from("wordup_async_matches")
             .insert({
-               category: effectiveCategory,
+               category: cat,
                player1_id: user.id,
                player2_id: targetUser.id,
                status: "pending",
@@ -28,15 +31,40 @@ export const useAsyncMatchmaking = (
          if (error || !data || data.length === 0) throw error || new Error("Failed to create match");
          const newMatch = data[0];
 
-         const rawQuestions = generateWordUpQuestions(effectiveCategory);
-         const secretKey = generateSecretKey();
-         const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+         let questionsCol: any;
+         let key: string;
+
+         if (isProceduralCategory(cat)) {
+            await supabase.from("wordup_matches").insert({
+               id: newMatch.id, category: cat,
+               player1_id: newMatch.player1_id, player2_id: newMatch.player2_id,
+               status: "generating", game_type: "async",
+               p1_answered: false, p2_answered: false,
+            });
+            await generateMatchQuestions(newMatch.id, cat);
+            const { data: td } = await supabase.from("wordup_matches")
+               .select("questions, encryption_key").eq("id", newMatch.id).single();
+            await supabase.from("wordup_matches").delete().eq("id", newMatch.id);
+
+            if (td?.questions && td?.encryption_key) {
+               questionsCol = td.questions;
+               key = td.encryption_key;
+            } else {
+               const raw = generateWordUpQuestions(cat);
+               key = generateSecretKey();
+               questionsCol = encryptQuestions(raw, key);
+            }
+         } else {
+            const raw = generateWordUpQuestions(cat);
+            key = generateSecretKey();
+            questionsCol = encryptQuestions(raw, key);
+         }
 
          const { error: updateError } = await supabase
             .from("wordup_async_matches")
             .update({
-               questions: encryptedStr,
-               encryption_key: secretKey,
+               questions: questionsCol,
+               encryption_key: key,
                status: "active",
             })
             .eq("id", newMatch.id);
@@ -51,7 +79,7 @@ export const useAsyncMatchmaking = (
          triggerToast("Failed to create match. Try again.", 4000);
          return null;
       }
-   }, [user, effectiveCategory, triggerToast]);
+   }, [user, category, triggerToast]);
 
    const sendInvite = useCallback(async (targetUser: any, onComplete: (matchId: string | null) => void) => {
       if (!user) return onComplete(null);
