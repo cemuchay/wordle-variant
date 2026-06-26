@@ -89,7 +89,8 @@ interface AppState {
    previewImage: string | null;
    challengePresets: ChallengePreset[];
    isPWAInstalled: boolean;
-   wordupMode: "live" | "async" | null;
+    wordupMode: "live" | "async" | null;
+    pendingAsyncMatchId: string | null;
 
    // Actions
    triggerToast: (message: string, duration?: number, isLarge?: boolean) => void;
@@ -135,8 +136,9 @@ interface AppState {
    addChallengePreset: (preset: ChallengePreset) => void;
    removeChallengePreset: (id: string) => void;
    setIsPWAInstalled: (val: boolean) => void;
-   setWordupMode: (mode: "live" | "async" | null) => void;
-   }
+    setWordupMode: (mode: "live" | "async" | null) => void;
+    setPendingAsyncMatchId: (id: string | null) => void;
+    }
 
    export const useAppStore = create<AppState>()(
    persist(
@@ -182,9 +184,10 @@ interface AppState {
          previewImage: null,
           challengePresets: [],
           isPWAInstalled: false,
-          wordupMode: null,
+           wordupMode: null,
+           pendingAsyncMatchId: null,
 
-         // Actions
+          // Actions
          triggerToast: (message, duration = 3000, isLarge = false) =>
             set({ toast: { show: true, message, duration, isLarge } }),
          setToast: (toast) => set({ toast }),
@@ -296,7 +299,8 @@ interface AppState {
                ),
             })),
           setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
-          setWordupMode: (wordupMode) => set({ wordupMode }),
+           setWordupMode: (wordupMode) => set({ wordupMode }),
+           setPendingAsyncMatchId: (pendingAsyncMatchId) => set({ pendingAsyncMatchId }),
 
       }),
       {

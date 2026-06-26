@@ -281,8 +281,8 @@ export function useGameEngine(props: EngineProps) {
 
          cb.current.handleMatchUpdate?.(upd);
 
-         if (gameType === "live") {
-             channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers, my_score: upd.p1_score || upd.p2_score, opp_score: upd.p2_score || upd.p1_score } }).catch(console.error);
+          if (gameType === "live") {
+              channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers } }).catch(console.error);
          }
       } catch (err) {
          console.error("[WordUp] handleAnswerSelect error:", err);
@@ -615,19 +615,19 @@ export function useGameEngine(props: EngineProps) {
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase.channel(`wordup_match_${mId}`, { config: { broadcast: { self: false } } })
                .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wordup_matches", filter: `id=eq.${mId}` }, (p: any) => cb.current.handleMatchUpdate?.(p.new))
-                .on("broadcast", { event: "player_answered" }, ({ payload }: any) => {
-                   const cur = S.current.matchData; if (!cur) return;
-                   const u: any = { ...cur };
-                   if (payload.role === "player1" || payload.role === "player2") {
-                      const role = payload.role;
-                      u[role === "player1" ? "p1_answered" : "p2_answered"] = true;
-                      u[role === "player1" ? "p1_answers" : "p2_answers"] = payload.answers;
-                      u.p1_score = role === "player1" ? payload.my_score : payload.opp_score;
-                      u.p2_score = role === "player2" ? payload.my_score : payload.opp_score;
-                   }
-                   cb.current.handleMatchUpdate?.(u);
-                   resetInactivityWatchdog();
-                })
+                 .on("broadcast", { event: "player_answered" }, ({ payload }: any) => {
+                    const cur = S.current.matchData; if (!cur) return;
+                    if (payload.role === "player1" || payload.role === "player2") {
+                       const role = payload.role;
+                       const targetAnswers = role === "player1" ? "p1_answers" : "p2_answers";
+                       const targetScore   = role === "player1" ? "p1_score"   : "p2_score";
+                       const targetAnswered= role === "player1" ? "p1_answered": "p2_answered";
+                       const newAnswers = payload.answers || [];
+                       const newScore = newAnswers.reduce((s: number, a: any) => s + (a.points || 0), 0);
+                       cb.current.handleMatchUpdate?.({ [targetAnswers]: newAnswers, [targetScore]: newScore, [targetAnswered]: true });
+                    }
+                    resetInactivityWatchdog();
+                 })
                   .on("broadcast", { event: "advance_round" }, ({ payload }: any) => {
                      const cur = S.current.matchData; if (!cur) return;
                      cb.current.handleMatchUpdate?.({ ...cur, current_question_index: payload.nextIdx, p1_answered: false, p2_answered: false });

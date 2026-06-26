@@ -399,8 +399,11 @@ export function useGameEngine(props: EngineProps) {
 
          if (match.status === "turn_submitted") {
             dispatch({ type: "SET_MATCH_DATA", data: match });
-            dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
-            return;
+            const alreadyPlayed = activeRole === "player1" ? match.p1_answered : match.p2_answered;
+            if (alreadyPlayed) {
+               dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
+               return;
+            }
          }
 
          dispatch({ type: "SET_MATCH_DATA", data: match });
