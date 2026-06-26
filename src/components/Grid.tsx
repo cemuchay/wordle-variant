@@ -107,9 +107,14 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     if (!isChallenge) {
       scale = { h: 1.1, w: 1.1 }
     }
+
   }
   if (isSuperTiny) {
     scale = { h: 0.7, w: 0.7 }
+  }
+
+  if (isDesktop && wordLength > 6) {
+    scale = { h: 0.85, w: 0.85 }
   }
   const finalWidth = dimensions.w * scale.w;
   const finalHeight = dimensions.h * scale.h;
@@ -186,30 +191,30 @@ const LONG_PRESS_MS = 400;
 export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, editIndex, onSetCursor, onSetEditIndex }) => {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlePointerDown = useCallback((i: number) => {
-     if (wordLength <= 5) return;
-     longPressTimerRef.current = setTimeout(() => {
-        onSetEditIndex?.(i);
-        longPressTimerRef.current = null;
-     }, LONG_PRESS_MS);
+    if (wordLength <= 5) return;
+    longPressTimerRef.current = setTimeout(() => {
+      onSetEditIndex?.(i);
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_MS);
   }, [wordLength, onSetEditIndex]);
   const handlePointerUp = useCallback(() => {
-     if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-     }
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   }, []);
   useEffect(() => () => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }, []);
   const lastClickRef = useRef<{ time: number; index: number } | null>(null);
   const handleCellClick = useCallback((i: number) => {
-     const now = Date.now();
-     const prev = lastClickRef.current;
-     if (wordLength > 5 && prev && prev.index === i && now - prev.time < 300) {
-        onSetEditIndex?.(i);
-        lastClickRef.current = null;
-        return;
-     }
-     lastClickRef.current = { time: now, index: i };
-     onSetCursor?.(i);
+    const now = Date.now();
+    const prev = lastClickRef.current;
+    if (wordLength > 5 && prev && prev.index === i && now - prev.time < 300) {
+      onSetEditIndex?.(i);
+      lastClickRef.current = null;
+      return;
+    }
+    lastClickRef.current = { time: now, index: i };
+    onSetCursor?.(i);
   }, [wordLength, onSetCursor, onSetEditIndex]);
   const [revealedRowsCount, setRevealedRowsCount] = useState(guesses.length);
 
@@ -360,7 +365,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
           </button>
           {showEditHelp && (
             <>
-              <div className="absolute top-full right-0 mt-1 z-50 w-64 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5">
+              <div className="absolute top-full right-0 mt-1 z-50 w-60 bg-slate-900 border border-white/10 rounded-xl p-2 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5">
                 <div className="font-bold text-white/90 text-xs mb-1.5">Editing Controls</div>
                 <p><span className="text-blue-400 font-bold">Tap</span> a cell to move the cursor there.</p>
                 <p><span className="text-red-400 font-bold">Backspace</span> deletes the letter at cursor and shifts remaining left.</p>
