@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Swords } from "lucide-react";
@@ -9,6 +10,7 @@ import { useAsyncMatchmaking } from "./hooks/useMatchmaking";
 import { useGameEngine as useAsyncGameEngine } from "./hooks/useGameEngine";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
+import { useAppStore } from "../../store/useAppStore";
 import { useAsyncStore } from "./store/useAsyncStore";
 import { LobbyView } from "./components/LobbyView";
 import { InvitePopup } from "./components/InvitePopup";
@@ -237,7 +239,9 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    }, [loadHistoryMatches]);
 
    useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (effectiveUser) refreshPending();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [effectiveUser?.id, refreshPending]);
 
    // Realtime listener for async match updates
@@ -316,6 +320,18 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       startMatch?.(match.id, mRole);
    }, [effectiveUser, setMatchId, setRole, setView, startMatch]);
 
+   // Auto-load match from notification click (pendingAsyncMatchId)
+   const pendingAsyncMatchId = useAppStore((s) => s.pendingAsyncMatchId);
+   const setPendingAsyncMatchId = useAppStore((s) => s.setPendingAsyncMatchId);
+   useEffect(() => {
+      if (!effectiveUser?.id || view !== "menu" || !pendingAsyncMatchId) return;
+      const mId = pendingAsyncMatchId;
+      setPendingAsyncMatchId(null);
+      supabase.from("wordup_async_matches").select("*").eq("id", mId).single().then(({ data }) => {
+         if (data) handlePlayTurn(data);
+      });
+   }, [pendingAsyncMatchId, effectiveUser?.id, view, handlePlayTurn, setPendingAsyncMatchId]);
+
    const handleSelectHistoryMatch = useCallback(async (match: any) => {
       if (!effectiveUser) return;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
@@ -330,7 +346,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
    if (!effectiveUser) {
       return (
-          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-indigo-950/40 to-dark p-6 text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark p-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -376,16 +392,16 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-gradient-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-linear-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
                   userStats={userStats} category={category} setCategory={setCategory}
-                   getRankColor={getRankColor} allProfiles={allProfiles}
+                  getRankColor={getRankColor} allProfiles={allProfiles}
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
-                  startChallenge={() => {}}
+                  startChallenge={() => { }}
                   pendingMatches={pendingMatches} historyMatches={historyMatches}
                   isLoadingData={isLoadingData}
                   onPlayTurn={handlePlayTurn}
@@ -393,7 +409,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
                   onSwitchMode={() => onSwitchMode?.("live")}
-                   onBack={() => onBack?.()}
+                  onBack={() => onBack?.()}
                />
             )}
             {view === "loading" && <ConnectingView message={connectingMsg} />}
