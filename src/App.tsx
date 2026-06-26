@@ -830,9 +830,9 @@ export default function App() {
                       setWordupMode(mode);
                     }} />
                   ) : wordupMode === "live" ? (
-                    <LiveView onBack={() => setWordupMode(null)} />
+                    <LiveView onBack={() => setWordupMode(null)} onSwitchMode={setWordupMode} />
                   ) : (
-                    <AsyncView onBack={() => setWordupMode(null)} />
+                    <AsyncView onBack={() => setWordupMode(null)} onSwitchMode={setWordupMode} />
                   )}
                 </Suspense>
               </div>

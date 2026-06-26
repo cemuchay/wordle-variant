@@ -57,6 +57,7 @@ export const BattleView = ({
    currentIdx,
    matchData,
    opponentStats,
+   maxTime,
    selectedAnswer,
    revealAnswers,
    handleAnswerSelect,
@@ -75,6 +76,7 @@ export const BattleView = ({
    const prevMyScoreRef = useRef(0);
    const prevOppScoreRef = useRef(0);
    const popupIdRef = useRef(0);
+   const timerBarRef = useRef<HTMLDivElement | null>(null);
 
    const activeQuestion = questions[currentIdx];
 
@@ -107,6 +109,42 @@ export const BattleView = ({
 
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoice = oppAnswers?.[currentIdx]?.choice;
+
+   const qMaxTime = maxTime || 10.0;
+
+   useEffect(() => {
+      const bar = timerBarRef.current;
+      if (!bar || revealAnswers || !activeQuestion) return;
+
+      bar.style.transition = "none";
+      bar.style.width = "100%";
+      bar.style.backgroundColor = "#818cf8";
+      bar.style.boxShadow = "0 0 8px #818cf8";
+
+      void bar.offsetHeight;
+
+      bar.style.transition = `width ${qMaxTime}s linear, background-color ${qMaxTime}s linear, box-shadow ${qMaxTime}s linear`;
+      bar.style.width = "0%";
+      bar.style.backgroundColor = "#ef4444";
+      bar.style.boxShadow = "0 0 8px #ef4444";
+   }, [currentIdx, revealAnswers, qMaxTime, activeQuestion]);
+
+   useEffect(() => {
+      const bar = timerBarRef.current;
+      if (!bar) return;
+
+      if (selectedAnswer !== null) {
+         const computedStyle = window.getComputedStyle(bar);
+         const currentWidth = computedStyle.width;
+         const currentColor = computedStyle.backgroundColor;
+         const currentBoxShadow = computedStyle.boxShadow;
+
+         bar.style.transition = "none";
+         bar.style.width = currentWidth;
+         bar.style.backgroundColor = currentColor;
+         bar.style.boxShadow = currentBoxShadow;
+      }
+   }, [selectedAnswer]);
 
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
@@ -217,9 +255,19 @@ export const BattleView = ({
                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
                />
             </div>
-         </div>
+          </div>
 
-         {/* Round Indicator */}
+          {/* Timer Bar */}
+          <div className="w-full h-2 bg-indigo-500/20 rounded-full overflow-hidden shrink-0 shadow-inner">
+             {!revealAnswers && (
+                <div
+                   ref={timerBarRef}
+                   className="h-full rounded-full"
+                />
+             )}
+          </div>
+
+          {/* Round Indicator */}
          <div className="flex justify-center items-center px-1 py-3 shrink-0">
             <div className="flex flex-col items-center">
                {categoryName && (

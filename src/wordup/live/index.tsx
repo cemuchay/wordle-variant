@@ -27,9 +27,10 @@ import { useLiveStore } from "./store/useLiveStore";
 
 interface LiveViewProps {
    onBack?: () => void;
+   onSwitchMode?: (mode: "live" | "async") => void;
 }
 
-export const LiveView = ({ onBack }: LiveViewProps) => {
+export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
    const { user: authUser } = useAuth();
    const { triggerToast, realtimeStatus, profile } = useApp();
 
@@ -279,6 +280,7 @@ export const LiveView = ({ onBack }: LiveViewProps) => {
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
+                  onSwitchMode={() => onSwitchMode?.("async")}
                    onBack={() => onBack?.()}
                />
             )}

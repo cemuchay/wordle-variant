@@ -8,11 +8,11 @@ import { generateMatchQuestions } from "../../../services/wordup/questionService
 import { useAsyncStore } from "../store/useAsyncStore";
 import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 import { wordupNetworkGate } from "../../../components/wordup/WordUpView/services/wordupNetworkGate";
-import { WORDUP_TIMEOUT, WORDUP_GAME } from "../../../constants/wordup";
+import { WORDUP_TIMEOUT, WORDUP_GAME, QUESTION_DURATION } from "../../../constants/wordup";
 import { gameEngineReducer, initialState } from "./useGameEngine.types";
 
-function getQuestionDuration(_type: string): number {
-   return 30;
+function getQuestionDuration(type: string): number {
+   return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
 }
 
 interface EngineProps {
@@ -33,6 +33,7 @@ export function useGameEngine(props: EngineProps) {
       revealTimeout: null as number | null,
       safetyTimeout: null as number | null,
       lastRoundPopupTimeout: null as number | null,
+      countdownInterval: null as number | null,
    });
 
    const G = useRef({
@@ -66,7 +67,7 @@ export function useGameEngine(props: EngineProps) {
    function clearT(name: keyof typeof T.current) {
       const h = T.current[name];
       if (h === null) return;
-      if (name === "roundInterval") clearInterval(h);
+      if (name === "roundInterval" || name === "countdownInterval") clearInterval(h);
       else clearTimeout(h);
       T.current[name] = null;
    }
@@ -84,6 +85,7 @@ export function useGameEngine(props: EngineProps) {
 
    const phaseToView: Record<string, string> = {
       loading: "loading",
+      countdown: "countdown",
       playing: "battle",
       reveal: "battle",
       gameover: "gameover",
@@ -116,10 +118,10 @@ export function useGameEngine(props: EngineProps) {
    }, [matchId]);
 
    useEffect(() => {
-      if (state.phase === "loading") {
+      if (state.phase === "loading" || state.phase === "countdown") {
          clearT("safetyTimeout");
          T.current.safetyTimeout = window.setTimeout(() => {
-            if (useAsyncStore.getState().view === "battle") return;
+            if (useAsyncStore.getState().view === "battle" || useAsyncStore.getState().view === "countdown") return;
             console.warn("[WordUp] Safety timeout — async game failed to start");
             triggerToast("Game creation timed out. Please try again.", WORDUP_TIMEOUT.TOAST_DURATION);
             clearAllT();
@@ -132,7 +134,7 @@ export function useGameEngine(props: EngineProps) {
    }, [state.phase, triggerToast]);
 
    useEffect(() => {
-      if (state.phase === "playing" || state.phase === "reveal") wordupAudio.startAmbient();
+      if (state.phase === "countdown" || state.phase === "playing" || state.phase === "reveal") wordupAudio.startAmbient();
       else wordupAudio.stopAmbient();
       return () => wordupAudio.stopAmbient();
    }, [state.phase]);
@@ -319,24 +321,43 @@ export function useGameEngine(props: EngineProps) {
       S.current.currentRound = index;
       clearT("roundInterval");
       const q = S.current.questions[index];
-      const duration = q ? getQuestionDuration(q.type) : 30;
+      const duration = q ? getQuestionDuration(q.type) : QUESTION_DURATION.default;
       dispatch({ type: "SET_ROUND", round: index, timeLeft: duration, maxTime: duration });
       dispatch({ type: "CLEAR_ANSWER" });
       dispatch({ type: "HIDE_REVEAL" });
       G.current.isSubmitting = false;
 
       const startTime = getSyncedNow();
+      let lastTicked = Math.ceil(duration) + 1;
       T.current.roundInterval = window.setInterval(() => {
          const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
          dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
          const cs = Math.ceil(remaining);
-         if (remaining <= 3.0 && cs <= 3) wordupAudio.playTicking();
+         if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
          if (remaining <= 0) {
             clearT("roundInterval");
+            if (useAsyncStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.("");
          }
       }, 50);
    }, [getSyncedNow]);
    cb.current.startQuestionRound = startQuestionRound;
+
+   const startCountdown = useCallback((match: any) => {
+      clearT("countdownInterval");
+      dispatch({ type: "SET_PHASE", phase: "countdown" });
+      let c = 3;
+      dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
+      T.current.countdownInterval = window.setInterval(() => {
+         c--;
+         if (c <= 0) {
+            clearT("countdownInterval");
+            dispatch({ type: "SET_PHASE", phase: "playing" });
+            cb.current.startQuestionRound?.(match, 0);
+         } else {
+            dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
+         }
+      }, 1000);
+   }, []);
 
    // ══════════════════════════════════════════════════════════════════════
    // MATCH LOADING
@@ -425,11 +446,16 @@ export function useGameEngine(props: EngineProps) {
                }
             })
             .subscribe();
-         channel.current = ch;
+          channel.current = ch;
 
-         dispatch({ type: "SET_PHASE", phase: "playing" });
-         cb.current.startQuestionRound?.(match, match.current_question_index || 0);
-      } catch (err) {
+          if (match.current_question_index > 0) {
+             dispatch({ type: "SET_PHASE", phase: "playing" });
+             cb.current.startQuestionRound?.(match, match.current_question_index || 0);
+          } else {
+             wordupAudio.playMatchStart();
+             startCountdown(match);
+          }
+       } catch (err) {
          console.error("[WordUp] loadMatch error:", err);
          triggerToast("Failed to load match. Aborting.", 5000);
          const sd = S.current.matchData;

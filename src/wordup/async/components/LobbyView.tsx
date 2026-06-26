@@ -25,6 +25,7 @@ interface AsyncLobbyViewProps {
    onChallengePlayer: (targetUser: any) => void;
    onRefreshPending: () => void;
    onRefreshHistory: () => void;
+   onSwitchMode?: () => void;
    onBack?: () => void;
 }
 
@@ -47,6 +48,7 @@ export const LobbyView = ({
    onChallengePlayer,
    onRefreshPending,
    onRefreshHistory,
+   onSwitchMode,
 }: AsyncLobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -75,9 +77,16 @@ export const LobbyView = ({
          className="flex flex-col gap-4 md:gap-6 flex-1 justify-center py-1 md:py-2"
       >
          <div className="space-y-1 relative text-center">
-            <div className="flex items-center justify-between gap-4 px-2 shrink-0">
-               <h2 className="text-2xl font-black uppercase tracking-wider text-white">Async WordUp</h2>
-               <div className="flex items-center gap-2 w-[84px] justify-end">
+             <div className="flex items-center justify-between gap-4 px-2 shrink-0">
+                <h2 className="text-2xl font-black uppercase tracking-wider text-white">Async WordUp</h2>
+                <div className="flex items-center gap-2">
+                   {onSwitchMode && (
+                      <button onClick={onSwitchMode}
+                         className="px-3 py-1.5 rounded-xl bg-correct/20 hover:bg-correct/30 border border-correct/30 text-correct text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer">
+                         Live Game
+                      </button>
+                   )}
+                   <div className="flex items-center gap-2 w-[84px] justify-end">
                   <button
                      onClick={onToggleSound}
                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
@@ -92,12 +101,13 @@ export const LobbyView = ({
                   >
                      <RotateCcw size={15} />
                   </button>
-               </div>
-            </div>
-         </div>
+                </div>
+                </div>
+             </div>
+          </div>
 
-         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
-            {(["play", "pending", "history"] as const).map((tab) => (
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+             {(["play", "pending", "history"] as const).map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}

@@ -16,14 +16,16 @@ import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
 import { ConnectingView } from "./components/ConnectingView";
+import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
 
 interface AsyncViewProps {
    onBack?: () => void;
+   onSwitchMode?: (mode: "live" | "async") => void;
 }
 
-export const AsyncView = ({ onBack }: AsyncViewProps) => {
+export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const { user: authUser } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
@@ -112,6 +114,7 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
 
    const { handleAnswerSelect, startMatch } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
+   const countdownText = engine.state.countdownText;
 
    const { loadPendingMatches, loadHistoryMatches, createMatch } = useAsyncMatchmaking(effectiveUser, category, triggerToast);
 
@@ -389,10 +392,12 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
                   onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
+                  onSwitchMode={() => onSwitchMode?.("live")}
                    onBack={() => onBack?.()}
                />
             )}
             {view === "loading" && <ConnectingView message={connectingMsg} />}
+            {view === "countdown" && <CountdownView countdownText={String(countdownText || "3")} />}
             {view === "battle" && (
                <BattleView
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
@@ -403,10 +408,9 @@ export const AsyncView = ({ onBack }: AsyncViewProps) => {
             )}
             {view === "turn_submitted" && (
                <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                  <div className="w-12 h-12 border-4 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin mb-6" />
-                  <h2 className="text-xl font-black text-white tracking-wider">Turn Submitted!</h2>
+                  <h2 className="text-xl font-black text-white tracking-wider">Game Complete!</h2>
                   <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
-                     Your answers have been saved. Waiting for opponent to play their turn...
+                     All questions answered. Waiting for your opponent to finish their turn.
                   </p>
                   <button onClick={resetGame} className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer">
                      Back to Lobby
