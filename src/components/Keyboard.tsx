@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import type { LetterStatus } from '../types/game';
 import { Delete, CornerDownLeft } from 'lucide-react';
 import { useIsResponsive } from '../hooks/useResponsive';
+import { useAppStore } from '../store/useAppStore';
 
 const ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -15,10 +16,15 @@ interface KeyProps {
   onClick: (char: string) => void;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
+  wordLength?: number
 }
 
-const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) => {
-  const { isSuperTiny } = useIsResponsive(); // Detect responsive state
+const Key = memo(({ char, status, onClick, compact, gameplayType, wordLength = 5 }: KeyProps) => {
+  const { isSuperTiny, isDesktop } = useIsResponsive(); // Detect responsive state
+  const isPWA = useAppStore(s => s.isPWAInstalled)
+
+  let localIsSuperTiny = isSuperTiny
+
   const isWide = char === 'ENTER' || char === 'DELETE';
 
   const getStyle = () => {
@@ -47,6 +53,18 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
     dynamicClass = `flex-1 min-w-[22px] h-8 text-sm sm:text-[8px]`
   }
 
+  //reduce key height in non PWA mobiel devices for long words
+  if (!isSuperTiny && !isChallenge && !isDesktop && !isPWA && wordLength > 6) {
+    localIsSuperTiny = true
+    dynamicClass = `flex-1 min-w-[22px] h-11 text-sm sm:text-[9px]`
+  }
+
+  if (!isChallenge && isDesktop && wordLength > 5) {
+    localIsSuperTiny = true
+    dynamicClass = `flex-1 min-w-[22px] h-11 text-sm`
+  }
+
+
   return (
     <button
       type="button"
@@ -62,7 +80,7 @@ const Key = memo(({ char, status, onClick, compact, gameplayType }: KeyProps) =>
         onClick(char);
       }}
     >
-      {char === 'DELETE' ? <Delete size={18} /> : (char === "ENTER" && isSuperTiny && !isChallenge) ? <CornerDownLeft size={18} /> : char}
+      {char === 'DELETE' ? <Delete size={18} /> : (char === "ENTER" && (isSuperTiny || localIsSuperTiny) && !isChallenge) ? <CornerDownLeft size={18} /> : char}
     </button>
   );
 });
@@ -76,9 +94,10 @@ interface Props {
   letterStatuses: Record<string, LetterStatus>;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
+  wordLength?: number;
 }
 
-export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact, gameplayType }) => {
+export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact, gameplayType, wordLength }) => {
   const handleKeyClick = React.useCallback((key: string) => {
     if (key === 'ENTER') onEnter();
     else if (key === 'DELETE') onDelete();
@@ -88,7 +107,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
   const isChallenge = gameplayType === 'challenge' || compact;
 
   return (
-    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-2 sm:pb-4'}`}>
+    <div className={`game-keyboard w-full max-w-[500px] mx-auto px-1 select-none shrink-0 ${isChallenge ? 'pb-1' : 'pb-2 sm:pb-0'}`}>
       {ROWS.map((row, i) => (
         <div key={i} className={`flex justify-center ${isChallenge ? 'mb-1.5 gap-1.5 sm:gap-2' : 'mb-1.5 gap-1.5 sm:gap-2'}`}>
           {row.map((key) => (
@@ -99,6 +118,7 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
               onClick={handleKeyClick}
               compact={compact}
               gameplayType={gameplayType}
+              wordLength={wordLength}
             />
           ))}
         </div>

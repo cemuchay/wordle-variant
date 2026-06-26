@@ -47,7 +47,7 @@ export const AppNavigation = ({
     ];
 
     // Reorder items based on preferences
-    const navItems = preferences.navOrder 
+    const navItems = preferences.navOrder
         ? [...preferences.navOrder].map(id => allItems.find(item => item.id === id)).filter(Boolean) as typeof allItems
         : allItems;
 

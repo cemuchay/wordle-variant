@@ -860,7 +860,7 @@ export const ChallengeModal = ({
   if (inline) {
     return (
       <div
-        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        className="flex flex-col h-full w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
         <div className="w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300">

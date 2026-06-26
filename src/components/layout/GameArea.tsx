@@ -118,7 +118,7 @@ export const GameArea = ({
             )}
 
 
-            <div className="flex-1 flex items-center justify-center min-h-0 w-full relative pt-6">
+            <div className="flex-1 flex items-center justify-center min-h-0 w-full relative pt-6 sm:pt-2">
                 <div className="relative">
                     <Grid
                         wordLength={wordLength}
@@ -178,13 +178,14 @@ export const GameArea = ({
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-8 shrink-0 px-2">
+                <div className="w-full max-w-[500px] mx-auto pb-0.5 pt-2 sm:pt-2 shrink-0 px-2">
                     <Keyboard
                         onChar={onChar}
                         onDelete={onDelete}
                         onEnter={onEnter}
                         letterStatuses={keyboardStatuses}
                         gameplayType="regular"
+                        wordLength={wordLength}
                     />
                 </div>
             )}

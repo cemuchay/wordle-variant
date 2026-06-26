@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabaseClient';
 import { useGlobalPresence, type PresenceUser } from '../hooks/useGlobalPresence';
 import { useAudioChat, type AudioChatState } from '../hooks/useAudioChat';
 import { useAppStore, type VoiceCallState } from '../store/useAppStore';
-import { useWordUpStore } from '../store/useWordUpStore';
+import { useLiveStore } from '../wordup/live/store/useLiveStore';
+import { useAsyncStore } from '../wordup/async/store/useAsyncStore';
 import { useAuthoritativeDate, useProfile, useChallengeStatus } from '../hooks/queries/useServerData';
 import { useAppInit } from '../hooks/useAppInit';
 import { useQueryClient } from '@tanstack/react-query';
@@ -444,7 +445,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .on('broadcast', { event: 'wordup_invite' }, ({ payload }) => {
                 // If invitee is already in a match or call, send busy back
                 const currentCall = useAppStore.getState().activeCall;
-                const activeMatchId = useWordUpStore.getState().matchId;
+                const activeMatchId = useLiveStore.getState().matchId || useAsyncStore.getState().matchId;
                 if ((currentCall && currentCall.status !== 'idle') || activeMatchId) {
                     const busyChannel = supabase.channel(`user_signals_${payload.senderId}`);
                     trackOneShotChannel(busyChannel);
@@ -470,7 +471,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .on('broadcast', { event: 'wordup_invite_accepted' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-accepted', { detail: payload }));
                 // Direct store update so the transition survives tab switches
-                const store = useWordUpStore.getState();
+                const store = useLiveStore.getState();
                 if (payload?.matchId && !store.matchId) {
                     store.setMatchId(payload.matchId);
                     store.setRole("player1");

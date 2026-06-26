@@ -543,7 +543,7 @@ export const ChallengeChat = memo(function ChallengeChat({
 
   return (
     <div
-      className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-[450px] space-y-3 relative overflow-hidden"
+      className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col h-full min-h-0 space-y-3 relative overflow-hidden"
       style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
     >
       <div className="absolute top-0 right-0 w-24 h-24 bg-correct/5 blur-2xl -mr-12 -mt-12 pointer-events-none" />
