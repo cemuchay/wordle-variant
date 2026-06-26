@@ -16,7 +16,8 @@ import NotificationPermissionPrompt from "./components/NotificationPermissionPro
 import FloatingChatBubble from "./components/chat/FloatingChatBubble";
 import { NotificationsManager } from "./components/notifications/NotificationsManager";
 import { Bell, Swords } from "lucide-react";
-import { useWordUpStore } from "./store/useWordUpStore";
+import { useLiveStore } from "./wordup/live/store/useLiveStore";
+import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
@@ -38,7 +39,9 @@ import { motion, AnimatePresence } from "framer-motion";
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
-const WordUpView = safeLazy(() => import("./components/wordup/WordUpView").then(m => ({ default: m.WordUpView })));
+const ModeSelect = safeLazy(() => import("./wordup/mode-select").then(m => ({ default: m.ModeSelect })));
+const LiveView = safeLazy(() => import("./wordup/live").then(m => ({ default: m.LiveView })));
+const AsyncView = safeLazy(() => import("./wordup/async").then(m => ({ default: m.AsyncView })));
 
 const fadeVariants = {
   initial: {
@@ -56,7 +59,9 @@ export default function App() {
   const { user } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
-  const isBattlePlaying = useWordUpStore((s) => s.isBattlePlaying);
+  const isBattlePlayingLive = useLiveStore((s) => s.isBattlePlaying);
+  const isBattlePlayingAsync = useAsyncStore((s) => s.isBattlePlaying);
+  const isBattlePlaying = isBattlePlayingLive || isBattlePlayingAsync;
   const {
     triggerToast,
     date,
@@ -135,6 +140,8 @@ export default function App() {
   
   const isWordUpOpen = useAppStore(s => s.isWordUpOpen);
   const setIsWordUpOpen = useAppStore(s => s.setWordUpOpen);
+  const wordupMode = useAppStore(s => s.wordupMode);
+  const setWordupMode = useAppStore(s => s.setWordupMode);
   
   const isWeeklyWrappedOpen = useAppStore(s => s.isWeeklyWrappedOpen);
   const setIsWeeklyWrappedOpen = useAppStore(s => s.setWeeklyWrappedOpen);
@@ -612,6 +619,9 @@ export default function App() {
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
     setIsWordUpOpen(item === "wordup");
+    if (item !== "wordup") {
+      setWordupMode(null);
+    }
     setIsInfoOpen(false);
     if (item === "leaderboard") {
       setStatsActiveTab("leaderboard");
@@ -815,7 +825,15 @@ export default function App() {
             {activeNavigationItem === "wordup" && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
-                  <WordUpView />
+                  {wordupMode === null ? (
+                    <ModeSelect onSelect={(mode: "live" | "async") => {
+                      setWordupMode(mode);
+                    }} />
+                  ) : wordupMode === "live" ? (
+                    <LiveView onBack={() => setWordupMode(null)} />
+                  ) : (
+                    <AsyncView onBack={() => setWordupMode(null)} />
+                  )}
                 </Suspense>
               </div>
             )}
@@ -957,9 +975,9 @@ export default function App() {
                           payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
                         }).then(() => {
                           // Show connecting screen, then navigate
-                          useWordUpStore.getState().setMatchId(newMatch.id);
-                          useWordUpStore.getState().setRole("player2");
-                          useWordUpStore.getState().setView("connecting");
+                          useLiveStore.getState().setMatchId(newMatch.id);
+                          useLiveStore.getState().setRole("player2");
+                          useLiveStore.getState().setView("connecting");
                           handleNavigation("wordup");
                         });
                         setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
@@ -1027,8 +1045,8 @@ export default function App() {
                 onClick={() => {
                   const matchId = opponentLaterInvite.matchId;
                   setOpponentLaterInvite(null);
-                  useWordUpStore.getState().setMatchId(matchId);
-                   useWordUpStore.getState().setRole("player2");
+                  useLiveStore.getState().setMatchId(matchId);
+                  useLiveStore.getState().setRole("player2");
                   handleNavigation("wordup");
                 }}
                 className="bg-correct hover:bg-correct/90 text-black text-xs font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"

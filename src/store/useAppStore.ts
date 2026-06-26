@@ -89,6 +89,7 @@ interface AppState {
    previewImage: string | null;
    challengePresets: ChallengePreset[];
    isPWAInstalled: boolean;
+   wordupMode: "live" | "async" | null;
 
    // Actions
    triggerToast: (message: string, duration?: number, isLarge?: boolean) => void;
@@ -134,6 +135,7 @@ interface AppState {
    addChallengePreset: (preset: ChallengePreset) => void;
    removeChallengePreset: (id: string) => void;
    setIsPWAInstalled: (val: boolean) => void;
+   setWordupMode: (mode: "live" | "async" | null) => void;
    }
 
    export const useAppStore = create<AppState>()(
@@ -178,8 +180,9 @@ interface AppState {
          pendingChatGroupId: null,
          pendingChallengeUserId: null,
          previewImage: null,
-         challengePresets: [],
-         isPWAInstalled: false,
+          challengePresets: [],
+          isPWAInstalled: false,
+          wordupMode: null,
 
          // Actions
          triggerToast: (message, duration = 3000, isLarge = false) =>
@@ -292,7 +295,8 @@ interface AppState {
                   (p) => p.id !== id,
                ),
             })),
-         setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
+          setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
+          setWordupMode: (wordupMode) => set({ wordupMode }),
 
       }),
       {
