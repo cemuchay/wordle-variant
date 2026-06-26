@@ -176,7 +176,7 @@ export const BattleView = ({
                   userId={playerProfile?.id || undefined}
                   src={playerProfile?.avatar_url || undefined}
                   username={playerProfile?.username || "You"}
-                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+                  className="w-10 h-10 rounded-full border border-indigo-500/30 shrink-0"
                />
                <div className="truncate">
                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
@@ -188,7 +188,7 @@ export const BattleView = ({
                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
                      transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
+                     className="absolute -top-1 right-0 text-indigo-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(99,102,241,0.8)] pointer-events-none"
                   >
                      +{p.points}
                   </motion.span>
@@ -235,7 +235,7 @@ export const BattleView = ({
          {/* Question Container */}
          <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
             <div className="text-center space-y-1 sm:space-y-2">
-               <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+               <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {activeQuestion.type.replace("_", " ")}
                </p>
@@ -282,7 +282,7 @@ export const BattleView = ({
                      } else {
                         cardClass += " cursor-default";
                         if (isCorrect) {
-                           cardClass += " border-correct shadow-[0_0_20px_rgba(106,170,100,0.6)] bg-correct/10";
+                           cardClass += " border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.6)] bg-indigo-500/10";
                         } else if (isSelected) {
                            cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
                         } else {
@@ -332,7 +332,7 @@ export const BattleView = ({
                            </div>
                            <div className="absolute right-1.5 bottom-1.5 flex gap-1 items-center z-10">
                               {isSelected && (
-                                 <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                                 <span className="bg-indigo-500 text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
                                  <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
@@ -357,7 +357,7 @@ export const BattleView = ({
                      } else {
                         btnClass += " cursor-default";
                         if (isCorrect) {
-                           btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
+                           btnClass += " bg-gradient-to-r from-indigo-500/40 to-indigo-500/60 border-indigo-500 text-white font-extrabold shadow-[0_0_25px_rgba(99,102,241,0.65)]";
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
                         } else {
@@ -378,10 +378,10 @@ export const BattleView = ({
                               scale: [1, 1.15, 0.95, 1.05, 1],
                               rotate: [0, -3, 3, -2, 2, 0],
                               boxShadow: [
-                                 "0 0 0px rgba(106,170,100,0)",
-                                 "0 0 45px rgba(106,170,100,0.95)",
-                                 "0 0 20px rgba(106,170,100,0.5)",
-                                 "0 0 0px rgba(106,170,100,0)"
+                                 "0 0 0px rgba(99,102,241,0)",
+                                 "0 0 45px rgba(99,102,241,0.95)",
+                                 "0 0 20px rgba(99,102,241,0.5)",
+                                 "0 0 0px rgba(99,102,241,0)"
                               ]
                            };
                            buttonTransition = { duration: 0.65, ease: "easeInOut" };
@@ -412,7 +412,7 @@ export const BattleView = ({
                            <span className="flex-1 text-center pr-8">{choice}</span>
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (
-                                 <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                                 <span className="bg-indigo-500 text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
                                  <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">

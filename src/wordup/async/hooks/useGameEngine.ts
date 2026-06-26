@@ -182,18 +182,14 @@ export function useGameEngine(props: EngineProps) {
    const advanceRound = useCallback((_mId: string, nextIdx: number) => {
       if (G.current.isAdvancing) return;
       G.current.isAdvancing = true;
-      const nextQ = S.current.questions[nextIdx];
-      const nextDur = nextQ ? getQuestionDuration(nextQ.type) : 30;
       const isP1 = S.current.role === "player1";
       const upd: any = {
          ...S.current.matchData,
          current_question_index: nextIdx,
          [isP1 ? "p1_answered" : "p2_answered"]: false,
       };
-      if (nextIdx < 6) {
-         dispatch({ type: "SET_ROUND", round: nextIdx, timeLeft: nextDur, maxTime: nextDur });
-      }
-      cb.current.handleMatchUpdate?.(upd);
+      dispatch({ type: "SET_MATCH_DATA", data: upd });
+      cb.current.startQuestionRound?.(upd, nextIdx);
       G.current.isAdvancing = false;
    }, []);
    cb.current.advanceRound = advanceRound;

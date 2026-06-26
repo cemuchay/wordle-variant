@@ -2,7 +2,7 @@
 import { useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAsyncStore } from "../store/useAsyncStore";
-import { generateMatchQuestions } from "../../../services/wordup/questionService";
+import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../utils/wordupQuestionGenerator";
 
 export const useAsyncMatchmaking = (
    user: any,
@@ -14,7 +14,7 @@ export const useAsyncMatchmaking = (
    const createMatch = useCallback(async (targetUser: any) => {
       if (!user?.id || !targetUser?.id) return null;
       try {
-         const { data: newMatch, error } = await supabase
+         const { data, error } = await supabase
             .from("wordup_async_matches")
             .insert({
                category: effectiveCategory,
@@ -24,10 +24,24 @@ export const useAsyncMatchmaking = (
                p1_answered: false,
                p2_answered: false,
             })
-            .select()
-            .single();
-         if (error || !newMatch) throw error || new Error("Failed to create match");
-         await generateMatchQuestions(newMatch.id, effectiveCategory);
+            .select();
+         if (error || !data || data.length === 0) throw error || new Error("Failed to create match");
+         const newMatch = data[0];
+
+         const rawQuestions = generateWordUpQuestions(effectiveCategory);
+         const secretKey = generateSecretKey();
+         const encryptedStr = encryptQuestions(rawQuestions, secretKey);
+
+         const { error: updateError } = await supabase
+            .from("wordup_async_matches")
+            .update({
+               questions: encryptedStr,
+               encryption_key: secretKey,
+               status: "active",
+            })
+            .eq("id", newMatch.id);
+         if (updateError) throw updateError;
+
          useAsyncStore.getState().setMatchId(newMatch.id);
          useAsyncStore.getState().setRole("player1");
          triggerToast("Match created! Your opponent will see it in their pending list.", 3000);

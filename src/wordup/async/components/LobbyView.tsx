@@ -11,7 +11,6 @@ interface AsyncLobbyViewProps {
    category: string;
    setCategory: (cat: string) => void;
    getRankColor: (rankName: string) => string;
-   onlineUsers: any[];
    allProfiles: any[];
    currentUser: any;
    onSelectHistoryMatch?: (match: any) => void;
@@ -23,7 +22,7 @@ interface AsyncLobbyViewProps {
    historyMatches: any[];
    isLoadingData: boolean;
    onPlayTurn: (match: any) => void;
-   onSendInvite: (targetUser: any) => void;
+   onChallengePlayer: (targetUser: any) => void;
    onRefreshPending: () => void;
    onRefreshHistory: () => void;
    onBack?: () => void;
@@ -45,7 +44,7 @@ export const LobbyView = ({
    historyMatches,
    isLoadingData,
    onPlayTurn,
-   onSendInvite,
+   onChallengePlayer,
    onRefreshPending,
    onRefreshHistory,
 }: AsyncLobbyViewProps) => {
@@ -103,7 +102,7 @@ export const LobbyView = ({
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
-                     ? "bg-correct text-black shadow-md font-black"
+                     ? "bg-indigo-500 text-white shadow-md font-black"
                      : "text-gray-400 hover:text-white"
                      }`}
                >
@@ -135,7 +134,7 @@ export const LobbyView = ({
                         </div>
                         <div>
                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Wins/Losses</p>
-                           <p className="text-lg font-black text-correct">
+                           <p className="text-lg font-black text-indigo-400">
                               {userStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
                            </p>
                         </div>
@@ -214,13 +213,13 @@ export const LobbyView = ({
                                        <p className="text-xs font-black text-white truncate">{profile.username}</p>
                                     </div>
                                  </div>
-                                 <button
-                                    onClick={() => onSendInvite(profile)}
-                                    className="flex items-center gap-1 bg-correct/20 hover:bg-correct/30 border border-correct/30 text-correct text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
-                                 >
-                                    <UserPlus size={12} />
-                                    Invite
-                                 </button>
+                                  <button
+                                     onClick={() => onChallengePlayer(profile)}
+                                     className="flex items-center gap-1 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-400 text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                                  >
+                                     <UserPlus size={12} />
+                                     Invite
+                                  </button>
                               </div>
                            ))
                         ) : (
@@ -233,7 +232,7 @@ export const LobbyView = ({
 
                   <button
                      onClick={startChallenge}
-                     className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
+                     className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(99,102,241,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
                   >
                      <Swords size={16} /> Start New Challenge
                   </button>
@@ -250,7 +249,7 @@ export const LobbyView = ({
                >
                   {isLoadingData ? (
                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-6 h-6 text-correct animate-spin" />
+                        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
                      </div>
                   ) : pendingMatches.length > 0 ? (
                      <div className="space-y-2">
@@ -270,7 +269,7 @@ export const LobbyView = ({
                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
                                        <p className="font-black text-white truncate">vs {oppName}</p>
-                                       <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md tracking-wider ${myTurn ? "bg-correct/10 border border-correct/30 text-correct animate-pulse" : "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"}`}>
+                                       <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md tracking-wider ${myTurn ? "bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 animate-pulse" : "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400"}`}>
                                           {statusText}
                                        </span>
                                     </div>
@@ -279,7 +278,7 @@ export const LobbyView = ({
                                  {myTurn && (
                                     <button
                                        onClick={() => onPlayTurn(match)}
-                                       className="bg-correct hover:bg-correct/90 text-black font-black uppercase text-[9px] tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer"
+                                       className="bg-indigo-500 hover:bg-indigo-600 text-white font-black uppercase text-[9px] tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer"
                                     >
                                        Play Turn
                                     </button>
@@ -307,7 +306,7 @@ export const LobbyView = ({
                >
                   {isLoadingData ? (
                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-6 h-6 text-correct animate-spin" />
+                        <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
                      </div>
                   ) : historyMatches.length > 0 ? (
                      <div className="space-y-2">
@@ -322,7 +321,7 @@ export const LobbyView = ({
                            let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
                            if (myScore > oppScore) {
                               outcome = "WIN";
-                              outcomeColor = "text-correct bg-correct/10 border-correct/20";
+                              outcomeColor = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
                            } else if (oppScore > myScore) {
                               outcome = "LOSS";
                               outcomeColor = "text-red-400 bg-red-500/10 border-red-500/20";
@@ -370,7 +369,7 @@ export const LobbyView = ({
                className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
             >
                <div className="flex items-center gap-2">
-                  <HelpCircle size={14} className="text-correct" />
+                  <HelpCircle size={14} className="text-indigo-400" />
                   <span>How to Play & Scoring</span>
                </div>
                {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -392,8 +391,8 @@ export const LobbyView = ({
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
                         <ul className="list-disc pl-4 space-y-1">
-                           <li><strong className="text-correct">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays over time with a 1.5s grace period).</li>
-                           <li><strong className="text-correct">Speed Bonus</strong>: Faster answers earn more — the 20-point max drops to 11 at the time limit.</li>
+                           <li><strong className="text-indigo-400">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays over time with a 1.5s grace period).</li>
+                           <li><strong className="text-indigo-400">Speed Bonus</strong>: Faster answers earn more — the 20-point max drops to 11 at the time limit.</li>
                            <li><strong className="text-pink-500">Round 7 (Final Round)</strong>: All points are <strong className="text-pink-500">DOUBLED</strong>! Make it count!</li>
                         </ul>
                      </div>
