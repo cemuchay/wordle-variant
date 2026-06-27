@@ -29,7 +29,7 @@ interface AsyncViewProps {
 }
 
 export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
-   const { user: authUser } = useAuth();
+   const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
    const [guestUser, setGuestUser] = useState<any>(() => {
@@ -381,6 +381,15 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const handlePurgeAndReset = useCallback(() => {
       resetGame();
    }, [resetGame]);
+
+   if (authLoading) {
+      return (
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark p-6 text-center">
+            <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-xs text-gray-400 mt-4 font-bold uppercase tracking-widest">Loading Session...</p>
+         </div>
+      );
+   }
 
    if (!effectiveUser) {
       return (

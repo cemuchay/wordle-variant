@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../hooks/useAuth";
@@ -27,7 +28,7 @@ import { useWordUpStore } from "../../../store/useWordUpStore";
 import { useAppStore } from "../../../store/useAppStore";
 
 export const WordUpView = () => {
-   const { user: authUser } = useAuth();
+   const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, realtimeStatus, onlineUsers, profile, allProfiles } = useApp();
 
    const [guestUser, setGuestUser] = useState<any>(() => {
@@ -121,7 +122,7 @@ export const WordUpView = () => {
       setMatchId(newMId);
       setRole(newRole);
       startMatchRef.current?.(newMId, newRole);
-   // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    const engine = useWordUpGameEngine({
@@ -149,7 +150,7 @@ export const WordUpView = () => {
    }, [setMatchId, setRole]);
 
    // Reactive sync for direct invites, rematch transitions, and loading state
-    useEffect(() => {
+   useEffect(() => {
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
@@ -174,7 +175,7 @@ export const WordUpView = () => {
       setView("menu");
    }, [cancelMatchmaking, resetGame, setView]);
 
-    const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+   const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
    const phase = engine.state.phase;
 
@@ -218,10 +219,10 @@ export const WordUpView = () => {
 
          launchedMatchRef.current = activeGame.matchId;
 
-          recoveryTimer = window.setTimeout(async () => {
-             if (!mounted) return;
-             await startMatchRef.current?.(activeGame.matchId, activeGame.role);
-          }, 100);
+         recoveryTimer = window.setTimeout(async () => {
+            if (!mounted) return;
+            await startMatchRef.current?.(activeGame.matchId, activeGame.role);
+         }, 100);
       } catch (err) {
          console.error("[WordUp Logs] Failed to restore active game:", err);
       }
@@ -229,7 +230,7 @@ export const WordUpView = () => {
          mounted = false;
          if (recoveryTimer !== null) clearTimeout(recoveryTimer);
       };
-   // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    // ── Purge and reset ──────────────────────────────────────────────────
@@ -248,10 +249,10 @@ export const WordUpView = () => {
       return () => {
          cancelMatchmakingRef.current();
          engineCleanupRef.current?.();
-        const state = useWordUpStore.getState();
-        if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
+         const state = useWordUpStore.getState();
+         if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
       };
-   // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [resetGame]);
 
    // ── History match viewer ──────────────────────────────────────────────
@@ -272,6 +273,15 @@ export const WordUpView = () => {
    }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
 
    // ── Render ────────────────────────────────────────────────────────────
+   if (authLoading) {
+      return (
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center">
+            <div className="w-10 h-10 border-4 border-correct/30 border-t-correct rounded-full animate-spin" />
+            <p className="text-xs text-gray-400 mt-4 font-bold uppercase tracking-widest">Loading Session...</p>
+         </div>
+      );
+   }
+
    if (!effectiveUser) {
       return (
          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
@@ -342,39 +352,39 @@ export const WordUpView = () => {
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
             {view === "loading" && <LoadingView onCancel={abortMatch} />}
-             {view === "battle" && (
-                <BattleView
-                   questions={questions} currentIdx={currentIdx} matchData={matchData}
-                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
-                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                   role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
-                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
-                   waitingForOpponent={waitingForOpponent}
-                />
-             )}
-             {view === "turn_submitted" && (
-                <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                   <div className="w-12 h-12 border-4 border-correct/30 border-t-correct rounded-full animate-spin mb-6" />
-                   <h2 className="text-xl font-black text-white tracking-wider">Turn Submitted!</h2>
-                   <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
-                      Your answers have been saved. Waiting for opponent to play their turn...
-                   </p>
-                   <button
-                      onClick={resetGame}
-                      className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer"
-                   >
-                      Back to Lobby
-                   </button>
-                </div>
-             )}
-             {view === "gameover" && (
+            {view === "battle" && (
+               <BattleView
+                  questions={questions} currentIdx={currentIdx} matchData={matchData}
+                  opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
+                  revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
+                  role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
+                  onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
+                  waitingForOpponent={waitingForOpponent}
+               />
+            )}
+            {view === "turn_submitted" && (
+               <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
+                  <div className="w-12 h-12 border-4 border-correct/30 border-t-correct rounded-full animate-spin mb-6" />
+                  <h2 className="text-xl font-black text-white tracking-wider">Turn Submitted!</h2>
+                  <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
+                     Your answers have been saved. Waiting for opponent to play their turn...
+                  </p>
+                  <button
+                     onClick={resetGame}
+                     className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer"
+                  >
+                     Back to Lobby
+                  </button>
+               </div>
+            )}
+            {view === "gameover" && (
                <GameOverView
                   matchData={matchData}
                   setView={(newView) => {
                      if (newView === "menu") { resetGame(); }
-                      else if (newView === "matchmaking") {
-                         engineCleanupRef.current?.();
-                         resetGame();
+                     else if (newView === "matchmaking") {
+                        engineCleanupRef.current?.();
+                        resetGame();
                         setView("connecting");
                         startMatchmaking();
                      }

@@ -101,6 +101,12 @@ export const CATEGORIES = [
       desc: "Cell biology, genetics, evolution, ecology, anatomy, microbiology, and zoology",
       featured: true,
    },
+   {
+      id: "football",
+      name: "Football (Soccer)",
+      desc: "Players, clubs, competitions, rules, and history of world football",
+      featured: true,
+   },
 
    // {
    //    id: "animal_kingdom",

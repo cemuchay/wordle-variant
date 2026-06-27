@@ -48,7 +48,10 @@ export const CATEGORY_SUPER_MAP: Record<string, SuperCategory> = {
       // Entity-based science categories
       physics: "science_facts",
       chemistry: "science_facts",
-      biology: "science_facts"
+       biology: "science_facts",
+       
+       // Sports & general knowledge
+       football: "science_facts"
 };
 
 
