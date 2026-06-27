@@ -5,6 +5,7 @@ import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
+import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
 import { type ProfileStats } from "../../shared/types";
 
 
@@ -477,7 +478,7 @@ export const BattleView = ({
                   {activeQuestion.type.replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
-                  {activeQuestion.prompt}
+                  <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
                   <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">

@@ -190,7 +190,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                      .eq("id", mId)
                      .single();
                   match = data;
-               } catch {}
+               } catch {/* comment */ }
                const role = match?.player1_id === effectiveUser.id ? "player1" : "player2";
                setMatchId(mId);
                setRole(role);

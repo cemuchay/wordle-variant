@@ -53,6 +53,12 @@ export const CATEGORIES = [
       featured: true,
    },
    {
+      id: "english_fundamentals",
+      name: "English Fundamentals",
+      desc: "Grammar rules, tenses, punctuation, literary devices, and word usage",
+      featured: true,
+   },
+   {
       id: "currency_exchange",
       name: "Currencies",
       desc: "Match currencies to their countries",

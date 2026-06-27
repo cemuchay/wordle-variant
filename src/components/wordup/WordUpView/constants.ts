@@ -56,6 +56,12 @@ export const CATEGORIES = [
       desc: "Vocabulary synonyms, grammar checks, spelling, and literary devices",
       featured: true,
    },
+   {
+      id: "english_fundamentals",
+      name: "English Fundamentals",
+      desc: "Grammar rules, tenses, punctuation, literary devices, and word usage",
+      featured: true,
+   },
    // {
    //    id: "capitals_clash",
    //    name: "Capital Cities",

@@ -94,20 +94,34 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
          timeline: 0,
       },
    }),
-   define("english_language", {
-      proceduralWeight: 0.6,
-      weights: {
-         forward: 2.5,
-         reverse: 1,
-         oddOneOut: 1,
-         trueFalse: 2.5,
-         multiClue: 0,
-         correctError: 1,
-         tagMatch: 0,
-         compare: 1,
-         timeline: 0,
-      },
-   }),
+    define("english_language", {
+       proceduralWeight: 0.6,
+       weights: {
+          forward: 2.5,
+          reverse: 1,
+          oddOneOut: 1,
+          trueFalse: 2.5,
+          multiClue: 0,
+          correctError: 1,
+          tagMatch: 0,
+          compare: 1,
+          timeline: 0,
+       },
+    }),
+    define("english_fundamentals", {
+       proceduralWeight: 0.5,
+       weights: {
+          forward: 2.5,
+          reverse: 1.5,
+          oddOneOut: 1,
+          trueFalse: 2,
+          multiClue: 1,
+          correctError: 1,
+          tagMatch: 1,
+          compare: 1,
+          timeline: 0,
+       },
+    }),
    define("flag_bearer", {
       weights: {
          forward: 3,
