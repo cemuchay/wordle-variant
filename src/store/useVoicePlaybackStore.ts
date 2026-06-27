@@ -52,6 +52,12 @@ export const useVoicePlaybackStore = create<VoicePlaybackState>((set, get) => ({
     const ref = audioRefs[id];
     if (!ref) return;
     ref.currentTime = 0;
+    // iOS PWA: bypass silent switch
+    try {
+      const session = (navigator as any).audioSession;
+      if (session) session.type = 'playback';
+    } catch { /* noop */ }
+    ref.load();
     ref.play().catch(console.error);
     set({
       currentlyPlaying: {

@@ -238,11 +238,7 @@ export const useChat = (userId: string) => {
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
-
-   useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFirstUnreadId(null);
-   }, [activeRoomId]);
+   const lastActiveRoomIdRef = useRef<string | null>(null);
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
@@ -429,7 +425,7 @@ export const useChat = (userId: string) => {
    // Filter messages by active group room and decrypt DMs
    const activeMessages = useMemo(() => {
       const filtered = globalMessages.filter(
-         (m) => m.group_id === activeRoomId,
+         (m) => m.group_id === activeRoomId && !m.content?.startsWith("[reaction:"),
       );
 
       if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
@@ -444,9 +440,14 @@ export const useChat = (userId: string) => {
       return filtered;
    }, [globalMessages, activeRoomId, activeRoom, userId]);
 
-   // Find the first unread message ID when activeRoomId changes
+   // Find the first unread message ID when the user switches rooms
    useEffect(() => {
       if (!userId || !activeRoomId) return;
+      // Avoid recalculating when readReceipts changes mid-session
+      if (lastActiveRoomIdRef.current === activeRoomId) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFirstUnreadId(null);
+      lastActiveRoomIdRef.current = activeRoomId;
       const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const unreads = activeMessages.filter(
          (m: any) =>
