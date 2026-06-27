@@ -1007,42 +1007,32 @@ export const useChat = (userId: string) => {
    };
 
    // Start DM room
-   const startDM = async (partnerId: string): Promise<string | null> => {
-      if (partnerId === userId) return null;
-      const dmKey = [userId, partnerId].sort().join(":");
+    const startDM = async (partnerId: string): Promise<string | null> => {
+       if (partnerId === userId) return null;
 
-      // 1. Check if DM room already exists using the dm_key
-      const { data: existingGroup } = await supabase
-         .from("chat_groups")
-         .select("id")
-         .eq("dm_key", dmKey)
-         .maybeSingle();
+       // 1. Check local cache first for instant transition
+       const existingLocal = groups.find(
+          (g) => g.type === "dm" && g.dm_partner?.id === partnerId
+       );
+       if (existingLocal) {
+          setActiveRoomId(existingLocal.id);
+          return existingLocal.id;
+       }
 
-      if (existingGroup) {
-         setActiveRoomId(existingGroup.id);
-         return existingGroup.id;
-      }
+       // 2. Use atomic RPC to find or create DM
+       const { data: groupId, error } = await supabase.rpc("get_or_create_dm", {
+          p_partner_id: partnerId,
+       });
 
-      // 2. Otherwise create a new DM group
-      const { data: newGroup, error: groupErr } = await supabase
-         .from("chat_groups")
-         .insert([{ name: "Direct Message", type: "dm", created_by: userId }])
-         .select()
-         .single();
+       if (error || !groupId) {
+          console.error("Failed to get_or_create_dm:", error);
+          return null;
+       }
 
-      if (groupErr) return null;
-
-      // Add memberships
-      // Note: The SQL trigger will automatically populate the dm_key on the 2nd membership insert
-      await supabase.from("chat_group_members").insert([
-         { group_id: newGroup.id, user_id: userId, status: "joined" },
-         { group_id: newGroup.id, user_id: partnerId, status: "joined" },
-      ]);
-
-      await fetchGroups();
-      setActiveRoomId(newGroup.id);
-      return newGroup.id;
-   };
+       await fetchGroups();
+       setActiveRoomId(groupId);
+       return groupId;
+    };
 
    // Get all profiles for user selector
    useEffect(() => {

@@ -619,9 +619,10 @@ export default function FloatingChatBubble() {
                 entry.unreadCount++;
              }
           }
-          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
-             entry.lastMessage = m;
-          }
+            if (m.content?.startsWith("[reaction:")) return;
+              if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
+                 entry.lastMessage = m;
+              }
        });
        return Array.from(groupMap.values())
           .filter(e => e.lastMessage)
@@ -1443,13 +1444,15 @@ export default function FloatingChatBubble() {
                       {/* Reply footer for detailed chat screen */}
                       {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
                          <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
-                            <UserSuggestions
-                               users={profilesList}
-                               filter={mentionState?.filter || ""}
-                               isVisible={!!mentionState?.isVisible}
-                               onSelect={handleUserSelect}
-                               currentInput={replyText}
-                            />
+                             {selectedGroupObject?.type !== "dm" && (
+                                <UserSuggestions
+                                   users={profilesList}
+                                   filter={mentionState?.filter || ""}
+                                   isVisible={!!mentionState?.isVisible}
+                                   onSelect={handleUserSelect}
+                                   currentInput={replyText}
+                                />
+                             )}
                            <input
                               ref={fileInputRef}
                               type="file"
@@ -1519,24 +1522,28 @@ export default function FloatingChatBubble() {
                                     rows={1}
                                     placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
                                     value={replyText}
-                                  onChange={(e) => {
-                                        const value = e.target.value;
-                                        setReplyText(value);
-                                        resetInactivityTimer();
-                                        const cursorPos = e.target.selectionStart;
-                                        const textBeforeCursor = value.substring(0, cursorPos);
-                                        const lastAtPos = textBeforeCursor.lastIndexOf("@");
-                                        if (lastAtPos !== -1) {
-                                           const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
-                                           if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
-                                              setMentionState({ isVisible: true, filter: textAfterAt, cursorPosition: cursorPos });
-                                           } else {
-                                              setMentionState(null);
-                                           }
-                                        } else {
-                                           setMentionState(null);
-                                        }
-                                     }}
+                                   onChange={(e) => {
+                                         const value = e.target.value;
+                                         setReplyText(value);
+                                         resetInactivityTimer();
+                                         if (selectedGroupObject?.type !== "dm") {
+                                            const cursorPos = e.target.selectionStart;
+                                            const textBeforeCursor = value.substring(0, cursorPos);
+                                            const lastAtPos = textBeforeCursor.lastIndexOf("@");
+                                            if (lastAtPos !== -1) {
+                                               const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
+                                               if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
+                                                  setMentionState({ isVisible: true, filter: textAfterAt, cursorPosition: cursorPos });
+                                               } else {
+                                                  setMentionState(null);
+                                               }
+                                            } else {
+                                               setMentionState(null);
+                                            }
+                                         } else {
+                                            setMentionState(null);
+                                         }
+                                      }}
                                      onInput={(e) => {
                                         e.currentTarget.style.height = 'auto';
                                         e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
