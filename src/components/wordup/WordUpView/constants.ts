@@ -83,6 +83,12 @@ export const CATEGORIES = [
       name: "Periodic Table",
       desc: "Questions about chemical elements",
    },
+   {
+      id: "physics",
+      name: "Physics",
+      desc: "Mechanics, thermodynamics, waves, optics, electricity, and modern physics",
+      featured: true,
+   },
 
    // {
    //    id: "animal_kingdom",
