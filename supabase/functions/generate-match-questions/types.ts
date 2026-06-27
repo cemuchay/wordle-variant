@@ -45,9 +45,10 @@ export const CATEGORY_SUPER_MAP: Record<string, SuperCategory> = {
      english_language: "language_arts",
      english_fundamentals: "language_arts",
      
-     // Entity-based science categories
-     physics: "science_facts",
-     chemistry: "science_facts"
+      // Entity-based science categories
+      physics: "science_facts",
+      chemistry: "science_facts",
+      biology: "science_facts"
 };
 
 

@@ -95,6 +95,12 @@ export const CATEGORIES = [
       desc: "Atomic structure, bonding, reactions, organic chemistry, and the periodic table",
       featured: true,
    },
+   {
+      id: "biology",
+      name: "Biology",
+      desc: "Cell biology, genetics, evolution, ecology, anatomy, microbiology, and zoology",
+      featured: true,
+   },
 
    // {
    //    id: "animal_kingdom",
