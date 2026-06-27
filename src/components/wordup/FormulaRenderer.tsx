@@ -6,14 +6,33 @@ interface FormulaRendererProps {
 }
 
 /**
- * Parses simple formulas with exponents (e.g. x^2, x^{12}), subscripts (e.g. H_2O, H_{2}),
- * variables (italicized), and common mathematical operators.
+ * Formats mathematical formulas with premium LaTeX-style typography,
+ * italicized variables, spaced operators, and custom subscripts/superscripts.
  */
 export const formatFormulaHTML = (formula: string): string => {
   let formatted = formula;
 
-  // Replace multiplication '*' with standard times symbol '×'
+  // Render LaTeX fractions \frac{num}{den} into HTML vertical layouts
+  formatted = formatted.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, (_, num, den) => {
+     // Format sub-components inside the fraction first
+     const formattedNum = formatFormulaHTML(num);
+     const formattedDen = formatFormulaHTML(den);
+     return `<span class="inline-flex flex-col align-middle text-center mx-1.5 leading-none"><span class="border-b border-white/20 pb-0.5 px-1 text-[0.85em]">${formattedNum}</span><span class="pt-0.5 px-1 text-[0.85em]">${formattedDen}</span></span>`;
+  });
+
+  // Clean LaTeX-style operators
+  formatted = formatted.replace(/\\le/g, " &le; ");
+  formatted = formatted.replace(/\\ge/g, " &ge; ");
+  formatted = formatted.replace(/\\approx/g, " &approx; ");
+  formatted = formatted.replace(/\\ne/g, " &ne; ");
+  formatted = formatted.replace(/\\cdot/g, " &middot; ");
+
+  // Spacing for basic operators
+  formatted = formatted.replace(/\+/g, " + ");
+  formatted = formatted.replace(/(?<![eE_^{])-(?![0-9a-zA-Z]*})/g, " &minus; "); // Pad minus but avoid negative exponents/subscripts
+  formatted = formatted.replace(/=/g, " = ");
   formatted = formatted.replace(/\*/g, " &times; ");
+  formatted = formatted.replace(/\//g, " &divide; ");
 
   // Handle superscript with braces: e.g. x^{12} -> x<sup>12</sup>
   formatted = formatted.replace(/\^\{([^}]+)\}/g, "<sup>$1</sup>");
@@ -25,15 +44,15 @@ export const formatFormulaHTML = (formula: string): string => {
   // Handle subscript single char/digit: e.g. H_2 -> H<sub>2</sub>
   formatted = formatted.replace(/_([0-9a-zA-Z+-]+)/g, "<sub>$1</sub>");
 
-  // Wrap variables (single alphabetical characters that are not part of HTML tags) in styled spans
-  // Match single letters surrounded by non-word boundaries or math operators
-   formatted = formatted.replace(/\b([a-zA-Z])\b/g, (_, letter) => {
-    // Avoid wrapping letters inside HTML tags (like s, u, b, p, d, i, v)
+  // Wrap mathematical variables (individual letters) in italicized serif spans
+  // Avoid modifying HTML entities (like &times;) or tag names
+  formatted = formatted.replace(/\b([a-zA-Z])\b/g, (_, letter) => {
     const lower = letter.toLowerCase();
-    if (lower === "a" || lower === "x" || lower === "y" || lower === "z" || lower === "n" || lower === "c" || lower === "m" || lower === "e" || lower === "b" || lower === "f") {
-      return `<span class="font-serif italic font-semibold text-sky-300">${letter}</span>`;
+    // Exclude single-letter variables that match HTML tags or common units
+    if (lower === "s" || lower === "g" || lower === "v" || lower === "d") {
+       return letter;
     }
-    return letter;
+    return `<span class="font-serif italic text-sky-300 font-semibold select-none">${letter}</span>`;
   });
 
   return formatted;
@@ -43,39 +62,35 @@ export const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, classNam
   if (!text) return null;
 
   // Split text by $$ (block math) and $ (inline math)
-  // We can use a regex to capture both: /|(\$\$.*?\$\$|\$.*?\$)/
   const parts = text.split(/(\$\$.*?\$\$|\$.*?\$)/g);
 
   return (
     <span className={`inline-block w-full ${className}`}>
       {parts.map((part, index) => {
-        if (part.startsWith("$$") && part.endsWith("$$")) {
-          // Block formula
-          const formula = part.slice(2, -2).trim();
+        const isBlock = part.startsWith("$$") && part.endsWith("$$");
+        const isInline = part.startsWith("$") && part.endsWith("$");
+
+        if (isBlock || isInline) {
+          const formula = isBlock ? part.slice(2, -2).trim() : part.slice(1, -1).trim();
           const htmlContent = formatFormulaHTML(formula);
           return (
             <span
               key={index}
-              className="block my-4 p-4 text-center bg-slate-900/60 backdrop-blur-md border border-sky-500/30 rounded-xl shadow-lg shadow-sky-500/5 text-xl sm:text-2xl font-mono text-sky-200 tracking-wide select-none"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-            />
-          );
-        } else if (part.startsWith("$") && part.endsWith("$")) {
-          // Inline formula
-          const formula = part.slice(1, -1).trim();
-          const htmlContent = formatFormulaHTML(formula);
-          return (
-            <span
-              key={index}
-              className="inline-block px-1.5 py-0.5 mx-0.5 bg-slate-800/80 rounded font-mono text-sky-300 border border-sky-500/10 text-[0.95em] align-middle select-none"
+              className="block my-3 p-3.5 text-center bg-slate-950/50 backdrop-blur-md border border-white/10 rounded-xl shadow-md font-serif text-lg sm:text-xl text-sky-200 select-none tracking-wide"
+              style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
           );
         } else {
-          // Normal text
-          return <React.Fragment key={index}>{part}</React.Fragment>;
+          // Normal text (preserve line breaks if any)
+          return (
+            <span key={index} className="whitespace-pre-line">
+              {part}
+            </span>
+          );
         }
       })}
     </span>
   );
 };
+

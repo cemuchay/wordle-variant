@@ -224,7 +224,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
 
    if (authLoading) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-correct/15 to-dark p-6 text-center">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark p-6 text-center">
             <div className="w-10 h-10 border-4 border-correct/30 border-t-correct rounded-full animate-spin" />
             <p className="text-xs text-gray-400 mt-4 font-bold uppercase tracking-widest">Loading Session...</p>
          </div>
@@ -233,7 +233,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-gradient-to-b from-correct/15 to-dark p-6 text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark p-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>

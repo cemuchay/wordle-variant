@@ -49,7 +49,9 @@ const SKIP_KEYS = new Set([
    "popularity", 
    "aliases", 
    "related", 
-   "facts"
+   "facts",
+   "primary_val",
+   "secondary_val"
 ]);
 const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
@@ -118,6 +120,13 @@ function generateQuestion(seed: string, entity: any, allEntities: any[], variant
    return qObj;
 }
 
+function censorWord(text: string, word: string): string {
+   if (!text || !word) return text;
+   const escaped = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+   const regex = new RegExp(`\\b${escaped}(s|es)?\\b`, "gi");
+   return text.replace(regex, "_____");
+}
+
 function _generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
@@ -143,7 +152,10 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       const interpolate = (pattern: string) => {
          let result = pattern.replace(/{label}/g, label);
          template.requiredKeys.forEach((key) => {
-            const val = cleanVal(String(meta[key] ?? ""));
+            let val = cleanVal(String(meta[key] ?? ""));
+            if (key === "definition" || key === "meaning" || key === "example" || key === "example_template" || key === "idiom_meaning") {
+               val = censorWord(val, label);
+            }
             const rx = new RegExp(`{${key}}`, "g");
             result = result.replace(rx, val);
          });
@@ -209,7 +221,10 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    }
 
    const correctValueRaw = String(meta[chosenKey] ?? "");
-   const correctValue = cleanVal(correctValueRaw);
+   let correctValue = cleanVal(correctValueRaw);
+   if (chosenKey === "definition" || chosenKey === "meaning" || chosenKey === "example" || chosenKey === "example_template" || chosenKey === "idiom_meaning") {
+      correctValue = censorWord(correctValue, label);
+   }
    const keyLabel = chosenKey.replace(/_/g, " ");
 
    // Determine if we should generate numeric distractors
@@ -223,7 +238,13 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    // If not numeric, or we couldn't generate at least 5 numeric distractors, get from peers
    if (distractors.length < 5) {
       const otherValues = validDistractorPool
-         .map((e) => cleanVal(String(e.metadata?.[chosenKey] ?? "")))
+         .map((e) => {
+            let val = cleanVal(String(e.metadata?.[chosenKey] ?? ""));
+            if (chosenKey === "definition" || chosenKey === "meaning" || chosenKey === "example" || chosenKey === "example_template" || chosenKey === "idiom_meaning") {
+               val = censorWord(val, e.label);
+            }
+            return val;
+         })
          .filter((v) => v && v !== correctValue);
       const uniqueOtherValues = [...new Set(otherValues)];
 
@@ -346,7 +367,11 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             chosenClueKey = seededShuffle(metaKeys, rng)[0];
          }
          
-         const clueVal = String(meta[chosenClueKey] ?? "");
+         const clueValRaw = String(meta[chosenClueKey] ?? "");
+         let clueVal = clueValRaw;
+         if (chosenClueKey === "definition" || chosenClueKey === "meaning" || chosenClueKey === "example" || chosenClueKey === "example_template" || chosenClueKey === "idiom_meaning") {
+            clueVal = censorWord(clueVal, label);
+         }
          const cLabel = chosenClueKey.replace(/_/g, " ").trim();
          const capitalizedClueLabel = cLabel.charAt(0).toUpperCase() + cLabel.slice(1);
 
@@ -373,8 +398,8 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          return q;
       }
 
-      // ── Variant 5: Correct the error ──────────────────────
-      if (v === 5 && distractors.length >= 1) {
+      // ── Variant 5: Correct the error (TEMPORARILY DISABLED) ──
+      if (v === 5 && false && distractors.length >= 1) {
          const wrongValue = distractors[0];
          const otherDistractors = distractors.filter((d) => d !== wrongValue);
          if (otherDistractors.length >= 3) {
@@ -390,8 +415,8 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          }
       }
 
-      // ── Variant 6: Tag Match ─────────────────────────────
-      if (v === 6 && entity.tags?.length > 0) {
+       // ── Variant 6: Tag Match (TEMPORARILY DISABLED) ───────
+       if (v === 6 && false && entity.tags?.length > 0) {
          const allTags = [...new Set(allEntities.flatMap((e: any) => e.tags || []))];
          const myTags: string[] = entity.tags;
          const otherTags = allTags.filter((t: string) => !myTags.includes(t));
@@ -564,7 +589,29 @@ serve(async (req) => {
          console.warn(`${logPrefix} No entities returned from RPC — will fallback to procedural questions`);
       }
 
+      // Fetch active handcrafted questions
+      let handcraftedList: any[] = [];
+      try {
+         const { data: hcData, error: hcError } = await supabaseClient
+            .from("wordup_handcrafted_questions")
+            .select("prompt, choices, answer, explanation")
+            .eq("category", category)
+            .or("expires_at.is.null,expires_at.gt.now()");
+
+         if (hcError) {
+            console.warn(`${logPrefix} Error fetching handcrafted questions:`, hcError);
+         } else {
+            handcraftedList = hcData || [];
+         }
+      } catch (e: any) {
+         console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
+      }
+      console.log(`${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions`);
+
       const matchRng = createSeededRandom(hashSeed(seed));
+      const shuffledHandcrafted = seededShuffle(handcraftedList, matchRng);
+      let handcraftedCursor = 0;
+
       const config = getQuestionConfig(category);
 
       // Weighted variant selection from config
@@ -604,6 +651,18 @@ serve(async (req) => {
          const variant = variantSequence[i] ?? 0;
 
          console.log(`${logPrefix} Round ${i}: variant=${variant} category=${category}`);
+
+         // ── Mix Strategy: Weave unexpired handcrafted questions from DB (40% chance if available) ──
+          if (shuffledHandcrafted.length > handcraftedCursor && roundRng() < 0.40) {
+             const hq = shuffledHandcrafted[handcraftedCursor];
+             handcraftedCursor++;
+             console.log(`${logPrefix} Round ${i}: weaving handcrafted question: "${hq.prompt}"`);
+             questions.push({
+                type: "definition", // default type for frontend rendering
+                ...hq
+             });
+             continue;
+          }
 
          // Route by category: hybrid algorithmic logic takes precedence
          if (category === "maths") {

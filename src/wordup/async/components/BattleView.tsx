@@ -286,7 +286,7 @@ export const BattleView = ({
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
-                  {activeQuestion.type.replace("_", " ")}
+                  {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
