@@ -122,3 +122,20 @@ Formulas must be wrapped in mathematical delimiters so they are parsed and rende
 3. **Exponents**: Format using `^`, e.g. `x^2`, `10^{-5}` (braces for multiple characters).
 4. **Subscripts**: Format using `_`, e.g. `H_2O`, `x_{ij}` (braces for multiple characters).
 5. **Multiplication**: Use `*` instead of x, e.g. `$F = m * a$`.
+
+---
+
+## 4. Question Template & Placeholder Rules
+
+To keep questions natural and highly engaging, each category uses a minimum of **2 to 3 handcrafted question templates** that pull from entity metadata keys.
+
+### Template Definition Standards
+When writing new question templates inside `templates.ts`:
+1. **Required Keys**: Specify all keys that the entity must have (e.g. `["discovered_by", "discovery_year"]`).
+2. **Placeholders**: Enclose metadata keys in curly braces (e.g. `{discovered_by}`). `{label}` is always available and represents the entity's name.
+3. **Template Phrasing**: Use clear, educational, and professional trivia vocabulary. Avoid database-centric terms.
+
+*Example Chemistry Template:*
+* **Prompt Template**: `"Which chemical element was discovered by {discovered_by} in the year {discovery_year}?"`
+* **Explanation Template**: `"{label} (Symbol: {symbol}) was discovered by {discovered_by} in {discovery_year}."`
+

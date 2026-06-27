@@ -1,16 +1,46 @@
 import { SuperCategory, CATEGORY_SUPER_MAP } from "./types.ts";
 
+export function cleanVal(v: string): string {
+   if (!v) return v;
+   if (/^[a-z0-9_ -]+$/.test(v) && (v.includes("-") || v.includes("_"))) {
+      return v.replace(/[-_]/g, " ").trim().replace(/\b\w/g, c => c.toUpperCase());
+   }
+   return v;
+}
+
 export function formatQuestionPrompt(
    variant: number,
    label: string,
    key: string,
-   correctValue: string,
-   displayOrWrongValue: string,
+   correctValueRaw: string,
+   displayOrWrongValueRaw: string,
    categoryType: string
 ): { prompt: string } {
-   const keyLabel = key.replace(/_/g, " ").trim();
+   const correctValue = cleanVal(correctValueRaw);
+   const displayOrWrongValue = cleanVal(displayOrWrongValueRaw);
+   
+   let keyLabel = key.replace(/_/g, " ").trim();
+   if (keyLabel === "group") keyLabel = "field of study";
+   
    const k = key.toLowerCase();
    const superCategory = CATEGORY_SUPER_MAP[categoryType] ?? "science_facts";
+
+   // Custom overrides for Group / Category / Class keys
+   if (k === "group" || k === "category" || k === "class") {
+      const fieldNoun = k === "group" ? "field" : "category";
+      if (variant === 0) {
+         return { prompt: `Which ${fieldNoun} of study does "${label}" belong to?` };
+      }
+      if (variant === 1) {
+         return { prompt: `Which of these options belongs to the ${fieldNoun} "${correctValue}"?` };
+      }
+      if (variant === 3) {
+         return { prompt: `True or False: "${label}" belongs to the ${fieldNoun} "${displayOrWrongValue}".` };
+      }
+      if (variant === 5) {
+         return { prompt: `"${label}" is NOT classified under the ${fieldNoun} "${displayOrWrongValue}". What is its correct ${fieldNoun}?` };
+      }
+   }
 
    // 1. Language Arts overrides
    if (superCategory === "language_arts") {

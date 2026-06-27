@@ -650,7 +650,9 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={btnClass}
                         >
-                           <span className="flex-1 text-center pr-8">{choice}</span>
+                           <span className="flex-1 text-center pr-8">
+                              <FormulaRenderer text={choice} />
+                           </span>
 
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (

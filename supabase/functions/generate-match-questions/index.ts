@@ -3,10 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 import { CATEGORY_SUPER_MAP } from "./types.ts";
 import { getQuestionConfig } from "./questionConfig.ts";
-import { createSeededRandom, seededShuffle, hashSeed, isNumeric, getNumericDistractors } from "./utils.ts";
-import { formatQuestionPrompt } from "./promptFormatter.ts";
+import { createSeededRandom, seededShuffle, hashSeed, isNumeric, getNumericDistractors, getBelievableMisspelling } from "./utils.ts";
+import { formatQuestionPrompt, cleanVal } from "./promptFormatter.ts";
 import { generateMathsQuestion } from "./maths.ts";
 import { generateEnglishQuestion } from "./english.ts";
+import { getRandomMatchingTemplate } from "./templates.ts";
 
 // ── Crypto ───────────────────────────────────────────────────
 
@@ -37,7 +38,19 @@ const corsHeaders = {
 
 // ── Generic entity-based question generator ──────────────────
 
-const SKIP_KEYS = new Set(["_distractors", "_symbolDistractors", "_directorDistractors", "id", "image"]);
+const SKIP_KEYS = new Set([
+   "_distractors", 
+   "_symbolDistractors", 
+   "_directorDistractors", 
+   "id", 
+   "image", 
+   "images", 
+   "difficulty", 
+   "popularity", 
+   "aliases", 
+   "related", 
+   "facts"
+]);
 const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
 function pickVariants(weights: number[], rng: () => number, count: number): number[] {
@@ -72,6 +85,27 @@ function generateQuestion(seed: string, entity: any, allEntities: any[], variant
    const qObj = _generateQuestion(seed, entity, allEntities, variantOverride, category, variantWeights);
    const meta = entity?.metadata || {};
    const rng = createSeededRandom(hashSeed(seed));
+
+   // ── Misspelling distractor injection (15% chance for multiple choice) ──
+   if (qObj && qObj.choices && qObj.choices.length >= 4 && qObj.answer && qObj.choices.includes(qObj.answer)) {
+      const isTrueFalse = qObj.choices.includes("True") && qObj.choices.includes("False");
+      if (!isTrueFalse && rng() < 0.15) {
+         const misspelled = getBelievableMisspelling(qObj.answer, rng);
+         if (misspelled && misspelled !== qObj.answer && !qObj.choices.includes(misspelled)) {
+            const distractorIndices: number[] = [];
+            for (let i = 0; i < qObj.choices.length; i++) {
+               if (qObj.choices[i] !== qObj.answer) {
+                  distractorIndices.push(i);
+               }
+            }
+            if (distractorIndices.length > 0) {
+               const idxToReplace = distractorIndices[Math.floor(rng() * distractorIndices.length)];
+               qObj.choices[idxToReplace] = misspelled;
+            }
+         }
+      }
+   }
+
    if (meta.images && Array.isArray(meta.images) && meta.images.length > 0) {
       const imgIdx = Math.floor(rng() * meta.images.length);
       const chosenImage = meta.images[imgIdx];
@@ -97,6 +131,48 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          choices: [label, "Unknown", "None", "All"],
          answer: label,
          explanation: `The correct answer is "${label}".`,
+      };
+   }
+
+   // ── Check if a handcrafted matrix template is available ──
+   const template = getRandomMatchingTemplate(entity, categoryType, rng);
+   if (template) {
+      const promptPattern = seededShuffle(template.prompts, rng)[0];
+      const explanationPattern = seededShuffle(template.explanations, rng)[0];
+
+      const interpolate = (pattern: string) => {
+         let result = pattern.replace(/{label}/g, label);
+         template.requiredKeys.forEach((key) => {
+            const val = cleanVal(String(meta[key] ?? ""));
+            const rx = new RegExp(`{${key}}`, "g");
+            result = result.replace(rx, val);
+         });
+         return result;
+      };
+
+      const promptText = interpolate(promptPattern);
+      const explanationText = interpolate(explanationPattern);
+
+      const distractors = seededShuffle(
+         allEntities
+            .filter((e) => {
+               if (e.label === label) return false;
+               // Exclude other entities that share the exact same key criteria value(s) to avoid double-correct options
+               const isDuplicateMatch = template.requiredKeys.every((key) => {
+                  return cleanVal(String(e.metadata?.[key] ?? "")) === cleanVal(String(meta[key] ?? ""));
+               });
+               return !isDuplicateMatch;
+            })
+            .map((e) => e.label),
+         rng
+      ).slice(0, 3);
+
+      return {
+         type: "definition",
+         prompt: promptText,
+         choices: seededShuffle([label, ...distractors], rng),
+         answer: label,
+         explanation: explanationText
       };
    }
 
@@ -132,7 +208,8 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       validDistractorPool = allEntities.filter((e) => e.id !== entity.id);
    }
 
-   const correctValue = String(meta[chosenKey] ?? "");
+   const correctValueRaw = String(meta[chosenKey] ?? "");
+   const correctValue = cleanVal(correctValueRaw);
    const keyLabel = chosenKey.replace(/_/g, " ");
 
    // Determine if we should generate numeric distractors
@@ -146,7 +223,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    // If not numeric, or we couldn't generate at least 5 numeric distractors, get from peers
    if (distractors.length < 5) {
       const otherValues = validDistractorPool
-         .map((e) => String(e.metadata?.[chosenKey] ?? ""))
+         .map((e) => cleanVal(String(e.metadata?.[chosenKey] ?? "")))
          .filter((v) => v && v !== correctValue);
       const uniqueOtherValues = [...new Set(otherValues)];
 
@@ -176,7 +253,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    }
 
    const entitiesWithDifferentValue = validDistractorPool
-      .filter((e) => String(e.metadata?.[chosenKey] ?? "") !== correctValue)
+      .filter((e) => cleanVal(String(e.metadata?.[chosenKey] ?? "")) !== correctValue)
       .map((e) => e.label)
       .filter((l) => l);
 
@@ -219,7 +296,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          const valueCounts = new Map<string, { count: number; labels: string[] }>();
          for (const e of allEntities) {
             if (e.id === entity?.id) continue;
-            const val = String(e.metadata?.[chosenKey] ?? "");
+            const val = cleanVal(String(e.metadata?.[chosenKey] ?? ""));
             if (!val) continue;
             if (!valueCounts.has(val)) valueCounts.set(val, { count: 0, labels: [] });
             const entry = valueCounts.get(val)!;
@@ -231,13 +308,14 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             .sort(() => rng() - 0.5);
          if (shared.length > 0) {
             const [sharedValue, info] = shared[0];
+            const cleanKeyLabel = keyLabel === "group" ? "field" : keyLabel;
             q = {
                type: "definition",
-               prompt: `Which of these options does not share the same ${keyLabel} as the others?`,
+               prompt: `Which of these options does not share the same ${cleanKeyLabel} as the others?`,
                choices: seededShuffle([...new Set([...seededShuffle(info.labels, rng).slice(0, 3), label])].slice(0, 4), rng),
                answer: label,
-               subPrompt: `The others have the ${keyLabel} "${sharedValue}".`,
-               explanation: `"${label}" is the odd one out — the others share ${keyLabel}: "${sharedValue}".`,
+               subPrompt: `The others are associated with the ${cleanKeyLabel} "${sharedValue}".`,
+               explanation: `"${label}" is the odd one out — the others are in the ${cleanKeyLabel} "${sharedValue}".`,
             };
             return q;
          }
@@ -260,58 +338,37 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          return q;
       }
 
-      // ── Variant 4: Multi-clue (What am I?) ────────────────
-      if (v === 4 && metaKeys.length >= 2 && entitiesWithDifferentValue.length >= 3) {
-         const clueKeys = seededShuffle(metaKeys, rng).slice(0, Math.min(3, metaKeys.length));
-         const clueParts: string[] = [];
-         const usedKeys = new Set<string>();
-
-         // Combine country and continent if both present
-         if (clueKeys.includes("country") && clueKeys.includes("continent")) {
-            const countryVal = meta["country"];
-            const continentVal = meta["continent"];
-            clueParts.push(`Located in ${countryVal} (${continentVal})`);
-            usedKeys.add("country");
-            usedKeys.add("continent");
+      // ── Variant 4: Single-clue (What am I?) ────────────────
+      if (v === 4 && metaKeys.length >= 1 && entitiesWithDifferentValue.length >= 3) {
+         const priorityKeys = ["definition", "meaning", "contrast", "formula", "achievement"];
+         let chosenClueKey = priorityKeys.find(k => metaKeys.includes(k));
+         if (!chosenClueKey) {
+            chosenClueKey = seededShuffle(metaKeys, rng)[0];
          }
+         
+         const clueVal = String(meta[chosenClueKey] ?? "");
+         const cLabel = chosenClueKey.replace(/_/g, " ").trim();
+         const capitalizedClueLabel = cLabel.charAt(0).toUpperCase() + cLabel.slice(1);
 
-         clueKeys.forEach((key: string) => {
-            if (usedKeys.has(key)) return;
-            const v = String(meta[key] ?? "");
-            const kLabel = key.replace(/_/g, " ").trim();
-            const capitalizedLabel = kLabel.charAt(0).toUpperCase() + kLabel.slice(1);
-            const k = key.toLowerCase();
-            const isTime = k.includes("year") || k.includes("date") || k.includes("founded") || k.includes("released") || k.includes("created") || k.includes("acquired");
-
-            let verb = "done";
-            if (k.includes("founded")) verb = "founded";
-            else if (k.includes("established")) verb = "established";
-            else if (k.includes("released")) verb = "released";
-            else if (k.includes("published")) verb = "published";
-            else if (k.includes("created")) verb = "created";
-            else if (k.includes("acquired")) verb = "acquired";
-            else if (k.includes("born")) verb = "born";
-            else if (k.includes("died")) verb = "died";
-
-            if (isTime && verb !== "done") {
-               clueParts.push(`${verb.toUpperCase()} IN: ${v}`);
-            } else {
-               clueParts.push(`${capitalizedLabel}: ${v}`);
-            }
-         });
-
-         const cluesStr = clueParts.map((p) => `• ${p}`).join("\n");
          const isWordMatch = categoryType.includes("english") || categoryType.includes("language") || categoryType.includes("vocab");
-         const intro = isWordMatch
-            ? "Find the word that fits these clues:"
-            : "Identify the match that fits these clues:";
+         
+         let promptText = "";
+         if (chosenClueKey === "definition" || chosenClueKey === "meaning") {
+            promptText = isWordMatch 
+               ? `Which word matches this definition:\n"${clueVal}"`
+               : `Identify the match for this definition:\n"${clueVal}"`;
+         } else {
+            promptText = isWordMatch
+               ? `Find the word that fits this clue:\n• ${capitalizedClueLabel}: ${clueVal}`
+               : `Identify the match that fits this clue:\n• ${capitalizedClueLabel}: ${clueVal}`;
+         }
 
          q = {
             type: "definition",
-            prompt: `${intro}\n${cluesStr}`,
+            prompt: promptText,
             choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
             answer: label,
-            explanation: `The clues describe "${label}" (${keyLabel}: "${correctValue}").`,
+            explanation: `"${label}" matches the clue (${cLabel}: "${clueVal}").`,
          };
          return q;
       }
