@@ -6,13 +6,15 @@ interface AppNavigationProps {
     onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup') => void;
     challengeUnreadCount: number;
     chatUnreadCount: number;
+    wordupUnreadCount?: number;
 }
 
 export const AppNavigation = ({
     activeItem,
     onNavigate,
     challengeUnreadCount,
-    chatUnreadCount
+    chatUnreadCount,
+    wordupUnreadCount
 }: AppNavigationProps) => {
     const { preferences } = useApp();
 
@@ -43,6 +45,7 @@ export const AppNavigation = ({
             id: 'wordup' as const,
             label: 'WordUp',
             icon: Swords,
+            badge: wordupUnreadCount,
         }
     ];
 

@@ -112,7 +112,7 @@ export const useAsyncMatchmaking = (
       try {
          const { data, error } = await supabase
             .from("wordup_async_matches")
-            .select("*")
+            .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
             .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
             .in("status", ["pending", "active", "turn_submitted"])
             .order("created_at", { ascending: false });
@@ -129,7 +129,7 @@ export const useAsyncMatchmaking = (
       try {
          const { data, error } = await supabase
             .from("wordup_async_matches")
-            .select("*")
+            .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
             .eq("status", "completed")
             .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
             .order("completed_at", { ascending: false })

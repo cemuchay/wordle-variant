@@ -8,6 +8,7 @@ import { useServerTime } from "../shared/useServerTime";
 import { useWordUpProfile } from "../shared/useWordUpProfile";
 import { useAsyncMatchmaking } from "./hooks/useMatchmaking";
 import { useGameEngine as useAsyncGameEngine } from "./hooks/useGameEngine";
+import { decryptMatchQuestions } from "../../utils/wordupQuestionGenerator";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { useAppStore } from "../../store/useAppStore";
@@ -54,6 +55,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const resetGame = useAsyncStore((s) => s.resetGame);
    const setMatchData = useAsyncStore((s) => s.setMatchData);
    const questions = useAsyncStore((s) => s.questions);
+   const setQuestions = useAsyncStore((s) => s.setQuestions);
    const currentIdx = useAsyncStore((s) => s.currentIdx);
    const matchData = useAsyncStore((s) => s.matchData);
    const opponentStats = useAsyncStore((s) => s.opponentStats);
@@ -367,8 +369,14 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
       setRole(myRole);
       setMatchData(match);
+      try {
+         const decrypted = await decryptMatchQuestions(match);
+         setQuestions(decrypted);
+      } catch (e) {
+         console.warn("Failed to decrypt history match questions:", e);
+      }
       setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setView]);
+   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();
