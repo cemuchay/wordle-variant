@@ -101,4 +101,17 @@ export async function reactToMessage(
   if (error) {
     console.error("Failed to react resiliently:", error);
   }
+
+  // Insert a reaction message for real-time sync / push notifications
+  const reactionContent = `[reaction:${emoji || 'None'}]`;
+  supabase.from("messages").insert([{
+    id: crypto.randomUUID(),
+    content: reactionContent,
+    user_id: userId,
+    reply_to: messageId,
+    group_id: msg.group_id,
+    is_read: true,
+  }]).then(({ error: insertErr }) => {
+    if (insertErr) console.error("Failed to insert reaction message:", insertErr);
+  });
 }

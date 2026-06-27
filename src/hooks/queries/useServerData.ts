@@ -10,7 +10,6 @@ export const useAuthoritativeDate = () => {
    return useQuery({
       queryKey: ["server-date"],
       queryFn: async () => {
-         console.log("[Cache] Fetching fresh server date...");
          const date = await getServerDate();
          safeLocalStorage.setItem("cached-server-date", JSON.stringify(date));
          return date;
@@ -52,7 +51,6 @@ export const useProfile = (userId: string | undefined) => {
          if (!userId) return null;
          try {
             const cached = safeLocalStorage.getItem(`cached-profile-${userId}`);
-            if (cached) console.log("[Cache] Serving profile from cache");
             return cached ? JSON.parse(cached) : undefined;
          } catch {
             return undefined;
@@ -103,8 +101,6 @@ export const useChallengeStatus = (userId: string | undefined) => {
             const cached = safeLocalStorage.getItem(
                `cached-challenge-status-${userId}`,
             );
-            if (cached)
-               console.log("[Cache] Serving challenge-status from cache");
             return cached ? JSON.parse(cached) : undefined;
          } catch {
             return undefined;

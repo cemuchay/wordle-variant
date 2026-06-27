@@ -662,6 +662,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         const newMessage = payload.new as any;
                         let profile;
 
+                        // Handle reaction messages: update target message's reactions map
+                        if (newMessage.content?.startsWith("[reaction:")) {
+                            const emoji = newMessage.content.match(/\[reaction:(.+?)\]/)?.[1];
+                            const targetId = newMessage.reply_to;
+                            if (targetId && emoji && emoji !== 'None') {
+                                const allMsgs = useAppStore.getState().globalMessages;
+                                const target = allMsgs.find((m: any) => m.id === targetId);
+                                if (target) {
+                                    const updatedReactions = { ...(target.reactions || {}), [newMessage.user_id]: emoji };
+                                    useAppStore.getState().updateGlobalMessage({ id: targetId, reactions: updatedReactions });
+                                }
+                            } else if (targetId && emoji === 'None') {
+                                // Remove reaction
+                                const allMsgs = useAppStore.getState().globalMessages;
+                                const target = allMsgs.find((m: any) => m.id === targetId);
+                                if (target && target.reactions) {
+                                    const updatedReactions = { ...target.reactions };
+                                    delete updatedReactions[newMessage.user_id];
+                                    useAppStore.getState().updateGlobalMessage({ id: targetId, reactions: updatedReactions });
+                                }
+                            }
+                            return; // Don't add reaction messages to the UI
+                        }
+
                         const allMsgs = useAppStore.getState().globalMessages;
                         const existingMsg = allMsgs.find(m => m.user_id === newMessage.user_id && m.profiles);
 

@@ -238,11 +238,7 @@ export const useChat = (userId: string) => {
    const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
    const typingTimeoutRef = useRef<number | null>(null);
    const isCurrentlyTypingLocally = useRef(false);
-
-   useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFirstUnreadId(null);
-   }, [activeRoomId]);
+   const lastActiveRoomIdRef = useRef<string | null>(null);
 
    const activeRoom = groups.find((g) => g.id === activeRoomId) || null;
 
@@ -429,7 +425,7 @@ export const useChat = (userId: string) => {
    // Filter messages by active group room and decrypt DMs
    const activeMessages = useMemo(() => {
       const filtered = globalMessages.filter(
-         (m) => m.group_id === activeRoomId,
+         (m) => m.group_id === activeRoomId && !m.content?.startsWith("[reaction:"),
       );
 
       if (activeRoom && activeRoom.type === "dm" && activeRoom.dm_partner) {
@@ -444,9 +440,14 @@ export const useChat = (userId: string) => {
       return filtered;
    }, [globalMessages, activeRoomId, activeRoom, userId]);
 
-   // Find the first unread message ID when activeRoomId changes
+   // Find the first unread message ID when the user switches rooms
    useEffect(() => {
       if (!userId || !activeRoomId) return;
+      // Avoid recalculating when readReceipts changes mid-session
+      if (lastActiveRoomIdRef.current === activeRoomId) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFirstUnreadId(null);
+      lastActiveRoomIdRef.current = activeRoomId;
       const lastSeen = readReceipts[activeRoomId] || new Date(0).toISOString();
       const unreads = activeMessages.filter(
          (m: any) =>
@@ -1006,42 +1007,32 @@ export const useChat = (userId: string) => {
    };
 
    // Start DM room
-   const startDM = async (partnerId: string): Promise<string | null> => {
-      if (partnerId === userId) return null;
-      const dmKey = [userId, partnerId].sort().join(":");
+    const startDM = async (partnerId: string): Promise<string | null> => {
+       if (partnerId === userId) return null;
 
-      // 1. Check if DM room already exists using the dm_key
-      const { data: existingGroup } = await supabase
-         .from("chat_groups")
-         .select("id")
-         .eq("dm_key", dmKey)
-         .maybeSingle();
+       // 1. Check local cache first for instant transition
+       const existingLocal = groups.find(
+          (g) => g.type === "dm" && g.dm_partner?.id === partnerId
+       );
+       if (existingLocal) {
+          setActiveRoomId(existingLocal.id);
+          return existingLocal.id;
+       }
 
-      if (existingGroup) {
-         setActiveRoomId(existingGroup.id);
-         return existingGroup.id;
-      }
+       // 2. Use atomic RPC to find or create DM
+       const { data: groupId, error } = await supabase.rpc("get_or_create_dm", {
+          p_partner_id: partnerId,
+       });
 
-      // 2. Otherwise create a new DM group
-      const { data: newGroup, error: groupErr } = await supabase
-         .from("chat_groups")
-         .insert([{ name: "Direct Message", type: "dm", created_by: userId }])
-         .select()
-         .single();
+       if (error || !groupId) {
+          console.error("Failed to get_or_create_dm:", error);
+          return null;
+       }
 
-      if (groupErr) return null;
-
-      // Add memberships
-      // Note: The SQL trigger will automatically populate the dm_key on the 2nd membership insert
-      await supabase.from("chat_group_members").insert([
-         { group_id: newGroup.id, user_id: userId, status: "joined" },
-         { group_id: newGroup.id, user_id: partnerId, status: "joined" },
-      ]);
-
-      await fetchGroups();
-      setActiveRoomId(newGroup.id);
-      return newGroup.id;
-   };
+       await fetchGroups();
+       setActiveRoomId(groupId);
+       return groupId;
+    };
 
    // Get all profiles for user selector
    useEffect(() => {

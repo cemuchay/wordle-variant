@@ -38,19 +38,19 @@ export const useGameEngine = (date: string) => {
       triggerToast,
    });
 
-    const actionsProps = useActions({
-       state,
-       dispatch,
-       config,
-       date,
-       user,
-       preferences,
-       triggerToast,
-       ask,
-       performSync,
-       updateOptimistically,
-       refresh,
-    });
+   const actionsProps = useActions({
+      state,
+      dispatch,
+      config,
+      date,
+      user,
+      preferences,
+      triggerToast,
+      ask,
+      performSync,
+      updateOptimistically,
+      refresh,
+   });
 
    // Hydration & Authentication Swap Logic
    const [rehydrateTrigger, setRehydrateTrigger] = useState(0);
@@ -58,7 +58,7 @@ export const useGameEngine = (date: string) => {
 
    useEffect(() => {
       const handleRehydrate = () => {
-         setRehydrateTrigger(prev => prev + 1);
+         setRehydrateTrigger((prev) => prev + 1);
       };
       window.addEventListener("app-visibility-visible", handleRehydrate);
       return () =>
@@ -72,15 +72,14 @@ export const useGameEngine = (date: string) => {
          return;
       }
 
-      const isUserOrDateChanged = hydratedUserRef.current !== user?.id || hydratedDateRef.current !== date;
-      const isTriggeredByVisibility = rehydrateTrigger !== lastProcessedTriggerRef.current;
+      const isUserOrDateChanged =
+         hydratedUserRef.current !== user?.id ||
+         hydratedDateRef.current !== date;
+      const isTriggeredByVisibility =
+         rehydrateTrigger !== lastProcessedTriggerRef.current;
       lastProcessedTriggerRef.current = rehydrateTrigger;
 
-      if (
-         isHydrated &&
-         !isUserOrDateChanged &&
-         !isTriggeredByVisibility
-      ) {
+      if (isHydrated && !isUserOrDateChanged && !isTriggeredByVisibility) {
          return;
       }
 

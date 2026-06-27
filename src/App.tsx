@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPage } from "./components/admin/AdminPage";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
 import { ChatSkeleton } from "./components/common/Skeletons";
@@ -95,6 +95,44 @@ export default function App() {
       setStableIsHintDisabled(state.isHintDisabled);
     }
   }, [state.guesses.length, state.isRevealing, state.isHintDisabled]);
+
+  // WordUp Async Unread Count
+  const [wordupUnreadCount, setWordupUnreadCount] = useState(0);
+
+  const fetchWordupUnreadCount = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("wordup_async_matches")
+        .select("id, player1_id, player2_id, p1_answered, p2_answered")
+        .in("status", ["pending", "active", "turn_submitted"])
+        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`);
+      if (error) throw error;
+      if (!data) { setWordupUnreadCount(0); return; }
+      const count = data.filter((m) => {
+        if (m.player1_id === userId && !m.p1_answered) return true;
+        if (m.player2_id === userId && !m.p2_answered) return true;
+        return false;
+      }).length;
+      setWordupUnreadCount(count);
+    } catch (e) {
+      console.error("Failed to fetch wordup unread count:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) { setWordupUnreadCount(0); return; }
+    fetchWordupUnreadCount(user.id);
+  }, [user?.id, fetchWordupUnreadCount]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`wordup_unread_${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player1_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "wordup_async_matches", filter: `player2_id=eq.${user.id}` }, () => fetchWordupUnreadCount(user.id))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, fetchWordupUnreadCount]);
 
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
@@ -890,6 +928,7 @@ export default function App() {
           onNavigate={handleNavigation}
           challengeUnreadCount={challengeUnreadCount}
           chatUnreadCount={isChatOpen ? 0 : unreadCount}
+          wordupUnreadCount={wordupUnreadCount}
         />
       )}
 

@@ -1,16 +1,104 @@
 import { SuperCategory, CATEGORY_SUPER_MAP } from "./types.ts";
 
+export function cleanVal(v: string): string {
+   if (!v) return v;
+   if (/^[a-z0-9_ -]+$/.test(v) && (v.includes("-") || v.includes("_"))) {
+      return v.replace(/[-_]/g, " ").trim().replace(/\b\w/g, c => c.toUpperCase());
+   }
+   return v;
+}
+
+export function getCategoryPromptOverrides(
+   category: string,
+   key: string,
+   label: string,
+   correctValue: string,
+   displayOrWrongValue: string,
+   variant: number
+): string | null {
+   const k = key.toLowerCase();
+   const cat = category.toLowerCase();
+   
+   if (cat === "football") {
+      if (k === "group" || k === "league") {
+         if (variant === 0) return `Which league does "${label}" compete in?`;
+         if (variant === 1) return `Which of these football clubs plays in the "${correctValue}"?`;
+         if (variant === 3) return `True or False: "${label}" competes in the "${displayOrWrongValue}".`;
+         if (variant === 5) return `Which league does "${label}" actually play in?`;
+      }
+      if (k === "stadium" || k === "ground") {
+         if (variant === 0) return `What is the home stadium of "${label}"?`;
+         if (variant === 1) return `Which football club plays their home matches at "${correctValue}"?`;
+         if (variant === 3) return `True or False: The home stadium of "${label}" is "${displayOrWrongValue}".`;
+      }
+      if (k === "nickname") {
+         if (variant === 0) return `What is the famous nickname of "${label}"?`;
+         if (variant === 1) return `Which football club is famously known as "${correctValue}"?`;
+      }
+      if (k === "all_time_top_scorer") {
+         if (variant === 0) return `Who is the all-time top scorer for "${label}"?`;
+         if (variant === 1) return `Which football club has "${correctValue}" as their all-time top scorer?`;
+      }
+   }
+   
+   if (cat === "chemistry" || cat === "element_arena") {
+      if (k === "group") {
+         if (variant === 0) return `Which periodic table group does the element "${label}" belong to?`;
+         if (variant === 1) return `Which chemical element belongs to periodic group "${correctValue}"?`;
+      }
+      if (k === "symbol") {
+         if (variant === 0) return `What is the chemical symbol for the element "${label}"?`;
+         if (variant === 1) return `Which chemical element is represented by the symbol "${correctValue}"?`;
+      }
+   }
+
+   return null;
+}
+
 export function formatQuestionPrompt(
    variant: number,
    label: string,
    key: string,
-   correctValue: string,
-   displayOrWrongValue: string,
+   correctValueRaw: string,
+   displayOrWrongValueRaw: string,
    categoryType: string
 ): { prompt: string } {
-   const keyLabel = key.replace(/_/g, " ").trim();
-   const k = key.toLowerCase();
+   const correctValue = cleanVal(correctValueRaw);
+   const displayOrWrongValue = cleanVal(displayOrWrongValueRaw);
+
+   const overridePrompt = getCategoryPromptOverrides(categoryType, key, label, correctValue, displayOrWrongValue, variant);
+   if (overridePrompt) {
+      return { prompt: overridePrompt };
+   }
+   
    const superCategory = CATEGORY_SUPER_MAP[categoryType] ?? "science_facts";
+   const isScienceOrAcademic = superCategory === "science_facts" || superCategory === "biography" || categoryType.includes("math") || categoryType.includes("phys") || categoryType.includes("chem");
+
+   let keyLabel = key.replace(/_/g, " ").trim();
+   if (keyLabel === "group") {
+      keyLabel = isScienceOrAcademic ? "field of study" : "group";
+   }
+   
+   const k = key.toLowerCase();
+
+   // Custom overrides for Group / Category / Class keys
+   if (k === "group" || k === "category" || k === "class") {
+      const fieldNoun = k === "group" ? (isScienceOrAcademic ? "field" : "group") : "category";
+      if (variant === 0) {
+         return { prompt: isScienceOrAcademic 
+            ? `Which ${fieldNoun} of study does "${label}" belong to?` 
+            : `Which ${fieldNoun} does "${label}" belong to?` };
+      }
+      if (variant === 1) {
+         return { prompt: `Which of these options belongs to the ${fieldNoun} "${correctValue}"?` };
+      }
+      if (variant === 3) {
+         return { prompt: `True or False: "${label}" belongs to the ${fieldNoun} "${displayOrWrongValue}".` };
+      }
+      if (variant === 5) {
+         return { prompt: `"${label}" is NOT classified under the ${fieldNoun} "${displayOrWrongValue}". What is its correct ${fieldNoun}?` };
+      }
+   }
 
    // 1. Language Arts overrides
    if (superCategory === "language_arts") {
@@ -31,9 +119,9 @@ export function formatQuestionPrompt(
             return { prompt: `True or False: "${label}" is defined as "${displayOrWrongValue}".` };
          }
          if (variant === 5) {
-            if (k === "synonym") return { prompt: `The word "${label}" does NOT mean "${displayOrWrongValue}". What is its correct synonym?` };
-            if (k === "antonym") return { prompt: `The opposite of "${label}" is NOT "${displayOrWrongValue}". What is its correct antonym?` };
-            return { prompt: `The word "${label}" is NOT defined as "${displayOrWrongValue}". What is its correct definition?` };
+            if (k === "synonym") return { prompt: `What is the correct synonym of the word "${label}"?` };
+            if (k === "antonym") return { prompt: `What is the correct antonym of the word "${label}"?` };
+            return { prompt: `What is the correct definition of the word "${label}"?` };
          }
       }
    }
@@ -160,6 +248,9 @@ export function formatQuestionPrompt(
       }
       if (isTime && verb !== "done") {
          return { prompt: `${label} was NOT ${verb} in ${displayOrWrongValue}. What is the correct year?` };
+      }
+      if (k === "definition" || k === "meaning" || k === "description") {
+         return { prompt: `Which of these options is the correct ${keyLabel} of "${label}"?` };
       }
       return { prompt: `The statement "${label}'s ${keyLabel} is ${displayOrWrongValue}" is incorrect. What is the correct ${keyLabel}?` };
    }

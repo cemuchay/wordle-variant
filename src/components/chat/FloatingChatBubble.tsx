@@ -10,6 +10,7 @@ import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
 import { ConnectedAudioPlayer } from "./ChatMessage/ConnectedAudioPlayer";
+import UserSuggestions from "./UserSuggestions";
 import { ChatImage } from "./ChatMessage/ChatImage";
 import { VoiceControlBar } from "./VoiceControlBar";
 import { ProtectedAvatar } from "./ProtectedAvatar";
@@ -83,6 +84,10 @@ export default function FloatingChatBubble() {
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
+
+   // @ Mentions support
+   const [mentionState, setMentionState] = useState<{ isVisible: boolean; filter: string; cursorPosition: number } | null>(null);
+   const [profilesList, setProfilesList] = useState<{ id: string; username: string; avatar_url: string }[]>([]);
 
    // Unread divider state
    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
@@ -246,6 +251,13 @@ export default function FloatingChatBubble() {
    useEffect(() => {
       return () => clearInactivityTimer();
    }, []);
+
+   // Auto-resize textarea after sending
+   useEffect(() => {
+      if (replyText === "" && replyInputRef.current) {
+         replyInputRef.current.style.height = "auto";
+      }
+   }, [replyText]);
 
    const handleSendVoice = async (blob: Blob) => {
       if (!user?.id || !selectedGroupId) return;
@@ -506,6 +518,17 @@ export default function FloatingChatBubble() {
       checkGameStatus();
    }, [user?.id, date]);
 
+   // Fetch all profiles for @ mentions
+   useEffect(() => {
+      if (!user?.id) return;
+      supabase
+         .from("profiles")
+         .select("id, username, avatar_url")
+         .then(({ data }) => {
+            if (data) setProfilesList(data);
+         });
+   }, [user?.id]);
+
    // Mark all unread messages as read when the bubble overlay closes
    useEffect(() => {
       if (isOverlayOpen || !user?.id) {
@@ -570,6 +593,7 @@ export default function FloatingChatBubble() {
       if (!user?.id) return false;
       if (m.user_id === user.id) return false;
       if (!joinedSet.has(m.group_id)) return false;
+      if (m.content?.startsWith("[reaction:")) return false;
       // Game Analysis is locked if user hasn't played today
       if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
       const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
@@ -595,9 +619,10 @@ export default function FloatingChatBubble() {
                 entry.unreadCount++;
              }
           }
-          if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
-             entry.lastMessage = m;
-          }
+            if (m.content?.startsWith("[reaction:")) return;
+              if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
+                 entry.lastMessage = m;
+              }
        });
        return Array.from(groupMap.values())
           .filter(e => e.lastMessage)
@@ -660,6 +685,12 @@ export default function FloatingChatBubble() {
          }
 
          const tempId = crypto.randomUUID();
+         const mentions: string[] = [];
+         profilesList.forEach(u => {
+            if (replyText.includes(`@${u.username}`)) {
+               mentions.push(u.id);
+            }
+         });
          const messagePayload: any = {
             id: tempId,
             content: finalContent,
@@ -667,6 +698,9 @@ export default function FloatingChatBubble() {
             group_id: selectedGroupId,
             is_read: false,
          };
+         if (mentions.length > 0) {
+            messagePayload.mentions = mentions;
+         }
          if (replyingToMsg) {
             messagePayload.reply_to = replyingToMsg.id;
          }
@@ -750,6 +784,24 @@ export default function FloatingChatBubble() {
       setReactingMessageId(null);
    };
 
+   // Handle @ mention user select
+   const handleUserSelect = (username: string) => {
+      if (!mentionState || !replyInputRef.current) return;
+      const lastAt = replyText.lastIndexOf("@", mentionState.cursorPosition - 1);
+      const textBeforeAt = replyText.substring(0, lastAt);
+      const textAfterCursor = replyText.substring(mentionState.cursorPosition);
+      const newText = textBeforeAt + "@" + username + " " + textAfterCursor;
+      setReplyText(newText);
+      setMentionState(null);
+      const newCursorPos = (textBeforeAt + "@" + username + " ").length;
+      setTimeout(() => {
+         if (replyInputRef.current) {
+            replyInputRef.current.focus();
+            replyInputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+         }
+      }, 0);
+   };
+
    // Handle reply
    const handleReply = (msg: any) => {
       setReplyingToMsg(msg);
@@ -780,8 +832,8 @@ export default function FloatingChatBubble() {
 
    const handleBubbleClick = () => {
       if (isDragging) return;
-      if (unreadMessages.length === 1) {
-         setSelectedGroupId(unreadMessages[0].group_id);
+      if (unreadMessages.length > 0) {
+         setSelectedGroupId(unreadMessages[unreadMessages.length - 1].group_id);
       } else {
          setSelectedGroupId(null);
       }
@@ -842,7 +894,7 @@ export default function FloatingChatBubble() {
 
    // Filter messages context for the active room in popover
    const allRoomMessages = selectedGroupId
-      ? globalMessages.filter(m => m.group_id === selectedGroupId)
+      ? globalMessages.filter(m => m.group_id === selectedGroupId && !m.content?.startsWith("[reaction:"))
       : [];
    const activeRoomMessages = allRoomMessages.slice(-20);
    const hasMoreMessages = allRoomMessages.length > 20;
@@ -895,6 +947,7 @@ export default function FloatingChatBubble() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleUnreadId(null);
       setShowUnreadLine(true);
+      setMentionState(null);
    }, [selectedGroupId]);
 
    // Divider visibility: auto-hide after 6s if in view, persist if scrolled below
@@ -1388,9 +1441,18 @@ export default function FloatingChatBubble() {
                            ))}
                      </div>
 
-                     {/* Reply footer for detailed chat screen */}
-                     {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
-                        <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0">
+                      {/* Reply footer for detailed chat screen */}
+                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
+                         <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
+                             {selectedGroupObject?.type !== "dm" && (
+                                <UserSuggestions
+                                   users={profilesList}
+                                   filter={mentionState?.filter || ""}
+                                   isVisible={!!mentionState?.isVisible}
+                                   onSelect={handleUserSelect}
+                                   currentInput={replyText}
+                                />
+                             )}
                            <input
                               ref={fileInputRef}
                               type="file"
@@ -1460,20 +1522,41 @@ export default function FloatingChatBubble() {
                                     rows={1}
                                     placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
                                     value={replyText}
-                                    onChange={(e) => {
-                                       setReplyText(e.target.value);
-                                       resetInactivityTimer();
-                                    }}
-                                    onInput={(e) => {
-                                       e.currentTarget.style.height = 'auto';
-                                       e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
-                                    }}
-                                    onKeyDown={(e) => {
-                                       if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-                                          e.preventDefault();
-                                          handleSendReply();
-                                       }
-                                    }}
+                                   onChange={(e) => {
+                                         const value = e.target.value;
+                                         setReplyText(value);
+                                         resetInactivityTimer();
+                                         if (selectedGroupObject?.type !== "dm") {
+                                            const cursorPos = e.target.selectionStart;
+                                            const textBeforeCursor = value.substring(0, cursorPos);
+                                            const lastAtPos = textBeforeCursor.lastIndexOf("@");
+                                            if (lastAtPos !== -1) {
+                                               const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
+                                               if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
+                                                  setMentionState({ isVisible: true, filter: textAfterAt, cursorPosition: cursorPos });
+                                               } else {
+                                                  setMentionState(null);
+                                               }
+                                            } else {
+                                               setMentionState(null);
+                                            }
+                                         } else {
+                                            setMentionState(null);
+                                         }
+                                      }}
+                                     onInput={(e) => {
+                                        e.currentTarget.style.height = 'auto';
+                                        e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                                     }}
+                                     onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+                                           e.preventDefault();
+                                           handleSendReply();
+                                        }
+                                        if (e.key === 'Escape') {
+                                           setMentionState(null);
+                                        }
+                                     }}
                                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
                                  />
                               )}

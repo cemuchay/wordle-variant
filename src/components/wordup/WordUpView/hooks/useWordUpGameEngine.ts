@@ -585,9 +585,7 @@ export function useWordUpGameEngine(props: EngineProps) {
                  questions: enc, encryption_key: sk,
               };
 
-              if (category === "flag_bearer") {
-                 try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); return; }
-              }
+               try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); return; }
               dispatch({ type: "SET_QUESTIONS", questions: raw });
               dispatch({ type: "SET_MATCH_DATA", data: match });
               setBotStats(match);
@@ -632,7 +630,7 @@ export function useWordUpGameEngine(props: EngineProps) {
          }
 
          const dec = await decryptMatchQuestions(match);
-         if (match.category === "flag_bearer") await preloadMatchImages(dec);
+          await preloadMatchImages(dec);
          dispatch({ type: "SET_QUESTIONS", questions: dec });
 
           // Load opponent profile (live only)

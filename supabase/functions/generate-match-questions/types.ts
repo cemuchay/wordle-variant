@@ -40,9 +40,18 @@ export const CATEGORY_SUPER_MAP: Record<string, SuperCategory> = {
    cinephile_trivia: "creative_work",
    naija_music: "creative_work",
    
-   // Unified topics
-   maths: "calculations",
-   english_language: "language_arts"
+     // Unified topics
+     maths: "calculations",
+     english_language: "language_arts",
+     english_fundamentals: "language_arts",
+     
+      // Entity-based science categories
+      physics: "science_facts",
+      chemistry: "science_facts",
+       biology: "science_facts",
+       
+       // Sports & general knowledge
+       football: "science_facts"
 };
 
 

@@ -5,6 +5,7 @@ import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
+import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
 import { type ProfileStats } from "../../shared/types";
 
 
@@ -474,10 +475,10 @@ export const BattleView = ({
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
-                  {activeQuestion.type.replace("_", " ")}
+                  {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
-                  {activeQuestion.prompt}
+                  <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
                   <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
@@ -649,7 +650,9 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={btnClass}
                         >
-                           <span className="flex-1 text-center pr-8">{choice}</span>
+                            <span className="flex-1 text-center pr-8">
+                               <FormulaRenderer text={choice} />
+                            </span>
 
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (

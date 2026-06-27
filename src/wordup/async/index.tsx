@@ -8,6 +8,7 @@ import { useServerTime } from "../shared/useServerTime";
 import { useWordUpProfile } from "../shared/useWordUpProfile";
 import { useAsyncMatchmaking } from "./hooks/useMatchmaking";
 import { useGameEngine as useAsyncGameEngine } from "./hooks/useGameEngine";
+import { decryptMatchQuestions } from "../../utils/wordupQuestionGenerator";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { useAppStore } from "../../store/useAppStore";
@@ -28,7 +29,7 @@ interface AsyncViewProps {
 }
 
 export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
-   const { user: authUser } = useAuth();
+   const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
    const [guestUser, setGuestUser] = useState<any>(() => {
@@ -54,6 +55,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const resetGame = useAsyncStore((s) => s.resetGame);
    const setMatchData = useAsyncStore((s) => s.setMatchData);
    const questions = useAsyncStore((s) => s.questions);
+   const setQuestions = useAsyncStore((s) => s.setQuestions);
    const currentIdx = useAsyncStore((s) => s.currentIdx);
    const matchData = useAsyncStore((s) => s.matchData);
    const opponentStats = useAsyncStore((s) => s.opponentStats);
@@ -188,7 +190,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                      .eq("id", mId)
                      .single();
                   match = data;
-               } catch {}
+               } catch {/* comment */ }
                const role = match?.player1_id === effectiveUser.id ? "player1" : "player2";
                setMatchId(mId);
                setRole(role);
@@ -367,12 +369,27 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
       setRole(myRole);
       setMatchData(match);
+      try {
+         const decrypted = await decryptMatchQuestions(match);
+         setQuestions(decrypted);
+      } catch (e) {
+         console.warn("Failed to decrypt history match questions:", e);
+      }
       setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setView]);
+   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();
    }, [resetGame]);
+
+   if (authLoading) {
+      return (
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark p-6 text-center">
+            <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-xs text-gray-400 mt-4 font-bold uppercase tracking-widest">Loading Session...</p>
+         </div>
+      );
+   }
 
    if (!effectiveUser) {
       return (
