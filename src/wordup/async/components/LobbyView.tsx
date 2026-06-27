@@ -64,6 +64,10 @@ export const LobbyView = ({
       if (activeTab === "history") onRefreshHistory();
    }, [activeTab]);
 
+   const pendingCount = (pendingMatches || []).filter((m: any) =>
+      !(m.player1_id === currentUser?.id ? m.p1_answered : m.p2_answered)
+   ).length;
+
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
       p.id !== currentUser?.id &&
       (p.username || "").toLowerCase().includes(playerSearch.toLowerCase())
@@ -116,7 +120,7 @@ export const LobbyView = ({
                      : "text-gray-400 hover:text-white"
                      }`}
                >
-                  {tab === "play" ? "Play" : tab === "pending" ? "Pending" : "History"}
+                   {tab === "play" ? "Play" : tab === "pending" ? `Pending${pendingCount > 0 ? ` (${pendingCount})` : ""}` : "History"}
                </button>
             ))}
          </div>

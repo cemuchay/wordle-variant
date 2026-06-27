@@ -415,7 +415,7 @@ export function useGameEngine(props: EngineProps) {
          }
 
          const dec = await decryptMatchQuestions(match);
-         if (match.category === "flag_bearer") await preloadMatchImages(dec);
+          await preloadMatchImages(dec);
          dispatch({ type: "SET_QUESTIONS", questions: dec });
 
          const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
