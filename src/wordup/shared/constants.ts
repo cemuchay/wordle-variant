@@ -80,6 +80,12 @@ export const CATEGORIES = [
       desc: "Mechanics, thermodynamics, waves, optics, electricity, and modern physics",
       featured: true,
    },
+   {
+      id: "chemistry",
+      name: "Chemistry",
+      desc: "Atomic structure, bonding, reactions, organic chemistry, and the periodic table",
+      featured: true,
+   },
 ];
 
 export const FLAG_MAP: Record<string, string> = {

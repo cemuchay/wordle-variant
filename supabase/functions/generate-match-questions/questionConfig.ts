@@ -122,6 +122,34 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
           timeline: 0,
        },
     }),
+    define("physics", {
+       proceduralWeight: 0.0,
+       weights: {
+          forward: 2.5,
+          reverse: 1.5,
+          oddOneOut: 1.5,
+          trueFalse: 1.5,
+          multiClue: 2,
+          correctError: 1,
+          tagMatch: 1.5,
+          compare: 2.5,
+          timeline: 0.5,
+       },
+    }),
+    define("chemistry", {
+       proceduralWeight: 0.0,
+       weights: {
+          forward: 2.5,
+          reverse: 1.5,
+          oddOneOut: 1.5,
+          trueFalse: 1.5,
+          multiClue: 2,
+          correctError: 1,
+          tagMatch: 1.5,
+          compare: 2.5,
+          timeline: 0.5,
+       },
+    }),
    define("flag_bearer", {
       weights: {
          forward: 3,
