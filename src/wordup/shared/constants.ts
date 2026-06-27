@@ -53,6 +53,12 @@ export const CATEGORIES = [
       featured: true,
    },
    {
+      id: "english_fundamentals",
+      name: "English Fundamentals",
+      desc: "Grammar rules, tenses, punctuation, literary devices, and word usage",
+      featured: true,
+   },
+   {
       id: "currency_exchange",
       name: "Currencies",
       desc: "Match currencies to their countries",
@@ -67,6 +73,30 @@ export const CATEGORIES = [
       id: "element_arena",
       name: "Periodic Table",
       desc: "Questions about chemical elements",
+   },
+   {
+      id: "physics",
+      name: "Physics",
+      desc: "Mechanics, thermodynamics, waves, optics, electricity, and modern physics",
+      featured: true,
+   },
+   {
+      id: "chemistry",
+      name: "Chemistry",
+      desc: "Atomic structure, bonding, reactions, organic chemistry, and the periodic table",
+      featured: true,
+   },
+   {
+      id: "biology",
+      name: "Biology",
+      desc: "Cell biology, genetics, evolution, ecology, anatomy, microbiology, and zoology",
+      featured: true,
+   },
+   {
+      id: "football",
+      name: "Football (Soccer)",
+      desc: "Players, clubs, competitions, rules, and history of world football",
+      featured: true,
    },
 ];
 

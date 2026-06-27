@@ -71,9 +71,15 @@ function buildVariantTryOrder(assignedVariant: number, weights: number[]): numbe
 function generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
    const qObj = _generateQuestion(seed, entity, allEntities, variantOverride, category, variantWeights);
    const meta = entity?.metadata || {};
-   if (meta.image) {
+   const rng = createSeededRandom(hashSeed(seed));
+   if (meta.images && Array.isArray(meta.images) && meta.images.length > 0) {
+      const imgIdx = Math.floor(rng() * meta.images.length);
+      const chosenImage = meta.images[imgIdx];
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+      qObj.imageUrl = chosenImage.startsWith("http") ? chosenImage : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
+   } else if (meta.image) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      qObj.imageUrl = meta.image.startsWith("http") ? meta.image : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
    }
    return qObj;
 }

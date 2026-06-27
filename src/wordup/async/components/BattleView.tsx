@@ -4,6 +4,7 @@ import type { TargetAndTransition, Transition } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { type ProfileStats } from "../../shared/types";
+import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../../shared/constants";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
@@ -288,7 +289,7 @@ export const BattleView = ({
                   {activeQuestion.type.replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
-                  {activeQuestion.prompt}
+                  <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
                   <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
