@@ -950,12 +950,16 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
 
     const handleNextStep = useCallback(() => {
-        setStep(s => Math.min(s + 1, 2));
+        setStep(s => Math.min(s + 1, 3));
     }, []);
 
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [step]);
+
     return (
-        <div className="space-y-6">
-            <CreateStepIndicator steps={['Setup', 'Customize', 'Confirm']} currentStep={step} />
+        <div className="space-y-6 max-w-xl mx-auto w-full">
+            <CreateStepIndicator steps={['Setup', 'Rules', 'Lobby', 'Confirm']} currentStep={step} />
 
             {step === 0 && (
                 <>
@@ -1010,27 +1014,6 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
             {step === 1 && (
                 <div className="space-y-5">
-                    {/* Daily Challenge Option (Admins Only) */}
-                    {isAdmin && (
-                        <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
-                            <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Daily Bot Challenge" 
-                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="dailyBotChallenge" 
-                                />
-                                <input
-                                    type="checkbox"
-                                    checked={isBotMarathon}
-                                    onChange={(e) => setIsBotMarathon(e.target.checked)}
-                                    className="w-5 h-5 accent-indigo-500 cursor-pointer"
-                                />
-                            </div>
-                        </div>
-                    )}
-
                     {/* Shape Shifter Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -1070,81 +1053,6 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                 onChange={(e) => setDisableHints(e.target.checked)}
                                 className="w-5 h-5 accent-correct cursor-pointer"
                             />
-                        </div>
-                    </div>
-
-                    {/* Public Challenge Option */}
-                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Public Challenge" 
-                                tooltip="When enabled, anyone with the challenge link can join. Otherwise, only explicitly invited players can enter." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="publicChallenge" 
-                            />
-                            <input
-                                type="checkbox"
-                                checked={isPublic}
-                                onChange={(e) => setIsPublic(e.target.checked)}
-                                className="w-5 h-5 accent-correct cursor-pointer"
-                            />
-                        </div>
-                        {isPublic && (
-                            <div className="space-y-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                <OptionLabel 
-                                    label="Max Participants" 
-                                    tooltip="Limit the total number of players allowed in this public lobby (between 2 and 100)." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="maxParticipants" 
-                                />
-                                <input
-                                    type="number"
-                                    inputMode="numeric"
-                                    min={2}
-                                    max={100}
-                                    value={maxParticipantsInput}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setMaxParticipantsInput(val);
-                                        const num = Number(val);
-                                        if (!isNaN(num) && num >= 2 && num <= 100) setMaxParticipants(num);
-                                    }}
-                                    onBlur={() => {
-                                        let num = parseInt(maxParticipantsInput, 10);
-                                        if (isNaN(num)) num = 10;
-                                        else if (num < 2) num = 2;
-                                        else if (num > 100) num = 100;
-                                        setMaxParticipants(num);
-                                        setMaxParticipantsInput(String(num));
-                                    }}
-                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Lifespan Option */}
-                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <OptionLabel 
-                            label="Challenge Lifespan" 
-                            tooltip="The number of hours this challenge lobby will remain open before automatically expiring." 
-                            activeTooltip={activeTooltip} 
-                            setActiveTooltip={setActiveTooltip} 
-                            tooltipId="lifespan" 
-                        />
-                        <div className="grid grid-cols-4 gap-2">
-                            {(isBotMarathon ? [24, 48, 72, 168] : [1, 6, 12, 24]).map(h => (
-                                <button
-                                    key={h}
-                                    type="button"
-                                    onClick={() => setLifespanHours(h)}
-                                    className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
-                                >
-                                    {h}h
-                                </button>
-                            ))}
                         </div>
                     </div>
 
@@ -1250,6 +1158,106 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {step === 2 && (
+                <div className="space-y-5">
+                    {/* Daily Challenge Option (Admins Only) */}
+                    {isAdmin && (
+                        <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Daily Bot Challenge" 
+                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="dailyBotChallenge" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isBotMarathon}
+                                    onChange={(e) => setIsBotMarathon(e.target.checked)}
+                                    className="w-5 h-5 accent-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Public Challenge Option */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <OptionLabel 
+                                label="Public Challenge" 
+                                tooltip="When enabled, anyone with the challenge link can join. Otherwise, only explicitly invited players can enter." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="publicChallenge" 
+                            />
+                            <input
+                                type="checkbox"
+                                checked={isPublic}
+                                onChange={(e) => setIsPublic(e.target.checked)}
+                                className="w-5 h-5 accent-correct cursor-pointer"
+                            />
+                        </div>
+                        {isPublic && (
+                            <div className="space-y-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
+                                <OptionLabel 
+                                    label="Max Participants" 
+                                    tooltip="Limit the total number of players allowed in this public lobby (between 2 and 100)." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="maxParticipants" 
+                                />
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={2}
+                                    max={100}
+                                    value={maxParticipantsInput}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMaxParticipantsInput(val);
+                                        const num = Number(val);
+                                        if (!isNaN(num) && num >= 2 && num <= 100) setMaxParticipants(num);
+                                    }}
+                                    onBlur={() => {
+                                        let num = parseInt(maxParticipantsInput, 10);
+                                        if (isNaN(num)) num = 10;
+                                        else if (num < 2) num = 2;
+                                        else if (num > 100) num = 100;
+                                        setMaxParticipants(num);
+                                        setMaxParticipantsInput(String(num));
+                                    }}
+                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Lifespan Option */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <OptionLabel 
+                            label="Challenge Lifespan" 
+                            tooltip="The number of hours this challenge lobby will remain open before automatically expiring." 
+                            activeTooltip={activeTooltip} 
+                            setActiveTooltip={setActiveTooltip} 
+                            tooltipId="lifespan" 
+                        />
+                        <div className="grid grid-cols-4 gap-2">
+                            {(isBotMarathon ? [24, 48, 72, 168] : [1, 6, 12, 24]).map(h => (
+                                <button
+                                    key={h}
+                                    type="button"
+                                    onClick={() => setLifespanHours(h)}
+                                    className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
+                                >
+                                    {h}h
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
                     {/* Marathon Custom Timers */}
                     {length === 1 && mode === 'LIVE' && (
@@ -1304,7 +1312,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     )}
 
                     {!editingChallenge && (
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <input type="text" placeholder="Or Enter Challenge ID..." value={joinId}
                                 onChange={(e) => setJoinId(e.target.value)}
                                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white" />
@@ -1315,17 +1323,17 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 </div>
             )}
 
-            {step === 2 && (
+            {step === 3 && (
                 <CreateSummaryStep
                     settings={summarySettings}
-                    onBack={() => setStep(1)}
+                    onBack={() => setStep(2)}
                     onConfirm={handleCreateTrigger}
                     loading={loading}
                 />
             )}
 
             {/* Inline Errors Display */}
-            {step < 2 && errors.length > 0 && (
+            {step < 3 && errors.length > 0 && (
                 <div className="bg-red-500/10 border border-red-500/30 p-3.5 rounded-2xl space-y-1.5 animate-in fade-in duration-300">
                     <p className="text-xs font-black uppercase text-red-500">Please correct the following errors:</p>
                     <ul className="list-disc pl-4 text-xs text-red-400/90 font-bold space-y-1">
@@ -1335,7 +1343,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             )}
 
             {/* Navigation */}
-            {step < 2 && (
+            {step < 3 && (
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     {step > 0 ? (
                         <button type="button" onClick={() => setStep(s => s - 1)}
