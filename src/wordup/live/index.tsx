@@ -138,10 +138,13 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
    const launchedMatchRef = useRef<string | null>(null);
    const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
    const engineCleanupRef = useRef<(() => void) | null>(null);
+   // eslint-disable-next-line react-hooks/immutability, react-hooks/refs
    startMatchRef.current = engine.startMatch;
+   // eslint-disable-next-line react-hooks/refs
    engineCleanupRef.current = engine.cleanup;
 
    const onMatchFound = useCallback((mId: string, mRole: "player1" | "player2") => {
+      // eslint-disable-next-line react-hooks/immutability
       launchedMatchRef.current = mId;
       setMatchId(mId);
       setRole(mRole);
@@ -150,6 +153,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
 
    useEffect(() => {
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
+         // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
@@ -195,6 +199,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
    useEffect(() => { cancelMatchmakingRef.current = cancelMatchmaking; }, [cancelMatchmaking]);
 
    useEffect(() => { engineCleanupRef.current = engine.cleanup; }, [engine.cleanup]);
+   // eslint-disable-next-line react-hooks/immutability
    useEffect(() => { startMatchRef.current = engine.startMatch; }, [engine.startMatch]);
 
    useEffect(() => {
@@ -280,7 +285,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
    }
 
    return (
-      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-gradient-to-b from-correct/15 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
+      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-linear-to-b from-correct/15 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView

@@ -1,4 +1,4 @@
-# 🧩 Wordle Variant
+# 🧩 Variant
 
 A high-performance, feature rich Wordle clone built with **React**, **TypeScript**, **Tailwind CSS**, and **Supabase**. This version goes beyond the classic game by introducing dynamic word lengths, real time social features, and a competitive challenge mode.
 
