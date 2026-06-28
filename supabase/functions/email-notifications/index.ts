@@ -336,7 +336,7 @@ serve(async (req) => {
             `Sending welcome email to ${targetEmail} (Username: ${targetUsername})...`,
          );
 
-          const content = `
+         const content = `
         <p>Welcome to <strong>variant</strong>! We are thrilled to have you join our community of word puzzle enthusiasts. Whether you are a casual player or a competitive solver, here is everything you need to know to get started and dominate the leaderboards.</p>
         
         <div style="margin: 24px 0; background-color: #0b0f19; border: 1px solid #1f2937; border-radius: 16px; padding: 20px;">
@@ -506,7 +506,7 @@ serve(async (req) => {
          if (skippedRecipients && skippedRecipients.length > 0) {
             for (const recipient of skippedRecipients) {
                const content = `
-            <p>You skipped playing yesterday! Don't let your daily Wordle momentum slip away.</p>
+            <p>You skipped playing yesterday! Don't let your daily variant momentum slip away.</p>
             <p>Challenge yourself, stay sharp, and maintain your standing by playing today's puzzle right now!</p>
             <div style="margin: 32px 0 16px 0; text-align: center;">
               <a href="${APP_URL}" class="btn-primary">Resume Play Now</a>
@@ -635,7 +635,7 @@ serve(async (req) => {
             for (const recipient of recipients) {
                const content = `
             <p>You have an active <strong>${recipient.current_streak}-day winning streak</strong> but haven't played today yet!</p>
-            <p>It is already past 7:00 PM WAT. Don't let all your hard work go to waste—solve today's Wordle before midnight to keep your streak alive!</p>
+            <p>It is already past 7:00 PM WAT. Don't let all your hard work go to waste—solve today's Word before midnight to keep your streak alive!</p>
             <div style="margin: 32px 0 16px 0; text-align: center;">
               <a href="${APP_URL}" class="btn-primary">Save My Streak</a>
             </div>

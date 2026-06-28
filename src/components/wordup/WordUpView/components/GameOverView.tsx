@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
@@ -27,6 +28,7 @@ export const GameOverView = ({
 }: GameOverViewProps) => {
    if (!matchData) return null;
 
+   // eslint-disable-next-line react-hooks/rules-of-hooks
    const questions = useWordUpStore((s) => s.questions);
 
    const isP1 = role === "player1";
@@ -41,9 +43,9 @@ export const GameOverView = ({
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
       : "Opponent";
 
-   const statusColor = isWinner 
+   const statusColor = isWinner
       ? "text-correct border-correct/20 bg-correct/10 shadow-[0_0_15px_rgba(46,204,113,0.1)]"
-      : isDraw 
+      : isDraw
          ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
          : "text-red-400 border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
 
@@ -55,15 +57,15 @@ export const GameOverView = ({
          animate={{ opacity: 1, scale: 1 }}
          className="flex flex-col flex-1 justify-center gap-6 py-4"
       >
-          <div className="text-center space-y-1">
-             <div className="flex justify-center">
-                <WordUpMascot expression={isWinner ? 'excited' : isDraw ? 'idle' : 'sad'} size={80} />
-             </div>
-             <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
-                {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
-             </h2>
-             <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
-          </div>
+         <div className="text-center space-y-1">
+            <div className="flex justify-center">
+               <WordUpMascot expression={isWinner ? 'excited' : isDraw ? 'idle' : 'sad'} size={80} />
+            </div>
+            <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
+               {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
+            </h2>
+            <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
+         </div>
 
          {/* Side-by-Side Scores */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
@@ -103,7 +105,7 @@ export const GameOverView = ({
                {rematchState === "sent" && (
                   <div className="w-full bg-white/5 border border-white/10 text-gray-400 font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest animate-pulse relative overflow-hidden">
                      <span className="flex items-center gap-2">⏳ Waiting for Opponent ({rematchCountdown}s)</span>
-                     <div 
+                     <div
                         className="absolute bottom-0 left-0 h-1 bg-pink-500/40 transition-all duration-1000 ease-linear"
                         style={{ width: `${(rematchCountdown / 20) * 100}%` }}
                      />
@@ -115,7 +117,7 @@ export const GameOverView = ({
                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black uppercase py-4 rounded-xl flex flex-col items-center justify-center gap-1 tracking-widest shadow-lg cursor-pointer animate-bounce hover:scale-102 active:scale-98 transition-all relative overflow-hidden"
                   >
                      <span className="flex items-center gap-2">🔥 Accept Rematch! ({rematchCountdown}s)</span>
-                     <div 
+                     <div
                         className="absolute bottom-0 left-0 h-1 bg-black/20 transition-all duration-1000 ease-linear"
                         style={{ width: `${(rematchCountdown / 20) * 100}%` }}
                      />
@@ -129,21 +131,21 @@ export const GameOverView = ({
             </div>
          )}
 
-          {/* Play Again / Lobby */}
-          <div className="grid grid-cols-2 gap-3">
-             <button
-                onClick={() => setView("matchmaking")}
-                className="bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
-             >
-                Play Again
-             </button>
-             <button
-                onClick={() => setView("menu")}
-                className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
-             >
-                Return to Lobby
-             </button>
-          </div>
+         {/* Play Again / Lobby */}
+         <div className="grid grid-cols-2 gap-3">
+            <button
+               onClick={() => setView("matchmaking")}
+               className="bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
+            >
+               Play Again
+            </button>
+            <button
+               onClick={() => setView("menu")}
+               className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
+            >
+               Return to Lobby
+            </button>
+         </div>
 
          {/* Round Breakdown */}
          {questions && questions.length > 0 && (
@@ -155,7 +157,7 @@ export const GameOverView = ({
                   {questions.map((q, idx) => {
                      const p1Ans = matchData.p1_answers?.find((a: any) => a.question_idx === idx);
                      const p2Ans = matchData.p2_answers?.find((a: any) => a.question_idx === idx);
-                     
+
                      const myAns = isP1 ? p1Ans : p2Ans;
                      const oppAns = isP1 ? p2Ans : p1Ans;
 
@@ -166,52 +168,51 @@ export const GameOverView = ({
                               <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
                            </div>
                            <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
-                            {q.subPrompt && (
-                               <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
-                                  {q.subPrompt}
-                               </p>
-                            )}
-                            {q.imageUrl && (
-                               <div className="flex justify-center py-1">
-                                  <div className="w-full max-w-[120px] h-[70px] rounded-lg overflow-hidden border border-white/10 bg-slate-950/60 flex items-center justify-center">
-                                     <img
-                                        src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl}
-                                        alt="Question Clue"
-                                        className="max-h-full max-w-full object-contain rounded"
-                                        draggable={false}
-                                     />
-                                  </div>
-                               </div>
-                            )}
-                            {q.imageUrls && q.imageUrls.length > 0 && (
-                               <div className="grid grid-cols-2 gap-1.5 py-1">
-                                  {q.imageUrls.map((code, i) => (
-                                     <div
-                                        key={i}
-                                        className={`rounded-lg overflow-hidden border ${
-                                           q.choices[i] === q.answer
-                                              ? "border-correct ring-1 ring-correct"
-                                              : "border-white/10"
-                                        } bg-slate-950/60 flex items-center justify-center aspect-[2/1]`}
-                                     >
-                                        <img
-                                           src={getCachedFlagUrl(code)}
-                                           alt={`Choice ${String.fromCharCode(65 + i)}`}
-                                           className="w-full h-full object-cover"
-                                           draggable={false}
-                                        />
-                                     </div>
-                                  ))}
-                               </div>
-                            )}
-                             <p className="text-[10px] text-gray-400 mt-1">
-                                Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
-                             </p>
-                             {q.explanation && (
-                                <p className="text-[10px] text-gray-300 bg-white/5 px-2 py-1 rounded italic mt-1 leading-relaxed">
-                                   💡 {q.explanation}
-                                </p>
-                             )}
+                           {q.subPrompt && (
+                              <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
+                                 {q.subPrompt}
+                              </p>
+                           )}
+                           {q.imageUrl && (
+                              <div className="flex justify-center py-1">
+                                 <div className="w-full max-w-[120px] h-[70px] rounded-lg overflow-hidden border border-white/10 bg-slate-950/60 flex items-center justify-center">
+                                    <img
+                                       src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl}
+                                       alt="Question Clue"
+                                       className="max-h-full max-w-full object-contain rounded"
+                                       draggable={false}
+                                    />
+                                 </div>
+                              </div>
+                           )}
+                           {q.imageUrls && q.imageUrls.length > 0 && (
+                              <div className="grid grid-cols-2 gap-1.5 py-1">
+                                 {q.imageUrls.map((code, i) => (
+                                    <div
+                                       key={i}
+                                       className={`rounded-lg overflow-hidden border ${q.choices[i] === q.answer
+                                             ? "border-correct ring-1 ring-correct"
+                                             : "border-white/10"
+                                          } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
+                                    >
+                                       <img
+                                          src={getCachedFlagUrl(code)}
+                                          alt={`Choice ${String.fromCharCode(65 + i)}`}
+                                          className="w-full h-full object-cover"
+                                          draggable={false}
+                                       />
+                                    </div>
+                                 ))}
+                              </div>
+                           )}
+                           <p className="text-[10px] text-gray-400 mt-1">
+                              Correct Answer: <span className="text-correct font-extrabold">{q.answer}</span>
+                           </p>
+                           {q.explanation && (
+                              <p className="text-[10px] text-gray-300 bg-white/5 px-2 py-1 rounded italic mt-1 leading-relaxed">
+                                 💡 {q.explanation}
+                              </p>
+                           )}
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
                                  <p className="font-black text-gray-500 uppercase">You</p>

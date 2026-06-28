@@ -13,11 +13,17 @@ export const ModeSelect = ({ onSelect }: ModeSelectProps) => {
          exit={{ opacity: 0, y: -15 }}
          className="flex flex-col items-center justify-center flex-1 gap-8 px-6 py-12"
       >
-         <div className="text-center space-y-1">
-            <div className="inline-flex p-1 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)]">
-               <Swords size={36} />
+         <div className="text-center space-y-2">
+            {/* Flex container to place icon and heading side-by-side */}
+            <div className="flex items-center justify-center gap-4">
+               <div className="inline-flex p-1 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)]">
+                  <Swords size={36} />
+               </div>
+               <h1 className="text-3xl font-black uppercase tracking-wider text-white">
+                  WordUp <span className="text-[10px]">beta</span>
+               </h1>
             </div>
-            <h1 className="text-3xl font-black uppercase tracking-wider text-white">WordUp</h1>
+
             <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
                Choose your battle mode
             </p>
@@ -28,7 +34,7 @@ export const ModeSelect = ({ onSelect }: ModeSelectProps) => {
                whileHover={{ scale: 1.02 }}
                whileTap={{ scale: 0.98 }}
                onClick={() => onSelect("live")}
-               className="group relative overflow-hidden bg-linear-to-br from-correct/20 to-correct/5 border-2 border-correct/30 rounded-3xl p-2 text-left transition-all hover:border-correct/60 hover:shadow-[0_0_30px_rgba(46,204,113,0.15)] cursor-pointer"
+               className="group relative overflow-hidden bg-linear-to-br from-correct/20 to-correct/5 border-2 border-correct/30 rounded-3xl p-2 py-3 text-left transition-all hover:border-correct/60 hover:shadow-[0_0_30px_rgba(46,204,113,0.15)] cursor-pointer"
             >
                <div className="flex items-start gap-2">
                   <div className="w-14 h-14 rounded-2xl bg-correct/20 border border-correct/30 flex items-center justify-center shrink-0 shadow-lg group-hover:shadow-correct/20">
@@ -52,14 +58,14 @@ export const ModeSelect = ({ onSelect }: ModeSelectProps) => {
                whileHover={{ scale: 1.02 }}
                whileTap={{ scale: 0.98 }}
                onClick={() => onSelect("async")}
-               className="group relative overflow-hidden bg-linear-to-br from-indigo-500/20 to-indigo-500/5 border-2 border-indigo-500/30 rounded-3xl p-2 text-left transition-all hover:border-indigo-500/60 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] cursor-pointer"
+               className="group relative overflow-hidden bg-linear-to-br from-indigo-500/20 to-indigo-500/5 border-2 border-indigo-500/30 rounded-3xl p-2 py-3 text-left transition-all hover:border-indigo-500/60 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] cursor-pointer"
             >
                <div className="flex items-start gap-2">
                   <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-lg group-hover:shadow-indigo-500/20">
                      <Swords size={28} className="text-indigo-400" />
                   </div>
                   <div className="space-y-1.5">
-                     <h2 className="text-lg font-black uppercase tracking-wider text-white">Async Challenge</h2>
+                     <h2 className="text-lg font-black uppercase tracking-wider text-white">1 v 1 Challenge</h2>
                      <p className="text-xs text-gray-300 leading-relaxed">
                         Play at your own pace, challenge friends. <br />
                         <span className="text-indigo-400 font-bold">7 rounds • no timer • ranked</span>
@@ -73,9 +79,6 @@ export const ModeSelect = ({ onSelect }: ModeSelectProps) => {
             </motion.button>
          </div>
 
-         <p className="text-[10px] text-gray-600 text-center max-w-xs">
-            Both modes use the same rating system. Your ELO and stats carry across all game types.
-         </p>
       </motion.div>
    );
 };
