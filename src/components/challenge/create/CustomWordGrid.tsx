@@ -17,62 +17,72 @@ function boxSizeClass(length: number) {
     return 'w-7 h-7 sm:w-8 sm:h-8 text-[10px]';
 }
 
-const LetterBox = memo(({ char, onChange, onKeyDown, inputRef, autoFocus, length }: {
+const LetterBox = memo(({ char, onChange, onKeyDown, inputRef, autoFocus, length, boxIndex }: {
     char: string;
-    onChange: (val: string) => void;
-    onKeyDown: (e: React.KeyboardEvent) => void;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     inputRef?: (el: HTMLInputElement | null) => void;
     autoFocus?: boolean;
     length: number;
+    boxIndex: number;
 }) => (
     <input
         ref={inputRef}
         type="text"
         maxLength={1}
         value={char}
-        onChange={(e) => {
-            const val = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
-            onChange(val);
-        }}
+        data-box-index={boxIndex}
+        data-ref-index={boxIndex}
+        onChange={onChange}
         onKeyDown={onKeyDown}
         autoFocus={autoFocus}
         className={`${boxSizeClass(length)} bg-black/40 border-2 border-white/20 rounded-lg text-center font-black uppercase text-white focus:border-correct/60 focus:bg-black/60 outline-none transition-all`}
     />
 ));
 
-function WordRow({ length, value, onChange, rowIndex, autoFocus }: {
+const WordRow = memo(({ length, value, onChange, rowIndex, autoFocus }: {
     length: number;
     value: string;
     onChange: (val: string) => void;
     rowIndex: number;
     autoFocus?: boolean;
-}) {
+}) => {
     const refs = useRef<(HTMLInputElement | null)[]>([]);
+    const valueRef = useRef(value);
+    valueRef.current = value;
 
     useEffect(() => {
         refs.current = refs.current.slice(0, length);
     }, [length]);
 
-    const setRef = useCallback((i: number) => (el: HTMLInputElement | null) => {
-        refs.current[i] = el;
+    const setRefFromIndex = useCallback((el: HTMLInputElement | null) => {
+        if (el) {
+            const idx = Number(el.dataset.refIndex);
+            refs.current[idx] = el;
+        }
     }, []);
 
-    const handleCharChange = useCallback((i: number, val: string) => {
-        const chars = value.split('');
+    const handleBoxChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
+        const i = Number(e.currentTarget.dataset.boxIndex);
+        const cur = valueRef.current;
+        const chars = cur.split('');
         chars[i] = val;
         onChange(chars.join(''));
         if (val && i < length - 1) {
             refs.current[i + 1]?.focus();
         }
-    }, [value, onChange, length]);
+    }, [onChange, length]);
 
-    const handleKeyDown = useCallback((i: number) => (e: React.KeyboardEvent) => {
-        if (e.key === 'Backspace' && !value[i] && i > 0) {
+    const handleBoxKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key !== 'Backspace') return;
+        const i = Number(e.currentTarget.dataset.boxIndex);
+        if (!valueRef.current[i] && i > 0) {
             refs.current[i - 1]?.focus();
         }
-    }, [value]);
+    }, []);
 
-    const labelFont = length > 10 ? 'text-[9px]' : length > 8 ? 'text-[10px]' : 'text-[10px]';
+    const labelFont = length > 10 ? 'text-[9px]' : 'text-[10px]';
     return (
         <div className="flex items-center gap-1.5">
             <span className={`${labelFont} text-white/60 font-bold tabular-nums w-8 shrink-0 text-right`}>
@@ -83,16 +93,17 @@ function WordRow({ length, value, onChange, rowIndex, autoFocus }: {
                     key={i}
                     length={length}
                     char={value[i] || ''}
-                    onChange={(v) => handleCharChange(i, v)}
-                    onKeyDown={handleKeyDown(i)}
-                    inputRef={setRef(i)}
+                    boxIndex={i}
+                    onChange={handleBoxChange}
+                    onKeyDown={handleBoxKeyDown}
+                    inputRef={setRefFromIndex}
                     autoFocus={autoFocus && i === 0}
                 />
             ))}
             <span className={`${labelFont} text-white/40 ml-1`}>{length}L</span>
         </div>
     );
-}
+});
 
 export const CustomWordGrid = memo(({
     mode,

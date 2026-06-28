@@ -13,6 +13,7 @@ import { MarathonGameSequence } from './create/MarathonGameSequence';
 import { CustomWordGrid } from './create/CustomWordGrid';
 import { CreateSummaryStep, type ChallengeFormSettings } from './create/CreateSummaryStep';
 import { DifficultySelector } from './create/DifficultySelector';
+import { MarathonTimerInputs } from './create/MarathonTimerInputs';
 
 const LoadPresetsList = memo(({ 
     onLoad, 
@@ -459,6 +460,14 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (mode === 'uniform') {
             setMarathonDifficulties([]);
         }
+    }, []);
+
+    const handleMarathonDifficultyChange = useCallback((idx: number, d: 'easy' | 'normal' | 'difficult') => {
+        setMarathonDifficulties(prev => {
+            const next = [...prev];
+            next[idx] = d;
+            return next;
+        });
     }, []);
 
     // Advanced UI States
@@ -1020,13 +1029,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             onForceOrderChange={setMarathonForceOrder}
                             difficultyMode={marathonDifficultyMode}
                             marathonDifficulties={marathonDifficulties}
-                            onMarathonDifficultyChange={(idx, d) => {
-                                setMarathonDifficulties(prev => {
-                                    const next = [...prev];
-                                    next[idx] = d;
-                                    return next;
-                                });
-                            }}
+                            onMarathonDifficultyChange={handleMarathonDifficultyChange}
                         />
                     )}
                     
@@ -1303,33 +1306,15 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                     <button type="button" onClick={() => setTimerType('custom')} className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-white/80'}`}>Custom</button>
                                 </div>
                             </div>
-                            {timerType === 'custom' && (
-                                <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                    {marathonGames.map((l, idx) => (
-                                        <div key={idx} className="space-y-1 min-w-[50px] flex-1">
-                                            <p className="text-[10px] font-black uppercase text-white/80 text-center">#{idx + 1} ({l}L)</p>
-                                            <input type="number" inputMode="numeric" min={1} max={60} value={marathonTimersInput[idx] || ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setMarathonTimersInput(prev => { const next = [...prev]; next[idx] = val; return next; });
-                                                    const num = Number(val);
-                                                    if (!isNaN(num) && num >= 1 && num <= 60) {
-                                                        setMarathonTimersArray(prev => { const next = [...prev]; next[idx] = num; return next; });
-                                                        if (isBotMarathon) { try { const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers'); const parsed = cached ? JSON.parse(cached) : {}; parsed[idx] = { length: marathonGames[idx], timer: num }; safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed)); } catch (e) { console.error('Failed to cache marathon timer', e); } }
-                                                    }
-                                                }}
-                                                onBlur={() => {
-                                                    let num = parseInt(marathonTimersInput[idx], 10);
-                                                    if (isNaN(num)) num = 5; else if (num < 1) num = 1; else if (num > 60) num = 60;
-                                                    setMarathonTimersArray(prev => { const next = [...prev]; next[idx] = num; return next; });
-                                                    setMarathonTimersInput(prev => { const next = [...prev]; next[idx] = String(num); return next; });
-                                                    if (isBotMarathon) { try { const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers'); const parsed = cached ? JSON.parse(cached) : {}; parsed[idx] = { length: marathonGames[idx], timer: num }; safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed)); } catch (e) { console.error('Failed to cache marathon timer', e); } }
-                                                }}
-                                                className="w-full bg-black/40 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-center focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all" />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <MarathonTimerInputs
+                                marathonGames={marathonGames}
+                                marathonTimersInput={marathonTimersInput}
+                                marathonTimersArray={marathonTimersArray}
+                                timerType={timerType}
+                                setMarathonTimersInput={setMarathonTimersInput}
+                                setMarathonTimersArray={setMarathonTimersArray}
+                                isBotMarathon={isBotMarathon}
+                            />
                         </div>
                     )}
 

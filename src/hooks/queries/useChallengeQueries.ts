@@ -786,7 +786,10 @@ export const useChallengeMutations = () => {
             disableHints,
             isShapeshifter,
             is_shapeshifter,
+            difficulty = 'normal',
          } = params;
+
+         const resolveDiff = (idx?: number) => Array.isArray(difficulty) ? difficulty[idx ?? 0] ?? 'normal' : difficulty;
 
          // 1. Double check in client logic if anyone has played
          const { data: parts, error: partsError } = await supabase
