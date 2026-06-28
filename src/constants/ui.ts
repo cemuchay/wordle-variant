@@ -8,6 +8,8 @@ export const TOAST_DURATION = {
    LONG: 4000,
    /** Extra-long toast. */
    VERY_LONG: 5000,
+   /** Extremely -long toast. */
+   EXTRA_LONG: 10000,
 } as const;
 
 /** Z-index values for layered UI elements (higher = on top). */

@@ -1,13 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useRef } from 'react';
-import { getWordLists } from '../../data/words';
-import { checkGuess, getLetterStatuses, isHintDisabled, getHint, updateStats, obfuscateWord } from '../../lib/game-logic';
-import { generateRoast } from '../../utils/roastEngine';
-import returnAnimationTime from '../../utils/returnAnimationTime';
-import { TOAST_DURATION, ANIMATION_DURATION } from '../../constants/ui';
-import { ANIMATION } from '../../constants/game';
-import { safeLocalStorage } from '../../utils/storage';
-import { getLocalSalt } from './utils';
+import { useCallback, useRef } from "react";
+import { getWordLists } from "../../data/words";
+import {
+   checkGuess,
+   getLetterStatuses,
+   isHintDisabled,
+   getHint,
+   updateStats,
+   obfuscateWord,
+} from "../../lib/game-logic";
+import { generateRoast } from "../../utils/roastEngine";
+import returnAnimationTime from "../../utils/returnAnimationTime";
+import { TOAST_DURATION, ANIMATION_DURATION } from "../../constants/ui";
+import { ANIMATION } from "../../constants/game";
+import { safeLocalStorage } from "../../utils/storage";
+import { getLocalSalt } from "./utils";
 
 interface UseActionsProps {
    state: any;
@@ -18,9 +25,9 @@ interface UseActionsProps {
    preferences: any;
    triggerToast: (msg: string, duration?: number) => void;
    ask: (params: any) => Promise<boolean>;
-    performSync: (payload: any) => Promise<boolean>;
-    updateOptimistically: (stats: any) => void;
-    refresh: () => Promise<void>;
+   performSync: (payload: any) => Promise<boolean>;
+   updateOptimistically: (stats: any) => void;
+   refresh: () => Promise<void>;
 }
 
 export const useActions = ({
@@ -32,9 +39,9 @@ export const useActions = ({
    preferences,
    triggerToast,
    ask,
-    performSync,
-    updateOptimistically,
-    refresh,
+   performSync,
+   updateOptimistically,
+   refresh,
 }: UseActionsProps) => {
    const isSubmittingRef = useRef(false);
 
@@ -45,33 +52,33 @@ export const useActions = ({
       [dispatch, config.length],
    );
 
-    const onDelete = useCallback(() => {
+   const onDelete = useCallback(() => {
       dispatch({ type: "DELETE_LETTER" });
-    }, [dispatch]);
+   }, [dispatch]);
 
-    const onSetCursor = useCallback(
+   const onSetCursor = useCallback(
       (index: number) => {
-        dispatch({ type: "SET_CURSOR", index });
+         dispatch({ type: "SET_CURSOR", index });
       },
       [dispatch],
-    );
+   );
 
-    const onSetEditIndex = useCallback(
+   const onSetEditIndex = useCallback(
       (index: number | null) => {
-        dispatch({ type: "SET_EDIT_INDEX", index });
+         dispatch({ type: "SET_EDIT_INDEX", index });
       },
       [dispatch],
-    );
+   );
 
-    const onCursorLeft = useCallback(() => {
+   const onCursorLeft = useCallback(() => {
       const newIdx = Math.max(0, state.cursorIndex - 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
-    }, [state.cursorIndex, dispatch]);
+   }, [state.cursorIndex, dispatch]);
 
-    const onCursorRight = useCallback(() => {
+   const onCursorRight = useCallback(() => {
       const newIdx = Math.min(state.currentGuess.length, state.cursorIndex + 1);
       dispatch({ type: "SET_CURSOR", index: newIdx });
-    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
+   }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
    const onEnter = useCallback(async () => {
       if (state.isGameOver || state.currentGuess.length !== config.length)
@@ -87,7 +94,10 @@ export const useActions = ({
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });
-            setTimeout(() => dispatch({ type: "STOP_SHAKE" }), ANIMATION_DURATION.SHAKE);
+            setTimeout(
+               () => dispatch({ type: "STOP_SHAKE" }),
+               ANIMATION_DURATION.SHAKE,
+            );
             return;
          }
 
@@ -150,7 +160,10 @@ export const useActions = ({
                word: obfuscateWord(payload.config.word, localSalt),
             },
          };
-         safeLocalStorage.setItem(`wordle-${date}`, JSON.stringify(savedPayload));
+         safeLocalStorage.setItem(
+            `wordle-${date}`,
+            JSON.stringify(savedPayload),
+         );
 
          // 2. Update UI immediately (flips row) — show result instantly
          dispatch({
@@ -181,13 +194,14 @@ export const useActions = ({
          }
 
          // 5. Handle game over modal and reveal timing
-         const revealDelay = returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
+         const revealDelay =
+            returnAnimationTime(config.length) + ANIMATION.REVEAL_BUFFER;
 
          if (won || lost) {
             if (lost) {
                triggerToast(
                   `The word is: ${config.word}`,
-                  TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
+                  TOAST_DURATION.EXTRA_LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
                );
             }
 
@@ -198,7 +212,8 @@ export const useActions = ({
                if (won) {
                   triggerToast(
                      message || state.gameMessage,
-                     TOAST_DURATION.LONG + ANIMATION.SYNC_FAIL_TOAST_EXTRA,
+                     TOAST_DURATION.EXTRA_LONG +
+                        ANIMATION.SYNC_FAIL_TOAST_EXTRA,
                   );
                }
             }, revealDelay);
@@ -230,7 +245,11 @@ export const useActions = ({
    ]);
 
    const handleHint = useCallback(async () => {
-      if (state.guesses.length < ANIMATION.HINT_MIN_GUESSES || state.isGameOver || state.usedHint)
+      if (
+         state.guesses.length < ANIMATION.HINT_MIN_GUESSES ||
+         state.isGameOver ||
+         state.usedHint
+      )
          return;
       if (state.guesses.length >= config.maxAttempts - 1) {
          triggerToast("Hint locked on last available guess.");
@@ -293,15 +312,21 @@ export const useActions = ({
       dispatch,
    ]);
 
-   const setGameOverModalOpen = useCallback((isOpen: boolean) => {
-      dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
-   }, [dispatch]);
+   const setGameOverModalOpen = useCallback(
+      (isOpen: boolean) => {
+         dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
+      },
+      [dispatch],
+   );
 
-   const loadState = useCallback((payload: any) => {
-      dispatch({ type: "LOAD_STATE", payload });
-   }, [dispatch]);
+   const loadState = useCallback(
+      (payload: any) => {
+         dispatch({ type: "LOAD_STATE", payload });
+      },
+      [dispatch],
+   );
 
-    return {
+   return {
       onChar,
       onDelete,
       onEnter,
@@ -312,5 +337,5 @@ export const useActions = ({
       onSetEditIndex,
       onCursorLeft,
       onCursorRight,
-    };
+   };
 };
