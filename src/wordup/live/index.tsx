@@ -315,6 +315,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
                   role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                   waitingForOpponent={waitingForOpponent}
+                  isConnected={engine.isConnected}
                />
             )}
             {view === "gameover" && (

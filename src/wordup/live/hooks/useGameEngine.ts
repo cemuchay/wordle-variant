@@ -300,7 +300,7 @@ export function useGameEngine(props: EngineProps) {
              const activeAnswers = isP1 ? upd.p1_answers : upd.p2_answers;
              const myScore = isP1 ? upd.p1_score : upd.p2_score;
              const oppScore = isP1 ? upd.p2_score : upd.p1_score;
-             channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: activeAnswers, my_score: myScore, opp_score: oppScore } }).catch(console.error);
+              channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: activeAnswers, my_score: myScore, opp_score: oppScore } }).catch(() => { dispatch({ type: "SET_CONNECTION", connected: false }); console.error("Broadcast failed"); });
           }
       } catch (err) {
          console.error("[WordUp] handleAnswerSelect error:", err);
@@ -410,7 +410,27 @@ export function useGameEngine(props: EngineProps) {
           dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
           const cs = Math.ceil(remainingTime);
           if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-          if (remainingTime <= 0) { clearT("roundInterval"); if (useLiveStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.(""); }
+           if (remainingTime <= 0) {
+              clearT("roundInterval");
+              if (useLiveStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.("");
+              const cur = S.current.matchData;
+              if (cur && gameType === "live") {
+                 const isP1 = S.current.role === "player1";
+                 const oppAnswered = isP1 ? cur.p2_answered : cur.p1_answered;
+                 if (!oppAnswered) {
+                    const synced = {
+                       ...cur,
+                       [isP1 ? "p2_answers" : "p1_answers"]: [
+                          ...((isP1 ? cur.p2_answers : cur.p1_answers) || []),
+                          { question_idx: S.current.currentRound, correct: false, time_taken: 0, points: 0, choice: "" },
+                       ],
+                       [isP1 ? "p2_answered" : "p1_answered"]: true,
+                       [isP1 ? "p2_score" : "p1_score"]: isP1 ? (cur.p2_score || 0) : (cur.p1_score || 0),
+                    };
+                    cb.current.handleMatchUpdate?.(synced);
+                 }
+              }
+           }
        }, 50);
 
        if (gameType === "live-bot" && q) {
@@ -726,13 +746,17 @@ export function useGameEngine(props: EngineProps) {
                   onRematchAccepted(payload.newMatchId, activeRole);
                })
                .on("broadcast", { event: "quick_chat" }, ({ payload }: any) => window.dispatchEvent(new CustomEvent("wordup-quick-chat", { detail: payload })))
-                .subscribe((status) => {
-                   if (status === "SUBSCRIBED") {
-                      supabase.from("wordup_matches").select("*").eq("id", mId).single().then(({ data }) => { if (data) cb.current.handleMatchUpdate?.(data); }, () => {});
-                      resetInactivityWatchdog();
-                   }
-                   if (status === "CHANNEL_ERROR") triggerToast("Connection lost. Attempting to reconnect...", 3000);
-                });
+                 .subscribe((status) => {
+                    if (status === "SUBSCRIBED") {
+                       dispatch({ type: "SET_CONNECTION", connected: true });
+                       supabase.from("wordup_matches").select("*").eq("id", mId).single().then(({ data }) => { if (data) cb.current.handleMatchUpdate?.(data); }, () => {});
+                       resetInactivityWatchdog();
+                    }
+                    if (status === "CHANNEL_ERROR" || status === "CLOSED") {
+                       dispatch({ type: "SET_CONNECTION", connected: false });
+                       triggerToast("Connection lost. Attempting to reconnect...", 3000);
+                    }
+                 });
             channel.current = ch;
          }
 
@@ -861,6 +885,7 @@ export function useGameEngine(props: EngineProps) {
    // ── Return ───────────────────────────────────────────────────────────
    return {
       state,
+      isConnected: state.isConnected,
       startMatch,
       handleAnswerSelect,
       sendRematch,
