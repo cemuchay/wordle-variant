@@ -297,7 +297,7 @@ export default function App() {
     const now = new Date();
     const hour = now.getHours();
     let greeting = "Hello!";
-    let face = "(•‿•)";
+    let expression: import('./components/wordup/WordUpView/components/WordUpMascot').MascotExpression = 'idle';
 
     if (hour >= 5 && hour < 12) {
       greeting = "Good morning! ☀️";
@@ -307,15 +307,14 @@ export default function App() {
       greeting = "Good evening! 🌙";
     } else {
       greeting = "Good night! ✨";
-      face = "(★‿★)";
+      expression = 'happy';
     }
 
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('mascot-changed', {
         detail: {
-          mascotFace: face,
-          mascotLabel: greeting,
-          animationClass: "animate-in slide-in-from-top-2 duration-500"
+          expression,
+          label: greeting
         }
       }));
     }, 2000);

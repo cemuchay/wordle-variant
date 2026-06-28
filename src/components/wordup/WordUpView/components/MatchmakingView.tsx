@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Swords } from "lucide-react";
 import { CATEGORIES } from "../constants";
+import { WordUpMascot } from "./WordUpMascot";
 
 interface MatchmakingViewProps {
    category: string;
@@ -21,8 +22,13 @@ export const MatchmakingView = ({ category, cancelMatchmaking, countdownSecs }: 
             <Swords size={28} className="absolute text-correct animate-pulse" />
          </div>
 
+         <WordUpMascot expression="thinking" size={72} className="mb-2" />
+
          <div className="text-center space-y-2">
             <h3 className="text-lg font-black uppercase tracking-wider">Finding Match</h3>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+               Searching for an opponent...
+            </p>
             <p className="text-xs text-gray-500 uppercase font-black tracking-wide">
                Category: {CATEGORIES.find(c => c.id === category)?.name}
             </p>

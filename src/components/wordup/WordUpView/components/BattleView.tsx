@@ -14,6 +14,8 @@ import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 import { CATEGORIES } from "../constants";
 import { WORDUP_GAME, CONFETTI, CHAT_BUBBLE, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../../constants/wordup";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { WordUpMascot } from "./WordUpMascot";
+import type { MascotExpression } from "./WordUpMascot";
 
 interface MatchData {
    p1_score?: number;
@@ -98,6 +100,7 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
+   const [mascotExpression, setMascotExpression] = useState<MascotExpression>('idle');
    const { ask } = useConfirmation();
    const timerBarRef = useRef<HTMLDivElement | null>(null);
 
@@ -105,13 +108,10 @@ export const BattleView = ({
    const setIsBattlePlaying = useWordUpStore((s) => s.setIsBattlePlaying);
 
    useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParticles([]);
-      // eslint-disable-next-line react-hooks/immutability
       setScorePopups([]);
+      setMascotExpression('thinking');
    }, [currentIdx]);
-
-
 
    const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
    const prevMyScoreRef = useRef(0);
@@ -143,6 +143,17 @@ export const BattleView = ({
 
    const activeQuestion = questions[currentIdx];
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
+
+   useEffect(() => {
+      if (selectedAnswer !== null && revealAnswers) {
+         const isCorrect = selectedAnswer === activeQuestion?.answer;
+         setMascotExpression(isCorrect ? 'excited' : 'sad');
+      } else if (selectedAnswer !== null) {
+         setMascotExpression('happy');
+      } else {
+         setMascotExpression('thinking');
+      }
+   }, [selectedAnswer, revealAnswers, activeQuestion?.answer]);
 
    // GPU-accelerated CSS transition logic for smooth countdown animation
    useEffect(() => {
@@ -246,6 +257,13 @@ export const BattleView = ({
 
    const onChoiceSelect = (choice: string) => {
       handleAnswerSelect(choice);
+      if ('vibrate' in navigator) {
+         if (choice === activeQuestion.answer) {
+            navigator.vibrate(100);
+         } else {
+            navigator.vibrate([50, 50, 50]);
+         }
+      }
       if (choice === activeQuestion.answer) {
          const newParticles = Array.from({ length: CONFETTI.PARTICLE_COUNT }).map((_, i) => {
             const angle = (i / CONFETTI.PARTICLE_COUNT) * 360 + (Math.random() * 20 - 10);
@@ -460,8 +478,13 @@ export const BattleView = ({
             </div>
          </div>
 
-         {/* Timer Bar */}
-         <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
+          {/* Mascot Reaction */}
+          <div className="flex items-center justify-center gap-2 py-1 shrink-0">
+             <WordUpMascot expression={mascotExpression} size={36} />
+          </div>
+
+          {/* Timer Bar */}
+          <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden shrink-0 shadow-inner">
             {!revealAnswers && (
                <div
                   ref={timerBarRef}

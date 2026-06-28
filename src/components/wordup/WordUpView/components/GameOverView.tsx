@@ -3,6 +3,7 @@ import { Award } from "lucide-react";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";
+import { WordUpMascot } from "./WordUpMascot";
 
 interface GameOverViewProps {
    matchData: any;
@@ -55,13 +56,15 @@ export const GameOverView = ({
          animate={{ opacity: 1, scale: 1 }}
          className="flex flex-col flex-1 justify-center gap-6 py-4"
       >
-         <div className="text-center space-y-1">
-            <Award size={48} className={`mx-auto animate-bounce ${statusTextClass}`} />
-            <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
-               {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
-            </h2>
-            <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
-         </div>
+          <div className="text-center space-y-1">
+             <div className="flex justify-center">
+                <WordUpMascot expression={isWinner ? 'excited' : isDraw ? 'idle' : 'sad'} size={80} />
+             </div>
+             <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
+                {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
+             </h2>
+             <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
+          </div>
 
          {/* Side-by-Side Scores */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
