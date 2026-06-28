@@ -291,7 +291,11 @@ export function useWordUpGameEngine(props: EngineProps) {
          cb.current.handleMatchUpdate?.(upd);
 
          if (gameType === "live") {
-             channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers, my_score: upd.p1_score || upd.p2_score, opp_score: upd.p2_score || upd.p1_score } }).catch(console.error);
+            const isP1 = S.current.role === "player1";
+            const activeAnswers = isP1 ? upd.p1_answers : upd.p2_answers;
+            const myScore = isP1 ? upd.p1_score : upd.p2_score;
+            const oppScore = isP1 ? upd.p2_score : upd.p1_score;
+            channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: activeAnswers, my_score: myScore, opp_score: oppScore } }).catch(console.error);
          }
          if (gameType === "async") await persistTurn(upd);
       } catch (err) {

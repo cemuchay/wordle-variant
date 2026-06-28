@@ -296,8 +296,9 @@ export function useGameEngine(props: EngineProps) {
          cb.current.handleMatchUpdate?.(upd);
 
           if (gameType === "live") {
-              channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: upd.p1_answers || upd.p2_answers } }).catch(console.error);
-         }
+             const activeAnswers = S.current.role === "player1" ? upd.p1_answers : upd.p2_answers;
+             channel.current?.send({ type: "broadcast", event: "player_answered", payload: { role: S.current.role, answers: activeAnswers } }).catch(console.error);
+          }
       } catch (err) {
          console.error("[WordUp] handleAnswerSelect error:", err);
          dispatch({ type: "CLEAR_ANSWER" });
