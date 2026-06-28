@@ -13,6 +13,20 @@ interface MarathonGameSequenceProps {
 const ADDABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10] as const;
 const MAX_GAMES = 20;
 
+function lengthColor(l: number): { text: string; border: string; bg: string } {
+    const map: Record<number, { text: string; border: string; bg: string }> = {
+        3: { text: 'text-rose-400', border: 'border-l-rose-400', bg: 'bg-rose-500/5' },
+        4: { text: 'text-orange-400', border: 'border-l-orange-400', bg: 'bg-orange-500/5' },
+        5: { text: 'text-correct', border: 'border-l-correct', bg: 'bg-correct/5' },
+        6: { text: 'text-cyan-400', border: 'border-l-cyan-400', bg: 'bg-cyan-500/5' },
+        7: { text: 'text-blue-400', border: 'border-l-blue-400', bg: 'bg-blue-500/5' },
+        8: { text: 'text-violet-400', border: 'border-l-violet-400', bg: 'bg-violet-500/5' },
+        9: { text: 'text-fuchsia-400', border: 'border-l-fuchsia-400', bg: 'bg-fuchsia-500/5' },
+        10: { text: 'text-amber-400', border: 'border-l-amber-400', bg: 'bg-amber-500/5' },
+    };
+    return map[l] ?? { text: 'text-white/60', border: 'border-l-transparent', bg: '' };
+}
+
 export const MarathonGameSequence = memo(({
     marathonGames,
     onUpdate,
@@ -101,31 +115,34 @@ export const MarathonGameSequence = memo(({
                             </div>
                         ) : (
                             <div className="space-y-1.5 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[240px] overflow-y-auto">
-                                {marathonGames.map((l, idx) => (
-                                    <div
-                                        key={idx}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, idx)}
-                                        onDragEnd={handleDragEnd}
-                                        onDragOver={handleDragOver}
-                                        onDrop={(e) => handleDrop(e, idx)}
-                                        className="flex items-center justify-between px-3 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-white transition-colors cursor-grab active:cursor-grabbing select-none"
-                                    >
-                                        <div className="flex items-center gap-2.5">
-                                            <GripVertical size={14} className="text-white/30 shrink-0" />
-                                            <span className="text-white/60 text-[10px] font-bold tabular-nums">#{idx + 1}</span>
-                                            <span className="text-yellow-500">{l}L</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemove(idx)}
-                                            className="p-1 text-white/80 hover:text-red-500 transition-colors cursor-pointer"
-                                            title="Remove game"
+                                {marathonGames.map((l, idx) => {
+                                    const c = lengthColor(l);
+                                    return (
+                                        <div
+                                            key={idx}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, idx)}
+                                            onDragEnd={handleDragEnd}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleDrop(e, idx)}
+                                            className={`flex items-center justify-between px-3 py-2.5 border border-l-4 border-white/10 rounded-xl text-xs font-black text-white transition-colors cursor-grab active:cursor-grabbing select-none ${c.border} ${c.bg}`}
                                         >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                ))}
+                                            <div className="flex items-center gap-2.5">
+                                                <GripVertical size={14} className="text-white/30 shrink-0" />
+                                                <span className="text-white/60 text-[10px] font-bold tabular-nums">#{idx + 1}</span>
+                                                <span className={c.text}>{l}L</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemove(idx)}
+                                                className="p-1 text-white/80 hover:text-red-500 transition-colors cursor-pointer"
+                                                title="Remove game"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -141,7 +158,7 @@ export const MarathonGameSequence = memo(({
                                     type="button"
                                     disabled={marathonGames.length >= MAX_GAMES}
                                     onClick={() => handleAdd(l)}
-                                    className="flex-1 min-w-[40px] py-2.5 rounded-xl border border-white/10 bg-black/20 hover:bg-white/5 text-xs font-black text-yellow-500 transition-all disabled:opacity-30 disabled:hover:bg-black/20 cursor-pointer"
+                                    className={`flex-1 min-w-[40px] py-2.5 rounded-xl border border-white/10 bg-black/20 hover:bg-white/5 text-xs font-black transition-all disabled:opacity-30 disabled:hover:bg-black/20 cursor-pointer ${lengthColor(l).text}`}
                                 >
                                     +{l}L
                                 </button>
