@@ -384,11 +384,13 @@ export const useChallengeMutations = () => {
          disableHints = false,
          isBotMarathon = false,
          is_bot_marathon,
-         isShapeshifter = false,
-         is_shapeshifter,
-      }: any) => {
-         const salt = Math.random().toString(36).substring(2, 15);
-         let actualLength = length;
+          isShapeshifter = false,
+          is_shapeshifter,
+          difficulty = 'normal',
+       }: any) => {
+          const salt = Math.random().toString(36).substring(2, 15);
+          const resolveDiff = (idx?: number) => Array.isArray(difficulty) ? difficulty[idx ?? 0] ?? 'normal' : difficulty;
+          let actualLength = length;
          let targetWord: string;
          const resolvedIsBotMarathon = !!(isBotMarathon || is_bot_marathon);
 
@@ -435,11 +437,11 @@ export const useChallengeMutations = () => {
                      rawWord = customWords[l];
                   }
                }
-               let word = (rawWord || getRandomWord(l)).toUpperCase();
-               if (!rawWord) {
-                  let limit = 0;
-                  while (chosenWords.has(word) && limit < 200) {
-                     word = getRandomWord(l).toUpperCase();
+                let word = (rawWord || getRandomWord(l, resolveDiff(idx))).toUpperCase();
+                if (!rawWord) {
+                   let limit = 0;
+                   while (chosenWords.has(word) && limit < 200) {
+                      word = getRandomWord(l, resolveDiff(idx)).toUpperCase();
                      limit++;
                   }
                }
@@ -455,7 +457,7 @@ export const useChallengeMutations = () => {
             actualLength =
                length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
             const plainWord = (
-               customWord || getRandomWord(actualLength)
+                customWord || getRandomWord(actualLength, resolveDiff())
             ).toUpperCase();
             plainRegularTarget = plainWord;
             targetWord = obfuscateWord(plainWord, salt);
@@ -472,46 +474,46 @@ export const useChallengeMutations = () => {
          if (handicapStarter === "__SYSTEM_RANDOM__") {
             if (resolvedMarathonGames) {
                // Marathon
-               const startersList: string[] = [];
-               resolvedMarathonGames.forEach((l: number, idx: number) => {
-                  const target =
-                     plainMarathonTargets[idx] ||
-                     getRandomWord(l).toUpperCase();
-                  const maxAllowed = l <= 4 ? 1 : 3;
-                  let starter = getRandomWord(l).toUpperCase();
-                  let limit = 0;
-                  while (limit < 200) {
-                     if (
-                        starter !== target &&
-                        getMatchCount(starter, target) <= maxAllowed
-                     ) {
-                        break;
-                     }
-                     starter = getRandomWord(l).toUpperCase();
-                     limit++;
-                  }
-                  startersList.push(starter);
-               });
-               finalHandicapStarters = startersList;
-               finalHandicapStarter = null;
-            } else {
-               const target =
-                  plainRegularTarget ||
-                  getRandomWord(actualLength).toUpperCase();
-               const maxAllowed = actualLength <= 4 ? 1 : 3;
-               let starter = getRandomWord(actualLength).toUpperCase();
-               let limit = 0;
-               while (limit < 200) {
-                  if (
-                      starter !== target &&
-                      getMatchCount(starter, target) <= maxAllowed
-                  ) {
-                     break;
-                  }
-                  starter = getRandomWord(actualLength).toUpperCase();
-                  limit++;
-               }
-               finalHandicapStarter = starter;
+                const startersList: string[] = [];
+                resolvedMarathonGames.forEach((l: number, idx: number) => {
+                   const target =
+                      plainMarathonTargets[idx] ||
+                      getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                   const maxAllowed = l <= 4 ? 1 : 3;
+                   let starter = getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                   let limit = 0;
+                   while (limit < 200) {
+                      if (
+                         starter !== target &&
+                         getMatchCount(starter, target) <= maxAllowed
+                      ) {
+                         break;
+                      }
+                      starter = getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                      limit++;
+                   }
+                   startersList.push(starter);
+                });
+                finalHandicapStarters = startersList;
+                finalHandicapStarter = null;
+             } else {
+                const target =
+                   plainRegularTarget ||
+                   getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                const maxAllowed = actualLength <= 4 ? 1 : 3;
+                let starter = getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                let limit = 0;
+                while (limit < 200) {
+                   if (
+                       starter !== target &&
+                       getMatchCount(starter, target) <= maxAllowed
+                   ) {
+                      break;
+                   }
+                   starter = getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                   limit++;
+                }
+                finalHandicapStarter = starter;
                finalHandicapStarters = null;
             }
          }
@@ -842,11 +844,11 @@ export const useChallengeMutations = () => {
                         rawWord = customWords[l];
                      }
                   }
-                  let word = (rawWord || getRandomWord(l)).toUpperCase();
-                  if (!rawWord) {
-                     let limit = 0;
-                     while (chosenWords.has(word) && limit < 200) {
-                        word = getRandomWord(l).toUpperCase();
+                   let word = (rawWord || getRandomWord(l, resolveDiff(idx))).toUpperCase();
+                   if (!rawWord) {
+                      let limit = 0;
+                      while (chosenWords.has(word) && limit < 200) {
+                         word = getRandomWord(l, resolveDiff(idx)).toUpperCase();
                         limit++;
                      }
                   }
@@ -861,9 +863,9 @@ export const useChallengeMutations = () => {
             } else {
                actualLength =
                   length === 0 ? Math.floor(Math.random() * 5) + 3 : length;
-               const plainWord = (
-                  customWord || getRandomWord(actualLength)
-               ).toUpperCase();
+                const plainWord = (
+                   customWord || getRandomWord(actualLength, resolveDiff())
+                ).toUpperCase();
                plainRegularTarget = plainWord;
                targetWord = obfuscateWord(plainWord, salt);
             }
@@ -895,46 +897,46 @@ export const useChallengeMutations = () => {
                   (!existing.handicap_starter && !existing.handicap_starters);
 
                if (needsNewRandom) {
-                  if (resolvedMarathonGames) {
-                     const startersList: string[] = [];
-                     resolvedMarathonGames.forEach((l: number, idx: number) => {
-                        const target =
-                           plainMarathonTargets[idx] ||
-                           getRandomWord(l).toUpperCase();
-                        const maxAllowed = l <= 4 ? 1 : 3;
-                        let starter = getRandomWord(l).toUpperCase();
-                        let limit = 0;
-                        while (limit < 200) {
-                           if (
-                              starter !== target &&
-                              getMatchCount(starter, target) <= maxAllowed
-                           ) {
-                              break;
-                           }
-                           starter = getRandomWord(l).toUpperCase();
-                           limit++;
-                        }
-                        startersList.push(starter);
-                     });
-                     finalHandicapStarters = startersList;
-                     finalHandicapStarter = null;
-                  } else {
-                     const target =
-                        plainRegularTarget ||
-                        getRandomWord(actualLength).toUpperCase();
-                     const maxAllowed = actualLength <= 4 ? 1 : 3;
-                     let starter = getRandomWord(actualLength).toUpperCase();
-                     let limit = 0;
-                     while (limit < 200) {
-                        if (
-                           starter !== target &&
-                           getMatchCount(starter, target) <= maxAllowed
-                        ) {
-                           break;
-                        }
-                        starter = getRandomWord(actualLength).toUpperCase();
-                        limit++;
-                     }
+                   if (resolvedMarathonGames) {
+                      const startersList: string[] = [];
+                      resolvedMarathonGames.forEach((l: number, idx: number) => {
+                         const target =
+                            plainMarathonTargets[idx] ||
+                            getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                         const maxAllowed = l <= 4 ? 1 : 3;
+                         let starter = getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                         let limit = 0;
+                         while (limit < 200) {
+                            if (
+                               starter !== target &&
+                               getMatchCount(starter, target) <= maxAllowed
+                            ) {
+                               break;
+                            }
+                            starter = getRandomWord(l, resolveDiff(idx)).toUpperCase();
+                            limit++;
+                         }
+                         startersList.push(starter);
+                      });
+                      finalHandicapStarters = startersList;
+                      finalHandicapStarter = null;
+                   } else {
+                      const target =
+                         plainRegularTarget ||
+                         getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                      const maxAllowed = actualLength <= 4 ? 1 : 3;
+                      let starter = getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                      let limit = 0;
+                      while (limit < 200) {
+                         if (
+                            starter !== target &&
+                            getMatchCount(starter, target) <= maxAllowed
+                         ) {
+                            break;
+                         }
+                         starter = getRandomWord(actualLength, resolveDiff()).toUpperCase();
+                         limit++;
+                      }
                      finalHandicapStarter = starter;
                      finalHandicapStarters = null;
                   }

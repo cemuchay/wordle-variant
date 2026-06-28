@@ -12,6 +12,7 @@ import { CreateStepIndicator } from './create/CreateStepIndicator';
 import { MarathonGameSequence } from './create/MarathonGameSequence';
 import { CustomWordGrid } from './create/CustomWordGrid';
 import { CreateSummaryStep, type ChallengeFormSettings } from './create/CreateSummaryStep';
+import { DifficultySelector } from './create/DifficultySelector';
 
 const LoadPresetsList = memo(({ 
     onLoad, 
@@ -447,6 +448,19 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     // Multi-step form state
     const [step, setStep] = useState(0);
 
+    // Difficulty state
+    const [globalDifficulty, setGlobalDifficulty] = useState<'easy' | 'normal' | 'difficult'>('normal');
+    const [marathonDifficultyMode, setMarathonDifficultyMode] = useState<'uniform' | 'custom'>('uniform');
+    const [marathonDifficulties, setMarathonDifficulties] = useState<('easy' | 'normal' | 'difficult')[]>([]);
+
+    // Reset marathonDifficulties when toggling back to uniform
+    const handleMarathonDifficultyMode = useCallback((mode: 'uniform' | 'custom') => {
+        setMarathonDifficultyMode(mode);
+        if (mode === 'uniform') {
+            setMarathonDifficulties([]);
+        }
+    }, []);
+
     // Advanced UI States
 
     const [isPublic, setIsPublic] = useState(false);
@@ -875,6 +889,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             isBotMarathon: isBotMarathon,
             isShapeshifter,
             is_shapeshifter: isShapeshifter,
+            difficulty: length === 1 && marathonDifficultyMode === 'custom' ? marathonDifficulties : globalDifficulty,
         };
 
         if (isCustomWord) {
@@ -921,7 +936,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties]);
 
     const summarySettings = useMemo((): ChallengeFormSettings => ({
         mode,
@@ -1003,9 +1018,28 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             onTypeChange={handleSetMarathonType}
                             marathonForceOrder={marathonForceOrder}
                             onForceOrderChange={setMarathonForceOrder}
+                            difficultyMode={marathonDifficultyMode}
+                            marathonDifficulties={marathonDifficulties}
+                            onMarathonDifficultyChange={(idx, d) => {
+                                setMarathonDifficulties(prev => {
+                                    const next = [...prev];
+                                    next[idx] = d;
+                                    return next;
+                                });
+                            }}
                         />
                     )}
                     
+                    {(length !== 1 ? [3, 4, 5, 0].includes(length) : marathonGames.some(l => [3, 4, 5].includes(l))) && (
+                        <DifficultySelector
+                            mode={length === 1 ? 'marathon' : 'single'}
+                            globalDifficulty={globalDifficulty}
+                            marathonDifficultyMode={marathonDifficultyMode}
+                            onGlobalChange={setGlobalDifficulty}
+                            onModeChange={handleMarathonDifficultyMode}
+                        />
+                    )}
+
                     {mode === 'LIVE' && (
                         <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
                     )}

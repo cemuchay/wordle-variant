@@ -1,5 +1,7 @@
 import { memo, useCallback, useRef } from 'react';
 import { GripVertical, X } from 'lucide-react';
+import { PerGameDifficulty } from './PerGameDifficulty';
+import type { Difficulty, DifficultyMode } from './DifficultySelector';
 
 interface MarathonGameSequenceProps {
     marathonGames: number[];
@@ -8,6 +10,9 @@ interface MarathonGameSequenceProps {
     onTypeChange: (type: 'standard' | 'custom') => void;
     marathonForceOrder: boolean;
     onForceOrderChange: (v: boolean) => void;
+    difficultyMode?: DifficultyMode;
+    marathonDifficulties?: Difficulty[];
+    onMarathonDifficultyChange?: (idx: number, d: Difficulty) => void;
 }
 
 const ADDABLE_LENGTHS = [3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -34,6 +39,9 @@ export const MarathonGameSequence = memo(({
     onTypeChange,
     marathonForceOrder,
     onForceOrderChange,
+    difficultyMode = 'uniform',
+    marathonDifficulties = [],
+    onMarathonDifficultyChange,
 }: MarathonGameSequenceProps) => {
     const dragIdx = useRef<number | null>(null);
 
@@ -132,14 +140,22 @@ export const MarathonGameSequence = memo(({
                                                 <span className="text-white/60 text-[10px] font-bold tabular-nums">#{idx + 1}</span>
                                                 <span className={c.text}>{l}L</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemove(idx)}
-                                                className="p-1 text-white/80 hover:text-red-500 transition-colors cursor-pointer"
-                                                title="Remove game"
-                                            >
-                                                <X size={14} />
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                {difficultyMode === 'custom' && (
+                                                    <PerGameDifficulty
+                                                        value={marathonDifficulties[idx] ?? 'normal'}
+                                                        onChange={(d) => onMarathonDifficultyChange?.(idx, d)}
+                                                    />
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemove(idx)}
+                                                    className="p-1 text-white/80 hover:text-red-500 transition-colors cursor-pointer"
+                                                    title="Remove game"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })}
