@@ -51,8 +51,8 @@ interface ChallengeContextType {
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     lengthFilter: 'ALL' | number;
     setLengthFilter: (l: 'ALL' | number) => void;
-    listColumn: 'active' | 'played' | 'expired' | 'open';
-    setListColumn: (col: 'active' | 'played' | 'expired' | 'open') => void;
+    listColumn: 'unplayed' | 'played';
+    setListColumn: (col: 'unplayed' | 'played') => void;
     clearFilters: () => void;
     filteredChallenges: any[];
 
@@ -232,11 +232,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const isBackgroundFetching =
         ((isChallengesFetching && !isChallengesLoading) ||
-        (listColumn === 'open' && isDiscoverFetching && !isDiscoverLoading) ||
+        (listColumn === 'unplayed' && isDiscoverFetching && !isDiscoverLoading) ||
         isParticipantsBulkFetching) && isRetrying;
 
-    const error = (listColumn === 'open' ? discoverChallengesError : myChallengesError)
-        ? ((listColumn === 'open' ? discoverChallengesError : myChallengesError) as any)?.message || "Failed to load challenges."
+    const error = (listColumn === 'unplayed' ? (discoverChallengesError || myChallengesError) : myChallengesError)
+        ? ((listColumn === 'unplayed' ? (discoverChallengesError || myChallengesError) : myChallengesError) as any)?.message || "Failed to load challenges."
         : null;
 
     const channelRef = useRef<any>(null);
@@ -355,27 +355,26 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const filteredChallenges = useMemo(() => {
         let sourceList: any[] = [];
-        if (listColumn === 'active') {
-            sourceList = myChallenges.filter((item: any) => {
+        if (listColumn === 'unplayed') {
+            const active = myChallenges.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
                 const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
                 const isBotMarathon = item.challenge?.is_bot_marathon;
                 if (isBotMarathon && item.status === 'pending') return false;
                 return !isExpired && !isCompleted && item.status !== 'viewed';
-            });
+            }).map((item: any) => ({ ...item, _section: 'active' }));
+            sourceList = [...active, ...openChallengeItems.map((item: any) => ({ ...item, _section: 'open' }))];
         } else if (listColumn === 'played') {
-            sourceList = myChallenges.filter((item: any) => {
+            const played = myChallenges.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
                 const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
                 return !isExpired && isCompleted && item.status !== 'viewed';
-            });
-        } else if (listColumn === 'expired') {
-            sourceList = myChallenges.filter((item: any) => {
+            }).map((item: any) => ({ ...item, _section: 'played' }));
+            const expired = myChallenges.filter((item: any) => {
                 const isExpired = new Date(item.challenge?.expires_at) < new Date();
                 return isExpired;
-            });
-        } else if (listColumn === 'open') {
-            sourceList = openChallengeItems;
+            }).map((item: any) => ({ ...item, _section: 'expired' }));
+            sourceList = [...played, ...expired];
         }
 
         return sourceList.filter((item: any) => {
@@ -915,13 +914,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             });
 
             if (activeChallenges.length > 0) {
-                setListColumn('active');
-            } else if (playedChallenges.length > 0) {
+                setListColumn('unplayed');
+            } else if (playedChallenges.length > 0 || expiredChallenges.length > 0) {
                 setListColumn('played');
-            } else if (expiredChallenges.length > 0) {
-                setListColumn('expired');
             } else {
-                setListColumn('active');
+                setListColumn('unplayed');
             }
         }
     }, [isChallengesLoading, myChallengesData, setListColumn]);
@@ -959,7 +956,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const saved = loadChallengeView();
             if (saved && saved.challengeId) {
                 hasRestoredView.current = true;
-                setListColumn(saved.listColumn);
+                const migratedColumn = ({ active: 'unplayed', open: 'unplayed', expired: 'played', played: 'played' } as Record<string, 'unplayed' | 'played'>)[saved.listColumn] || 'unplayed';
+                setListColumn(migratedColumn);
                 setSearchQuery(saved.searchQuery || '');
                 setStatusFilter(saved.statusFilter || 'ALL');
                 setModeFilter(saved.modeFilter || 'ALL');
@@ -1089,7 +1087,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         submitResult,
         listColumn,
         setListColumn,
-        loading: isChallengesLoading || (listColumn === 'open' && isDiscoverLoading) || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
+        loading: isChallengesLoading || (listColumn === 'unplayed' && isDiscoverLoading) || createMutation.isPending || submitMutation.isPending || joinMutation.isPending || startMutation.isPending || marathonMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
         isBackgroundFetching,
         error,
         joinId,

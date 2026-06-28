@@ -10,6 +10,7 @@ import formatLastSeen from '../utils/formatLastSeen';
 import { useAppStore } from '../store/useAppStore';
 import { WordUpMascot } from './wordup/WordUpView/components/WordUpMascot';
 import type { MascotExpression } from './wordup/WordUpView/components/WordUpMascot';
+import formatUsername from '../utils/formatUsername';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -549,7 +550,7 @@ export const DynamicIslandStatus = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span
-                                                        className="text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                        className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
                                                         onClick={(e) => {
                                                             if (p.id) {
                                                                 e.stopPropagation();
@@ -557,7 +558,7 @@ export const DynamicIslandStatus = () => {
                                                             }
                                                         }}
                                                     >
-                                                        {p.username} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
+                                                        {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
                                                     </span>
                                                     <div className="flex items-center gap-1 text-[9px] text-gray-500">
                                                         {inVoiceRoom ? (

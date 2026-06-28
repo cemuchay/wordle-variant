@@ -233,6 +233,8 @@ const AuthenticatedChallengeContent = memo(
       }).length;
     }, [myChallenges]);
 
+    const unplayedCount = activeCount + openChallengesCount;
+
     const displayChallenges = useMemo(() => {
       const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
       return filteredChallenges.filter(
@@ -372,9 +374,9 @@ const AuthenticatedChallengeContent = memo(
                     <div className="space-y-6">
                       {/* Segmented Switcher for Columns */}
                       <div className="flex bg-white/5 p-0.5 sm:p-1 rounded-xl border border-white/10 gap-1 shrink-0">
-                        {(["active", "played", "expired", "open"] as const).map((tab) => {
-                          const count = tab === "active" ? activeCount : tab === "played" ? playedCount : tab === "expired" ? expiredCount : openChallengesCount;
-                          const label = tab === "open" ? `Open (${count})` : `${tab} (${count})`;
+                        {(["unplayed", "played"] as const).map((tab) => {
+                          const count = tab === "unplayed" ? unplayedCount : playedCount + expiredCount;
+                          const label = tab === "unplayed" ? `Unplayed (${count})` : `Played (${count})`;
                           return (
                             <button
                               key={tab}
@@ -392,7 +394,7 @@ const AuthenticatedChallengeContent = memo(
 
                       {/* Search and Filters Toggle */}
                       <div className="space-y-4">
-                        {dailyMarathonChallenges.length > 0 && (["open", "played"]).includes(listColumn) && (
+                        {dailyMarathonChallenges.length > 0 && listColumn === 'unplayed' && (
                           <MarathonBanner
                             challenges={dailyMarathonChallenges}
                             onClick={(challenge) => {
@@ -497,6 +499,39 @@ const AuthenticatedChallengeContent = memo(
                               ? "No challenges yet."
                               : "No matching challenges found."}
                           </div>
+                        ) : listColumn === 'unplayed' ? (
+                          <>
+                            {displayChallenges.filter((i: any) => i._section === 'active').map((item: any, idx: number) => (
+                              <ChallengeItem
+                                key={item.id}
+                                item={item}
+                                user={user}
+                                onSelect={handleViewChallenge}
+                                index={idx}
+                              />
+                            ))}
+                            {displayChallenges.filter((i: any) => i._section === 'open').length > 0 && (
+                              <div className="relative py-2">
+                                <div className="absolute inset-0 flex items-center">
+                                  <div className="w-full border-t border-white/10" />
+                                </div>
+                                <div className="relative flex justify-center">
+                                  <span className="bg-gray-950 px-3 text-[9px] font-black uppercase tracking-widest text-white/30">
+                                    — Open Challenges —
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {displayChallenges.filter((i: any) => i._section === 'open').map((item: any, idx: number) => (
+                              <ChallengeItem
+                                key={item.id}
+                                item={item}
+                                user={user}
+                                onSelect={handleViewChallenge}
+                                index={idx}
+                              />
+                            ))}
+                          </>
                         ) : (
                           displayChallenges.map((item: any, idx: number) => (
                             <ChallengeItem
