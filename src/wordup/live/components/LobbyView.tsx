@@ -42,8 +42,9 @@ export const LobbyView = ({
    const [showCategoryModal, setShowCategoryModal] = useState(false);
    const lastCategoryRef = useRef<string>(category || "mixed");
 
-   const [activeTab, setActiveTab] = useState<"play" | "rankings" | "history">("play");
-   const [historyMatches, setHistoryMatches] = useState<any[]>([]);
+    const activeTab = useLiveStore((s) => s.activeTab);
+    const setActiveTab = useLiveStore((s) => s.setActiveTab);
+    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);
 
    const fetchHistory = useCallback(async () => {

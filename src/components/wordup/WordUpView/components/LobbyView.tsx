@@ -56,7 +56,8 @@ export const LobbyView = ({
     const lastCategoryRef = useRef<string>(category || "mixed");
 
    // New states for tabs and challenge matching
-   const [activeTab, setActiveTab] = useState<"play" | "rankings" | "pending" | "history">("play");
+    const activeTab = useWordUpStore((s) => s.activeTab);
+    const setActiveTab = useWordUpStore((s) => s.setActiveTab);
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);

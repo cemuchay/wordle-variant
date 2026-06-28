@@ -4,8 +4,11 @@ import { type ProfileStats } from "../../shared/types";
 import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 import { postProcessQuestions } from "../../../utils/wordupQuestionPostProcessor";
 
+type LiveTab = "play" | "rankings" | "history";
+
 interface LiveState {
    isBattlePlaying: boolean;
+   activeTab: LiveTab;
    view:
       | "menu"
       | "connecting"
@@ -41,11 +44,13 @@ interface LiveState {
    setMaxTime: (time: number) => void;
    setSelectedAnswer: (ans: string | null) => void;
    setRevealAnswers: (reveal: boolean) => void;
+   setActiveTab: (tab: LiveTab) => void;
    resetGame: () => void;
 }
 
 export const useLiveStore = create<LiveState>((set) => ({
    isBattlePlaying: false,
+   activeTab: (safeSessionStorage.getItem("wordup_live_tab") as LiveTab) || "play",
    view: "menu",
    category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
@@ -81,6 +86,10 @@ export const useLiveStore = create<LiveState>((set) => ({
    setMaxTime: (maxTime) => set({ maxTime }),
    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
+   setActiveTab: (activeTab) => {
+      safeSessionStorage.setItem("wordup_live_tab", activeTab);
+      set({ activeTab });
+   },
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
       const state = useLiveStore.getState();
