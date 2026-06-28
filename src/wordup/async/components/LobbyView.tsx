@@ -6,6 +6,7 @@ import { CATEGORIES } from "../../shared/constants";
 import { type ProfileStats } from "../../shared/types";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { CategorySelectModal, CATEGORY_STYLE_MAP } from "../../../components/wordup/WordUpView/components/CategorySelectModal";
+import { useAsyncStore } from "../store/useAsyncStore";
 
 interface AsyncLobbyViewProps {
    userStats: ProfileStats | null;
@@ -53,7 +54,8 @@ export const LobbyView = ({
 }: AsyncLobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
-   const [activeTab, setActiveTab] = useState<"play" | "pending" | "history">("play");
+    const activeTab = useAsyncStore((s) => s.activeTab);
+    const setActiveTab = useAsyncStore((s) => s.setActiveTab);
    const [playerSearch, setPlayerSearch] = useState("");
    const lastCategoryRef = useRef<string>(category || "mixed");
 

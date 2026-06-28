@@ -5,10 +5,12 @@ import { type ProfileStats } from "../components/wordup/WordUpView/types";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 import { postProcessQuestions } from "../utils/wordupQuestionPostProcessor";
 
+type WordUpTab = "play" | "rankings" | "pending" | "history";
 
 interface WordUpState {
    isBattlePlaying: boolean;
-    view:
+   activeTab: WordUpTab;
+   view:
        | "menu"
        | "connecting"
        | "matchmaking"
@@ -54,11 +56,13 @@ interface WordUpState {
    setMaxTime: (time: number) => void;
    setSelectedAnswer: (ans: string | null) => void;
    setRevealAnswers: (reveal: boolean) => void;
+   setActiveTab: (tab: WordUpTab) => void;
    resetGame: () => void;
 }
 
 export const useWordUpStore = create<WordUpState>((set) => ({
    isBattlePlaying: false,
+   activeTab: (safeSessionStorage.getItem("wordup_tab") as WordUpTab) || "play",
    view: "menu",
     category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
@@ -94,6 +98,10 @@ export const useWordUpStore = create<WordUpState>((set) => ({
    setMaxTime: (maxTime) => set({ maxTime }),
    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
+   setActiveTab: (activeTab) => {
+      safeSessionStorage.setItem("wordup_tab", activeTab);
+      set({ activeTab });
+   },
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
       const state = useWordUpStore.getState();
