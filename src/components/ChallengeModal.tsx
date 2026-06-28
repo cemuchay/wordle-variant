@@ -259,38 +259,46 @@ const AuthenticatedChallengeContent = memo(
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-2 sm:p-2 mt-7 sm:mt-9"}`}
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-2 sm:p-2 mt-7 sm:mt-9"
+            }`}
         >
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {!isPlaying && selectedChallenge && (
               <button
                 onClick={() => setSelectedChallenge(null)}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white cursor-pointer mr-1 flex items-center justify-center"
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white cursor-pointer mr-1 flex items-center justify-center shrink-0"
                 title="Back to List"
               >
                 <ArrowLeft size={18} />
               </button>
             )}
-            <div className="bg-correct/20 p-0.5 sm:p-1 rounded-lg sm:rounded-xl">
-              <Trophy className="text-correct w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-black uppercase tracking-tighter">
-                  Challenges {activeGameLength ? `#${activeGameLength}L` : ""}
-                </h2>
-                {isBackgroundFetching && (
-                  <Loader2 className="w-3.5 h-3.5 text-correct animate-spin" />
-                )}
+
+            {/* Combined Parent Layout Context Wrapper */}
+            <div className="flex items-center gap-3 sm:gap-4 w-full min-w-0">
+              {/* 1. Trophy Container */}
+
+              <div className="bg-correct/20 p-0.5 sm:p-1 rounded-lg sm:rounded-xl shrink-0 flex items-center justify-center">
+                <Trophy className="text-correct w-8 h-8 sm:w-10 sm:h-10" />
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-2 min-h-5">
-                {isPlaying ? (
-                  <>
+
+              {/* 2. Unified Text & Actions Row (Strictly inline across all screens) */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {/* Header Title Section */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <h2 className="text-base sm:text-xl font-black uppercase tracking-tighter truncate">
+                    {selectedChallenge && myParticipation && activeGameLength ? `#${activeGameLength}L` : !selectedChallenge && !myParticipation ? "Challenges" : "Challenge"}
+                  </h2>
+                  {isBackgroundFetching && (
+                    <Loader2 className="w-3.5 h-3.5 text-correct animate-spin shrink-0" />
+                  )}
+                </div>
+
+                {/* Secondary Action Controls Inline Area */}
+                {isPlaying && (
+                  <div className="flex items-center gap-1.5 sm:gap-2 border-l border-white/10 pl-3">
                     <button
-                      onClick={() =>
-                        backAction ? backAction() : setIsPlaying(false)
-                      }
-                      className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white hover:text-white"
+                      onClick={() => (backAction ? backAction() : setIsPlaying(false))}
+                      className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white shrink-0"
                     >
                       <ArrowLeft size={16} />
                     </button>
@@ -298,23 +306,17 @@ const AuthenticatedChallengeContent = memo(
                     {selectedChallenge && myParticipation && (
                       <AudioChatControls
                         challengeId={selectedChallenge.id}
-                        userId={
-                          myParticipation.user_id ||
-                          myParticipation.guest_id ||
-                          ""
-                        }
+                        userId={myParticipation.user_id || myParticipation.guest_id || ""}
                       />
                     )}
-                  </>
-                ) : (
-                  <p className="text-white text-[10px] sm:text-xs">
-                    Compete with friends
-                  </p>
+                  </div>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+
+          {/* Right Side Action Shell Panel */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {!isPlaying && !selectedChallenge && (
               <button
                 onClick={() => {
@@ -323,20 +325,19 @@ const AuthenticatedChallengeContent = memo(
                 }}
                 className="bg-correct hover:bg-correct/90 text-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98] mr-1 sm:mr-2"
               >
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={3} />
-                Create
+                <Plus className="w-6 h-6" strokeWidth={3} />
               </button>
             )}
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
+              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white"
               title="Challenge Guide"
             >
               <HelpCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
+              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white"
             >
               <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
             </button>
@@ -381,7 +382,7 @@ const AuthenticatedChallengeContent = memo(
                             <button
                               key={tab}
                               onClick={() => setListColumn(tab)}
-                              className={`flex-1 py-0.5 sm:py-2 text-center text-[9px] sm:text-[10px]  font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${listColumn === tab
+                              className={`flex-1 py-1.5 sm:py-2 text-center text-[10px] sm:text-[12px]  font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${listColumn === tab
                                 ? "bg-correct text-black font-extrabold shadow-md"
                                 : "text-white hover:text-white hover:bg-white/5"
                                 }`}
