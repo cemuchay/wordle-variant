@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useRef } from "react";
-import { getWordLists } from "../../data/words";
+import { loadWordLists } from "../../data/words";
 import {
    checkGuess,
    getLetterStatuses,
@@ -89,7 +89,7 @@ export const useActions = ({
 
       try {
          const upperGuess = state.currentGuess.toUpperCase();
-         const { valid } = getWordLists(config.length);
+          const { valid } = await loadWordLists(config.length);
 
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");

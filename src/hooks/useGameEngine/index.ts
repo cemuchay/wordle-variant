@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import type { GameConfig } from "../../types/game";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../useAuth";
 import {
@@ -21,12 +22,17 @@ import { useActions } from "./useActions";
 export const useGameEngine = (date: string) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
+   const [config, setConfig] = useState<GameConfig | null>(null);
    const hydratedUserRef = useRef<string | undefined>(undefined);
    const hydratedDateRef = useRef<string | null>(null);
    const { user, loading: isAuthLoading } = useAuth();
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
-   const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
+
+   useEffect(() => {
+      if (!date) return;
+      getDailyConfig(!!user, date).then(setConfig);
+   }, [date, user]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
@@ -66,7 +72,7 @@ export const useGameEngine = (date: string) => {
    }, []);
 
    useEffect(() => {
-      if (!date || isAuthLoading) {
+      if (!date || !config || isAuthLoading) {
          // eslint-disable-next-line react-hooks/set-state-in-effect
          setIsHydrated(false);
          return;
@@ -255,8 +261,8 @@ export const useGameEngine = (date: string) => {
       [state.guesses],
    );
    const isHintBar1Restricted = useMemo(
-      () => isHintDisabled(config.word, state.guesses),
-      [config.word, state.guesses],
+      () => config ? isHintDisabled(config.word, state.guesses) : false,
+      [config?.word, state.guesses],
    );
 
    return {

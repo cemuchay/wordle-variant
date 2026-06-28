@@ -5,7 +5,7 @@ import type {
    GuessResult,
    LetterStatus,
 } from "../../types/game";
-import { getWordLists } from "../../data/words";
+import { loadWordLists } from "../../data/words";
 import { getEasyWords } from "../../data/easy-words";
 import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
@@ -101,11 +101,11 @@ const newHash = (str: string) =>
  *
  * @adjustment Tip: To change length distribution, adjust the 'r < X' thresholds below.
  */
-function getWordAtDate(
+async function getWordAtDate(
    dateStr: string,
    isAuthenticated: boolean = true,
    attempt = 0,
-): string {
+): Promise<string> {
    const isNew = dateStr >= TRANSITION_DATE;
    const isNewLength = dateStr >= LENGTH_TRANSITION_DATE;
    const isPost3lRemoval = dateStr >= REMOVAL_3L_TRANSITION_DATE;
@@ -146,7 +146,7 @@ function getWordAtDate(
       length = ([4, 5, 6] as const)[Math.floor(random() * 3)];
    }
 
-   const { official } = getWordLists(length);
+   const { official } = await loadWordLists(length);
 
    return official[Math.floor(random() * official.length)].toUpperCase();
 }
@@ -157,8 +157,8 @@ function getWordAtDate(
  * @param length - Desired word length.
  * @returns A random official word in uppercase.
  */
-export function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult'): string {
-   const { official, valid } = getWordLists(length);
+export async function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult'): Promise<string> {
+   const { official, valid } = await loadWordLists(length);
    let pool: string[];
    if (difficulty === 'easy' && length >= 3 && length <= 5) {
       pool = getEasyWords(length);
@@ -349,10 +349,10 @@ const formatDateString = (date: Date): string => {
    return date.toISOString().split("T")[0];
 };
 
-export function getDailyConfig(
+export async function getDailyConfig(
    isAuthenticated: boolean,
    dateOverride?: string,
-): GameConfig {
+): Promise<GameConfig> {
    const dateStr = dateOverride || formatDateString(new Date());
 
    const cacheKey = `${dateStr}_auth_${isAuthenticated}`;
@@ -376,7 +376,7 @@ export function getDailyConfig(
 
    // 1. If target date is before the constraint date, use the legacy algorithm directly.
    if (dateStr < START_CONSTRAINT_DATE) {
-      const config = getUnconstrainedDailyConfig(isAuthenticated, dateStr);
+      const config = await getUnconstrainedDailyConfig(isAuthenticated, dateStr);
       dailyConfigCache[cacheKey] = config;
       return config;
    }
@@ -402,7 +402,7 @@ export function getDailyConfig(
                maxAttempts: MAX_ATTEMPTS,
             };
          } else {
-            dailyConfigCache[k] = getUnconstrainedDailyConfig(
+            dailyConfigCache[k] = await getUnconstrainedDailyConfig(
                isAuthenticated,
                dStr,
             );
@@ -437,7 +437,7 @@ export function getDailyConfig(
                const prevKey = `${prevStr}_auth_${isAuthenticated}`;
                let prevConfig = dailyConfigCache[prevKey];
                if (!prevConfig) {
-                  prevConfig = getDailyConfig(isAuthenticated, prevStr);
+                  prevConfig = await getDailyConfig(isAuthenticated, prevStr);
                }
                if (prevConfig) {
                   history.add(prevConfig.word);
@@ -458,7 +458,7 @@ export function getDailyConfig(
             let length: 5 | 6 | 4 | 3 | 7;
 
             do {
-               word = getWordAtDate(currentStr, isAuthenticated, attempt);
+               word = await getWordAtDate(currentStr, isAuthenticated, attempt);
                length = word.length as 5 | 6 | 4 | 3 | 7;
                attempt++;
             } while (
@@ -484,14 +484,14 @@ export function getDailyConfig(
 /**
  * Legacy unconstrained daily configuration generator.
  */
-function getUnconstrainedDailyConfig(
+async function getUnconstrainedDailyConfig(
    isAuthenticated: boolean,
    dateStr: string,
-): GameConfig {
+): Promise<GameConfig> {
    const isNewEra = dateStr >= TRANSITION_DATE;
 
    if (!isNewEra) {
-      const word = getWordAtDate(dateStr, isAuthenticated);
+      const word = await getWordAtDate(dateStr, isAuthenticated);
       const length = word.length as 4 | 6 | 5;
       return { word, length, maxAttempts: length + 1 };
    }
@@ -503,14 +503,14 @@ function getUnconstrainedDailyConfig(
       const prevDate = new Date(cursor);
       prevDate.setDate(cursor.getDate() - i);
       const prevStr = formatDateString(prevDate);
-      history.add(getWordAtDate(prevStr, isAuthenticated));
+      history.add(await getWordAtDate(prevStr, isAuthenticated));
    }
 
    let attempt = 0;
    let word;
 
    do {
-      word = getWordAtDate(dateStr, isAuthenticated, attempt);
+      word = await getWordAtDate(dateStr, isAuthenticated, attempt);
       attempt++;
    } while (history.has(word) && attempt < 50);
 
@@ -1320,14 +1320,14 @@ export function isGuessCompatible(candidate: string, pastGuess: GuessResult[]): 
  * Shape Shifter Mode shift algorithm.
  * Uses a minimax bucket partitioning strategy to select the next target word.
  */
-export function getShapeShifterFeedbackAndWord(
+export async function getShapeShifterFeedbackAndWord(
    guess: string,
    currentTargetWord: string,
    pastGuesses: GuessResult[][],
    wordLength: number,
    hintRecord?: { letter: string; index: number } | null
-): { nextWord: string; feedback: GuessResult[] } {
-   const { official } = getWordLists(wordLength);
+): Promise<{ nextWord: string; feedback: GuessResult[] }> {
+   const { official } = await loadWordLists(wordLength);
    const upperCurrent = currentTargetWord.toUpperCase();
    const upperGuess = guess.toUpperCase();
 

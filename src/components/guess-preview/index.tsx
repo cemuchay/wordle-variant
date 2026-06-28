@@ -355,23 +355,25 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       isShapeshifter,
     ]);
 
-    const getTargetWordToUse = () => {
-      let wordToUse = targetWord || getDailyConfig(!!profile, targetDate).word;
+    const [targetWordToUse, setTargetWordToUse] = useState("");
 
-      if (isMarathon && targetWord) {
-        try {
-          wordToUse = activeGame ? activeGame.word : "";
-        } catch (e) {
-          console.error("Failed to parse targetWord in marathon preview", e);
-        }
-      } else if (targetWord && salt) {
-        wordToUse = deobfuscateWord(targetWord, salt);
-      }
+    useEffect(() => {
+        (async () => {
+            let wordToUse = targetWord || (await getDailyConfig(!!profile, targetDate)).word;
 
-      return wordToUse;
-    };
+            if (isMarathon && targetWord) {
+                try {
+                    wordToUse = activeGame ? activeGame.word : "";
+                } catch (e) {
+                    console.error("Failed to parse targetWord in marathon preview", e);
+                }
+            } else if (targetWord && salt) {
+                wordToUse = deobfuscateWord(targetWord, salt);
+            }
 
-    const targetWordToUse = getTargetWordToUse();
+            setTargetWordToUse(wordToUse);
+        })();
+    }, [targetWord, profile, targetDate, isMarathon, activeGame, salt]);
 
     const fakeGrid = useMemo(() => {
       const cols = 2;

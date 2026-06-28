@@ -392,14 +392,14 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
     );
 });
 
-import { getWordLists } from '../../data/words';
+import { loadWordLists } from '../../data/words';
 
 
-const validateCustomWord = (word: string, len: number) => {
+const validateCustomWord = async (word: string, len: number) => {
     const trimmed = word.trim();
     if (!trimmed) return "Cannot be empty";
     if (trimmed.length !== len) return `Must be exactly ${len} letters`;
-    const { valid } = getWordLists(len);
+    const { valid } = await loadWordLists(len);
     if (!valid.has(trimmed.toUpperCase())) return `"${trimmed.toUpperCase()}" is not a valid word`;
     return null;
 };
@@ -803,75 +803,83 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     }, [handleUpdateMarathonGames]);
 
     // Inline errors
-    const errors = useMemo(() => {
-        const errs: string[] = [];
-        const resolvedLength = length === 0 ? 5 : length;
+    const [errors, setErrors] = useState<string[]>([]);
 
-        if (isCustomWord) {
-            if (length === 1) {
-                marathonGames.forEach((l, idx) => {
-                    const w = customMarathonWords[idx];
-                    if (!w) {
-                        if (!editingChallenge) {
-                            errs.push(`Game #${idx + 1} (${l}-letter): Target word is empty.`);
+    useEffect(() => {
+        const validate = async () => {
+            const errs: string[] = [];
+            const resolvedLength = length === 0 ? 5 : length;
+
+            if (isCustomWord) {
+                if (length === 1) {
+                    for (let idx = 0; idx < marathonGames.length; idx++) {
+                        const l = marathonGames[idx];
+                        const w = customMarathonWords[idx];
+                        if (!w) {
+                            if (!editingChallenge) {
+                                errs.push(`Game #${idx + 1} (${l}-letter): Target word is empty.`);
+                            }
+                        } else {
+                            const valError = await validateCustomWord(w, l);
+                            if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                         }
-                    } else {
-                        const valError = validateCustomWord(w, l);
-                        if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
-                    }
-                });
-            } else {
-                if (!customWord) {
-                    if (!editingChallenge) {
-                        errs.push(`Target Word: Cannot be empty.`);
                     }
                 } else {
-                    const valError = validateCustomWord(customWord, resolvedLength);
-                    if (valError) errs.push(`Target Word: ${valError}`);
-                }
-            }
-        }
-
-        if (isHandicap && handicapMode === 'custom') {
-            if (length === 1) {
-                marathonGames.forEach((l, idx) => {
-                    const w = handicapStartersArray[idx];
-                    if (!w) {
+                    if (!customWord) {
                         if (!editingChallenge) {
-                            errs.push(`Game #${idx + 1} (${l}-letter): Starter word is empty.`);
+                            errs.push(`Target Word: Cannot be empty.`);
                         }
-                    } else if (w !== '__MASKED__') {
-                        const valError = validateCustomWord(w, l);
-                        if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
-                        if (isCustomWord && customMarathonWords[idx] && w.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
-                            errs.push(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
-                        }
-                    }
-                });
-            } else {
-                if (!handicapStarter) {
-                    if (!editingChallenge) {
-                        errs.push(`Handicap Starter: Cannot be empty.`);
-                    }
-                } else if (handicapStarter !== '__MASKED__') {
-                    const valError = validateCustomWord(handicapStarter, resolvedLength);
-                    if (valError) errs.push(`Handicap Starter: ${valError}`);
-                    if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
-                        errs.push(`Handicap starter cannot match target word.`);
+                    } else {
+                        const valError = await validateCustomWord(customWord, resolvedLength);
+                        if (valError) errs.push(`Target Word: ${valError}`);
                     }
                 }
             }
-        }
 
-        if (length === 1 && marathonGames.length === 0) {
-            errs.push("Marathon must have at least 1 game.");
-        }
+            if (isHandicap && handicapMode === 'custom') {
+                if (length === 1) {
+                    for (let idx = 0; idx < marathonGames.length; idx++) {
+                        const l = marathonGames[idx];
+                        const w = handicapStartersArray[idx];
+                        if (!w) {
+                            if (!editingChallenge) {
+                                errs.push(`Game #${idx + 1} (${l}-letter): Starter word is empty.`);
+                            }
+                        } else if (w !== '__MASKED__') {
+                            const valError = await validateCustomWord(w, l);
+                            if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
+                            if (isCustomWord && customMarathonWords[idx] && w.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
+                                errs.push(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
+                            }
+                        }
+                    }
+                } else {
+                    if (!handicapStarter) {
+                        if (!editingChallenge) {
+                            errs.push(`Handicap Starter: Cannot be empty.`);
+                        }
+                    } else if (handicapStarter !== '__MASKED__') {
+                        const valError = await validateCustomWord(handicapStarter, resolvedLength);
+                        if (valError) errs.push(`Handicap Starter: ${valError}`);
+                        if (isCustomWord && customWord && handicapStarter.toUpperCase() === customWord.toUpperCase()) {
+                            errs.push(`Handicap starter cannot match target word.`);
+                        }
+                    }
+                }
+            }
 
-        if (isBotMarathon && lifespanHours > 168) {
-            errs.push("Daily Bot Challenge lifespan cannot exceed 7 days (168 hours).");
-        }
+            if (length === 1 && marathonGames.length === 0) {
+                errs.push("Marathon must have at least 1 game.");
+            }
 
-        return errs;
+            if (isBotMarathon && lifespanHours > 168) {
+                errs.push("Daily Bot Challenge lifespan cannot exceed 7 days (168 hours).");
+            }
+
+            setErrors(errs);
+        };
+
+        validate();
     }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
 
     const handleCreateTrigger = useCallback(async () => {

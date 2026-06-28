@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useMemo, useRef } from "react";
-import { getWordLists } from "../../data/words";
+import { loadWordLists } from "../../data/words";
 import {
    checkGuess,
    getLetterStatuses,
@@ -128,7 +128,7 @@ export const useActions = ({
       try {
          const upperGuess = state.currentGuess.toUpperCase();
 
-         const { valid } = getWordLists(wordLength);
+          const { valid } = await loadWordLists(wordLength);
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });
@@ -163,7 +163,7 @@ export const useActions = ({
          const updatedTargetWords = [...targetWords];
 
          if (challenge.is_shapeshifter) {
-            const shiftResult = getShapeShifterFeedbackAndWord(
+            const shiftResult = await getShapeShifterFeedbackAndWord(
                upperGuess,
                targetWord,
                guesses,
