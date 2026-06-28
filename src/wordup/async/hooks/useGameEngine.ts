@@ -493,6 +493,7 @@ export function useGameEngine(props: EngineProps) {
                .then(({ error }) => { if (error) console.error("Failed to set completed on load error:", error); }, console.error);
          }
          dispatch({ type: "RESET" });
+         useAsyncStore.getState().resetGame();
       }
    }, [triggerToast, onGameOver]);
 
@@ -531,10 +532,10 @@ export function useGameEngine(props: EngineProps) {
       launchedId.current = null;
    }, []);
 
-   const abortMatch = useCallback(async () => {
+   const abortMatch = useCallback(() => {
       cleanup();
       if (matchId) {
-         await wordupNetworkGate.enqueue("put", "abort async match", async () => {
+         wordupNetworkGate.enqueue("put", "abort async match", async () => {
             const { error } = await supabase.from("wordup_async_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", matchId);
             if (error) throw error;
          }).catch((e) => console.error("Failed to abort match:", e));

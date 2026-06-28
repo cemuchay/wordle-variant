@@ -585,7 +585,7 @@ export function useWordUpGameEngine(props: EngineProps) {
                  questions: enc, encryption_key: sk,
               };
 
-               try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); return; }
+                try { await preloadMatchImages(raw); } catch { triggerToast("Failed to load images.", 5000); dispatch({ type: "RESET" }); useWordUpStore.getState().resetGame(); return; }
               dispatch({ type: "SET_QUESTIONS", questions: raw });
               dispatch({ type: "SET_MATCH_DATA", data: match });
               setBotStats(match);
@@ -751,6 +751,7 @@ export function useWordUpGameEngine(props: EngineProps) {
                .then(({ error }) => { if (error) console.error("Failed to set completed on load error:", error); }, console.error);
          }
          dispatch({ type: "RESET" });
+         useWordUpStore.getState().resetGame();
       }
    }, [triggerToast, startCountdown, onGameOver, onRematchAccepted]);
 
@@ -815,21 +816,19 @@ export function useWordUpGameEngine(props: EngineProps) {
       if (channel.current) { supabase.removeChannel(channel.current); channel.current = null; }
       launchedId.current = null;
    }, []);
-
-   const abortMatch = useCallback(async () => {
-      cleanup();
-      if (matchId) {
-         await wordupNetworkGate.enqueue("put", "abort match", async () => {
-            const { error } = await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", matchId);
-            if (error) throw error;
-         }).catch((e) => console.error("Failed to abort match:", e));
-      }
-      safeLocalStorage.removeItem("wordup_active_game");
-      dispatch({ type: "RESET" });
-      useWordUpStore.getState().resetGame();
-      triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
-   }, [matchId, triggerToast, cleanup]);
-
+    const abortMatch = useCallback(async () => {
+       cleanup();
+       if (matchId) {
+          wordupNetworkGate.enqueue("put", "abort match", async () => {
+             const { error } = await supabase.from("wordup_matches").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", matchId);
+             if (error) throw error;
+          }).catch((e) => console.error("Failed to abort match:", e));
+       }
+       safeLocalStorage.removeItem("wordup_active_game");
+       dispatch({ type: "RESET" });
+       useWordUpStore.getState().resetGame();
+       triggerToast("Match aborted.", WORDUP_TIMEOUT.TOAST_DURATION);
+    }, [matchId, triggerToast, cleanup]);
    const purgeAndReset = useCallback(async () => {
       cleanup();
       try {
