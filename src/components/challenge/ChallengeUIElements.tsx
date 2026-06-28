@@ -228,15 +228,20 @@ export const ChallengeItem = memo(function ChallengeItem({
     return 'active';
   }, [status, isExpired, isFinished]);
 
-  const bgGradient = itemType === 'active' ? 'from-indigo-500/[7%] to-transparent' :
-    itemType === 'open' ? 'from-blue-500/[7%] to-transparent' :
-    itemType === 'played' ? 'from-emerald-500/[7%] to-transparent' :
-    'from-red-500/[5%] to-transparent';
+  const bgGradient = itemType === 'active' ? 'from-indigo-500/[15%] to-transparent' :
+    itemType === 'open' ? 'from-sky-500/[15%] to-transparent' :
+      itemType === 'played' ? 'from-emerald-500/[15%] to-transparent' :
+        'from-red-500/[10%] to-transparent';
+
+  const borderAccent = itemType === 'active' ? 'border-l-indigo-500 border-l-[3px]' :
+    itemType === 'open' ? 'border-l-sky-500 border-l-[3px]' :
+      itemType === 'played' ? 'border-l-emerald-500 border-l-[3px]' :
+        'border-l-red-500/50 border-l-[3px]';
 
   return (
     <button
       onClick={handleSelect}
-      className={`w-full text-left bg-linear-to-br ${bgGradient} border ${isExpired
+      className={`w-full text-left bg-linear-to-br ${bgGradient} ${borderAccent} border ${isExpired
         ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
         : isSelfChallenge
           ? "border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:border-indigo-500/50"
@@ -265,7 +270,7 @@ export const ChallengeItem = memo(function ChallengeItem({
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-wrap items-center gap-2">
           {/* Index Number Badge */}
-          <span className="text-[10px] font-black text-white bg-white/10 px-2 py-0.5 rounded-lg font-mono">
+          <span className="text-[12px] font-black text-white px-2 py-0.5 rounded-lg font-mono">
             #{index + 1}
           </span>
           {/* Mode Pill */}

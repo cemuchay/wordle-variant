@@ -318,8 +318,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             guesses: []
         }));
 
-        // Find in myChallenges (pending status)
-        const pendingDailies = myChallenges.filter((item: any) => item.challenge?.is_bot_marathon && item.status === 'pending');
+        // Find in myChallenges (pending status, not expired)
+        const pendingDailies = myChallenges.filter((item: any) => item.challenge?.is_bot_marathon && item.status === 'pending' && new Date(item.challenge?.expires_at) > new Date());
 
         const combined = [...openDailies, ...pendingDailies];
         
@@ -332,12 +332,13 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             return acc;
         }, []);
 
-        // Sort by earliest to expire
+        // Sort by earliest to expire, filter expired, up to 2
         return unique.sort((a, b) => {
             const dateA = new Date(a.challenge?.expires_at).getTime();
             const dateB = new Date(b.challenge?.expires_at).getTime();
             return dateA - dateB;
-        }).slice(0, 2); // Up to 2
+        }).filter((c: any) => new Date(c.challenge?.expires_at) > new Date())
+        .slice(0, 2);
     }, [discoverChallenges, myChallenges]);
 
     const unplayedCount = useMemo(() =>
@@ -903,25 +904,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 return !isExpired && !isCompleted && item.status !== 'viewed';
             });
 
-            const playedChallenges = myChallengesData.filter((item: any) => {
-                const isExpired = new Date(item.challenge?.expires_at) < new Date();
-                const isCompleted = item.status === 'completed' || item.status === 'timed_out' || item.status === 'declined';
-                return !isExpired && isCompleted && item.status !== 'viewed';
-            });
-
-            const expiredChallenges = myChallengesData.filter((item: any) => {
-                return new Date(item.challenge?.expires_at) < new Date();
-            });
-
-            if (activeChallenges.length > 0) {
-                setListColumn('unplayed');
-            } else if (playedChallenges.length > 0 || expiredChallenges.length > 0) {
-                setListColumn('played');
-            } else {
-                setListColumn('unplayed');
-            }
+            const isAnyUnplayed = activeChallenges.length > 0 || openChallenges.length > 0;
+            setListColumn(isAnyUnplayed ? 'unplayed' : 'played');
         }
-    }, [isChallengesLoading, myChallengesData, setListColumn]);
+    }, [isChallengesLoading, myChallengesData, openChallenges.length, setListColumn]);
 
     // Auto-navigate to gameplay if restored view was gameplay and game is still valid
     const hasNavigatedToGameplay = useRef(false);
