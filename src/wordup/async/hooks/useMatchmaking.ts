@@ -84,6 +84,11 @@ export const useAsyncMatchmaking = (
    const sendInvite = useCallback(async (targetUser: any, onComplete: (matchId: string | null) => void) => {
       if (!user) return onComplete(null);
       try {
+         const mId = await createMatch(targetUser);
+         if (!mId) {
+            onComplete(null);
+            return;
+         }
          const channel = supabase.channel(`user_signals_${targetUser.id}`);
          channel.subscribe((status) => {
             if (status === "SUBSCRIBED") {
@@ -94,12 +99,12 @@ export const useAsyncMatchmaking = (
                      senderId: user.id,
                      senderName: user.user_metadata?.username || user.email?.split("@")[0] || "Someone",
                      category: effectiveCategory,
+                     matchId: mId,
                   },
                });
                setTimeout(() => supabase.removeChannel(channel), 1000);
             }
          });
-         const mId = await createMatch(targetUser);
          onComplete(mId);
       } catch (e) {
          console.error("Failed to send invite:", e);
@@ -107,40 +112,61 @@ export const useAsyncMatchmaking = (
       }
    }, [user, effectiveCategory, createMatch]);
 
-   const loadPendingMatches = useCallback(async () => {
-      if (!user?.id) return [];
-      try {
-         const { data, error } = await supabase
-            .from("wordup_async_matches")
-            .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
-            .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-            .in("status", ["pending", "active", "turn_submitted"])
-            .order("created_at", { ascending: false });
-         if (error) throw error;
-         return data || [];
-      } catch (e) {
-         console.error("Failed to load pending matches:", e);
-         return [];
-      }
-   }, [user]);
+    const loadPendingMatches = useCallback(async () => {
+       if (!user?.id) return [];
+       try {
+          const { data, error } = await supabase
+             .from("wordup_async_matches")
+             .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
+             .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+             .in("status", ["pending", "active", "turn_submitted", "completed"])
+             .order("created_at", { ascending: false });
+          if (error) throw error;
 
-   const loadHistoryMatches = useCallback(async () => {
-      if (!user?.id) return [];
-      try {
-         const { data, error } = await supabase
-            .from("wordup_async_matches")
-            .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
-            .eq("status", "completed")
-            .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-            .order("completed_at", { ascending: false })
-            .limit(15);
-         if (error) throw error;
-         return data || [];
-      } catch (e) {
-         console.error("Failed to load history:", e);
-         return [];
-      }
-   }, [user]);
+          const pending: any[] = [];
+          for (const m of data || []) {
+             if (m.status === "completed" || (m.p1_answered && m.p2_answered)) {
+                if (m.status !== "completed") {
+                   supabase.from("wordup_async_matches")
+                      .update({ status: "completed", completed_at: m.completed_at || new Date().toISOString() })
+                      .eq("id", m.id)
+                      .then(({ error }) => { if (error) console.error("Self-heal complete failed:", error); });
+                }
+             } else if (m.status !== "declined") {
+                pending.push(m);
+             }
+          }
+          return pending;
+       } catch (e) {
+          console.error("Failed to load pending matches:", e);
+          return [];
+       }
+    }, [user]);
+
+    const loadHistoryMatches = useCallback(async () => {
+       if (!user?.id) return [];
+       try {
+          const { data, error } = await supabase
+             .from("wordup_async_matches")
+             .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
+             .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+             .in("status", ["completed", "declined", "pending", "active", "turn_submitted"])
+             .order("completed_at", { ascending: false })
+             .limit(30);
+          if (error) throw error;
+
+          const history: any[] = [];
+          for (const m of data || []) {
+             if (m.status === "completed" || m.status === "declined" || (m.p1_answered && m.p2_answered)) {
+                history.push(m);
+             }
+          }
+          return history.slice(0, 15);
+       } catch (e) {
+          console.error("Failed to load history:", e);
+          return [];
+       }
+    }, [user]);
 
    return { createMatch, sendInvite, loadPendingMatches, loadHistoryMatches };
 };

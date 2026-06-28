@@ -1,12 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/wordup/WordUpView/services/wordupNetworkGate.ts
 import { supabase } from "../../../../lib/supabaseClient";
 import { safeLocalStorage } from "../../../../utils/storage";
 
-export type RequestType = 'get' | 'post' | 'put' | 'delete' | 'rpc';
+export type RequestType = "get" | "post" | "put" | "delete" | "rpc";
 
 export interface SerializableTaskConfig {
    table?: string;
-   action: 'insert' | 'update' | 'upsert' | 'delete' | 'rpc';
+   action: "insert" | "update" | "upsert" | "delete" | "rpc";
    payload?: any;
    filter?: any;
    rpcMethod?: string;
@@ -21,11 +22,11 @@ export interface NetworkTask {
    config?: SerializableTaskConfig;
    resolve?: (value: any) => void;
    reject?: (reason: any) => void;
-   status: 'pending' | 'processing' | 'resolved' | 'rejected';
+   status: "pending" | "processing" | "resolved" | "rejected";
    retryCount: number;
 }
 
-const STORAGE_KEY = 'wordup_persistent_network_queue';
+const STORAGE_KEY = "wordup_persistent_network_queue";
 
 class WordUpNetworkGate {
    private queue: NetworkTask[] = [];
@@ -44,7 +45,6 @@ class WordUpNetworkGate {
          const stored = safeLocalStorage.getItem(STORAGE_KEY);
          if (stored) {
             const parsed = JSON.parse(stored) as any[];
-            console.log(`[WordUp NetworkGate] Found ${parsed.length} queued tasks in storage.`);
             parsed.forEach((item) => {
                const task: NetworkTask = {
                   id: item.id,
@@ -52,38 +52,51 @@ class WordUpNetworkGate {
                   description: item.description,
                   blocking: item.blocking ?? false,
                   config: item.config,
-                  status: 'pending',
-                  retryCount: item.retryCount ?? 0
+                  status: "pending",
+                  retryCount: item.retryCount ?? 0,
                };
                this.queue.push(task);
             });
             this.processNext();
          }
       } catch (e) {
-         console.error('[WordUp NetworkGate] Failed to load queue from storage:', e);
+         console.error(
+            "[WordUp NetworkGate] Failed to load queue from storage:",
+            e,
+         );
       }
    }
 
    private saveQueueToStorage() {
       try {
          const serializableTasks = this.queue
-            .filter((t) => t.config && (t.status === 'pending' || t.status === 'processing'))
+            .filter(
+               (t) =>
+                  t.config &&
+                  (t.status === "pending" || t.status === "processing"),
+            )
             .map((t) => ({
                id: t.id,
                type: t.type,
                description: t.description,
                blocking: t.blocking,
                config: t.config,
-               retryCount: t.retryCount
+               retryCount: t.retryCount,
             }));
 
          if (serializableTasks.length > 0) {
-            safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(serializableTasks));
+            safeLocalStorage.setItem(
+               STORAGE_KEY,
+               JSON.stringify(serializableTasks),
+            );
          } else {
             safeLocalStorage.removeItem(STORAGE_KEY);
          }
       } catch (e) {
-         console.error('[WordUp NetworkGate] Failed to save queue to storage:', e);
+         console.error(
+            "[WordUp NetworkGate] Failed to save queue to storage:",
+            e,
+         );
       }
    }
 
@@ -91,27 +104,31 @@ class WordUpNetworkGate {
       type: RequestType,
       description: string,
       executeOrConfig: (() => Promise<any>) | SerializableTaskConfig,
-      blocking = false
+      blocking = false,
    ): Promise<any> {
       return new Promise((resolve, reject) => {
-         const isConfig = typeof executeOrConfig !== 'function';
-         
+         const isConfig = typeof executeOrConfig !== "function";
+
          const task: NetworkTask = {
             id: crypto.randomUUID(),
             type,
             description,
             blocking,
-            execute: isConfig ? undefined : (executeOrConfig as () => Promise<any>),
-            config: isConfig ? (executeOrConfig as SerializableTaskConfig) : undefined,
+            execute: isConfig
+               ? undefined
+               : (executeOrConfig as () => Promise<any>),
+            config: isConfig
+               ? (executeOrConfig as SerializableTaskConfig)
+               : undefined,
             resolve,
             reject,
-            status: 'pending',
-            retryCount: 0
+            status: "pending",
+            retryCount: 0,
          };
 
          this.queue.push(task);
-         
-         if (isConfig && type !== 'get') {
+
+         if (isConfig && type !== "get") {
             this.saveQueueToStorage();
          }
 
@@ -125,33 +142,49 @@ class WordUpNetworkGate {
       }
 
       if (!task.config) {
-         throw new Error('Task lacks both execute function and serializable config');
+         throw new Error(
+            "Task lacks both execute function and serializable config",
+         );
       }
 
       const { action, table, payload, filter, rpcMethod } = task.config;
 
       switch (action) {
-         case 'insert': {
-            const { data, error } = await supabase.from(table!).insert(payload).select();
+         case "insert": {
+            const { data, error } = await supabase
+               .from(table!)
+               .insert(payload)
+               .select();
             if (error) throw error;
             return data;
          }
-         case 'update': {
-            const { data, error } = await supabase.from(table!).update(payload).match(filter || {}).select();
+         case "update": {
+            const { data, error } = await supabase
+               .from(table!)
+               .update(payload)
+               .match(filter || {})
+               .select();
             if (error) throw error;
             return data;
          }
-         case 'upsert': {
-            const { data, error } = await supabase.from(table!).upsert(payload).select();
+         case "upsert": {
+            const { data, error } = await supabase
+               .from(table!)
+               .upsert(payload)
+               .select();
             if (error) throw error;
             return data;
          }
-         case 'delete': {
-            const { data, error } = await supabase.from(table!).delete().match(filter || {}).select();
+         case "delete": {
+            const { data, error } = await supabase
+               .from(table!)
+               .delete()
+               .match(filter || {})
+               .select();
             if (error) throw error;
             return data;
          }
-         case 'rpc': {
+         case "rpc": {
             const { data, error } = await supabase.rpc(rpcMethod!, payload);
             if (error) throw error;
             return data;
@@ -167,15 +200,17 @@ class WordUpNetworkGate {
 
       try {
          while (true) {
-            const runningBlocking = this.queue.some(t => t.status === 'processing' && t.blocking);
+            const runningBlocking = this.queue.some(
+               (t) => t.status === "processing" && t.blocking,
+            );
             if (runningBlocking) break;
 
-            const nextTask = this.queue.find(t => t.status === 'pending');
+            const nextTask = this.queue.find((t) => t.status === "pending");
             if (!nextTask) break;
 
             if (nextTask.blocking && this.activeTaskCount > 0) break;
 
-            nextTask.status = 'processing';
+            nextTask.status = "processing";
             this.activeTaskCount++;
 
             this.runTask(nextTask);
@@ -187,33 +222,40 @@ class WordUpNetworkGate {
 
    private async runTask(task: NetworkTask) {
       try {
-         console.log(`[WordUp NetworkGate] Processing task: ${task.description} (${task.type})`);
          const result = await this.executeTask(task);
-         task.status = 'resolved';
+         task.status = "resolved";
          if (task.resolve) task.resolve(result);
       } catch (error: any) {
-         console.warn(`[WordUp NetworkGate] Task failed: ${task.description}`, error);
-         
-         const isTransient = !error || error.status === undefined || error.status === 0 || error.status >= 500 || error.message?.includes('Failed to fetch') || error.message?.includes('Network Error');
-         
+         console.warn(
+            `[WordUp NetworkGate] Task failed: ${task.description}`,
+            error,
+         );
+
+         const isTransient =
+            !error ||
+            error.status === undefined ||
+            error.status === 0 ||
+            error.status >= 500 ||
+            error.message?.includes("Failed to fetch") ||
+            error.message?.includes("Network Error");
+
          if (isTransient && task.config && task.retryCount < 5) {
             task.retryCount++;
-            task.status = 'pending';
-            console.log(`[WordUp NetworkGate] Retrying transient error in 5s (retry ${task.retryCount}/5): ${task.description}`);
-            
+            task.status = "pending";
+
             this.saveQueueToStorage();
-            
+
             setTimeout(() => {
                this.processNext();
             }, 5000);
          } else {
-            task.status = 'rejected';
+            task.status = "rejected";
             if (task.reject) task.reject(error);
          }
       } finally {
          this.activeTaskCount--;
-         if (task.status === 'resolved' || task.status === 'rejected') {
-            this.queue = this.queue.filter(t => t.id !== task.id);
+         if (task.status === "resolved" || task.status === "rejected") {
+            this.queue = this.queue.filter((t) => t.id !== task.id);
             this.saveQueueToStorage();
          }
          this.processNext();

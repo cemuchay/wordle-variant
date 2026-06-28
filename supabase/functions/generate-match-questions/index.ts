@@ -3,7 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 import { CATEGORY_SUPER_MAP } from "./types.ts";
 import { getQuestionConfig } from "./questionConfig.ts";
-import { createSeededRandom, seededShuffle, hashSeed, isNumeric, getNumericDistractors, getBelievableMisspelling } from "./utils.ts";
+import {
+   createSeededRandom,
+   seededShuffle,
+   hashSeed,
+   isNumeric,
+   getNumericDistractors,
+   getBelievableMisspelling,
+} from "./utils.ts";
 import { formatQuestionPrompt, cleanVal } from "./promptFormatter.ts";
 import { generateMathsQuestion } from "./maths.ts";
 import { generateEnglishQuestion } from "./english.ts";
@@ -13,18 +20,33 @@ import { getRandomMatchingTemplate } from "./templates.ts";
 
 async function generateSecureSessionKey(): Promise<string> {
    const key = await crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"],
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"],
    );
    const raw = await crypto.subtle.exportKey("raw", key);
    return btoa(String.fromCharCode(...new Uint8Array(raw)));
 }
 
-async function encryptPayload(payload: string, base64Key: string): Promise<string> {
+async function encryptPayload(
+   payload: string,
+   base64Key: string,
+): Promise<string> {
    const rawKey = Uint8Array.from(atob(base64Key), (c) => c.charCodeAt(0));
-   const key = await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+   const key = await crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt"],
+   );
    const iv = crypto.getRandomValues(new Uint8Array(12));
    const encoded = new TextEncoder().encode(payload);
-   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+   const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoded,
+   );
    const combined = new Uint8Array(iv.length + encrypted.byteLength);
    combined.set(iv, 0);
    combined.set(new Uint8Array(encrypted), iv.length);
@@ -33,29 +55,34 @@ async function encryptPayload(payload: string, base64Key: string): Promise<strin
 
 const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
-   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+   "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
 };
 
 // ── Generic entity-based question generator ──────────────────
 
 const SKIP_KEYS = new Set([
-   "_distractors", 
-   "_symbolDistractors", 
-   "_directorDistractors", 
-   "id", 
-   "image", 
-   "images", 
-   "difficulty", 
-   "popularity", 
-   "aliases", 
-   "related", 
+   "_distractors",
+   "_symbolDistractors",
+   "_directorDistractors",
+   "id",
+   "image",
+   "images",
+   "difficulty",
+   "popularity",
+   "aliases",
+   "related",
    "facts",
    "primary_val",
-   "secondary_val"
+   "secondary_val",
 ]);
 const DEFAULT_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 
-function pickVariants(weights: number[], rng: () => number, count: number): number[] {
+function pickVariants(
+   weights: number[],
+   rng: () => number,
+   count: number,
+): number[] {
    const total = weights.reduce((a, b) => a + b, 0);
    const result: number[] = [];
    for (let i = 0; i < count; i++) {
@@ -66,7 +93,10 @@ function pickVariants(weights: number[], rng: () => number, count: number): numb
          variant = 0;
          for (let v = 0; v < weights.length; v++) {
             roll -= weights[v];
-            if (roll <= 0) { variant = v; break; }
+            if (roll <= 0) {
+               variant = v;
+               break;
+            }
          }
          attempts++;
       } while (i > 0 && variant === result[i - 1] && attempts < 10);
@@ -75,7 +105,10 @@ function pickVariants(weights: number[], rng: () => number, count: number): numb
    return result;
 }
 
-function buildVariantTryOrder(assignedVariant: number, weights: number[]): number[] {
+function buildVariantTryOrder(
+   assignedVariant: number,
+   weights: number[],
+): number[] {
    const others = weights
       .map((w, i) => ({ variant: i, weight: w }))
       .filter((item) => item.variant !== assignedVariant)
@@ -83,17 +116,42 @@ function buildVariantTryOrder(assignedVariant: number, weights: number[]): numbe
    return [assignedVariant, ...others.map((o) => o.variant)];
 }
 
-function generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
-   const qObj = _generateQuestion(seed, entity, allEntities, variantOverride, category, variantWeights);
+function generateQuestion(
+   seed: string,
+   entity: any,
+   allEntities: any[],
+   variantOverride?: number,
+   category?: string,
+   variantWeights?: number[],
+): any {
+   const qObj = _generateQuestion(
+      seed,
+      entity,
+      allEntities,
+      variantOverride,
+      category,
+      variantWeights,
+   );
    const meta = entity?.metadata || {};
    const rng = createSeededRandom(hashSeed(seed));
 
    // ── Misspelling distractor injection (15% chance for multiple choice) ──
-   if (qObj && qObj.choices && qObj.choices.length >= 4 && qObj.answer && qObj.choices.includes(qObj.answer)) {
-      const isTrueFalse = qObj.choices.includes("True") && qObj.choices.includes("False");
+   if (
+      qObj &&
+      qObj.choices &&
+      qObj.choices.length >= 4 &&
+      qObj.answer &&
+      qObj.choices.includes(qObj.answer)
+   ) {
+      const isTrueFalse =
+         qObj.choices.includes("True") && qObj.choices.includes("False");
       if (!isTrueFalse && rng() < 0.15) {
          const misspelled = getBelievableMisspelling(qObj.answer, rng);
-         if (misspelled && misspelled !== qObj.answer && !qObj.choices.includes(misspelled)) {
+         if (
+            misspelled &&
+            misspelled !== qObj.answer &&
+            !qObj.choices.includes(misspelled)
+         ) {
             const distractorIndices: number[] = [];
             for (let i = 0; i < qObj.choices.length; i++) {
                if (qObj.choices[i] !== qObj.answer) {
@@ -101,7 +159,10 @@ function generateQuestion(seed: string, entity: any, allEntities: any[], variant
                }
             }
             if (distractorIndices.length > 0) {
-               const idxToReplace = distractorIndices[Math.floor(rng() * distractorIndices.length)];
+               const idxToReplace =
+                  distractorIndices[
+                     Math.floor(rng() * distractorIndices.length)
+                  ];
                qObj.choices[idxToReplace] = misspelled;
             }
          }
@@ -112,22 +173,33 @@ function generateQuestion(seed: string, entity: any, allEntities: any[], variant
       const imgIdx = Math.floor(rng() * meta.images.length);
       const chosenImage = meta.images[imgIdx];
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = chosenImage.startsWith("http") ? chosenImage : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
+      qObj.imageUrl = chosenImage.startsWith("http")
+         ? chosenImage
+         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
    } else if (meta.image) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = meta.image.startsWith("http") ? meta.image : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+      qObj.imageUrl = meta.image.startsWith("http")
+         ? meta.image
+         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
    }
    return qObj;
 }
 
 function censorWord(text: string, word: string): string {
    if (!text || !word) return text;
-   const escaped = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+   const escaped = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
    const regex = new RegExp(`\\b${escaped}(s|es)?\\b`, "gi");
    return text.replace(regex, "_____");
 }
 
-function _generateQuestion(seed: string, entity: any, allEntities: any[], variantOverride?: number, category?: string, variantWeights?: number[]): any {
+function _generateQuestion(
+   seed: string,
+   entity: any,
+   allEntities: any[],
+   variantOverride?: number,
+   category?: string,
+   variantWeights?: number[],
+): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
    const meta = entity?.metadata || {};
@@ -153,7 +225,13 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          let result = pattern.replace(/{label}/g, label);
          template.requiredKeys.forEach((key) => {
             let val = cleanVal(String(meta[key] ?? ""));
-            if (key === "definition" || key === "meaning" || key === "example" || key === "example_template" || key === "idiom_meaning") {
+            if (
+               key === "definition" ||
+               key === "meaning" ||
+               key === "example" ||
+               key === "example_template" ||
+               key === "idiom_meaning"
+            ) {
                val = censorWord(val, label);
             }
             const rx = new RegExp(`{${key}}`, "g");
@@ -171,12 +249,15 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
                if (e.label === label) return false;
                // Exclude other entities that share the exact same key criteria value(s) to avoid double-correct options
                const isDuplicateMatch = template.requiredKeys.every((key) => {
-                  return cleanVal(String(e.metadata?.[key] ?? "")) === cleanVal(String(meta[key] ?? ""));
+                  return (
+                     cleanVal(String(e.metadata?.[key] ?? "")) ===
+                     cleanVal(String(meta[key] ?? ""))
+                  );
                });
                return !isDuplicateMatch;
             })
             .map((e) => e.label),
-         rng
+         rng,
       ).slice(0, 3);
 
       return {
@@ -184,7 +265,7 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          prompt: promptText,
          choices: seededShuffle([label, ...distractors], rng),
          answer: label,
-         explanation: explanationText
+         explanation: explanationText,
       };
    }
 
@@ -192,10 +273,20 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    const availableKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
    if (availableKeys.length === 0) {
       const distractors = seededShuffle(
-         allEntities.filter((e) => e.label !== label).map((e) => e.label), rng,
+         allEntities.filter((e) => e.label !== label).map((e) => e.label),
+         rng,
       ).slice(0, 3);
-      const choices = seededShuffle([...new Set([label, ...distractors])].slice(0, 4), rng);
-      return { type: "definition", prompt: `Which of the following is "${label}"?`, choices, answer: label, explanation: `The entity described is "${label}".` };
+      const choices = seededShuffle(
+         [...new Set([label, ...distractors])].slice(0, 4),
+         rng,
+      );
+      return {
+         type: "definition",
+         prompt: `Which of the following is "${label}"?`,
+         choices,
+         answer: label,
+         explanation: `The entity described is "${label}".`,
+      };
    }
 
    const shuffledKeys = seededShuffle(availableKeys, rng);
@@ -205,7 +296,10 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    // Find a key shared by at least 3 other entities
    for (const key of shuffledKeys) {
       const peers = allEntities.filter(
-         (e) => e.id !== entity.id && e.metadata?.[key] !== undefined && String(e.metadata[key]).trim() !== ""
+         (e) =>
+            e.id !== entity.id &&
+            e.metadata?.[key] !== undefined &&
+            String(e.metadata[key]).trim() !== "",
       );
       if (peers.length >= 3) {
          chosenKey = key;
@@ -222,7 +316,13 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
 
    const correctValueRaw = String(meta[chosenKey] ?? "");
    let correctValue = cleanVal(correctValueRaw);
-   if (chosenKey === "definition" || chosenKey === "meaning" || chosenKey === "example" || chosenKey === "example_template" || chosenKey === "idiom_meaning") {
+   if (
+      chosenKey === "definition" ||
+      chosenKey === "meaning" ||
+      chosenKey === "example" ||
+      chosenKey === "example_template" ||
+      chosenKey === "idiom_meaning"
+   ) {
       correctValue = censorWord(correctValue, label);
    }
    const keyLabel = chosenKey.replace(/_/g, " ");
@@ -240,7 +340,13 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       const otherValues = validDistractorPool
          .map((e) => {
             let val = cleanVal(String(e.metadata?.[chosenKey] ?? ""));
-            if (chosenKey === "definition" || chosenKey === "meaning" || chosenKey === "example" || chosenKey === "example_template" || chosenKey === "idiom_meaning") {
+            if (
+               chosenKey === "definition" ||
+               chosenKey === "meaning" ||
+               chosenKey === "example" ||
+               chosenKey === "example_template" ||
+               chosenKey === "idiom_meaning"
+            ) {
                val = censorWord(val, e.label);
             }
             return val;
@@ -274,13 +380,19 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
    }
 
    const entitiesWithDifferentValue = validDistractorPool
-      .filter((e) => cleanVal(String(e.metadata?.[chosenKey] ?? "")) !== correctValue)
+      .filter(
+         (e) =>
+            cleanVal(String(e.metadata?.[chosenKey] ?? "")) !== correctValue,
+      )
       .map((e) => e.label)
       .filter((l) => l);
 
    const metaKeys = Object.keys(meta).filter((k) => !SKIP_KEYS.has(k));
    const weights = variantWeights ?? DEFAULT_WEIGHTS;
-   const assignedVariant = variantOverride !== undefined ? variantOverride : Math.floor(rng() * weights.length);
+   const assignedVariant =
+      variantOverride !== undefined
+         ? variantOverride
+         : Math.floor(rng() * weights.length);
    const tryOrder = buildVariantTryOrder(assignedVariant, weights);
 
    for (const v of tryOrder) {
@@ -288,11 +400,21 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
 
       // ── Variant 0: Forward ──────────────────────────────────
       if (v === 0 || distractors.length < 1) {
-         const prompt = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
+         const prompt = formatQuestionPrompt(
+            0,
+            label,
+            chosenKey,
+            correctValue,
+            "",
+            categoryType,
+         );
          q = {
             type: "definition",
             prompt: prompt.prompt,
-            choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
+            choices: seededShuffle(
+               [...new Set([correctValue, ...distractors])].slice(0, 4),
+               rng,
+            ),
             answer: correctValue,
             explanation: `"${label}" has a ${keyLabel} of "${correctValue}".`,
          };
@@ -301,11 +423,26 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
 
       // ── Variant 1: Reverse ──────────────────────────────────
       if (v === 1 && entitiesWithDifferentValue.length >= 3) {
-         const prompt = formatQuestionPrompt(1, label, chosenKey, correctValue, "", categoryType);
+         const prompt = formatQuestionPrompt(
+            1,
+            label,
+            chosenKey,
+            correctValue,
+            "",
+            categoryType,
+         );
          q = {
             type: "definition",
             prompt: prompt.prompt,
-            choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
+            choices: seededShuffle(
+               [
+                  ...new Set([
+                     label,
+                     ...seededShuffle(entitiesWithDifferentValue, rng),
+                  ]),
+               ].slice(0, 4),
+               rng,
+            ),
             answer: label,
             explanation: `"${label}" is the one with a ${keyLabel} of "${correctValue}".`,
          };
@@ -314,18 +451,27 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
 
       // ── Variant 2: Odd one out ─────────────────────────────
       if (v === 2 && distractors.length >= 1) {
-         const valueCounts = new Map<string, { count: number; labels: string[] }>();
+         const valueCounts = new Map<
+            string,
+            { count: number; labels: string[] }
+         >();
          for (const e of allEntities) {
             if (e.id === entity?.id) continue;
             const val = cleanVal(String(e.metadata?.[chosenKey] ?? ""));
             if (!val) continue;
-            if (!valueCounts.has(val)) valueCounts.set(val, { count: 0, labels: [] });
+            if (!valueCounts.has(val))
+               valueCounts.set(val, { count: 0, labels: [] });
             const entry = valueCounts.get(val)!;
             entry.count++;
             entry.labels.push(e.label);
          }
          const shared = Array.from(valueCounts.entries())
-            .filter(([val, info]) => val !== correctValue && info.count >= 3 && info.labels.length >= 3)
+            .filter(
+               ([val, info]) =>
+                  val !== correctValue &&
+                  info.count >= 3 &&
+                  info.labels.length >= 3,
+            )
             .sort(() => rng() - 0.5);
          if (shared.length > 0) {
             const [sharedValue, info] = shared[0];
@@ -333,7 +479,15 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             q = {
                type: "definition",
                prompt: `Which of these options does not share the same ${cleanKeyLabel} as the others?`,
-               choices: seededShuffle([...new Set([...seededShuffle(info.labels, rng).slice(0, 3), label])].slice(0, 4), rng),
+               choices: seededShuffle(
+                  [
+                     ...new Set([
+                        ...seededShuffle(info.labels, rng).slice(0, 3),
+                        label,
+                     ]),
+                  ].slice(0, 4),
+                  rng,
+               ),
                answer: label,
                subPrompt: `The others are associated with the ${cleanKeyLabel} "${sharedValue}".`,
                explanation: `"${label}" is the odd one out — the others are in the ${cleanKeyLabel} "${sharedValue}".`,
@@ -346,7 +500,14 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       if (v === 3 && distractors.length >= 1) {
          const isTrue = Math.floor(rng() * 2) === 0;
          const displayedValue = isTrue ? correctValue : distractors[0];
-         const prompt = formatQuestionPrompt(3, label, chosenKey, correctValue, displayedValue, categoryType);
+         const prompt = formatQuestionPrompt(
+            3,
+            label,
+            chosenKey,
+            correctValue,
+            displayedValue,
+            categoryType,
+         );
          q = {
             type: "definition",
             prompt: prompt.prompt,
@@ -360,26 +521,46 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       }
 
       // ── Variant 4: Single-clue (What am I?) ────────────────
-      if (v === 4 && metaKeys.length >= 1 && entitiesWithDifferentValue.length >= 3) {
-         const priorityKeys = ["definition", "meaning", "contrast", "formula", "achievement"];
-         let chosenClueKey = priorityKeys.find(k => metaKeys.includes(k));
+      if (
+         v === 4 &&
+         metaKeys.length >= 1 &&
+         entitiesWithDifferentValue.length >= 3
+      ) {
+         const priorityKeys = [
+            "definition",
+            "meaning",
+            "contrast",
+            "formula",
+            "achievement",
+         ];
+         let chosenClueKey = priorityKeys.find((k) => metaKeys.includes(k));
          if (!chosenClueKey) {
             chosenClueKey = seededShuffle(metaKeys, rng)[0];
          }
-         
+
          const clueValRaw = String(meta[chosenClueKey] ?? "");
          let clueVal = clueValRaw;
-         if (chosenClueKey === "definition" || chosenClueKey === "meaning" || chosenClueKey === "example" || chosenClueKey === "example_template" || chosenClueKey === "idiom_meaning") {
+         if (
+            chosenClueKey === "definition" ||
+            chosenClueKey === "meaning" ||
+            chosenClueKey === "example" ||
+            chosenClueKey === "example_template" ||
+            chosenClueKey === "idiom_meaning"
+         ) {
             clueVal = censorWord(clueVal, label);
          }
          const cLabel = chosenClueKey.replace(/_/g, " ").trim();
-         const capitalizedClueLabel = cLabel.charAt(0).toUpperCase() + cLabel.slice(1);
+         const capitalizedClueLabel =
+            cLabel.charAt(0).toUpperCase() + cLabel.slice(1);
 
-         const isWordMatch = categoryType.includes("english") || categoryType.includes("language") || categoryType.includes("vocab");
-         
+         const isWordMatch =
+            categoryType.includes("english") ||
+            categoryType.includes("language") ||
+            categoryType.includes("vocab");
+
          let promptText = "";
          if (chosenClueKey === "definition" || chosenClueKey === "meaning") {
-            promptText = isWordMatch 
+            promptText = isWordMatch
                ? `Which word matches this definition:\n"${clueVal}"`
                : `Identify the match for this definition:\n"${clueVal}"`;
          } else {
@@ -391,7 +572,15 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          q = {
             type: "definition",
             prompt: promptText,
-            choices: seededShuffle([...new Set([label, ...seededShuffle(entitiesWithDifferentValue, rng)])].slice(0, 4), rng),
+            choices: seededShuffle(
+               [
+                  ...new Set([
+                     label,
+                     ...seededShuffle(entitiesWithDifferentValue, rng),
+                  ]),
+               ].slice(0, 4),
+               rng,
+            ),
             answer: label,
             explanation: `"${label}" matches the clue (${cLabel}: "${clueVal}").`,
          };
@@ -403,11 +592,21 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          const wrongValue = distractors[0];
          const otherDistractors = distractors.filter((d) => d !== wrongValue);
          if (otherDistractors.length >= 3) {
-            const prompt = formatQuestionPrompt(5, label, chosenKey, correctValue, wrongValue, categoryType);
+            const prompt = formatQuestionPrompt(
+               5,
+               label,
+               chosenKey,
+               correctValue,
+               wrongValue,
+               categoryType,
+            );
             q = {
                type: "definition",
                prompt: prompt.prompt,
-               choices: seededShuffle([...new Set([correctValue, ...otherDistractors])].slice(0, 4), rng),
+               choices: seededShuffle(
+                  [...new Set([correctValue, ...otherDistractors])].slice(0, 4),
+                  rng,
+               ),
                answer: correctValue,
                explanation: `"${label}" actually has a ${keyLabel} of "${correctValue}", not "${wrongValue}".`,
             };
@@ -415,20 +614,23 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          }
       }
 
-       // ── Variant 6: Tag Match (TEMPORARILY DISABLED) ───────
-       if (v === 6 && false && entity.tags?.length > 0) {
-         const allTags = [...new Set(allEntities.flatMap((e: any) => e.tags || []))];
+      // ── Variant 6: Tag Match (TEMPORARILY DISABLED) ───────
+      if (v === 6 && false && entity.tags?.length > 0) {
+         const allTags = [
+            ...new Set(allEntities.flatMap((e: any) => e.tags || [])),
+         ];
          const myTags: string[] = entity.tags;
          const otherTags = allTags.filter((t: string) => !myTags.includes(t));
          if (otherTags.length >= 3) {
             const tagCounts = new Map<string, number>();
             for (const e of allEntities) {
-               for (const t of (e.tags || [])) {
+               for (const t of e.tags || []) {
                   tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
                }
             }
-            const sortedTags = seededShuffle([...myTags], rng)
-               .sort((a, b) => (tagCounts.get(a) || 0) - (tagCounts.get(b) || 0));
+            const sortedTags = seededShuffle([...myTags], rng).sort(
+               (a, b) => (tagCounts.get(a) || 0) - (tagCounts.get(b) || 0),
+            );
             const chosenTag = sortedTags[0];
             const tagDistractors = seededShuffle(otherTags, rng).slice(0, 3);
             q = {
@@ -445,22 +647,41 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       // ── Variant 7: Compare (Numeric) ─────────────────────
       if (v === 7 && isNum) {
          const validPeers = allEntities.filter(
-            (e: any) => e.id !== entity.id && e.metadata?.[chosenKey] !== undefined &&
-               isNumeric(String(e.metadata[chosenKey]))
+            (e: any) =>
+               e.id !== entity.id &&
+               e.metadata?.[chosenKey] !== undefined &&
+               isNumeric(String(e.metadata[chosenKey])),
          );
          if (validPeers.length >= 1) {
             const peer = seededShuffle(validPeers, rng)[0];
-            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
-            const peerNum = parseFloat(sanitize(String(peer.metadata[chosenKey])));
+            const sanitize = (val: string) =>
+               val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const peerNum = parseFloat(
+               sanitize(String(peer.metadata[chosenKey])),
+            );
             const correctNum = parseFloat(sanitize(correctValue));
-            if (!isNaN(correctNum) && !isNaN(peerNum) && correctNum !== peerNum) {
+            if (
+               !isNaN(correctNum) &&
+               !isNaN(peerNum) &&
+               correctNum !== peerNum
+            ) {
                const isHigher = rng() > 0.5;
                const winner = isHigher
-                  ? (correctNum > peerNum ? label : peer.label)
-                  : (correctNum < peerNum ? label : peer.label);
+                  ? correctNum > peerNum
+                     ? label
+                     : peer.label
+                  : correctNum < peerNum
+                    ? label
+                    : peer.label;
                const loser = winner === label ? peer.label : label;
-               const winnerVal = winner === label ? correctValue : String(peer.metadata[chosenKey] ?? "");
-               const loserVal = loser === label ? correctValue : String(peer.metadata[chosenKey] ?? "");
+               const winnerVal =
+                  winner === label
+                     ? correctValue
+                     : String(peer.metadata[chosenKey] ?? "");
+               const loserVal =
+                  loser === label
+                     ? correctValue
+                     : String(peer.metadata[chosenKey] ?? "");
                q = {
                   type: "definition",
                   prompt: isHigher
@@ -478,10 +699,16 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
       // ── Variant 8: Timeline ──────────────────────────────
       if (v === 8 && isNum) {
          const k = chosenKey.toLowerCase();
-         const isTime = k.includes("year") || k.includes("date") || k.includes("founded") ||
-            k.includes("released") || k.includes("created") || k.includes("acquired");
+         const isTime =
+            k.includes("year") ||
+            k.includes("date") ||
+            k.includes("founded") ||
+            k.includes("released") ||
+            k.includes("created") ||
+            k.includes("acquired");
          if (isTime) {
-            const sanitize = (val: string) => val.replace(/[$,%\s]/g, "").replace(/,/g, "");
+            const sanitize = (val: string) =>
+               val.replace(/[$,%\s]/g, "").replace(/,/g, "");
             const candidates: { label: string; value: number }[] = [];
             for (const e of allEntities) {
                const raw = String(e.metadata?.[chosenKey] ?? "");
@@ -493,16 +720,24 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
             if (candidates.length >= 4) {
                candidates.sort((a, b) => a.value - b.value);
                const askEarliest = rng() > 0.5;
-               const answer = askEarliest ? candidates[0] : candidates[candidates.length - 1];
+               const answer = askEarliest
+                  ? candidates[0]
+                  : candidates[candidates.length - 1];
                const timelineDistractors = seededShuffle(
-                  candidates.filter((c) => c.label !== answer.label), rng
-               ).slice(0, 3).map((c) => c.label);
+                  candidates.filter((c) => c.label !== answer.label),
+                  rng,
+               )
+                  .slice(0, 3)
+                  .map((c) => c.label);
                q = {
                   type: "definition",
                   prompt: askEarliest
                      ? `Which of these happened earliest (${keyLabel})?`
                      : `Which of these happened most recently (${keyLabel})?`,
-                  choices: seededShuffle([answer.label, ...timelineDistractors], rng),
+                  choices: seededShuffle(
+                     [answer.label, ...timelineDistractors],
+                     rng,
+                  ),
                   answer: answer.label,
                   explanation: `"${answer.label}" is the ${askEarliest ? "earliest" : "most recent"} (${keyLabel}: ${answer.value}).`,
                };
@@ -511,11 +746,21 @@ function _generateQuestion(seed: string, entity: any, allEntities: any[], varian
          }
       }
    }
-   const fallbackQ = formatQuestionPrompt(0, label, chosenKey, correctValue, "", categoryType);
+   const fallbackQ = formatQuestionPrompt(
+      0,
+      label,
+      chosenKey,
+      correctValue,
+      "",
+      categoryType,
+   );
    return {
       type: "definition",
       prompt: fallbackQ.prompt,
-      choices: seededShuffle([...new Set([correctValue, ...distractors])].slice(0, 4), rng),
+      choices: seededShuffle(
+         [...new Set([correctValue, ...distractors])].slice(0, 4),
+         rng,
+      ),
       answer: correctValue,
       explanation: `"${label}" has a ${keyLabel} of "${correctValue}".`,
    };
@@ -534,14 +779,19 @@ serve(async (req) => {
       if (!matchId || !category) {
          return new Response(
             JSON.stringify({ error: "matchId and category are required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            {
+               status: 400,
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
          );
       }
 
       const seed = clientSeed || `${matchId}-${category}`;
       const logPrefix = `[generate-match-questions]`;
 
-      console.log(`${logPrefix} Starting for match=${matchId} category=${category} seed=${seed}`);
+      console.log(
+         `${logPrefix} Starting for match=${matchId} category=${category} seed=${seed}`,
+      );
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -551,15 +801,16 @@ serve(async (req) => {
       console.log(`${logPrefix} Checking existing match ${matchId}`);
       const { data: existing } = await supabaseClient
          .from("wordup_matches")
-         .select("questions, encryption_key, player1_id, player2_id, is_bot_match")
+         .select(
+            "questions, encryption_key, player1_id, player2_id, is_bot_match",
+         )
          .eq("id", matchId)
          .single();
 
       if (existing?.questions && existing?.encryption_key) {
-         return new Response(
-            JSON.stringify({ matchId, cached: true }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-         );
+         return new Response(JSON.stringify({ matchId, cached: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
       }
 
       // Gather player IDs to exclude/deprioritize seen entities
@@ -570,23 +821,35 @@ serve(async (req) => {
       }
 
       // Call the RPC function to get randomized entities with even type distribution and user history filter
-      const { data: entities, error: entityError } = await supabaseClient
-         .rpc("get_wordup_entities_v2", {
+      const { data: entities, error: entityError } = await supabaseClient.rpc(
+         "get_wordup_entities_v2",
+         {
             p_category: category,
             p_user_ids: playerIds,
-            p_limit_per_type: 40
-         });
+            p_limit_per_type: 40,
+         },
+      );
 
       if (entityError) {
-         console.warn("[generate-match-questions] RPC get_wordup_entities_v2 error:", entityError);
+         console.warn(
+            "[generate-match-questions] RPC get_wordup_entities_v2 error:",
+            entityError,
+         );
       }
 
       const entityList: any[] = entities || [];
-      console.log(`${logPrefix} Fetched ${entityList.length} entities for category="${category}"`);
+      console.log(
+         `${logPrefix} Fetched ${entityList.length} entities for category="${category}"`,
+      );
       if (entityList.length > 0) {
-         console.log(`${logPrefix} Entity sample:`, JSON.stringify(entityList.slice(0, 2)).substring(0, 300));
+         console.log(
+            `${logPrefix} Entity sample:`,
+            JSON.stringify(entityList.slice(0, 2)).substring(0, 300),
+         );
       } else {
-         console.warn(`${logPrefix} No entities returned from RPC — will fallback to procedural questions`);
+         console.warn(
+            `${logPrefix} No entities returned from RPC — will fallback to procedural questions`,
+         );
       }
 
       // Fetch active handcrafted questions
@@ -599,14 +862,19 @@ serve(async (req) => {
             .or("expires_at.is.null,expires_at.gt.now()");
 
          if (hcError) {
-            console.warn(`${logPrefix} Error fetching handcrafted questions:`, hcError);
+            console.warn(
+               `${logPrefix} Error fetching handcrafted questions:`,
+               hcError,
+            );
          } else {
             handcraftedList = hcData || [];
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
       }
-      console.log(`${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions`);
+      console.log(
+         `${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions`,
+      );
 
       const matchRng = createSeededRandom(hashSeed(seed));
       const shuffledHandcrafted = seededShuffle(handcraftedList, matchRng);
@@ -642,145 +910,269 @@ serve(async (req) => {
          return e;
       };
 
-      console.log(`${logPrefix} Variant sequence: [${variantSequence.join(", ")}]`);
-      console.log(`${logPrefix} Config: proceduralWeight=${config.proceduralWeight} variantWeights=[${config.variantWeights.join(", ")}]`);
+      console.log(
+         `${logPrefix} Variant sequence: [${variantSequence.join(", ")}]`,
+      );
+      console.log(
+         `${logPrefix} Config: proceduralWeight=${config.proceduralWeight} variantWeights=[${config.variantWeights.join(", ")}]`,
+      );
 
       for (let i = 0; i < 7; i++) {
          const roundSeed = `${seed}-${i}`;
          const roundRng = createSeededRandom(hashSeed(roundSeed));
          const variant = variantSequence[i] ?? 0;
 
-         console.log(`${logPrefix} Round ${i}: variant=${variant} category=${category}`);
+         console.log(
+            `${logPrefix} Round ${i}: variant=${variant} category=${category}`,
+         );
 
          // ── Mix Strategy: Weave unexpired handcrafted questions from DB (40% chance if available) ──
-          if (shuffledHandcrafted.length > handcraftedCursor && roundRng() < 0.40) {
-             const hq = shuffledHandcrafted[handcraftedCursor];
-             handcraftedCursor++;
-             console.log(`${logPrefix} Round ${i}: weaving handcrafted question: "${hq.prompt}"`);
-             questions.push({
-                type: "definition", // default type for frontend rendering
-                ...hq
-             });
-             continue;
-          }
+         if (
+            shuffledHandcrafted.length > handcraftedCursor &&
+            roundRng() < 0.8
+         ) {
+            const hq = shuffledHandcrafted[handcraftedCursor];
+            handcraftedCursor++;
+            console.log(
+               `${logPrefix} Round ${i}: weaving handcrafted question: "${hq.prompt}"`,
+            );
+            questions.push({
+               type: "definition", // default type for frontend rendering
+               ...hq,
+            });
+            continue;
+         }
 
          // Route by category: hybrid algorithmic logic takes precedence
          if (category === "maths") {
             const entity = entityList.length > 0 ? getNextEntity() : null;
             chosenEntities.push(entity);
-            console.log(`${logPrefix} Round ${i} [maths]: entity=${entity?.label ?? "null"}`);
-            const q = generateMathsQuestion(roundSeed, entity, entityList, roundRng, variant, config.proceduralWeight);
+            console.log(
+               `${logPrefix} Round ${i} [maths]: entity=${entity?.label ?? "null"}`,
+            );
+            const q = generateMathsQuestion(
+               roundSeed,
+               entity,
+               entityList,
+               roundRng,
+               variant,
+               config.proceduralWeight,
+            );
             if (q) {
-               console.log(`${logPrefix} Round ${i} [maths]: generated procedural question type=${q.type}`);
+               console.log(
+                  `${logPrefix} Round ${i} [maths]: generated procedural question type=${q.type}`,
+               );
                questions.push(q);
                continue;
             }
             if (entity) {
-               console.log(`${logPrefix} Round ${i} [maths]: falling back to entity question for ${entity.label}`);
-               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
+               console.log(
+                  `${logPrefix} Round ${i} [maths]: falling back to entity question for ${entity.label}`,
+               );
+               questions.push(
+                  generateQuestion(
+                     roundSeed,
+                     entity,
+                     entityList,
+                     variant,
+                     category,
+                     config.variantWeights,
+                  ),
+               );
                continue;
             }
-            console.warn(`${logPrefix} Round ${i} [maths]: no question generated at all!`);
+            console.warn(
+               `${logPrefix} Round ${i} [maths]: no question generated at all!`,
+            );
          }
 
          if (category === "english_language") {
             const entity = entityList.length > 0 ? getNextEntity() : null;
             chosenEntities.push(entity);
-            console.log(`${logPrefix} Round ${i} [english]: entity=${entity?.label ?? "null"}`);
-            const q = generateEnglishQuestion(roundSeed, entity, entityList, roundRng, variant, config.proceduralWeight);
+            console.log(
+               `${logPrefix} Round ${i} [english]: entity=${entity?.label ?? "null"}`,
+            );
+            const q = generateEnglishQuestion(
+               roundSeed,
+               entity,
+               entityList,
+               roundRng,
+               variant,
+               config.proceduralWeight,
+            );
             if (q) {
-               console.log(`${logPrefix} Round ${i} [english]: generated procedural question type=${q.type}`);
+               console.log(
+                  `${logPrefix} Round ${i} [english]: generated procedural question type=${q.type}`,
+               );
                questions.push(q);
                continue;
             }
             if (entity) {
-               console.log(`${logPrefix} Round ${i} [english]: falling back to entity question for ${entity.label}`);
-               questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
+               console.log(
+                  `${logPrefix} Round ${i} [english]: falling back to entity question for ${entity.label}`,
+               );
+               questions.push(
+                  generateQuestion(
+                     roundSeed,
+                     entity,
+                     entityList,
+                     variant,
+                     category,
+                     config.variantWeights,
+                  ),
+               );
                continue;
             }
-            console.warn(`${logPrefix} Round ${i} [english]: no question generated at all!`);
+            console.warn(
+               `${logPrefix} Round ${i} [english]: no question generated at all!`,
+            );
          }
 
-           // Standard entity-based procedural category logic
-           if (entityList.length === 0) {
-              console.log(`${logPrefix} Round ${i} [standard]: no entities — fallback to maths procedural`);
-              const q = generateMathsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
-              questions.push(q);
-           } else {
-              const entity = getNextEntity();
-              chosenEntities.push(entity);
-              console.log(`${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`);
-              questions.push(generateQuestion(roundSeed, entity, entityList, variant, category, config.variantWeights));
-           }
+         // Standard entity-based procedural category logic
+         if (entityList.length === 0) {
+            if (shuffledHandcrafted.length > 0) {
+               const hq = shuffledHandcrafted[handcraftedCursor % shuffledHandcrafted.length];
+               handcraftedCursor++;
+               console.log(
+                  `${logPrefix} Round ${i} [standard]: no entities — falling back to handcrafted question`,
+               );
+               questions.push({
+                  type: "definition",
+                  ...hq,
+               });
+            } else {
+               console.log(
+                  `${logPrefix} Round ${i} [standard]: no entities & no handcrafted — fallback to maths procedural`,
+               );
+               const q = generateMathsQuestion(
+                  roundSeed,
+                  null,
+                  [],
+                  roundRng,
+                  variant,
+                  config.proceduralWeight,
+               );
+               questions.push(q);
+            }
+         } else {
+            const entity = getNextEntity();
+            chosenEntities.push(entity);
+            console.log(
+               `${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`,
+            );
+            questions.push(
+               generateQuestion(
+                  roundSeed,
+                  entity,
+                  entityList,
+                  variant,
+                  category,
+                  config.variantWeights,
+               ),
+            );
+         }
 
-           console.log(`${logPrefix} Round ${i}: question generated successfully`);
-        }
+         console.log(
+            `${logPrefix} Round ${i}: question generated successfully`,
+         );
+      }
 
-       console.log(`${logPrefix} Generated ${questions.length} questions total`);
-       console.log(`${logPrefix} Chosen entities:`, chosenEntities.filter(Boolean).map((e: any) => e.label));
+      console.log(`${logPrefix} Generated ${questions.length} questions total`);
+      console.log(
+         `${logPrefix} Chosen entities:`,
+         chosenEntities.filter(Boolean).map((e: any) => e.label),
+      );
 
-       // Encrypt and persist
-       const plaintext = JSON.stringify(questions);
-       console.log(`${logPrefix} Plaintext payload length: ${plaintext.length} chars`);
-       const encryptionKey = await generateSecureSessionKey();
-       console.log(`${logPrefix} Encryption key generated (${encryptionKey.length} chars)`);
-       const encryptedQuestions = await encryptPayload(plaintext, encryptionKey);
-       console.log(`${logPrefix} Payload encrypted (${encryptedQuestions.length} chars)`);
+      // Encrypt and persist
+      const plaintext = JSON.stringify(questions);
+      console.log(
+         `${logPrefix} Plaintext payload length: ${plaintext.length} chars`,
+      );
+      const encryptionKey = await generateSecureSessionKey();
+      console.log(
+         `${logPrefix} Encryption key generated (${encryptionKey.length} chars)`,
+      );
+      const encryptedQuestions = await encryptPayload(plaintext, encryptionKey);
+      console.log(
+         `${logPrefix} Payload encrypted (${encryptedQuestions.length} chars)`,
+      );
 
-       console.log(`${logPrefix} Updating wordup_matches ${matchId} with questions and encryption_key`);
-        const { error: updateError } = await supabaseClient
-           .from("wordup_matches")
-           .update({
-              questions: encryptedQuestions,
-              encryption_key: encryptionKey,
-           })
-           .eq("id", matchId)
-           .is("questions", null);
+      console.log(
+         `${logPrefix} Updating wordup_matches ${matchId} with questions and encryption_key`,
+      );
+      const { error: updateError } = await supabaseClient
+         .from("wordup_matches")
+         .update({
+            questions: encryptedQuestions,
+            encryption_key: encryptionKey,
+         })
+         .eq("id", matchId)
+         .is("questions", null);
 
-       if (updateError) {
-          console.error(`${logPrefix} DB update error:`, updateError);
-          console.log(`${logPrefix} Falling back to wordup_match_payloads insert`);
-          const { error: payloadError } = await supabaseClient
-             .from("wordup_match_payloads")
-             .insert({ match_id: matchId, encrypted_payload: encryptedQuestions });
-          if (payloadError) {
-             throw new Error(`Failed to store payload: ${payloadError.message}`);
-          }
-          console.log(`${logPrefix} Payload stored in wordup_match_payloads`);
-       } else {
-          console.log(`${logPrefix} Match updated successfully`);
+      if (updateError) {
+         console.error(`${logPrefix} DB update error:`, updateError);
+         console.log(
+            `${logPrefix} Falling back to wordup_match_payloads insert`,
+         );
+         const { error: payloadError } = await supabaseClient
+            .from("wordup_match_payloads")
+            .insert({
+               match_id: matchId,
+               encrypted_payload: encryptedQuestions,
+            });
+         if (payloadError) {
+            throw new Error(`Failed to store payload: ${payloadError.message}`);
+         }
+         console.log(`${logPrefix} Payload stored in wordup_match_payloads`);
+      } else {
+         console.log(`${logPrefix} Match updated successfully`);
 
-          // Log the chosen entities in the user history table for tracking
-          const validChosenEntityIds = chosenEntities
-             .filter((e) => e && e.id)
-             .map((e) => e.id);
+         // Log the chosen entities in the user history table for tracking
+         const validChosenEntityIds = chosenEntities
+            .filter((e) => e && e.id)
+            .map((e) => e.id);
 
-          if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
-             console.log(`${logPrefix} Recording entity history for ${playerIds.length} user(s)`);
-             const { error: historyError } = await supabaseClient
-                .rpc("record_user_entities_seen", {
-                   p_user_ids: playerIds,
-                   p_entity_ids: validChosenEntityIds
-                });
+         if (validChosenEntityIds.length > 0 && playerIds.length > 0) {
+            console.log(
+               `${logPrefix} Recording entity history for ${playerIds.length} user(s)`,
+            );
+            const { error: historyError } = await supabaseClient.rpc(
+               "record_user_entities_seen",
+               {
+                  p_user_ids: playerIds,
+                  p_entity_ids: validChosenEntityIds,
+               },
+            );
 
-              if (historyError) {
-                 console.error(`${logPrefix} Failed to record entity history:`, historyError);
-              } else {
-                 console.log(`${logPrefix} Entity history recorded`);
+            if (historyError) {
+               console.error(
+                  `${logPrefix} Failed to record entity history:`,
+                  historyError,
+               );
+            } else {
+               console.log(`${logPrefix} Entity history recorded`);
             }
          }
       }
 
-       console.log(`${logPrefix} Returning success response`);
-       return new Response(
-          JSON.stringify({ matchId, encryptedQuestions, encryptionKey, questionCount: questions.length }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-       );
+      console.log(`${logPrefix} Returning success response`);
+      return new Response(
+         JSON.stringify({
+            matchId,
+            encryptedQuestions,
+            encryptionKey,
+            questionCount: questions.length,
+         }),
+         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
    } catch (err: any) {
       console.error("[generate-match-questions] Error:", err);
       return new Response(
          JSON.stringify({ error: err.message || "Internal error" }),
-         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+         {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         },
       );
    }
 });

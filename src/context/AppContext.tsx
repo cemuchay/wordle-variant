@@ -58,6 +58,8 @@ interface AppContextType {
     // WordUp Direct Invite State
     incomingWordUpInvite: { senderId: string; senderName: string; category: string } | null;
     setIncomingWordUpInvite: (invite: { senderId: string; senderName: string; category: string } | null) => void;
+    incomingAsyncInvite: { senderId: string; senderName: string; category: string; matchId: string } | null;
+    setIncomingAsyncInvite: (invite: { senderId: string; senderName: string; category: string; matchId: string } | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -65,6 +67,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<any>(null);
     const [incomingWordUpInvite, setIncomingWordUpInvite] = useState<{ senderId: string; senderName: string; category: string } | null>(null);
+    const [incomingAsyncInvite, setIncomingAsyncInvite] = useState<{ senderId: string; senderName: string; category: string; matchId: string } | null>(null);
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -462,6 +465,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
                 setIncomingWordUpInvite(payload);
             })
+            .on('broadcast', { event: 'wordup_async_invite' }, ({ payload }) => {
+                setIncomingAsyncInvite(payload);
+            })
             .on('broadcast', { event: 'wordup_invite_rejected' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-rejected', { detail: payload }));
             })
@@ -837,7 +843,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         realtimeStatus,
         isDynamicIslandVisible: true,
         incomingWordUpInvite,
-        setIncomingWordUpInvite
+        setIncomingWordUpInvite,
+        incomingAsyncInvite,
+        setIncomingAsyncInvite
     }), [
         profile, preferences, isProfileLoading, refreshProfile, toast, triggerToast,
         setToast, unreadCount, setUnreadCount, challengeUnreadCount,
@@ -852,7 +860,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         allProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
         acceptCall, rejectCall, hangUpCall, realtimeStatus,
-        incomingWordUpInvite, setIncomingWordUpInvite
+        incomingWordUpInvite, setIncomingWordUpInvite,
+        incomingAsyncInvite, setIncomingAsyncInvite
     ]);
 
     return (

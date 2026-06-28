@@ -139,10 +139,13 @@ export const WordUpView = () => {
    const launchedMatchRef = useRef<string | null>(null);
    const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
    const engineCleanupRef = useRef<(() => void) | null>(null);
+   // eslint-disable-next-line react-hooks/immutability, react-hooks/refs
    startMatchRef.current = engine.startMatch;
+   // eslint-disable-next-line react-hooks/refs
    engineCleanupRef.current = engine.cleanup;
 
    const onMatchFound = useCallback((mId: string, mRole: "player1" | "player2") => {
+      // eslint-disable-next-line react-hooks/immutability
       launchedMatchRef.current = mId;
       setMatchId(mId);
       setRole(mRole);
@@ -152,6 +155,7 @@ export const WordUpView = () => {
    // Reactive sync for direct invites, rematch transitions, and loading state
    useEffect(() => {
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
+         // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
@@ -217,6 +221,7 @@ export const WordUpView = () => {
          store.setRevealAnswers(activeGame.revealAnswers || false);
          store.setSelectedAnswer(activeGame.selectedAnswer || null);
 
+         // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = activeGame.matchId;
 
          recoveryTimer = window.setTimeout(async () => {
@@ -230,7 +235,6 @@ export const WordUpView = () => {
          mounted = false;
          if (recoveryTimer !== null) clearTimeout(recoveryTimer);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    // ── Purge and reset ──────────────────────────────────────────────────
@@ -243,6 +247,7 @@ export const WordUpView = () => {
    useEffect(() => { cancelMatchmakingRef.current = cancelMatchmaking; }, [cancelMatchmaking]);
 
    useEffect(() => { engineCleanupRef.current = engine.cleanup; }, [engine.cleanup]);
+   // eslint-disable-next-line react-hooks/immutability
    useEffect(() => { startMatchRef.current = engine.startMatch; }, [engine.startMatch]);
 
    useEffect(() => {
@@ -252,7 +257,6 @@ export const WordUpView = () => {
          const state = useWordUpStore.getState();
          if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [resetGame]);
 
    // ── History match viewer ──────────────────────────────────────────────
@@ -285,12 +289,21 @@ export const WordUpView = () => {
    if (!effectiveUser) {
       return (
          <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-dark p-6 text-center space-y-6">
-            <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
-               <Swords size={32} />
-            </div>
-            <div className="space-y-2">
-               <h2 className="text-2xl font-black uppercase tracking-wider text-white">WordUp Battles</h2>
-               <p className="text-xs text-gray-400 max-w-xs mx-auto">Log in to save stats permanently, or enter a nickname to play as a guest!</p>
+
+            <div className="space-y-4 text-center">
+               {/* Flex container to place icon and heading side-by-side */}
+               <div className="flex items-center justify-center gap-4">
+                  <span className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
+                     <Swords size={32} />
+                  </span>
+                  <h2 className="text-2xl font-black uppercase tracking-wider text-white">
+                     WordUp Battles
+                  </h2>
+               </div>
+
+               <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  Log in to save stats permanently, or enter a nickname to play as a guest!
+               </p>
             </div>
 
             {!showGuestInput ? (

@@ -1,11 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Trophy, Swords, Users } from 'lucide-react';
+import formatUsername from '../../utils/formatUsername';
 
 interface MarathonBannerProps {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     challenges: any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onClick: (challenge: any) => void;
     className?: string;
     showTimer?: boolean;
@@ -87,7 +87,6 @@ const URGENT_CONFIG = {
     description: 'Today\'s marathon is about to expire. Join the race before it\'s too late!'
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: any, onClick: (c: any) => void, showTimer: boolean, navigation?: React.ReactNode }) => {
     const [timeLeft, setTimeLeft] = useState<string>('');
     const [isUrgent, setIsUrgent] = useState(false);
@@ -129,6 +128,14 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
 
         return () => clearInterval(timer);
     }, [challenge]);
+
+    const participants = challenge?.challenge?.participants || [];
+
+    const participantCount = participants.length;
+    const gamesPlayed = participants.reduce((sum: number, p: any) => {
+        return sum + (p.marathon_progress?.filter((g: any) => g.status === 'completed' || g.status === 'timed_out').length || 0);
+    }, 0);
+    const leader = [...participants].filter((p: any) => p.profiles?.username).sort((a: any, b: any) => (b.score || 0) - (a.score || 0))[0];
 
     return (
         <div
@@ -172,6 +179,27 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
                         Play Now &rarr;
                     </span>
                 </div>
+                {participantCount > 0 && (
+                    <div className="flex items-center gap-3 text-[10px] text-white/30 mt-1">
+                        {leader && leader.score > 0 && (
+                            <span className="flex items-center gap-1 text-white">
+                                <Trophy size={11} className={config.textAccent} />
+                                <span className="font-medium text-white uppercase">{formatUsername(leader.profiles.username)}</span>
+                                <span className="font-black tabular-nums">{leader.score}</span>
+                            </span>
+                        )}
+                        <span className="flex items-center gap-1 text-white">
+                            <Swords size={11} />
+                            <span className="font-black tabular-nums">{gamesPlayed}</span>
+                            <span className="text-white/20">games</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-white">
+                            <Users size={11} />
+                            <span className="font-black tabular-nums">{participantCount}</span>
+
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -254,7 +282,7 @@ export const MarathonBanner = ({ challenges, onClick, className, showTimer = tru
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ 
+                    transition={{
                         type: "spring",
                         stiffness: 300,
                         damping: 30,

@@ -221,10 +221,32 @@ export const ChallengeItem = memo(function ChallengeItem({
     return parseMarathonGames(challenge.target_word, challenge.salt).length;
   }, [isMarathon, challenge.target_word, challenge.salt]);
 
+  const isNewChallenge = useMemo(() => {
+    const diffMs = Date.now() - new Date(created_at).getTime();
+    return diffMs < 3600000 && diffMs >= 0 && !isFinished;
+  }, [created_at, isFinished]);
+
+  const itemType = useMemo((): 'active' | 'open' | 'played' | 'expired' => {
+    if (status === 'open') return 'open';
+    if (isExpired) return 'expired';
+    if (isFinished) return 'played';
+    return 'active';
+  }, [status, isExpired, isFinished]);
+
+  const bgGradient = itemType === 'active' ? 'from-indigo-500/[15%] to-transparent' :
+    itemType === 'open' ? 'from-sky-500/[15%] to-transparent' :
+      itemType === 'played' ? 'from-emerald-500/[15%] to-transparent' :
+        'from-red-500/[10%] to-transparent';
+
+  const borderAccent = itemType === 'active' ? 'border-l-indigo-500 border-l-[3px]' :
+    itemType === 'open' ? 'border-l-sky-500 border-l-[3px]' :
+      itemType === 'played' ? 'border-l-emerald-500 border-l-[3px]' :
+        'border-l-red-500/50 border-l-[3px]';
+
   return (
     <button
       onClick={handleSelect}
-      className={`w-full text-left bg-linear-to-br from-white/5 to-transparent border ${isExpired
+      className={`w-full text-left bg-linear-to-br ${bgGradient} ${borderAccent} border ${isExpired
         ? "border-white/5 opacity-65 hover:opacity-100 hover:border-white/15"
         : isSelfChallenge
           ? "border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:border-indigo-500/50"
@@ -236,24 +258,30 @@ export const ChallengeItem = memo(function ChallengeItem({
         } p-2 sm:p-4 rounded-3xl hover:bg-white/10 transition-all duration-300 group relative overflow-hidden flex flex-col gap-4`}
     >
       {/* Ambient Background Glows */}
-      {!isExpired && isSelfChallenge && (
+      {itemType === 'active' && isSelfChallenge && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-2xl -mr-16 -mt-16 pointer-events-none" />
       )}
-      {!isExpired && !isSelfChallenge && isLeader && (
+      {itemType === 'active' && !isSelfChallenge && isLeader && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-2xl -mr-16 -mt-16 pointer-events-none" />
       )}
-      {!isExpired && !isSelfChallenge && !isLeader && mode === "LIVE" && (
+      {itemType === 'active' && !isSelfChallenge && !isLeader && mode === "LIVE" && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
       )}
-      {!isExpired && !isSelfChallenge && !isLeader && mode !== "LIVE" && (
+      {itemType === 'active' && !isSelfChallenge && !isLeader && mode !== "LIVE" && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+      )}
+
+      {isNewChallenge && (
+        <div className="absolute top-2 right-2 z-20 px-2 py-0.5 bg-yellow-400/15 border border-yellow-400/30 text-yellow-400 text-[9px] font-black uppercase tracking-wider rounded-full shadow-lg backdrop-blur-sm pointer-events-none">
+          New
+        </div>
       )}
 
       {/* HEADER ROW */}
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-wrap items-center gap-2">
           {/* Index Number Badge */}
-          <span className="text-[10px] font-black text-white bg-white/10 px-2 py-0.5 rounded-lg font-mono">
+          <span className="text-[12px] font-black text-white px-2 py-0.5 rounded-lg font-mono">
             #{index + 1}
           </span>
           {/* Mode Pill */}
@@ -377,9 +405,9 @@ export const ChallengeItem = memo(function ChallengeItem({
                   : "text-white/80"
                 }`}
             >
-              {status === "host" ? "Host (Spectating)" : 
-               isMarathon ? `${marathonCompletedCount}/${totalMarathonGames} Games` : 
-               (status === "timed_out" ? "Time Expired" : status)}
+              {status === "host" ? "Host (Spectating)" :
+                isMarathon ? `${marathonCompletedCount}/${totalMarathonGames} Games` :
+                  (status === "timed_out" ? "Time Expired" : status)}
             </span>
             {status !== "host" && hasStarted && (
               <span className="text-[9px] sm:text-lg font-black text-white font-mono">
@@ -438,7 +466,7 @@ export const ChallengeItem = memo(function ChallengeItem({
                 </div>
                 {opponents.length > CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS && (
                   <span className="text-[8px] font-bold text-white/80 ml-1">
-                     +{opponents.length - CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS} more
+                    +{opponents.length - CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS} more
                   </span>
                 )}
               </div>

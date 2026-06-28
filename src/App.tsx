@@ -78,7 +78,9 @@ export default function App() {
     challengeUnreadCount,
     realtimeStatus,
     incomingWordUpInvite,
-    setIncomingWordUpInvite
+    setIncomingWordUpInvite,
+    incomingAsyncInvite,
+    setIncomingAsyncInvite
   } = useApp();
 
   // Core Game Engine
@@ -297,7 +299,7 @@ export default function App() {
     const now = new Date();
     const hour = now.getHours();
     let greeting = "Hello!";
-    let face = "(•‿•)";
+    let expression: import('./components/wordup/WordUpView/components/WordUpMascot').MascotExpression = 'idle';
 
     if (hour >= 5 && hour < 12) {
       greeting = "Good morning! ☀️";
@@ -307,15 +309,14 @@ export default function App() {
       greeting = "Good evening! 🌙";
     } else {
       greeting = "Good night! ✨";
-      face = "(★‿★)";
+      expression = 'happy';
     }
 
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('mascot-changed', {
         detail: {
-          mascotFace: face,
-          mascotLabel: greeting,
-          animationClass: "animate-in slide-in-from-top-2 duration-500"
+          expression,
+          label: greeting
         }
       }));
     }, 2000);
@@ -1054,6 +1055,99 @@ export default function App() {
                       setTimeout(() => supabase.removeChannel(rejectChannel), 1000);
                     }
                   });
+                }}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Decline
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {incomingAsyncInvite && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4"
+          >
+            <div className="inline-flex p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 mx-auto">
+              <Swords size={24} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-wider text-white">WordUp Async Battle</h3>
+            <p className="text-xs text-gray-400">
+              <strong className="text-white">{incomingAsyncInvite.senderName}</strong> has challenged you to an async match in category <strong className="text-correct">{incomingAsyncInvite.category.replace('_', ' ')}</strong>!
+            </p>
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <button
+                onClick={async () => {
+                  const invite = incomingAsyncInvite;
+                  setIncomingAsyncInvite(null);
+                  try {
+                    useAsyncStore.getState().setMatchId(invite.matchId);
+                    useAsyncStore.getState().setRole("player2");
+                    useAsyncStore.getState().setView("loading");
+                    handleNavigation("wordup");
+                    setWordupMode("async");
+
+                    const acceptChannel = supabase.channel(`wordup_async_match_signals_${invite.matchId}`);
+                    acceptChannel.subscribe((status) => {
+                      if (status === 'SUBSCRIBED') {
+                        acceptChannel.send({
+                          type: 'broadcast',
+                          event: 'wordup_async_invite_accepted',
+                          payload: { matchId: invite.matchId, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+                        });
+                        setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
+                      }
+                    });
+                  } catch (e) {
+                    console.error("Failed to accept async invite:", e);
+                  }
+                }}
+                className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => {
+                  const invite = incomingAsyncInvite;
+                  setIncomingAsyncInvite(null);
+                  const laterChannel = supabase.channel(`wordup_async_match_signals_${invite.matchId}`);
+                  laterChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                      laterChannel.send({
+                        type: 'broadcast',
+                        event: 'wordup_async_invite_later',
+                        payload: { matchId: invite.matchId }
+                      });
+                      setTimeout(() => supabase.removeChannel(laterChannel), 1000);
+                    }
+                  });
+                  triggerToast("Challenge saved as pending. Play when ready!", 3000);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+              >
+                Later
+              </button>
+              <button
+                onClick={async () => {
+                  const invite = incomingAsyncInvite;
+                  setIncomingAsyncInvite(null);
+                  const declineChannel = supabase.channel(`wordup_async_match_signals_${invite.matchId}`);
+                  declineChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                      declineChannel.send({
+                        type: 'broadcast',
+                        event: 'wordup_async_invite_declined',
+                        payload: { matchId: invite.matchId }
+                      });
+                      setTimeout(() => supabase.removeChannel(declineChannel), 1000);
+                    }
+                  });
+                  await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", invite.matchId);
                 }}
                 className="bg-white/5 hover:bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
               >

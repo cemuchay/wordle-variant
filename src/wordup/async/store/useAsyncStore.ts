@@ -5,9 +5,11 @@ import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
 import { postProcessQuestions } from "../../../utils/wordupQuestionPostProcessor";
 
 type AsyncView = "menu" | "loading" | "countdown" | "battle" | "turn_submitted" | "gameover";
+type AsyncTab = "play" | "pending" | "history";
 
 interface AsyncState {
    isBattlePlaying: boolean;
+   activeTab: AsyncTab;
    view: AsyncView;
    category: string;
    matchId: string | null;
@@ -34,11 +36,13 @@ interface AsyncState {
    setRevealAnswers: (reveal: boolean) => void;
    setTimeLeft: (time: number) => void;
    setMaxTime: (time: number) => void;
+   setActiveTab: (tab: AsyncTab) => void;
    resetGame: () => void;
 }
 
 export const useAsyncStore = create<AsyncState>((set) => ({
    isBattlePlaying: false,
+   activeTab: (safeSessionStorage.getItem("wordup_async_tab") as AsyncTab) || "play",
    view: "menu",
    category: safeSessionStorage.getItem("wordup_async_selected_category") || "mixed",
    matchId: null,
@@ -72,6 +76,10 @@ export const useAsyncStore = create<AsyncState>((set) => ({
    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
    setTimeLeft: (timeLeft) => set({ timeLeft }),
    setMaxTime: (maxTime) => set({ maxTime }),
+   setActiveTab: (activeTab) => {
+      safeSessionStorage.setItem("wordup_async_tab", activeTab);
+      set({ activeTab });
+   },
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_async_active_game");
       set({

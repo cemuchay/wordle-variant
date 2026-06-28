@@ -14,14 +14,14 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAppStore } from "../../store/useAppStore";
 import { useAsyncStore } from "./store/useAsyncStore";
 import { LobbyView } from "./components/LobbyView";
-import { InvitePopup } from "./components/InvitePopup";
 import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { ConnectingView } from "./components/ConnectingView";
+import { LoadingView } from "../../components/wordup/WordUpView/components/LoadingView";
 import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
+import { safeLocalStorage } from "../../utils/storage";
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -67,7 +67,6 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);
    const [soundEnabled, setSoundEnabled] = useState(wordupAudio.isEnabled());
-   const [incomingInvite, setIncomingInvite] = useState<any | null>(null);
    const [pendingChallenge, setPendingChallenge] = useState<{ matchId: string; targetUser: any } | null>(null);
    const [connectingMsg, setConnectingMsg] = useState("Loading...");
    const challengeResolvedRef = useRef(false);
@@ -130,29 +129,37 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       challengeTimersRef.current = [];
    }, []);
 
+   const handleCancelChallenge = useCallback(() => {
+      clearChallengeResources();
+      challengeResolvedRef.current = true;
+      setView("menu");
+      triggerToast("Challenge cancelled.", WORDUP_TIMEOUT.TOAST_DURATION);
+   }, [clearChallengeResources, setView, triggerToast]);
+
    const handleChallengePlayer = useCallback(async (targetUser: any) => {
       if (!effectiveUser) return;
       clearChallengeResources();
       challengeResolvedRef.current = false;
 
+      setConnectingMsg("Creating challenge...");
+      setView("loading");
+
+      const mId = await createMatch(targetUser);
+      if (!mId) {
+         setView("menu");
+         triggerToast("Failed to create challenge.", 4000);
+         return;
+      }
+
       const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
 
       if (!isOnline) {
-         setConnectingMsg("Creating challenge...");
-         setView("loading");
-         const mId = await createMatch(targetUser);
-         if (mId) {
-            setPendingChallenge({ matchId: mId, targetUser });
-            setView("menu");
-         } else {
-            setView("menu");
-            triggerToast("Failed to create challenge.", 4000);
-         }
+         setPendingChallenge({ matchId: mId, targetUser });
+         setView("menu");
          return;
       }
 
       setConnectingMsg("Sending challenge...");
-      setView("loading");
 
       const myName = effectiveUser.user_metadata?.username || effectiveUser.email?.split("@")[0] || "Someone";
 
@@ -167,35 +174,26 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   senderId: effectiveUser.id,
                   senderName: myName,
                   category,
+                  matchId: mId,
                },
             });
             setTimeout(() => supabase.removeChannel(targetChannel), 1000);
          }
       });
 
-      const responseChannel = supabase.channel(`user_signals_${effectiveUser.id}`);
+      const responseChannel = supabase.channel(`wordup_async_match_signals_${mId}`);
       challengeChannelsRef.current.push(responseChannel);
       responseChannel
          .on("broadcast", { event: "wordup_async_invite_accepted" }, async ({ payload }: any) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
-            const mId = payload?.matchId;
-            if (mId && effectiveUser) {
-               let match: any = null;
-               try {
-                  const { data } = await supabase
-                     .from("wordup_async_matches")
-                     .select("player1_id, player2_id")
-                     .eq("id", mId)
-                     .single();
-                  match = data;
-               } catch {/* comment */ }
-               const role = match?.player1_id === effectiveUser.id ? "player1" : "player2";
-               setMatchId(mId);
-               setRole(role);
+            const acceptedMId = payload?.matchId || mId;
+            if (effectiveUser) {
+               setMatchId(acceptedMId);
+               setRole("player1");
                setView("loading");
-               startMatch?.(mId, role);
+               startMatch?.(acceptedMId, "player1");
             } else {
                setView("menu");
                triggerToast("Failed to start match.", 4000);
@@ -205,15 +203,20 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
+            setPendingChallenge({ matchId: mId, targetUser });
             setView("menu");
-            triggerToast("Challenge saved as pending.", 3000);
          })
-         .on("broadcast", { event: "wordup_async_invite_declined" }, ({ payload }: any) => {
+         .on("broadcast", { event: "wordup_async_invite_declined" }, async ({ payload }: any) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
             setView("menu");
             triggerToast(`${payload?.senderName || "They"} declined your challenge.`, 3000);
+            try {
+               await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", mId);
+            } catch (err) {
+               console.warn("Failed to set match status to declined:", err);
+            }
          })
          .subscribe();
 
@@ -223,8 +226,8 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          if (challengeResolvedRef.current) return;
          challengeResolvedRef.current = true;
          clearChallengeResources();
+         setPendingChallenge({ matchId: mId, targetUser });
          setView("menu");
-         triggerToast("No response. Challenge saved as pending.", 3000);
       }, 15000));
    }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
 
@@ -250,9 +253,48 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (effectiveUser) refreshPending();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [effectiveUser?.id, refreshPending]);
+       if (effectiveUser) refreshPending();
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [effectiveUser?.id, refreshPending]);
+
+    // Recovery from refresh
+    useEffect(() => {
+       const activeGameStr = safeLocalStorage.getItem("wordup_async_active_game");
+       if (!activeGameStr) return;
+       let mounted = true;
+       let recoveryTimer: number | null = null;
+       try {
+          const activeGame = JSON.parse(activeGameStr);
+          if (!activeGame || !activeGame.matchId || activeGame.matchData?.status === "completed") return;
+          if (activeGame.role && !["player1", "player2"].includes(activeGame.role)) {
+             safeLocalStorage.removeItem("wordup_async_active_game");
+             return;
+          }
+          console.log("[WordUp Logs] Restoring active async game from localStorage:", activeGame.matchId);
+
+          const store = useAsyncStore.getState();
+          store.setMatchId(activeGame.matchId);
+          store.setRole(activeGame.role);
+          store.setCategory(activeGame.matchData?.category || "mixed");
+          store.setQuestions(activeGame.questions || []);
+          store.setCurrentIdx(activeGame.currentRound ?? activeGame.currentIdx ?? 0);
+          store.setMatchData(activeGame.matchData);
+          store.setOpponentStats(activeGame.opponentStats);
+          store.setRevealAnswers(activeGame.revealAnswers || false);
+          store.setSelectedAnswer(activeGame.selectedAnswer || null);
+
+          recoveryTimer = window.setTimeout(async () => {
+             if (!mounted) return;
+             await startMatch?.(activeGame.matchId, activeGame.role);
+          }, 100);
+       } catch (err) {
+          console.error("[WordUp Logs] Failed to restore active async game:", err);
+       }
+       return () => {
+          mounted = false;
+          if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+       };
+    }, [startMatch]);
 
    // Realtime listener for async match updates
    useEffect(() => {
@@ -265,92 +307,16 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       return () => { supabase.removeChannel(channel); };
    }, [effectiveUser?.id, refreshPending]);
 
-   // Listen for incoming async invites
-   useEffect(() => {
-      if (!effectiveUser?.id) return;
-      const channel = supabase
-         .channel(`user_signals_${effectiveUser.id}`)
-         .on("broadcast", { event: "wordup_async_invite" }, ({ payload }: any) => {
-            setIncomingInvite(payload);
-         })
-         .subscribe();
-      return () => { supabase.removeChannel(channel); };
-   }, [effectiveUser?.id]);
 
-   const handleAcceptInvite = useCallback(async () => {
-      const invite = incomingInvite;
-      if (!invite || !effectiveUser) return;
-      setIncomingInvite(null);
-      const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser, invite.category);
-      if (mId) {
-         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
-         ackChannel.subscribe((status) => {
-            if (status === "SUBSCRIBED") {
-               ackChannel.send({
-                  type: "broadcast",
-                  event: "wordup_async_invite_accepted",
-                  payload: { matchId: mId },
-               });
-               setTimeout(() => supabase.removeChannel(ackChannel), 1000);
-            }
-         });
-         triggerToast("Challenge accepted! Starting game...", 3000);
-         const mRole = "player2";
-         setMatchId(mId);
-         setRole(mRole);
-         setView("loading");
-         startMatch?.(mId, mRole);
-      }
-   }, [incomingInvite, effectiveUser, createMatch, triggerToast, setMatchId, setRole, setView, startMatch]);
-
-   const handleLaterInvite = useCallback(async () => {
-      const invite = incomingInvite;
-      if (!invite || !effectiveUser) return;
-      setIncomingInvite(null);
-      const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser, invite.category);
-      if (mId) {
-         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
-         ackChannel.subscribe((status) => {
-            if (status === "SUBSCRIBED") {
-               ackChannel.send({
-                  type: "broadcast",
-                  event: "wordup_async_invite_later",
-                  payload: { matchId: mId },
-               });
-               setTimeout(() => supabase.removeChannel(ackChannel), 1000);
-            }
-         });
-         triggerToast("Challenge saved! Play when you're ready.", 3000);
-         refreshPending();
-      }
-   }, [incomingInvite, effectiveUser, createMatch, triggerToast, refreshPending]);
-
-   const handleDeclineInvite = useCallback(() => {
-      const invite = incomingInvite;
-      if (!invite) return;
-      setIncomingInvite(null);
-      const declineChannel = supabase.channel(`user_signals_${invite.senderId}`);
-      declineChannel.subscribe((status) => {
-         if (status === "SUBSCRIBED") {
-            declineChannel.send({
-               type: "broadcast",
-               event: "wordup_async_invite_declined",
-               payload: { senderName: effectiveUser?.user_metadata?.username || "Your opponent" },
-            });
-            setTimeout(() => supabase.removeChannel(declineChannel), 1000);
-         }
-      });
-   }, [incomingInvite, effectiveUser]);
 
    const handlePlayTurn = useCallback((match: any) => {
       const mRole = match.player1_id === effectiveUser?.id ? "player1" : "player2";
       setMatchId(match.id);
       setRole(mRole);
+      setCategory(match.category);
       setView("loading");
       startMatch?.(match.id, mRole);
-   }, [effectiveUser, setMatchId, setRole, setView, startMatch]);
+   }, [effectiveUser, setMatchId, setRole, setCategory, setView, startMatch]);
 
    // Auto-load match from notification click (pendingAsyncMatchId)
    const pendingAsyncMatchId = useAppStore((s) => s.pendingAsyncMatchId);
@@ -368,6 +334,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!effectiveUser) return;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
       setRole(myRole);
+      setCategory(match.category);
       setMatchData(match);
       try {
          const decrypted = await decryptMatchQuestions(match);
@@ -376,7 +343,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          console.warn("Failed to decrypt history match questions:", e);
       }
       setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
+   }, [effectiveUser, setRole, setCategory, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();
@@ -459,7 +426,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   onBack={() => onBack?.()}
                />
             )}
-            {view === "loading" && <ConnectingView message={connectingMsg} />}
+            {view === "loading" && <LoadingView message={connectingMsg} onCancel={handleCancelChallenge} />}
             {view === "countdown" && <CountdownView countdownText={String(countdownText || "3")} />}
             {view === "battle" && (
                <BattleView
@@ -491,14 +458,6 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
             )}
          </AnimatePresence>
 
-         {incomingInvite && (
-            <InvitePopup
-               invite={incomingInvite}
-               onAccept={handleAcceptInvite}
-               onLater={handleLaterInvite}
-               onDecline={handleDeclineInvite}
-            />
-         )}
          {pendingChallenge && (
             <PlayNowLaterPopup
                opponentName={pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name || "Opponent"}

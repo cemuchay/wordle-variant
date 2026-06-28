@@ -6,6 +6,7 @@ import type {
    LetterStatus,
 } from "../../types/game";
 import { getWordLists } from "../../data/words";
+import { getEasyWords } from "../../data/easy-words";
 import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
 import { safeLocalStorage } from "../../utils/storage";
@@ -156,9 +157,17 @@ function getWordAtDate(
  * @param length - Desired word length.
  * @returns A random official word in uppercase.
  */
-export function getRandomWord(length: number): string {
-   const { official } = getWordLists(length);
-   return official[Math.floor(Math.random() * official.length)].toUpperCase();
+export function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult'): string {
+   const { official, valid } = getWordLists(length);
+   let pool: string[];
+   if (difficulty === 'easy' && length >= 3 && length <= 5) {
+      pool = getEasyWords(length);
+   } else if (difficulty === 'difficult' && length >= 3 && length <= 5) {
+      pool = [...valid];
+   } else {
+      pool = official;
+   }
+   return pool[Math.floor(Math.random() * pool.length)].toUpperCase();
 }
 
 /**

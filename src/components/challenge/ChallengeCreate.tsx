@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Clock, Play, Plus, Search, X, ChevronUp, ChevronDown, HelpCircle, Settings2, Save, Download, Trash2 } from 'lucide-react';
+import { Clock, Play, Plus, Search, X, HelpCircle, Save, Download, Trash2 } from 'lucide-react';
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -8,6 +8,12 @@ import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
 import { useAppStore, type ChallengePreset } from '../../store/useAppStore';
 import { safeLocalStorage } from '../../utils/storage';
+import { CreateStepIndicator } from './create/CreateStepIndicator';
+import { MarathonGameSequence } from './create/MarathonGameSequence';
+import { CustomWordGrid } from './create/CustomWordGrid';
+import { CreateSummaryStep, type ChallengeFormSettings } from './create/CreateSummaryStep';
+import { DifficultySelector } from './create/DifficultySelector';
+import { MarathonTimerInputs } from './create/MarathonTimerInputs';
 
 const LoadPresetsList = memo(({ 
     onLoad, 
@@ -440,8 +446,32 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
     const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
 
+    // Multi-step form state
+    const [step, setStep] = useState(0);
+
+    // Difficulty state
+    const [globalDifficulty, setGlobalDifficulty] = useState<'easy' | 'normal' | 'difficult'>('normal');
+    const [marathonDifficultyMode, setMarathonDifficultyMode] = useState<'uniform' | 'custom'>('uniform');
+    const [marathonDifficulties, setMarathonDifficulties] = useState<('easy' | 'normal' | 'difficult')[]>([]);
+
+    // Reset marathonDifficulties when toggling back to uniform
+    const handleMarathonDifficultyMode = useCallback((mode: 'uniform' | 'custom') => {
+        setMarathonDifficultyMode(mode);
+        if (mode === 'uniform') {
+            setMarathonDifficulties([]);
+        }
+    }, []);
+
+    const handleMarathonDifficultyChange = useCallback((idx: number, d: 'easy' | 'normal' | 'difficult') => {
+        setMarathonDifficulties(prev => {
+            const next = [...prev];
+            next[idx] = d;
+            return next;
+        });
+    }, []);
+
     // Advanced UI States
-    const [showAdvanced, setShowAdvanced] = useState(true);
+
     const [isPublic, setIsPublic] = useState(false);
     const [maxParticipants, setMaxParticipants] = useState<number>(10);
     const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
@@ -772,16 +802,6 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         }
     }, [handleUpdateMarathonGames]);
 
-    const handleMoveGame = useCallback((idx: number, direction: 'up' | 'down') => {
-        const next = [...marathonGames];
-        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-        if (targetIdx < 0 || targetIdx >= next.length) return;
-        const temp = next[idx];
-        next[idx] = next[targetIdx];
-        next[targetIdx] = temp;
-        handleUpdateMarathonGames(next);
-    }, [marathonGames, handleUpdateMarathonGames]);
-
     // Inline errors
     const errors = useMemo(() => {
         const errs: string[] = [];
@@ -878,6 +898,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             isBotMarathon: isBotMarathon,
             isShapeshifter,
             is_shapeshifter: isShapeshifter,
+            difficulty: length === 1 && marathonDifficultyMode === 'custom' ? marathonDifficulties : globalDifficulty,
         };
 
         if (isCustomWord) {
@@ -924,205 +945,112 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties]);
+
+    const summarySettings = useMemo((): ChallengeFormSettings => ({
+        mode,
+        length,
+        maxAttempts,
+        maxTime,
+        isMarathon: length === 1,
+        marathonGames,
+        marathonForceOrder,
+        marathonTimerType: timerType,
+        marathonTimers: marathonTimersArray,
+        invitedCount: invitedIds.length,
+        isPublic,
+        maxParticipants,
+        lifespanHours,
+        isCustomWord,
+        customWordCount: customMarathonWords.filter(Boolean).length,
+        isHandicap,
+        handicapMode,
+        handicapEnforced,
+        isShapeshifter,
+        disableHints,
+        isBotMarathon,
+        isEditing: !!editingChallenge,
+        errorCount: errors.length,
+    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
+
+    const handleNextStep = useCallback(() => {
+        setStep(s => Math.min(s + 1, 3));
+    }, []);
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [step]);
 
     return (
-        <div className="space-y-6">
-            {!editingChallenge && (
-                <LoadPresetsList 
-                    presets={challengePresets}
-                    onLoad={handleLoadPreset}
-                    onRemove={removeChallengePreset}
-                />
-            )}
-            <ModeSelector mode={mode} setMode={setMode} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
-            <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
+        <div className="space-y-6 max-w-xl mx-auto w-full">
+            <CreateStepIndicator steps={['Setup', 'Rules', 'Lobby', 'Confirm']} currentStep={step} />
 
-            <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-                <OptionLabel 
-                    label="Max Attempts" 
-                    tooltip="The maximum number of guesses allowed for this challenge (between 3 and 10). Default is 6." 
-                    activeTooltip={activeTooltip} 
-                    setActiveTooltip={setActiveTooltip} 
-                    tooltipId="maxAttempts" 
-                />
-                <div className="flex gap-2 flex-wrap">
-                    {[3, 4, 5, 6, 7, 8, 9, 10].map((a) => (
-                        <button
-                            key={a}
-                            type="button"
-                            onClick={() => {
-                                setMaxAttempts(a);
-                            }}
-                            className={`w-11 h-11 rounded-xl border font-black transition-all ${maxAttempts === a ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10 text-xs'}`}
-                        >
-                            {a}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {length === 1 && (
-                <div className="p-5 rounded-2xl border border-yellow-500/25 bg-yellow-500/5 space-y-4 animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-black uppercase text-white">Marathon Mode Setup</p>
-                            <p className="text-[10px] text-white/80">Configure your marathon format</p>
-                        </div>
-                        
-                        <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
-                            <button
-                                type="button"
-                                onClick={() => handleSetMarathonType('standard')}
-                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'standard' ? 'bg-yellow-500 text-black font-extrabold' : 'text-white/80'}`}
-                            >
-                                Standard (3-7L)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleSetMarathonType('custom')}
-                                className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${marathonType === 'custom' ? 'bg-yellow-500 text-black font-extrabold' : 'text-white/80'}`}
-                            >
-                                Custom
-                            </button>
-                        </div>
-                    </div>
-
-                    {marathonType === 'custom' && (
-                        <div className="space-y-4 animate-in fade-in duration-200">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-white">
-                                    Current Game Sequence ({marathonGames.length}/20 Games)
-                                </label>
-                                
-                                {marathonGames.length === 0 ? (
-                                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl bg-black/20">
-                                        <p className="text-[10px] text-white/80 font-bold uppercase">No games added yet. Click lengths below to build your sequence.</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2 p-3 bg-black/40 rounded-xl border border-white/10 max-h-[220px] overflow-y-auto">
-                                        {marathonGames.map((l, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-white transition-colors"
-                                            >
-                                                <span className="text-white">Game #{idx + 1}: <strong className="text-yellow-500 ml-1">{l}L Word</strong></span>
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleMoveGame(idx, 'up')}
-                                                        disabled={idx === 0}
-                                                        className="p-1 text-white/80 hover:text-white disabled:opacity-30 disabled:hover:text-white/80 transition-colors"
-                                                    >
-                                                        <ChevronUp size={14} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleMoveGame(idx, 'down')}
-                                                        disabled={idx === marathonGames.length - 1}
-                                                        className="p-1 text-white/80 hover:text-white disabled:opacity-30 disabled:hover:text-white/80 transition-colors"
-                                                    >
-                                                        <ChevronDown size={14} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const next = [...marathonGames];
-                                                            next.splice(idx, 1);
-                                                            handleUpdateMarathonGames(next);
-                                                        }}
-                                                        className="p-1 text-white/80 hover:text-red-500 transition-colors ml-1"
-                                                    >
-                                                        <X size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-white">
-                                    Add Game Length
-                                </label>
-                                <div className="flex gap-2">
-                                    {[3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
-                                        <button
-                                            key={l}
-                                            type="button"
-                                            disabled={marathonGames.length >= 20}
-                                            onClick={() => {
-                                                if (marathonGames.length < 20) {
-                                                    handleUpdateMarathonGames([...marathonGames, l]);
-                                                }
-                                            }}
-                                            className="flex-1 py-2.5 rounded-xl border border-white/10 bg-black/20 hover:bg-white/5 text-xs font-black text-yellow-500 transition-all disabled:opacity-30 disabled:hover:bg-black/20"
-                                        >
-                                            +{l}L
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+            {step === 0 && (
+                <>
+                    {!editingChallenge && (
+                        <LoadPresetsList 
+                            presets={challengePresets}
+                            onLoad={handleLoadPreset}
+                            onRemove={removeChallengePreset}
+                        />
                     )}
+                    <ModeSelector mode={mode} setMode={setMode} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
+                    <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
 
-                    {/* Force Game Order Option */}
-                    <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-2">
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
                         <OptionLabel 
-                            label="Force Game Order" 
-                            tooltip="Forces players to play games sequentially. Game #N must be completed/failed to unlock Game #(N+1)." 
+                            label="Max Attempts" 
+                            tooltip="The maximum number of guesses allowed for this challenge (between 3 and 10). Default is 6." 
                             activeTooltip={activeTooltip} 
                             setActiveTooltip={setActiveTooltip} 
-                            tooltipId="forceOrder" 
+                            tooltipId="maxAttempts" 
                         />
-                        <input
-                            type="checkbox"
-                            checked={marathonForceOrder}
-                            onChange={(e) => setMarathonForceOrder(e.target.checked)}
-                            className="w-5 h-5 accent-yellow-500 cursor-pointer"
-                        />
-                    </div>
-                </div>
-            )}
-            
-            {mode === 'LIVE' && (
-                <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
-            )}
-
-            {/* Advanced Settings Button */}
-            <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full py-3.5 px-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl flex items-center justify-between text-xs font-black uppercase tracking-wider text-white transition-all shadow-md"
-            >
-                <span className="flex items-center gap-2"><Settings2 size={14} /> Advanced Settings</span>
-                <span className="text-white/80">{showAdvanced ? 'Hide' : 'Show'}</span>
-            </button>
-
-            {showAdvanced && (
-                <div className="p-5 rounded-2xl border border-white/15 bg-white/5 space-y-5 animate-in fade-in duration-300">
-                    
-                    {/* Daily Challenge Option (Admins Only) */}
-                    {isAdmin && (
-                        <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
-                            <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Daily Bot Challenge" 
-                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="dailyBotChallenge" 
-                                />
-                                <input
-                                    type="checkbox"
-                                    checked={isBotMarathon}
-                                    onChange={(e) => setIsBotMarathon(e.target.checked)}
-                                    className="w-5 h-5 accent-indigo-500 cursor-pointer"
-                                />
-                            </div>
+                        <div className="flex gap-2 flex-wrap">
+                            {[3, 4, 5, 6, 7, 8, 9, 10].map((a) => (
+                                <button
+                                    key={a}
+                                    type="button"
+                                    onClick={() => { setMaxAttempts(a); }}
+                                    className={`w-11 h-11 rounded-xl border font-black transition-all ${maxAttempts === a ? 'border-correct bg-correct text-black border-2 shadow-lg shadow-correct/10 text-sm' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10 text-xs'}`}
+                                >
+                                    {a}
+                                </button>
+                            ))}
                         </div>
+                    </div>
+
+                    {length === 1 && (
+                        <MarathonGameSequence
+                            marathonGames={marathonGames}
+                            onUpdate={handleUpdateMarathonGames}
+                            marathonType={marathonType}
+                            onTypeChange={handleSetMarathonType}
+                            marathonForceOrder={marathonForceOrder}
+                            onForceOrderChange={setMarathonForceOrder}
+                            difficultyMode={marathonDifficultyMode}
+                            marathonDifficulties={marathonDifficulties}
+                            onMarathonDifficultyChange={handleMarathonDifficultyChange}
+                        />
+                    )}
+                    
+                    {(length !== 1 ? [3, 4, 5, 0].includes(length) : marathonGames.some(l => [3, 4, 5].includes(l))) && (
+                        <DifficultySelector
+                            mode={length === 1 ? 'marathon' : 'single'}
+                            globalDifficulty={globalDifficulty}
+                            marathonDifficultyMode={marathonDifficultyMode}
+                            onGlobalChange={setGlobalDifficulty}
+                            onModeChange={handleMarathonDifficultyMode}
+                        />
                     )}
 
+                    {mode === 'LIVE' && (
+                        <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
+                    )}
+                </>
+            )}
+
+            {step === 1 && (
+                <div className="space-y-5">
                     {/* Shape Shifter Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -1139,9 +1067,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                 onChange={(e) => {
                                     const checked = e.target.checked;
                                     setIsShapeshifter(checked);
-                                    if (checked) {
-                                        setIsCustomWord(false);
-                                    }
+                                    if (checked) setIsCustomWord(false);
                                 }}
                                 className="w-5 h-5 accent-correct cursor-pointer"
                             />
@@ -1166,6 +1092,134 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             />
                         </div>
                     </div>
+
+                    {/* Custom target word option */}
+                    {!isShapeshifter && (
+                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Custom Word Challenge" 
+                                    tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="customWord" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isCustomWord}
+                                    onChange={(e) => setIsCustomWord(e.target.checked)}
+                                    className="w-5 h-5 accent-correct cursor-pointer"
+                                />
+                            </div>
+                            {isCustomWord && (
+                                <div className="pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
+                                    {length === 1 ? (
+                                        <CustomWordGrid
+                                            mode="marathon"
+                                            marathonWords={customMarathonWords}
+                                            marathonLengths={marathonGames}
+                                            onMarathonChange={setCustomMarathonWords}
+                                        />
+                                    ) : (
+                                        <CustomWordGrid
+                                            mode="single"
+                                            wordLength={length === 0 ? 5 : length}
+                                            value={customWord}
+                                            onChange={setCustomWord}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Handicap Options */}
+                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                            <OptionLabel 
+                                label="Handicap Challenge" 
+                                tooltip="Set a designated starter word for all players, which limits their opening guesses." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="handicap" 
+                            />
+                            <input
+                                type="checkbox"
+                                checked={isHandicap}
+                                onChange={(e) => setIsHandicap(e.target.checked)}
+                                className="w-5 h-5 accent-correct cursor-pointer"
+                            />
+                        </div>
+                        {isHandicap && (
+                            <div className="space-y-3.5 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
+                                <div className="space-y-2">
+                                    <OptionLabel 
+                                        label="Starter Type" 
+                                        tooltip="Choose whether the starter word is selected randomly by the system or explicitly typed by the creator." 
+                                        activeTooltip={activeTooltip} 
+                                        setActiveTooltip={setActiveTooltip} 
+                                        tooltipId="starterType" 
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button type="button" onClick={() => setHandicapMode('random')}
+                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'random' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                        >System Random</button>
+                                        <button type="button" onClick={() => setHandicapMode('custom')}
+                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'custom' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
+                                        >Custom Word</button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between pt-3">
+                                    <OptionLabel label="Enforce Starter Word" tooltip="If enabled, the starter word is automatically submitted as the player's first guess." activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} tooltipId="enforceStarter" />
+                                    <input type="checkbox" checked={handicapEnforced} onChange={(e) => setHandicapEnforced(e.target.checked)} className="w-5 h-5 accent-correct cursor-pointer" />
+                                </div>
+                                {handicapMode === 'custom' && (
+                                    <div className="space-y-2.5 pt-3">
+                                        {length === 1 ? marathonGames.map((l, idx) => (
+                                            <div key={idx} className="flex flex-col gap-1">
+                                                <span className="text-xs font-black uppercase text-white">Game #{idx + 1} ({l}-letter Starter):</span>
+                                                <input type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"} maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l} placeholder={`Enter ${l}-letter starter`} value={handicapStartersArray[idx] || ''}
+                                                    onChange={(e) => { const prev = handicapStartersArray[idx] || ''; const val = resolveNewStarterInput(e.target.value, prev); setHandicapStartersArray(prevArr => { const next = [...prevArr]; next[idx] = val; return next; }); }}
+                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                            </div>
+                                        )) : (
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-black uppercase text-white">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
+                                                <input type={handicapStarter === '__MASKED__' ? "password" : "text"} maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)} placeholder={`Enter starter word`} value={handicapStarter}
+                                                    onChange={(e) => { const val = resolveNewStarterInput(e.target.value, handicapStarter); setHandicapStarter(val); }}
+                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {step === 2 && (
+                <div className="space-y-5">
+                    {/* Daily Challenge Option (Admins Only) */}
+                    {isAdmin && (
+                        <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Daily Bot Challenge" 
+                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="dailyBotChallenge" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isBotMarathon}
+                                    onChange={(e) => setIsBotMarathon(e.target.checked)}
+                                    className="w-5 h-5 accent-indigo-500 cursor-pointer"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Public Challenge Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
@@ -1203,9 +1257,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                         const val = e.target.value;
                                         setMaxParticipantsInput(val);
                                         const num = Number(val);
-                                        if (!isNaN(num) && num >= 2 && num <= 100) {
-                                            setMaxParticipants(num);
-                                        }
+                                        if (!isNaN(num) && num >= 2 && num <= 100) setMaxParticipants(num);
                                     }}
                                     onBlur={() => {
                                         let num = parseInt(maxParticipantsInput, 10);
@@ -1244,337 +1296,86 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         </div>
                     </div>
 
-                    {/* Custom target word option */}
-                    {!isShapeshifter && (
-                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                            <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Custom Word Challenge" 
-                                    tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="customWord" 
-                                />
-                                <input
-                                    type="checkbox"
-                                    checked={isCustomWord}
-                                    onChange={(e) => setIsCustomWord(e.target.checked)}
-                                    className="w-5 h-5 accent-correct cursor-pointer"
-                                />
-                            </div>
-                            {isCustomWord && (
-                                <div className="space-y-3 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                    {length === 1 ? (
-                                        <div className="space-y-2.5">
-                                            {marathonGames.map((l, idx) => (
-                                                <div key={idx} className="flex flex-col gap-1">
-                                                    <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Word):</span>
-                                                    <input
-                                                        type="text"
-                                                        maxLength={l}
-                                                        placeholder={`Enter ${l}-letter word`}
-                                                        value={customMarathonWords[idx] || ''}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value.replace(/[^A-Za-z]/g, '');
-                                                            setCustomMarathonWords(prev => {
-                                                                const next = [...prev];
-                                                                next[idx] = val;
-                                                                return next;
-                                                            });
-                                                        }}
-                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <span className="text-[10px] font-black uppercase text-white">Target Word:</span>
-                                            <input
-                                                type="text"
-                                                maxLength={length === 0 ? 5 : length}
-                                                placeholder={`Enter custom ${length === 0 ? 5 : length}-letter word`}
-                                                value={customWord}
-                                                onChange={(e) => setCustomWord(e.target.value)}
-                                                className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Handicap Options */}
-                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Handicap Challenge" 
-                                tooltip="Set a designated starter word for all players, which limits their opening guesses." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="handicap" 
-                            />
-                            <input
-                                type="checkbox"
-                                checked={isHandicap}
-                                onChange={(e) => setIsHandicap(e.target.checked)}
-                                className="w-5 h-5 accent-correct cursor-pointer"
-                            />
-                        </div>
-                        {isHandicap && (
-                            <div className="space-y-3.5 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                <div className="space-y-2">
-                                    <OptionLabel 
-                                        label="Starter Type" 
-                                        tooltip="Choose whether the starter word is selected randomly by the system or explicitly typed by the creator." 
-                                        activeTooltip={activeTooltip} 
-                                        setActiveTooltip={setActiveTooltip} 
-                                        tooltipId="starterType" 
-                                    />
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setHandicapMode('random')}
-                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'random' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
-                                        >
-                                            System Random
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setHandicapMode('custom')}
-                                            className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${handicapMode === 'custom' ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20'}`}
-                                        >
-                                            Custom Word
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                                    <OptionLabel 
-                                        label="Enforce Starter Word" 
-                                        tooltip="If enabled, the starter word is automatically submitted as the player's first guess." 
-                                        activeTooltip={activeTooltip} 
-                                        setActiveTooltip={setActiveTooltip} 
-                                        tooltipId="enforceStarter" 
-                                    />
-                                    <input
-                                        type="checkbox"
-                                        checked={handicapEnforced}
-                                        onChange={(e) => setHandicapEnforced(e.target.checked)}
-                                        className="w-5 h-5 accent-correct cursor-pointer"
-                                    />
-                                </div>
-
-                                {handicapMode === 'custom' && (
-                                    <div className="space-y-2.5 border-t border-white/5 pt-3">
-                                        {length === 1 ? (
-                                            marathonGames.map((l, idx) => (
-                                                <div key={idx} className="flex flex-col gap-1">
-                                                    <span className="text-[10px] font-black uppercase text-white">Game #{idx + 1} ({l}-letter Starter):</span>
-                                                    <input
-                                                        type={handicapStartersArray[idx] === '__MASKED__' ? "password" : "text"}
-                                                        maxLength={handicapStartersArray[idx] === '__MASKED__' ? undefined : l}
-                                                        placeholder={`Enter ${l}-letter starter`}
-                                                        value={handicapStartersArray[idx] || ''}
-                                                        onChange={(e) => {
-                                                            const prev = handicapStartersArray[idx] || '';
-                                                            const val = resolveNewStarterInput(e.target.value, prev);
-                                                            setHandicapStartersArray(prevArr => {
-                                                                const next = [...prevArr];
-                                                                next[idx] = val;
-                                                                return next;
-                                                            });
-                                                        }}
-                                                        className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                                    />
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-black uppercase text-white">Starter Word ({length === 0 ? '5-letter' : `${length}-letter`}):</label>
-                                                <input
-                                                    type={handicapStarter === '__MASKED__' ? "password" : "text"}
-                                                    maxLength={handicapStarter === '__MASKED__' ? undefined : (length === 0 ? 5 : length)}
-                                                    placeholder={`Enter starter word`}
-                                                    value={handicapStarter}
-                                                    onChange={(e) => {
-                                                        const val = resolveNewStarterInput(e.target.value, handicapStarter);
-                                                        setHandicapStarter(val);
-                                                    }}
-                                                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs focus:border-correct/60 focus:bg-black/60 outline-none uppercase text-white transition-all"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
                     {/* Marathon Custom Timers */}
                     {length === 1 && mode === 'LIVE' && (
                         <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                             <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Per-Word Timers" 
-                                    tooltip="Specify a different timer duration for each game in the Marathon mode sequence." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="perWordTimers" 
-                                />
+                                <OptionLabel label="Per-Word Timers" tooltip="Specify a different timer duration for each game in the Marathon mode sequence." activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} tooltipId="perWordTimers" />
                                 <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTimerType('same')}
-                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-white/80'}`}
-                                    >
-                                        Same
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTimerType('custom')}
-                                        className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-white/80'}`}
-                                    >
-                                        Custom
-                                    </button>
+                                    <button type="button" onClick={() => setTimerType('same')} className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${timerType === 'same' ? 'bg-correct text-black' : 'text-white/80'}`}>Same</button>
+                                    <button type="button" onClick={() => setTimerType('custom')} className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${timerType === 'custom' ? 'bg-correct text-black' : 'text-white/80'}`}>Custom</button>
                                 </div>
                             </div>
-                            {timerType === 'custom' && (
-                                <div className="flex flex-wrap gap-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                    {marathonGames.map((l, idx) => (
-                                        <div key={idx} className="space-y-1 min-w-[50px] flex-1">
-                                            <p className="text-[8px] font-black uppercase text-white/80 text-center">#{idx + 1} ({l}L)</p>
-                                            <input
-                                                type="number"
-                                                inputMode="numeric"
-                                                min={1}
-                                                max={60}
-                                                value={marathonTimersInput[idx] || ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setMarathonTimersInput(prev => {
-                                                        const next = [...prev];
-                                                        next[idx] = val;
-                                                        return next;
-                                                    });
+                            <MarathonTimerInputs
+                                marathonGames={marathonGames}
+                                marathonTimersInput={marathonTimersInput}
+                                marathonTimersArray={marathonTimersArray}
+                                timerType={timerType}
+                                setMarathonTimersInput={setMarathonTimersInput}
+                                setMarathonTimersArray={setMarathonTimersArray}
+                                isBotMarathon={isBotMarathon}
+                            />
+                        </div>
+                    )}
 
-                                                    const num = Number(val);
-                                                    if (!isNaN(num) && num >= 1 && num <= 60) {
-                                                        setMarathonTimersArray(prev => {
-                                                            const next = [...prev];
-                                                            next[idx] = num;
-                                                            return next;
-                                                        });
+                    <ProfileInviteSystem 
+                        availableProfiles={availableProfiles} 
+                        invitedIds={invitedIds} 
+                        toggleInvite={toggleInvite} 
+                        activeTooltip={activeTooltip}
+                        setActiveTooltip={setActiveTooltip}
+                    />
 
-                                                        // Persist preference to localStorage ONLY for Daily Bot Challenges
-                                                        if (isBotMarathon) {
-                                                            try {
-                                                                const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
-                                                                const parsed = cached ? JSON.parse(cached) : {};
-                                                                parsed[idx] = { length: marathonGames[idx], timer: num };
-                                                                safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
-                                                            } catch (e) {
-                                                                console.error('Failed to cache marathon timer', e);
-                                                            }
-                                                        }
-                                                    }
-                                                }}
-                                                onBlur={() => {
-                                                    let num = parseInt(marathonTimersInput[idx], 10);
-                                                    if (isNaN(num)) num = 5;
-                                                    else if (num < 1) num = 1;
-                                                    else if (num > 60) num = 60;
-                                                    
-                                                    setMarathonTimersArray(prev => {
-                                                        const next = [...prev];
-                                                        next[idx] = num;
-                                                        return next;
-                                                    });
-                                                    setMarathonTimersInput(prev => {
-                                                        const next = [...prev];
-                                                        next[idx] = String(num);
-                                                        return next;
-                                                    });
+                    {!editingChallenge && (
+                        <SavePresetForm onSave={handleSavePreset} canSave={challengePresets.length < 5} />
+                    )}
 
-                                                    // Persist preference to localStorage ONLY for Daily Bot Challenges
-                                                    if (isBotMarathon) {
-                                                        try {
-                                                            const cached = safeLocalStorage.getItem('wordle_daily_marathon_timers');
-                                                            const parsed = cached ? JSON.parse(cached) : {};
-                                                            parsed[idx] = { length: marathonGames[idx], timer: num };
-                                                            safeLocalStorage.setItem('wordle_daily_marathon_timers', JSON.stringify(parsed));
-                                                        } catch (e) {
-                                                            console.error('Failed to cache marathon timer', e);
-                                                        }
-                                                    }
-                                                }}
-                                                className="w-full bg-black/40 border border-white/15 rounded-lg px-2 py-1.5 text-[10px] text-center focus:border-correct/60 focus:bg-black/60 outline-none text-white transition-all"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                    {!editingChallenge && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <input type="text" placeholder="Or Enter Challenge ID..." value={joinId}
+                                onChange={(e) => setJoinId(e.target.value)}
+                                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white" />
+                            <button type="button" onClick={() => joinId && handleViewChallenge(joinId)} disabled={!joinId}
+                                className="bg-white text-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50 cursor-pointer">Join</button>
                         </div>
                     )}
                 </div>
             )}
 
+            {step === 3 && (
+                <CreateSummaryStep
+                    settings={summarySettings}
+                    onBack={() => setStep(2)}
+                    onConfirm={handleCreateTrigger}
+                    loading={loading}
+                />
+            )}
+
             {/* Inline Errors Display */}
-            {errors.length > 0 && (
+            {step < 3 && errors.length > 0 && (
                 <div className="bg-red-500/10 border border-red-500/30 p-3.5 rounded-2xl space-y-1.5 animate-in fade-in duration-300">
-                    <p className="text-[10px] font-black uppercase text-red-500">Please correct the following errors:</p>
-                    <ul className="list-disc pl-4 text-[10px] text-red-400/90 font-bold space-y-1">
+                    <p className="text-xs font-black uppercase text-red-500">Please correct the following errors:</p>
+                    <ul className="list-disc pl-4 text-xs text-red-400/90 font-bold space-y-1">
                         {errors.map((e, idx) => <li key={idx}>{e}</li>)}
                     </ul>
                 </div>
             )}
 
-            <ProfileInviteSystem 
-                availableProfiles={availableProfiles} 
-                invitedIds={invitedIds} 
-                toggleInvite={toggleInvite} 
-                activeTooltip={activeTooltip}
-                setActiveTooltip={setActiveTooltip}
-            />
-
-            {!editingChallenge && (
-                <SavePresetForm 
-                    onSave={handleSavePreset} 
-                    canSave={challengePresets.length < 5} 
-                />
-            )}
-
-            <div className="pt-4 border-t border-white/5 space-y-4">
-                {!editingChallenge && (
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="text"
-                            placeholder="Or Enter Challenge ID..."
-                            value={joinId}
-                            onChange={(e) => setJoinId(e.target.value)}
-                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none transition-colors text-white"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => joinId && handleViewChallenge(joinId)}
-                            disabled={!joinId}
-                            className="bg-white text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-50"
-                        >
-                            Join
+            {/* Navigation */}
+            {step < 3 && (
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                    {step > 0 ? (
+                        <button type="button" onClick={() => setStep(s => s - 1)}
+                            className="px-6 py-3.5 rounded-2xl border border-white/15 bg-white/5 text-xs font-black uppercase tracking-wider text-white hover:bg-white/10 transition-all cursor-pointer">
+                            ← Back
                         </button>
-                    </div>
-                )}
-
-                <button
-                    type="button"
-                    onClick={handleCreateTrigger}
-                    disabled={loading || errors.length > 0}
-                    className="w-full bg-correct text-black py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:brightness-50"
-                >
-                    {loading ? (editingChallenge ? 'Saving...' : 'Creating...') : (editingChallenge ? 'Save Changes' : <><Plus size={18} /> Create Challenge</>)}
-                </button>
-            </div>
+                    ) : <div />}
+                    <button type="button" onClick={handleNextStep} disabled={errors.length > 0}
+                        className="px-8 py-3.5 rounded-2xl bg-correct text-black text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:brightness-50 cursor-pointer flex items-center gap-2">
+                        Next →
+                    </button>
+                </div>
+            )}
         </div>
     );
 });

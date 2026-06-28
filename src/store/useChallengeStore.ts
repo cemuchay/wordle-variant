@@ -6,7 +6,7 @@ export type ChallengeViewType = 'list' | 'lobby' | 'gameplay';
 export interface SavedChallengeView {
     type: ChallengeViewType;
     challengeId: string | null;
-    listColumn: 'active' | 'played' | 'expired' | 'open';
+    listColumn: 'unplayed' | 'played';
     marathonGameIndex: number | null;
     previewParticipantId: string | null;
     previewMarathonGameIndex: number | null;
@@ -45,7 +45,7 @@ interface ChallengeState {
     statusFilter: 'ALL' | 'ACTIVE' | 'COMPLETED';
     modeFilter: 'ALL' | 'LIVE' | 'ANYTIME';
     lengthFilter: 'ALL' | number;
-    listColumn: 'active' | 'played' | 'expired' | 'open';
+    listColumn: 'unplayed' | 'played';
 
     // Actions
     setActiveTab: (tab: 'my' | 'create' | 'join') => void;
@@ -69,7 +69,7 @@ interface ChallengeState {
     setStatusFilter: (f: 'ALL' | 'ACTIVE' | 'COMPLETED') => void;
     setModeFilter: (m: 'ALL' | 'LIVE' | 'ANYTIME') => void;
     setLengthFilter: (l: 'ALL' | number) => void;
-    setListColumn: (col: 'active' | 'played' | 'expired' | 'open') => void;
+    setListColumn: (col: 'unplayed' | 'played') => void;
     clearFilters: () => void;
     resetForm: () => void;
 }
@@ -96,7 +96,7 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     statusFilter: 'ALL',
     modeFilter: 'ALL',
     lengthFilter: 'ALL',
-    listColumn: 'active',
+    listColumn: 'unplayed',
 
     // Actions
     setActiveTab: (activeTab) => set({ activeTab }),

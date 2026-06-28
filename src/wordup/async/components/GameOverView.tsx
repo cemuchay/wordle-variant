@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
 import { Award } from "lucide-react";
 import { useAsyncStore } from "../store/useAsyncStore";
@@ -17,6 +18,7 @@ export const GameOverView = ({
 }: GameOverViewProps) => {
    if (!matchData) return null;
 
+   // eslint-disable-next-line react-hooks/rules-of-hooks
    const questions = useAsyncStore((s) => s.questions);
 
    const isP1 = role === "player1";
@@ -24,6 +26,7 @@ export const GameOverView = ({
    const oppScore = isP1 ? matchData.p2_score : matchData.p1_score;
    const myAnswers = isP1 ? matchData.p1_answers : matchData.p2_answers;
 
+   const isCompleted = matchData.status === "completed";
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
 
@@ -31,13 +34,15 @@ export const GameOverView = ({
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
       : "Opponent";
 
-   const statusColor = isWinner
-      ? "text-indigo-400 border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-      : isDraw
-         ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
-         : "text-red-400 border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
+   const statusColor = !isCompleted
+      ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+      : isWinner
+         ? "text-indigo-400 border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+         : isDraw
+            ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+            : "text-red-400 border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
 
-   const statusTextClass = isWinner ? "text-indigo-400" : isDraw ? "text-yellow-500" : "text-red-400";
+   const statusTextClass = !isCompleted ? "text-yellow-500" : isWinner ? "text-indigo-400" : isDraw ? "text-yellow-500" : "text-red-400";
 
    return (
       <motion.div
@@ -48,9 +53,11 @@ export const GameOverView = ({
          <div className="text-center space-y-1">
             <Award size={48} className={`mx-auto animate-bounce ${statusTextClass}`} />
             <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
-               {isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
+               {!isCompleted ? "Challenge Pending" : isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
             </h2>
-            <p className="text-xs text-gray-400 uppercase tracking-widest font-black">Match Completed</p>
+            <p className="text-xs text-gray-400 uppercase tracking-widest font-black">
+               {!isCompleted ? "Waiting for Opponent" : "Match Completed"}
+            </p>
          </div>
 
          {/* Side-by-Side Scores */}
@@ -68,11 +75,13 @@ export const GameOverView = ({
          {/* Rewards and Elo changes */}
          <div className={`border rounded-2xl p-4 text-center space-y-1 ${statusColor}`}>
             <p className="text-xs font-bold uppercase tracking-wider">
-               Rating Change: {isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}
+               {!isCompleted ? "Rating & XP will calculate upon completion" : `Rating Change: ${isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}`}
             </p>
-            <p className="text-[10px] text-gray-400 uppercase font-black">
-               Earned: +{50 + (isWinner ? 100 : 0) + ((myAnswers || []).filter((a: any) => a.correct).length * 10)} XP
-            </p>
+            {isCompleted && (
+               <p className="text-[10px] text-gray-400 uppercase font-black">
+                  Earned: +{50 + (isWinner ? 100 : 0) + ((myAnswers || []).filter((a: any) => a.correct).length * 10)} XP
+               </p>
+            )}
          </div>
 
          {/* Play Again / Lobby */}
@@ -134,11 +143,10 @@ export const GameOverView = ({
                                  {q.imageUrls.map((code: string, i: number) => (
                                     <div
                                        key={i}
-                                       className={`rounded-lg overflow-hidden border ${
-                                          q.choices[i] === q.answer
+                                       className={`rounded-lg overflow-hidden border ${q.choices[i] === q.answer
                                              ? "border-indigo-500 ring-1 ring-indigo-500"
                                              : "border-white/10"
-                                       } bg-slate-950/60 flex items-center justify-center aspect-[2/1]`}
+                                          } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
                                     >
                                        <img
                                           src={getCachedFlagUrl(code)}

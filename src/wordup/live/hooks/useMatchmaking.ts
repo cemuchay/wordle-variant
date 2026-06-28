@@ -190,16 +190,12 @@ export const useWordUpMatchmaking = (
              subscribeToMatchmaking();
           } else {
              // Player2: matched immediately — generate questions via edge function
-             const newMatchId = result.match_id;
-             setMatchId(newMatchId);
-             setRole("player2");
-
-             await generateMatchQuestions(newMatchId, useLiveStore.getState().category || "mixed");
-
-             // Set match status to countdown for PvP
-             await supabase.from("wordup_matches").update({ status: "countdown", question_started_at: new Date(Date.now() + 4500).toISOString() }).eq("id", newMatchId);
-
-             onMatchFound(newMatchId, "player2");
+              const newMatchId = result.match_id;
+              await generateMatchQuestions(newMatchId, useLiveStore.getState().category || "mixed");
+              await supabase.from("wordup_matches").update({ status: "countdown", question_started_at: new Date(Date.now() + 4500).toISOString() }).eq("id", newMatchId);
+              setRole("player2");
+              setMatchId(newMatchId);
+              onMatchFound(newMatchId, "player2");
           }
        } catch (err: any) {
           console.error("[WordUp Category] Matchmaking startup failed:", err);

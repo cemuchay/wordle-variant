@@ -256,48 +256,35 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     }
   }
 
-  const [mascotData, setMascotData] = useState<{ face: string; label: string; animationClass: string } | null>(null);
+  const [mascotData, setMascotData] = useState<{ expression: import('./wordup/WordUpView/components/WordUpMascot').MascotExpression; label: string } | null>(null);
 
   useEffect(() => {
-    let face = "(•‿•)";
-    let label = "Looking good!";
-    let animClass = "";
-
-    // Always wait for the reveal animation if it's currently happening
     const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
 
+    let expression: import('./wordup/WordUpView/components/WordUpMascot').MascotExpression = 'idle';
+    let label = 'Looking good!';
+
     if (isWon) {
-      face = "(★‿★)";
-      label = "Splendid job! 🎉";
-      animClass = "animate-bounce text-correct";
+      expression = 'happy';
+      label = 'Splendid job!';
     } else if (isLost) {
-      face = "(✖╭╮✖)";
-      label = "Aww, maybe next time! 😢";
-      animClass = "text-red-400";
+      expression = 'sad';
+      label = 'Aww, maybe next time!';
     } else if (isOneAttemptLeft) {
-      face = "(⊙_⊙;)";
-      label = "Yikes! Only 1 guess left! 😰";
-      animClass = "animate-pulse text-amber-400";
+      expression = 'worried';
+      label = 'Only 1 guess left!';
     } else if (hasRepeatedLetters) {
-      face = "(🤨)";
-      label = "Hmm... interesting choice. 🧐";
-      animClass = "animate-shake text-yellow-400";
+      expression = 'thinking';
+      label = 'Interesting choice...';
     } else if (attemptsCount > 0) {
-      const defaultMascots = [
-        { face: "(•_•)", label: "Thinking..." },
-        { face: "(o_O)", label: "Let's see..." },
-        { face: "(^_-)", label: "Keep going! 😉" }
-      ];
-      const idx = (attemptsCount - 1) % defaultMascots.length;
-      face = defaultMascots[idx].face;
-      label = defaultMascots[idx].label;
-      animClass = "text-white/80";
-    } else {
-      animClass = "text-white/60";
+      const labels = ['Thinking...', 'Let us see...', 'Keep going!'];
+      const idx = (attemptsCount - 1) % labels.length;
+      expression = 'thinking';
+      label = labels[idx];
     }
 
     const timer = setTimeout(() => {
-      setMascotData({ face, label, animationClass: animClass });
+      setMascotData({ expression, label });
     }, delay);
 
     return () => clearTimeout(timer);
@@ -306,7 +293,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   useEffect(() => {
     if (mascotData) {
       window.dispatchEvent(new CustomEvent('mascot-changed', {
-        detail: { mascotFace: mascotData.face, mascotLabel: mascotData.label, animationClass: mascotData.animationClass }
+        detail: { expression: mascotData.expression, label: mascotData.label }
       }));
     }
     return () => {

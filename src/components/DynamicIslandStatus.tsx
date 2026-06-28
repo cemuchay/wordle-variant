@@ -8,6 +8,9 @@ import { AudioChatControls } from './challenge/AudioChatControls';
 import formatLastSeen from '../utils/formatLastSeen';
 
 import { useAppStore } from '../store/useAppStore';
+import { WordUpMascot } from './wordup/WordUpView/components/WordUpMascot';
+import type { MascotExpression } from './wordup/WordUpView/components/WordUpMascot';
+import formatUsername from '../utils/formatUsername';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -32,7 +35,7 @@ export const DynamicIslandStatus = () => {
     } = useApp();
 
     const [isExpanded, setIsExpanded] = useState(false);
-    const [mascot, setMascot] = useState<{ mascotFace: string; mascotLabel: string; animationClass: string } | null>(null);
+    const [mascot, setMascot] = useState<{ expression: MascotExpression; label: string } | null>(null);
     const [showOnlineNotification, setShowOnlineNotification] = useState(false);
     const toastTimerRef = useRef<number>(null);
 
@@ -362,13 +365,13 @@ export const DynamicIslandStatus = () => {
                                     </>
                                 )
                             ) : mascot ? (
-                                <div className={`flex items-center gap-1 px-2.5 h-full w-full justify-center ${mascot.animationClass}`}>
-                                    <span className="text-[9px] font-mono font-black text-correct shrink-0 tracking-wide select-none">{mascot.mascotFace}</span>
-                                    <span className="text-[8px] uppercase font-black tracking-widest text-white/80 truncate max-w-[115px] select-none">{mascot.mascotLabel}</span>
+                                <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                    <WordUpMascot expression={mascot.expression} size={18} />
+                                    <span className="text-[8px] uppercase font-black tracking-widest text-white/80 truncate max-w-[115px] select-none">{mascot.label}</span>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center opacity-50">
-                                    <span className="text-[9px] font-mono font-black text-correct shrink-0 tracking-wide select-none">(•‿•)</span>
+                                <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                    <WordUpMascot expression="idle" size={16} />
                                     <span className="text-[10px] font-black tracking-widest text-white/80 tabular-nums select-none">{localTime}</span>
                                 </div>
                             )}
@@ -547,7 +550,7 @@ export const DynamicIslandStatus = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span
-                                                        className="text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                        className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
                                                         onClick={(e) => {
                                                             if (p.id) {
                                                                 e.stopPropagation();
@@ -555,7 +558,7 @@ export const DynamicIslandStatus = () => {
                                                             }
                                                         }}
                                                     >
-                                                        {p.username} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
+                                                        {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
                                                     </span>
                                                     <div className="flex items-center gap-1 text-[9px] text-gray-500">
                                                         {inVoiceRoom ? (

@@ -13,6 +13,7 @@ import { safeLocalStorage } from "../../../../utils/storage";
 import { CategorySelectModal, CATEGORY_STYLE_MAP } from "./CategorySelectModal";
 import { RankingView } from "./RankingView";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
+import { WordUpMascot } from "./WordUpMascot";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;
@@ -55,7 +56,8 @@ export const LobbyView = ({
     const lastCategoryRef = useRef<string>(category || "mixed");
 
    // New states for tabs and challenge matching
-   const [activeTab, setActiveTab] = useState<"play" | "rankings" | "pending" | "history">("play");
+    const activeTab = useWordUpStore((s) => s.activeTab);
+    const setActiveTab = useWordUpStore((s) => s.setActiveTab);
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [isLoadingData, setIsLoadingData] = useState(false);
@@ -72,8 +74,8 @@ export const LobbyView = ({
           inviteResolvedRef.current = true;
           const detail = (e as CustomEvent)?.detail;
           setOutgoingInvite(null);
-          window.dispatchEvent(new CustomEvent("MascoChanged", {
-             detail: { mascotFace: "(︶︿︶)", mascotLabel: `${detail?.senderName || "Opponent"} declined your invite.` }
+          window.dispatchEvent(new CustomEvent("mascot-changed", {
+             detail: { expression: "sad", label: `${detail?.senderName || "Opponent"} declined your invite.` }
           }));
           clearInviteTimers();
        };
@@ -535,9 +537,18 @@ export const LobbyView = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
-               >
-                  {userStats && (
+                   className="space-y-6"
+                >
+                   <div className="flex items-center justify-center gap-3 py-2 bg-white/5 border border-white/10 rounded-2xl px-4">
+                      <WordUpMascot expression="idle" size={52} />
+                      <div>
+                         <p className="text-sm font-black text-white uppercase tracking-wider">Ready to play?</p>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                            {userStats ? `Rating: ${userStats.rating} ELO` : 'Select a category and start matching!'}
+                         </p>
+                      </div>
+                   </div>
+                   {userStats && (
                      <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                         <div>
                            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>

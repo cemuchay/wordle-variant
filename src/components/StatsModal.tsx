@@ -10,6 +10,7 @@ import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
 import { LeaderboardSkeleton } from './common/Skeletons';
+import formatUsername from '../utils/formatUsername';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -773,7 +774,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
             <span
               className={`text-xs font-bold truncate max-w-20 ${isFirst ? 'text-yellow-50 tracking-wide' : 'text-gray-200'}`}
             >
-              {entry.username}
+              {formatUsername(entry.username)}
             </span>
             {entry.user_id && (
               <button
