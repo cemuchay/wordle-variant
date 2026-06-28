@@ -275,6 +275,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
           const store = useAsyncStore.getState();
           store.setMatchId(activeGame.matchId);
           store.setRole(activeGame.role);
+          store.setCategory(activeGame.matchData?.category || "mixed");
           store.setQuestions(activeGame.questions || []);
           store.setCurrentIdx(activeGame.currentRound ?? activeGame.currentIdx ?? 0);
           store.setMatchData(activeGame.matchData);
@@ -312,9 +313,10 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       const mRole = match.player1_id === effectiveUser?.id ? "player1" : "player2";
       setMatchId(match.id);
       setRole(mRole);
+      setCategory(match.category);
       setView("loading");
       startMatch?.(match.id, mRole);
-   }, [effectiveUser, setMatchId, setRole, setView, startMatch]);
+   }, [effectiveUser, setMatchId, setRole, setCategory, setView, startMatch]);
 
    // Auto-load match from notification click (pendingAsyncMatchId)
    const pendingAsyncMatchId = useAppStore((s) => s.pendingAsyncMatchId);
@@ -332,6 +334,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!effectiveUser) return;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
       setRole(myRole);
+      setCategory(match.category);
       setMatchData(match);
       try {
          const decrypted = await decryptMatchQuestions(match);
@@ -340,7 +343,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          console.warn("Failed to decrypt history match questions:", e);
       }
       setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
+   }, [effectiveUser, setRole, setCategory, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();

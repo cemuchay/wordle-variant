@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
-import { AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, WifiOff } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
@@ -50,6 +50,7 @@ interface BattleViewProps {
    onAbort: () => void;
    lastRoundPopup: boolean;
    waitingForOpponent: boolean;
+   isConnected?: boolean;
 }
 
 const PREFILLED_MESSAGES = [
@@ -94,7 +95,8 @@ export const BattleView = ({
    sendQuickChat,
    onAbort,
    lastRoundPopup,
-   waitingForOpponent
+   waitingForOpponent,
+   isConnected
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
@@ -351,9 +353,20 @@ export const BattleView = ({
                }}
                className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
             >
-               <AlertTriangle size={12} />
-               <span>Abort Game</span>
+                <AlertTriangle size={12} />
+                <span>Abort Game</span>
             </button>
+
+            {isConnected === false && (
+               <motion.div
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  className="flex items-center gap-1 text-amber-400"
+               >
+                  <WifiOff size={14} />
+                  <span className="text-[8px] font-black uppercase">Sync</span>
+               </motion.div>
+            )}
 
             <button
                onClick={() => setIsBattlePlaying(!isBattlePlaying)}
