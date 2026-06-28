@@ -221,6 +221,11 @@ export const ChallengeItem = memo(function ChallengeItem({
     return parseMarathonGames(challenge.target_word, challenge.salt).length;
   }, [isMarathon, challenge.target_word, challenge.salt]);
 
+  const isNewChallenge = useMemo(() => {
+    const diffMs = Date.now() - new Date(created_at).getTime();
+    return diffMs < 3600000 && diffMs >= 0 && !isFinished;
+  }, [created_at, isFinished]);
+
   const itemType = useMemo((): 'active' | 'open' | 'played' | 'expired' => {
     if (status === 'open') return 'open';
     if (isExpired) return 'expired';
@@ -264,6 +269,12 @@ export const ChallengeItem = memo(function ChallengeItem({
       )}
       {itemType === 'active' && !isSelfChallenge && !isLeader && mode !== "LIVE" && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/3 blur-2xl -mr-16 -mt-16 pointer-events-none" />
+      )}
+
+      {isNewChallenge && (
+        <div className="absolute top-2 right-2 z-20 px-2 py-0.5 bg-yellow-400/15 border border-yellow-400/30 text-yellow-400 text-[9px] font-black uppercase tracking-wider rounded-full shadow-lg backdrop-blur-sm pointer-events-none">
+          New
+        </div>
       )}
 
       {/* HEADER ROW */}
