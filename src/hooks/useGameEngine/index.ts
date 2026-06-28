@@ -27,7 +27,6 @@ export const useGameEngine = (date: string) => {
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
    const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
-   console.log(config.word[0]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 

@@ -260,17 +260,31 @@ export function useGameEngine(props: EngineProps) {
 
          if (gameType === "live-bot") {
             clearT("botTimeout");
-            const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
-            let bp = 0;
-            if (ba.correct) { const eff = Math.max(0, ba.time_taken - 1.5); const denom = duration - 1.5; bp = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
-            if (S.current.currentRound === 6) bp *= 2;
-            let bc = q?.answer;
-            if (!ba.correct && q?.choices) { const w = q.choices.filter((c: any) => c !== q.answer); bc = w[Math.floor(Math.random() * w.length)] || "WRONG"; }
-            upd = {
-               ...lm, p1_answers: [...(lm.p1_answers || []), sub], p1_answered: true, p1_score: (lm.p1_score || 0) + points,
-               p2_answers: [...(lm.p2_answers || []), { question_idx: S.current.currentRound, correct: ba.correct, time_taken: ba.time_taken, points: bp, choice: bc }],
-               p2_answered: true, p2_score: (lm.p2_score || 0) + bp,
-            };
+            const botAlreadyAnswered = lm.p2_answers?.some((a: any) => a.question_idx === S.current.currentRound);
+            if (botAlreadyAnswered) {
+               upd = {
+                  ...lm,
+                  p1_answers: [...(lm.p1_answers || []), sub],
+                  p1_answered: true,
+                  p1_score: (lm.p1_score || 0) + points,
+               };
+            } else {
+               const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
+               let bp = 0;
+               if (ba.correct) { const eff = Math.max(0, ba.time_taken - 1.5); const denom = duration - 1.5; bp = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration)))); }
+               if (S.current.currentRound === 6) bp *= 2;
+               let bc = q?.answer;
+               if (!ba.correct && q?.choices) { const w = q.choices.filter((c: any) => c !== q.answer); bc = w[Math.floor(Math.random() * w.length)] || "WRONG"; }
+               upd = {
+                  ...lm,
+                  p1_answers: [...(lm.p1_answers || []), sub],
+                  p1_answered: true,
+                  p1_score: (lm.p1_score || 0) + points,
+                  p2_answers: [...(lm.p2_answers || []), { question_idx: S.current.currentRound, correct: ba.correct, time_taken: ba.time_taken, points: bp, choice: bc }],
+                  p2_answered: true,
+                  p2_score: (lm.p2_score || 0) + bp,
+               };
+            }
          } else {
             const isP1 = S.current.role === "player1";
             const answers = [...((isP1 ? lm.p1_answers : lm.p2_answers) || [])];
@@ -371,27 +385,64 @@ export function useGameEngine(props: EngineProps) {
        const q = S.current.questions[index];
        const duration = q ? getQuestionDuration(q.type) : 10.0;
        botAction.current = null;
-       dispatch({ type: "SET_ROUND", round: index, timeLeft: duration, maxTime: duration });
+
+       let elapsed = 0;
+       if (_match?.question_started_at && _match?.status === "active") {
+          const startedAt = new Date(_match.question_started_at).getTime();
+          elapsed = Math.max(0, (getSyncedNow() - startedAt) / 1000);
+       }
+       const remaining = Math.max(0, duration - elapsed);
+
+       dispatch({ type: "SET_ROUND", round: index, timeLeft: remaining, maxTime: duration });
        dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
        G.current.isSubmitting = false;
 
-        const startTime = getSyncedNow();
-       let lastTicked = Math.ceil(duration) + 1;
+       const startTime = _match?.question_started_at && _match?.status === "active"
+          ? new Date(_match.question_started_at).getTime()
+          : getSyncedNow();
+       let lastTicked = Math.ceil(remaining) + 1;
        T.current.roundInterval = window.setInterval(() => {
-          const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-          dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
-          const cs = Math.ceil(remaining);
-          if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-          if (remaining <= 0) { clearT("roundInterval"); if (useLiveStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.(""); }
+          const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+          dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
+          const cs = Math.ceil(remainingTime);
+          if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
+          if (remainingTime <= 0) { clearT("roundInterval"); if (useLiveStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.(""); }
        }, 50);
 
-      if (gameType === "live-bot" && q) {
-         const bp = _match.bot_profile || "average";
+       if (gameType === "live-bot" && q) {
+          const bp = _match.bot_profile || "average";
           const br = simulateBotResponse(q, bp, duration);
-         const bt = Math.min(br.time_taken, duration - 0.5);
-         botAction.current = { ...br, time_taken: bt };
-         T.current.botTimeout = window.setTimeout(() => cb.current.handleMatchUpdate?.({ p2_answered: true }), bt * 1000);
-      }
+          const bt = Math.min(br.time_taken, duration - 0.5);
+          botAction.current = { ...br, time_taken: bt };
+          const botAlreadyAnswered = _match.p2_answers?.some((a: any) => a.question_idx === index);
+          if (!botAlreadyAnswered) {
+             const botRemainingTime = Math.max(0, bt - elapsed);
+             T.current.botTimeout = window.setTimeout(() => {
+                const lm = S.current.matchData;
+                if (!lm) return;
+                const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
+                let bpPoints = 0;
+                if (ba.correct) {
+                   const eff = Math.max(0, ba.time_taken - 1.5);
+                   const denom = duration - 1.5;
+                   bpPoints = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
+                }
+                if (index === 6) bpPoints *= 2;
+                let bc = q?.answer;
+                if (!ba.correct && q?.choices) {
+                   const w = q.choices.filter((c: any) => c !== q.answer);
+                   bc = w[Math.floor(Math.random() * w.length)] || "WRONG";
+                }
+                const updatedMatch = {
+                   ...lm,
+                   p2_answers: [...(lm.p2_answers || []), { question_idx: index, correct: ba.correct, time_taken: ba.time_taken, points: bpPoints, choice: bc }],
+                   p2_answered: true,
+                   p2_score: (lm.p2_score || 0) + bpPoints,
+                };
+                cb.current.handleMatchUpdate?.(updatedMatch);
+             }, botRemainingTime * 1000);
+          }
+       }
    }, [gameType, getSyncedNow]);
    cb.current.startQuestionRound = startQuestionRound;
 

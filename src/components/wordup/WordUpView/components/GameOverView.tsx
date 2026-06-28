@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { Award } from "lucide-react";
 import { useWordUpStore } from "../../../../store/useWordUpStore";
 import { BOT_PROFILES } from "../../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../../utils/wordupQuestionPostProcessor";

@@ -51,6 +51,7 @@ export function useGameEngine(props: EngineProps) {
       timeLeft: 0,
       role: null as "player1" | "player2" | null,
       maxTime: 0,
+      roundStartedAt: 0,
    });
 
    const channel = useRef<any>(null);
@@ -330,19 +331,36 @@ export function useGameEngine(props: EngineProps) {
       clearT("roundInterval");
       const q = S.current.questions[index];
       const duration = q ? getQuestionDuration(q.type) : QUESTION_DURATION.default;
-      dispatch({ type: "SET_ROUND", round: index, timeLeft: duration, maxTime: duration });
+
+      // Recover time left if we reloaded
+      let elapsed = 0;
+      const recoveredGame = safeLocalStorage.getItem("wordup_async_active_game");
+      if (recoveredGame) {
+         try {
+            const parsed = JSON.parse(recoveredGame);
+            if (parsed && parsed.matchId === matchId && parsed.currentRound === index && parsed.roundStartedAt) {
+               const now = getSyncedNow();
+               elapsed = Math.max(0, (now - parsed.roundStartedAt) / 1000);
+            }
+         } catch {}
+      }
+      const remaining = Math.max(0, duration - elapsed);
+
+      dispatch({ type: "SET_ROUND", round: index, timeLeft: remaining, maxTime: duration });
       dispatch({ type: "CLEAR_ANSWER" });
       dispatch({ type: "HIDE_REVEAL" });
       G.current.isSubmitting = false;
 
-      const startTime = getSyncedNow();
-      let lastTicked = Math.ceil(duration) + 1;
+      const startTime = getSyncedNow() - (elapsed * 1000);
+      S.current.roundStartedAt = startTime;
+
+      let lastTicked = Math.ceil(remaining) + 1;
       T.current.roundInterval = window.setInterval(() => {
-         const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-         dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
-         const cs = Math.ceil(remaining);
-         if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-         if (remaining <= 0) {
+         const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+         dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
+         const cs = Math.ceil(remainingTime);
+         if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
+         if (remainingTime <= 0) {
             clearT("roundInterval");
             if (useAsyncStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.("");
          }
@@ -486,6 +504,7 @@ export function useGameEngine(props: EngineProps) {
          matchData: state.matchData, opponentStats: state.opponentStats,
          revealAnswers: state.revealAnswers, selectedAnswer: state.selectedAnswer,
          timeLeft: state.timeLeft, maxTime: state.maxTime, gameType,
+         roundStartedAt: S.current.roundStartedAt,
       };
       const d = setTimeout(() => safeLocalStorage.setItem("wordup_async_active_game", JSON.stringify(as)), 1000);
       return () => clearTimeout(d);

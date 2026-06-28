@@ -22,6 +22,7 @@ import { ConnectingView } from "./components/ConnectingView";
 import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
+import { safeLocalStorage } from "../../utils/storage";
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -135,24 +136,25 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       clearChallengeResources();
       challengeResolvedRef.current = false;
 
+      setConnectingMsg("Creating challenge...");
+      setView("loading");
+
+      const mId = await createMatch(targetUser);
+      if (!mId) {
+         setView("menu");
+         triggerToast("Failed to create challenge.", 4000);
+         return;
+      }
+
       const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
 
       if (!isOnline) {
-         setConnectingMsg("Creating challenge...");
-         setView("loading");
-         const mId = await createMatch(targetUser);
-         if (mId) {
-            setPendingChallenge({ matchId: mId, targetUser });
-            setView("menu");
-         } else {
-            setView("menu");
-            triggerToast("Failed to create challenge.", 4000);
-         }
+         setPendingChallenge({ matchId: mId, targetUser });
+         setView("menu");
          return;
       }
 
       setConnectingMsg("Sending challenge...");
-      setView("loading");
 
       const myName = effectiveUser.user_metadata?.username || effectiveUser.email?.split("@")[0] || "Someone";
 
@@ -167,35 +169,26 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   senderId: effectiveUser.id,
                   senderName: myName,
                   category,
+                  matchId: mId,
                },
             });
             setTimeout(() => supabase.removeChannel(targetChannel), 1000);
          }
       });
 
-      const responseChannel = supabase.channel(`user_signals_${effectiveUser.id}`);
+      const responseChannel = supabase.channel(`wordup_async_match_signals_${mId}`);
       challengeChannelsRef.current.push(responseChannel);
       responseChannel
          .on("broadcast", { event: "wordup_async_invite_accepted" }, async ({ payload }: any) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
-            const mId = payload?.matchId;
-            if (mId && effectiveUser) {
-               let match: any = null;
-               try {
-                  const { data } = await supabase
-                     .from("wordup_async_matches")
-                     .select("player1_id, player2_id")
-                     .eq("id", mId)
-                     .single();
-                  match = data;
-               } catch {/* comment */ }
-               const role = match?.player1_id === effectiveUser.id ? "player1" : "player2";
-               setMatchId(mId);
-               setRole(role);
+            const acceptedMId = payload?.matchId || mId;
+            if (effectiveUser) {
+               setMatchId(acceptedMId);
+               setRole("player1");
                setView("loading");
-               startMatch?.(mId, role);
+               startMatch?.(acceptedMId, "player1");
             } else {
                setView("menu");
                triggerToast("Failed to start match.", 4000);
@@ -205,15 +198,20 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
+            setPendingChallenge({ matchId: mId, targetUser });
             setView("menu");
-            triggerToast("Challenge saved as pending.", 3000);
          })
-         .on("broadcast", { event: "wordup_async_invite_declined" }, ({ payload }: any) => {
+         .on("broadcast", { event: "wordup_async_invite_declined" }, async ({ payload }: any) => {
             if (challengeResolvedRef.current) return;
             challengeResolvedRef.current = true;
             clearChallengeResources();
             setView("menu");
             triggerToast(`${payload?.senderName || "They"} declined your challenge.`, 3000);
+            try {
+               await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", mId);
+            } catch (err) {
+               console.warn("Failed to set match status to declined:", err);
+            }
          })
          .subscribe();
 
@@ -223,8 +221,8 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          if (challengeResolvedRef.current) return;
          challengeResolvedRef.current = true;
          clearChallengeResources();
+         setPendingChallenge({ matchId: mId, targetUser });
          setView("menu");
-         triggerToast("No response. Challenge saved as pending.", 3000);
       }, 15000));
    }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
 
@@ -250,9 +248,47 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (effectiveUser) refreshPending();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [effectiveUser?.id, refreshPending]);
+       if (effectiveUser) refreshPending();
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [effectiveUser?.id, refreshPending]);
+
+    // Recovery from refresh
+    useEffect(() => {
+       const activeGameStr = safeLocalStorage.getItem("wordup_async_active_game");
+       if (!activeGameStr) return;
+       let mounted = true;
+       let recoveryTimer: number | null = null;
+       try {
+          const activeGame = JSON.parse(activeGameStr);
+          if (!activeGame || !activeGame.matchId || activeGame.matchData?.status === "completed") return;
+          if (activeGame.role && !["player1", "player2"].includes(activeGame.role)) {
+             safeLocalStorage.removeItem("wordup_async_active_game");
+             return;
+          }
+          console.log("[WordUp Logs] Restoring active async game from localStorage:", activeGame.matchId);
+
+          const store = useAsyncStore.getState();
+          store.setMatchId(activeGame.matchId);
+          store.setRole(activeGame.role);
+          store.setQuestions(activeGame.questions || []);
+          store.setCurrentIdx(activeGame.currentRound ?? activeGame.currentIdx ?? 0);
+          store.setMatchData(activeGame.matchData);
+          store.setOpponentStats(activeGame.opponentStats);
+          store.setRevealAnswers(activeGame.revealAnswers || false);
+          store.setSelectedAnswer(activeGame.selectedAnswer || null);
+
+          recoveryTimer = window.setTimeout(async () => {
+             if (!mounted) return;
+             await startMatch?.(activeGame.matchId, activeGame.role);
+          }, 100);
+       } catch (err) {
+          console.error("[WordUp Logs] Failed to restore active async game:", err);
+       }
+       return () => {
+          mounted = false;
+          if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+       };
+    }, [startMatch]);
 
    // Realtime listener for async match updates
    useEffect(() => {
@@ -282,9 +318,11 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!invite || !effectiveUser) return;
       setIncomingInvite(null);
       const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser, invite.category);
+      const mId = invite.matchId || (await createMatch(targetUser, invite.category));
       if (mId) {
-         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
+         const ackChannel = invite.matchId 
+            ? supabase.channel(`wordup_async_match_signals_${invite.matchId}`)
+            : supabase.channel(`user_signals_${invite.senderId}`);
          ackChannel.subscribe((status) => {
             if (status === "SUBSCRIBED") {
                ackChannel.send({
@@ -296,7 +334,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
             }
          });
          triggerToast("Challenge accepted! Starting game...", 3000);
-         const mRole = "player2";
+         const mRole = invite.matchId ? "player2" : "player1";
          setMatchId(mId);
          setRole(mRole);
          setView("loading");
@@ -309,9 +347,11 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       if (!invite || !effectiveUser) return;
       setIncomingInvite(null);
       const targetUser = { id: invite.senderId, username: invite.senderName };
-      const mId = await createMatch(targetUser, invite.category);
+      const mId = invite.matchId || (await createMatch(targetUser, invite.category));
       if (mId) {
-         const ackChannel = supabase.channel(`user_signals_${invite.senderId}`);
+         const ackChannel = invite.matchId 
+            ? supabase.channel(`wordup_async_match_signals_${invite.matchId}`)
+            : supabase.channel(`user_signals_${invite.senderId}`);
          ackChannel.subscribe((status) => {
             if (status === "SUBSCRIBED") {
                ackChannel.send({
@@ -331,7 +371,15 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       const invite = incomingInvite;
       if (!invite) return;
       setIncomingInvite(null);
-      const declineChannel = supabase.channel(`user_signals_${invite.senderId}`);
+      if (invite.matchId) {
+         supabase.from("wordup_async_matches")
+            .update({ status: "declined" })
+            .eq("id", invite.matchId)
+            .then(({ error }) => { if (error) console.error("Failed to decline match in DB:", error); });
+      }
+      const declineChannel = invite.matchId 
+         ? supabase.channel(`wordup_async_match_signals_${invite.matchId}`)
+         : supabase.channel(`user_signals_${invite.senderId}`);
       declineChannel.subscribe((status) => {
          if (status === "SUBSCRIBED") {
             declineChannel.send({

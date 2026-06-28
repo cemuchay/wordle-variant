@@ -13,7 +13,6 @@ interface WordUpMascotProps {
   className?: string
 }
 
-const FACE_BASE = '#FFD93D'
 const FACE_STROKE = '#E8B830'
 
 const accent: Record<MascotExpression, { color: string; shadow: string }> = {

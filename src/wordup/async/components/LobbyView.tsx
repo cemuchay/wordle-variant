@@ -289,12 +289,19 @@ export const LobbyView = ({
                                     </div>
                                     <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">{match.category?.replace(/_/g, " ")}</p>
                                  </div>
-                                 {myTurn && (
+                                 {myTurn ? (
                                     <button
                                        onClick={() => onPlayTurn(match)}
                                        className="bg-indigo-500 hover:bg-indigo-600 text-white font-black uppercase text-[9px] tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer"
                                     >
                                        Play Turn
+                                    </button>
+                                 ) : (
+                                    <button
+                                       onClick={() => onSelectHistoryMatch?.(match)}
+                                       className="bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[9px] tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer"
+                                    >
+                                       Preview
                                     </button>
                                  )}
                               </div>
