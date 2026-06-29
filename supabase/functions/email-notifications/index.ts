@@ -533,15 +533,6 @@ serve(async (req) => {
                } else {
                   log(`Failed to send email to ${recipient.email}`);
                }
-
-               // Send copy to cemuchay@gmail.com with logs appended
-               const fellowHtml = appendLogsToHtml(html, logs);
-               log(`Sending fellow copy to cemuchay@gmail.com...`);
-               await sendEmailWithFallback(
-                  "cemuchay@gmail.com",
-                  `[Fellow Copy] [To: ${recipient.email}] Resume your play today! ⚡`,
-                  fellowHtml,
-               );
             }
          }
 
@@ -578,15 +569,6 @@ serve(async (req) => {
                } else {
                   log(`Failed to send inactive reminder to ${recipient.email}`);
                }
-
-               // Send copy to cemuchay@gmail.com with logs appended
-               const fellowHtml = appendLogsToHtml(html, logs);
-               log(`Sending fellow copy to cemuchay@gmail.com...`);
-               await sendEmailWithFallback(
-                  "cemuchay@gmail.com",
-                  `[Fellow Copy] [To: ${recipient.email}] The Leaderboard Misses You! 🧩`,
-                  fellowHtml,
-               );
             }
          }
 
@@ -662,15 +644,6 @@ serve(async (req) => {
                } else {
                   log(`Failed to send email to ${recipient.email}`);
                }
-
-               // Send copy to cemuchay@gmail.com with logs appended
-               const fellowHtml = appendLogsToHtml(html, logs);
-               log(`Sending fellow copy to cemuchay@gmail.com...`);
-               await sendEmailWithFallback(
-                  "cemuchay@gmail.com",
-                  `[Fellow Copy] [To: ${recipient.email}] ${subject}`,
-                  fellowHtml,
-               );
             }
          }
 
@@ -884,15 +857,6 @@ serve(async (req) => {
                } else {
                   log(`Failed to send email to ${recipient.email}`);
                }
-
-               // Send copy to cemuchay@gmail.com with logs appended
-               const fellowHtml = appendLogsToHtml(html, logs);
-               log(`Sending fellow copy to cemuchay@gmail.com...`);
-               await sendEmailWithFallback(
-                  "cemuchay@gmail.com",
-                  `[Fellow Copy] [To: ${recipient.email}] ${subject}`,
-                  fellowHtml,
-               );
             }
          }
 
