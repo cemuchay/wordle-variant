@@ -19,49 +19,106 @@ import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 
 export const useGameEngine = (date: string, user: User | null, isAuthLoading: boolean) => {
-   const [state, dispatch] = useReducer(gameReducer, initialState);
-   const [isHydrated, setIsHydrated] = useState(false);
-   const [config, setConfig] = useState<GameConfig | null>(null);
-   const [isConfigLoading, setIsConfigLoading] = useState(false);
-   const hydratedUserRef = useRef<string | undefined>(undefined);
-   const hydratedDateRef = useRef<string | null>(null);
-   const hydratedConfigWordRef = useRef<string | undefined>(undefined);
-   const cachedHydrationDoneRef = useRef(false);
-   const { triggerToast, preferences } = useApp();
-   const { ask } = useConfirmation();
+    const [state, dispatch] = useReducer(gameReducer, initialState, () => {
+       if (!date) return initialState;
+       const saved = safeLocalStorage.getItem(`wordle-${date}`);
+       const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
+       const isSameDay = date && lastTimestamp?.startsWith(date);
+       if (!saved || !isSameDay) return initialState;
 
-   // EARLY: Cache-first hydration — render immediately if saved state exists for today
-   useEffect(() => {
-      if (!date || cachedHydrationDoneRef.current) return;
-      const saved = safeLocalStorage.getItem(`wordle-${date}`);
-      const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
-      const isSameDay = date && lastTimestamp?.startsWith(date);
-      if (!saved || !isSameDay) return;
+       try {
+          const payload = JSON.parse(saved);
+          if (payload.config?.word) {
+             const localSalt = getLocalSalt(date, user?.id);
+             payload.config.word = deobfuscateWord(payload.config.word, localSalt);
+          }
+          return {
+             ...initialState,
+             ...payload
+          };
+       } catch {
+          return initialState;
+       }
+    });
 
-      try {
-         const payload = JSON.parse(saved);
-         if (payload.config?.word) {
-            const localSalt = getLocalSalt(date, user?.id);
-            payload.config.word = deobfuscateWord(payload.config.word, localSalt);
-         }
-         setConfig(payload.config);
-         dispatch({ type: "LOAD_STATE", payload });
-         setIsHydrated(true);
-         cachedHydrationDoneRef.current = true;
-      } catch {
-         // Cache corrupted — fall through to normal hydration
-      }
-   }, [date]);
+    const [isHydrated, setIsHydrated] = useState(() => {
+       if (!date) return false;
+       const saved = safeLocalStorage.getItem(`wordle-${date}`);
+       const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
+       const isSameDay = date && lastTimestamp?.startsWith(date);
+       if (saved && isSameDay) {
+          return true;
+       }
+       return false;
+    });
 
-   useEffect(() => {
-      if (!date) return;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsConfigLoading(true);
-      getDailyConfig(!!user, date).then((cfg) => {
-         setConfig(cfg);
-         setIsConfigLoading(false);
-      });
-   }, [date, user]);
+    const [config, setConfig] = useState<GameConfig | null>(() => {
+       if (!date) return null;
+       const saved = safeLocalStorage.getItem(`wordle-${date}`);
+       const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
+       const isSameDay = date && lastTimestamp?.startsWith(date);
+       if (saved && isSameDay) {
+          try {
+             const payload = JSON.parse(saved);
+             if (payload.config?.word) {
+                const localSalt = getLocalSalt(date, user?.id);
+                payload.config.word = deobfuscateWord(payload.config.word, localSalt);
+             }
+             return payload.config;
+          } catch {
+             return null;
+          }
+       }
+       return null;
+    });
+
+    const [isConfigLoading, setIsConfigLoading] = useState(false);
+    const hydratedUserRef = useRef<string | undefined>(user?.id);
+    const hydratedDateRef = useRef<string | null>(date);
+    const hydratedConfigWordRef = useRef<string | undefined>(config?.word || undefined);
+    const cachedHydrationDoneRef = useRef(isHydrated);
+    const { triggerToast, preferences } = useApp();
+    const { ask } = useConfirmation();
+
+    // EARLY: Cache-first hydration — render immediately if saved state exists for today
+    useEffect(() => {
+       if (!date || cachedHydrationDoneRef.current) return;
+       const saved = safeLocalStorage.getItem(`wordle-${date}`);
+       const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
+       const isSameDay = date && lastTimestamp?.startsWith(date);
+       if (!saved || !isSameDay) return;
+
+       try {
+          const payload = JSON.parse(saved);
+          if (payload.config?.word) {
+             const localSalt = getLocalSalt(date, user?.id);
+             payload.config.word = deobfuscateWord(payload.config.word, localSalt);
+          }
+          setConfig(payload.config);
+          dispatch({ type: "LOAD_STATE", payload });
+          setIsHydrated(true);
+          cachedHydrationDoneRef.current = true;
+       } catch {
+          // Cache corrupted — fall through to normal hydration
+       }
+    }, [date]);
+
+    useEffect(() => {
+       if (!date) return;
+       // eslint-disable-next-line react-hooks/set-state-in-effect
+       setIsConfigLoading(true);
+       getDailyConfig(!!user, date)
+          .then((cfg) => {
+             setConfig(cfg);
+          })
+          .catch((err) => {
+             console.error("Failed to fetch daily config:", err);
+             triggerToast("Connection error: using offline game configuration.", 4000);
+          })
+          .finally(() => {
+             setIsConfigLoading(false);
+          });
+    }, [date, user, triggerToast]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
