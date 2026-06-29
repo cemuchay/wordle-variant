@@ -670,8 +670,50 @@ export default function App() {
 
   if (isLoadingDate || !isHydrated) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
-        loading game ...
+      <div className="h-dvh w-full flex flex-col bg-dark text-white p-4 justify-between animate-pulse select-none">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between border-b border-white/5 pb-4 shrink-0 px-2 mt-2">
+          <div className="w-8 h-8 rounded-full bg-white/10" />
+          <div className="h-6 w-32 bg-white/10 rounded-lg" />
+          <div className="flex gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/10" />
+            <div className="w-8 h-8 rounded-lg bg-white/10" />
+          </div>
+        </div>
+
+        {/* Board Grid Skeleton */}
+        <div className="flex-1 flex items-center justify-center min-h-0 py-8">
+          <div className="grid grid-rows-6 gap-1.5 w-full max-w-[280px] sm:max-w-[320px] aspect-[5/6] max-h-[350px] sm:max-h-[400px]">
+            {Array.from({ length: 6 }).map((_, r) => (
+              <div key={r} className="grid grid-cols-5 gap-1.5 w-full">
+                {Array.from({ length: 5 }).map((_, c) => (
+                  <div key={c} className="border-2 border-white/10 aspect-square rounded-lg bg-white/2" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Keyboard Skeleton */}
+        <div className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] space-y-1.5 shrink-0 px-2">
+          <div className="flex justify-center gap-1.5">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+          </div>
+          <div className="flex justify-center gap-1.5 px-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+          </div>
+          <div className="flex justify-center gap-1.5">
+            <div className="h-12 w-14 rounded bg-white/10" />
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+            <div className="h-12 w-14 rounded bg-white/10" />
+          </div>
+        </div>
       </div>
     );
   }

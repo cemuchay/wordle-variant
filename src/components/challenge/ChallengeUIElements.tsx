@@ -22,8 +22,29 @@ import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
-      {Array.from({ length: CHALLENGE_LIMITS.MAX_OPPONENT_AVATARS }).map((_, i) => (
-        <div key={i} className="h-40 bg-white/5 rounded-4xl" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="w-full bg-white/5 border border-white/5 p-4 rounded-3xl flex flex-col gap-4 h-48"
+        >
+          {/* Header Row Placeholder */}
+          <div className="flex items-center justify-between w-full">
+            <div className="flex gap-2">
+              <div className="h-5 w-12 bg-white/10 rounded-lg" />
+              <div className="h-5 w-20 bg-white/10 rounded-lg" />
+            </div>
+            <div className="h-5 w-16 bg-white/10 rounded" />
+          </div>
+
+          {/* Configuration Options Placeholder */}
+          <div className="h-4 bg-white/5 rounded w-3/4" />
+
+          {/* Progress Split Grid Placeholder */}
+          <div className="grid grid-cols-2 gap-3 w-full flex-1">
+            <div className="bg-white/5 border border-white/5 p-3 rounded-2xl h-16" />
+            <div className="bg-white/5 border border-white/5 p-3 rounded-2xl h-16" />
+          </div>
+        </div>
       ))}
     </div>
   );
