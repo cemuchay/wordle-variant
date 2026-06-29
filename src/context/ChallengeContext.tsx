@@ -182,6 +182,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setPreviewMarathonGameIndex = useChallengeStore(s => s.setPreviewMarathonGameIndex);
     const backAction = useChallengeStore(s => s.backAction);
     const setBackAction = useChallengeStore(s => s.setBackAction);
+    const activeGameLength = useChallengeStore(s => s.activeGameLength);
     const [isEditingChallenge, setIsEditingChallenge] = useState(false);
     const [bootstrappingMessage, setBootstrappingMessage] = useState<string | null>(null);
 
@@ -200,7 +201,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // 1. Server Data (TanStack Query)
     const myChallengesQuery = useMyChallenges(effectiveUser?.id);
     const { data: myChallengesData, isLoading: isChallengesLoading, refetch: refetchChallenges, isFetching: isChallengesFetching, error: myChallengesError, failureCount: myChallengesFailureCount } = myChallengesQuery;
-    
+
     const discoverChallengesQuery = useDiscoverChallenges();
     const { data: discoverChallengesData, isLoading: isDiscoverLoading, isFetching: isDiscoverFetching, error: discoverChallengesError, failureCount: discoverChallengesFailureCount } = discoverChallengesQuery;
 
@@ -233,8 +234,8 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const isBackgroundFetching =
         ((isChallengesFetching && !isChallengesLoading) ||
-        (listColumn === 'unplayed' && isDiscoverFetching && !isDiscoverLoading) ||
-        isParticipantsBulkFetching) && isRetrying;
+            (listColumn === 'unplayed' && isDiscoverFetching && !isDiscoverLoading) ||
+            isParticipantsBulkFetching) && isRetrying;
 
     const error = (listColumn === 'unplayed' ? (discoverChallengesError || myChallengesError) : myChallengesError)
         ? ((listColumn === 'unplayed' ? (discoverChallengesError || myChallengesError) : myChallengesError) as any)?.message || "Failed to load challenges."
@@ -323,7 +324,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         const pendingDailies = myChallenges.filter((item: any) => item.challenge?.is_bot_marathon && item.status === 'pending' && new Date(item.challenge?.expires_at) > new Date());
 
         const combined = [...openDailies, ...pendingDailies];
-        
+
         // Remove duplicates if same challenge is in both
         const unique = combined.reduce((acc: any[], curr: any) => {
             const id = curr.challenge_id || curr.challenge?.id;
@@ -339,7 +340,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const dateB = new Date(b.challenge?.expires_at).getTime();
             return dateA - dateB;
         }).filter((c: any) => new Date(c.challenge?.expires_at) > new Date())
-        .slice(0, 2);
+            .slice(0, 2);
     }, [discoverChallenges, myChallenges]);
 
     const unplayedCount = useMemo(() =>
@@ -400,7 +401,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         });
     }, [myChallenges, openChallengeItems, listColumn, modeFilter, lengthFilter, searchQuery, effectiveUser?.id]);
 
-        // 4. Action Wrappers
+    // 4. Action Wrappers
     const cleanupSubscription = useCallback(() => {
         // Call the participants cleanup function if it exists
         if (participantsCleanupRef.current) {
@@ -527,8 +528,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             });
 
             let challenge = localMatch?.challenge;
+
+            // Run challenge fetch and my-challenges refetch in parallel
+            const [fetchedChallenge] = await Promise.all([
+                challenge ? Promise.resolve(challenge) : challengePromise,
+                queryClient.refetchQueries({ queryKey: ['my-challenges'] })
+            ]);
+
             if (!challenge) {
-                challenge = await challengePromise;
+                challenge = fetchedChallenge;
             }
 
             if (challenge) {
@@ -540,9 +548,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 // Add to recent challenges in localStorage
                 addRecentChallenge(challenge.id);
                 queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
-
-                // Wait for refetch to get fresh participation data (especially marathon_progress)
-                await queryClient.refetchQueries({ queryKey: ['my-challenges'] });
 
                 cleanupSubscription();
                 setSelectedChallenge(challenge);
@@ -597,7 +602,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 // Keep channelRef for backward compatibility (used elsewhere)
                 const existingChannels = supabase.getChannels().filter(
                     (c) => (c as any).topic === `realtime:challenge_participants_${challenge.id}` ||
-                            (c as any).topic === `realtime:challenge_participants_marathon_${challenge.id}`
+                        (c as any).topic === `realtime:challenge_participants_marathon_${challenge.id}`
                 );
                 channelRef.current = existingChannels[0] || null;
             } else {
@@ -736,12 +741,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     const handleEdit = useCallback(async (challengeId: string, params: any) => {
         try {
-            await updateMutation.mutateAsync({ 
-                challengeId, 
+            await updateMutation.mutateAsync({
+                challengeId,
                 params: {
                     ...params,
                     max_attempts: maxAttempts
-                } 
+                }
             });
             triggerToast("Challenge updated successfully!", 3000);
             setIsEditingChallenge(false);
@@ -890,6 +895,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         initialProcessed.current = true;
 
         if (initialChallengeId && initialChallengeId !== "null" && initialChallengeId !== "undefined") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             handleViewChallenge(initialChallengeId).then(() => {
                 // Clear the URL parameter after successful load to keep the URL clean
                 const url = new URL(window.location.href);
@@ -967,6 +973,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     pendingPreviewIdRef.current = saved.previewParticipantId;
                 }
                 if (saved.type === 'lobby' || saved.type === 'gameplay') {
+                    // eslint-disable-next-line react-hooks/set-state-in-effect
                     handleViewChallenge(saved.challengeId);
                 }
             }

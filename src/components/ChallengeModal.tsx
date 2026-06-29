@@ -187,6 +187,7 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
+      dailyMarathonChallenges,
       initialChallengeId,
       activeGameLength,
       bootstrappingMessage,
