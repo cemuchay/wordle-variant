@@ -122,6 +122,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!user?.id) { setWordupUnreadCount(0); return; }
     fetchWordupUnreadCount(user.id);
   }, [user?.id, fetchWordupUnreadCount]);
@@ -171,24 +172,24 @@ export default function App() {
   const setIsStatsOpen = useAppStore(s => s.setStatsOpen);
   const statsActiveTab = useAppStore(s => s.statsActiveTab);
   const setStatsActiveTab = useAppStore(s => s.setStatsActiveTab);
-  
+
   const isSettingsOpen = useAppStore(s => s.isSettingsOpen);
   const setIsSettingsOpen = useAppStore(s => s.setSettingsOpen);
-  
+
   const isInfoOpen = useAppStore(s => s.isInfoOpen);
   const setIsInfoOpen = useAppStore(s => s.setInfoOpen);
-  
+
   const isWordUpOpen = useAppStore(s => s.isWordUpOpen);
   const setIsWordUpOpen = useAppStore(s => s.setWordUpOpen);
   const wordupMode = useAppStore(s => s.wordupMode);
   const setWordupMode = useAppStore(s => s.setWordupMode);
-  
+
   const isWeeklyWrappedOpen = useAppStore(s => s.isWeeklyWrappedOpen);
   const setIsWeeklyWrappedOpen = useAppStore(s => s.setWeeklyWrappedOpen);
-  
+
   const showNotifications = useAppStore(s => s.showNotifications);
   const setShowNotifications = useAppStore(s => s.setShowNotifications);
-  
+
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [navLoading] = useState<{ active: boolean; message: string }>({
@@ -670,8 +671,42 @@ export default function App() {
 
   if (isLoadingDate || !isHydrated) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-white font-black uppercase tracking-widest animate-pulse">
-        loading game ...
+      <div className="h-dvh w-full flex flex-col bg-dark text-white p-4 justify-between animate-pulse select-none">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between border-b border-white/5 pb-4 shrink-0 px-2 mt-2">
+          <div className="w-8 h-8 rounded-full bg-white/10" />
+          <div className="h-6 w-32 bg-white/10 rounded-lg" />
+          <div className="flex gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/10" />
+            <div className="w-8 h-8 rounded-lg bg-white/10" />
+          </div>
+        </div>
+
+        {/* Board Grid Skeleton: a full unified pulsing block about the height of the grid */}
+        <div className="flex-1 flex items-center justify-center min-h-0 py-8 w-full px-4">
+          <div className="w-full max-w-[280px] sm:max-w-[320px] aspect-5/6 max-h-[350px] sm:max-h-[400px] bg-white/5 border border-white/10 rounded-3xl" />
+        </div>
+
+        {/* Keyboard Skeleton */}
+        <div className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] space-y-1.5 shrink-0 px-2">
+          <div className="flex justify-center gap-1.5">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+          </div>
+          <div className="flex justify-center gap-1.5 px-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+          </div>
+          <div className="flex justify-center gap-1.5">
+            <div className="h-12 w-14 rounded bg-white/10" />
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
+            ))}
+            <div className="h-12 w-14 rounded bg-white/10" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -745,7 +780,7 @@ export default function App() {
             usedHint={state.usedHint}
             canShowHint={stableGuessesCount >= 2}
             isHintLocked={
-               (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
+              (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
                 stableIsHintDisabled) &&
               !state.usedHint
             }
@@ -798,8 +833,8 @@ export default function App() {
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
                 <GameArea
-                   wordLength={config?.length ?? 5}
-                   maxAttempts={config?.maxAttempts ?? 6}
+                  wordLength={config?.length ?? 5}
+                  maxAttempts={config?.maxAttempts ?? 6}
                   guesses={state.guesses}
                   currentGuess={state.currentGuess}
                   cursorIndex={state.cursorIndex}
@@ -834,13 +869,13 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <StatsModal
-                     isOpen={true}
-                     inline={true}
-                     stats={stats}
-                     onClose={() => setIsStatsOpen(false)}
-                     user={user as AppUser}
-                     isGameOver={state.isGameOver}
-                     initialTab={statsActiveTab}
+                    isOpen={true}
+                    inline={true}
+                    stats={stats}
+                    onClose={() => setIsStatsOpen(false)}
+                    user={user as AppUser}
+                    isGameOver={state.isGameOver}
+                    initialTab={statsActiveTab}
                   />
                 </Suspense>
               </div>
@@ -850,12 +885,12 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
-                     isOpen={true}
-                     inline={true}
-                     onClose={() => setIsChallengeOpen(false)}
-                     user={user as AppUser}
-                     onChallengeCreated={handleChallengeCreated}
-                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setIsChallengeOpen(false)}
+                    user={user as AppUser}
+                    onChallengeCreated={handleChallengeCreated}
+                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                   />
                 </Suspense>
               </div>
