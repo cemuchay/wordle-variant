@@ -47,9 +47,9 @@ export const useActions = ({
 
    const onChar = useCallback(
       (char: string) => {
-         dispatch({ type: "ADD_LETTER", char, maxLength: config.length });
+         dispatch({ type: "ADD_LETTER", char, maxLength: config?.length || 5 });
       },
-      [dispatch, config.length],
+      [dispatch, config?.length],
    );
 
    const onDelete = useCallback(() => {
@@ -81,7 +81,7 @@ export const useActions = ({
    }, [state.cursorIndex, state.currentGuess.length, dispatch]);
 
    const onEnter = useCallback(async () => {
-      if (state.isGameOver || state.currentGuess.length !== config.length)
+      if (state.isGameOver || state.currentGuess.length !== config?.length)
          return;
 
       if (isSubmittingRef.current) return;
@@ -89,7 +89,7 @@ export const useActions = ({
 
       try {
          const upperGuess = state.currentGuess.toUpperCase();
-          const { valid } = await loadWordLists(config.length);
+         const { valid } = await loadWordLists(config.length);
 
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
@@ -295,47 +295,47 @@ export const useActions = ({
             if (!success) {
                triggerToast(
                   "Sync failed after 3 attempts. Hint saved locally.",
-               );
-            }
-         }
-         triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
-      }
-   }, [
-      state.guesses,
-      state.isGameOver,
-      state.usedHint,
-      config,
-      date,
-      user,
-      triggerToast,
-      performSync,
-      dispatch,
-   ]);
-
-   const setGameOverModalOpen = useCallback(
-      (isOpen: boolean) => {
-         dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
-      },
-      [dispatch],
-   );
-
-   const loadState = useCallback(
-      (payload: any) => {
-         dispatch({ type: "LOAD_STATE", payload });
-      },
-      [dispatch],
-   );
-
-   return {
-      onChar,
-      onDelete,
-      onEnter,
-      handleHint,
-      setGameOverModalOpen,
-      loadState,
-      onSetCursor,
-      onSetEditIndex,
-      onCursorLeft,
-      onCursorRight,
-   };
-};
+                );
+             }
+          }
+          triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
+       }
+    }, [
+       state.guesses,
+       state.isGameOver,
+       state.usedHint,
+       config,
+       date,
+       user,
+       triggerToast,
+       performSync,
+       dispatch,
+    ]);
+ 
+    const setGameOverModalOpen = useCallback(
+       (isOpen: boolean) => {
+          dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
+       },
+       [dispatch],
+    );
+ 
+    const loadState = useCallback(
+       (payload: any) => {
+          dispatch({ type: "LOAD_STATE", payload });
+       },
+       [dispatch],
+    );
+ 
+    return {
+       onChar,
+       onDelete,
+       onEnter,
+       handleHint,
+       setGameOverModalOpen,
+       loadState,
+       onSetCursor,
+       onSetEditIndex,
+       onCursorLeft,
+       onCursorRight,
+    };
+ };
