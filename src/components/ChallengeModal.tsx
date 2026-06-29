@@ -948,7 +948,7 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className={`fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-300 ${isPlaying
+        className={`fixed inset-0 flex items-center justify-center bg-black/85 md:backdrop-blur-xs transition-[padding,background-color] duration-300 ${isPlaying
           ? "p-0 sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
           : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
           }`}
@@ -958,7 +958,7 @@ export const ChallengeModal = ({
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
+          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] duration-300 ${isPlaying
             ? "h-svh max-h-svh rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
             : "max-w-xl rounded-3xl h-full max-h-full sm:h-[85vh] sm:max-h-[85vh]"
             }`}
