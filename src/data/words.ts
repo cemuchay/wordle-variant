@@ -20,6 +20,22 @@ const memoryCache = new Map<number, WordListCache>();
 const pending = new Map<number, Promise<WordListCache>>();
 
 async function fetchAndCache(length: number): Promise<WordListCache> {
+   // 1. Try to read from IndexedDB cache first
+   try {
+      const cached = await getCachedWords(length);
+      if (cached) {
+         const result: WordListCache = {
+            official: cached.official,
+            valid: new Set(cached.valid),
+         };
+         memoryCache.set(length, result);
+         return result;
+      }
+   } catch (e) {
+      console.warn('Failed to load from IndexedDB cache:', e);
+   }
+
+   // 2. Fallback to network fetch
    const [officialRaw, allowedRaw] = await Promise.all([
       fetch(`/words/words_${length}_official.txt`).then(r => r.text()),
       fetch(`/words/words_${length}_allowed.txt`).then(r => r.text()),
@@ -45,15 +61,15 @@ export async function loadWordLists(length: number): Promise<WordListCache> {
    const mem = memoryCache.get(len);
    if (mem) return mem;
 
-   // 2. In-flight — deduplicate concurrent requests
-   const inflight = pending.get(len);
-   if (inflight) return inflight;
-
-   const promise = fetchAndCache(len);
-   pending.set(len, promise);
+   // 2. Deduplicate in-flight operations (IndexedDB lookup / Network fetch)
+   let inflight = pending.get(len);
+   if (!inflight) {
+      inflight = fetchAndCache(len);
+      pending.set(len, inflight);
+   }
 
    try {
-      const result = await promise;
+      const result = await inflight;
       pending.delete(len);
       return result;
    } catch (e) {
@@ -62,22 +78,10 @@ export async function loadWordLists(length: number): Promise<WordListCache> {
    }
 }
 
-/**
- * Preload word lists into the in-memory cache.
- * Fire-and-forget — call at app bootstrap to avoid flashes on the daily path.
- */
+// Preload word lists on bootstrap to populate memory cache & IndexedDB
 const PRELOAD_LENGTHS = [4, 5, 6, 7];
 PRELOAD_LENGTHS.forEach(l => {
-   // Try IndexedDB first, fall through to dynamic import
-   getCachedWords(l).then(cached => {
-      if (cached) {
-         memoryCache.set(l, { official: cached.official, valid: new Set(cached.valid) });
-         return;
-      }
-      fetchAndCache(l).catch(() => {});
-   }).catch(() => {
-      fetchAndCache(l).catch(() => {});
-   });
+   loadWordLists(l).catch(() => {});
 });
 
 export const getWORDS_3 = () => loadWordLists(3).then(r => r.official);
