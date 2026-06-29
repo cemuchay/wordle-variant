@@ -287,232 +287,243 @@ export const useChallengeGameEngine = ({
          setIsSaving(true);
 
          let loadedTargetWords: string[] = [];
-         if (participation) {
-            if (isMarathon) {
-               const progress = participation.marathon_progress?.find(
-                  (p: any) =>
-                     p.game_index === gameIndex ||
-                     (p.game_index === undefined &&
-                        p.word_length === activeGame?.wordLength),
-               );
-               loadedTargetWords = progress?.target_words || [];
-            } else {
-               loadedTargetWords = participation.target_words || [];
-            }
-         }
-
-         let localTargetWords = loadedTargetWords;
-         try {
-            const saved = safeLocalStorage.getItem(storageKey);
-            if (saved) {
-               const parsed = JSON.parse(saved);
-               if (
-                  parsed.target_words &&
-                  parsed.target_words.length >= loadedTargetWords.length
-               ) {
-                  localTargetWords = parsed.target_words;
-               }
-            }
-         } catch (e) {
-            console.error("Local target words recovery failed", e);
-         }
-
-         if (challenge.is_shapeshifter) {
-            const resolvedWords =
-               localTargetWords.length > 0
-                  ? localTargetWords
-                  : [initialTargetWord];
-            setTargetWords(resolvedWords);
-            setActiveTargetWord(resolvedWords[resolvedWords.length - 1]);
-         } else {
-            setTargetWords([initialTargetWord]);
-            setActiveTargetWord(initialTargetWord);
-         }
-
-         const key = getDecryptionKey(participation);
-
+         let localTargetWords: string[] = [];
+         let key = "";
          let incoming: any[] = [];
          let serverHintRecord: any = null;
+         let progress: any = null;
+         let serverStatus = "playing";
+         let isFinishedStatus = false;
+         let initialTimeLeft: number | null = null;
+         let hasTimedOutOffline = false;
+         let localGuesses: any[] = [];
+         let localUsedHint = false;
+         let localHintRecord: any = null;
+         let needsBackgroundSync = false;
+         let recoveredPayload = null;
+         let isStarterEnforced = false;
 
-         if (participation) {
-            if (isMarathon) {
-               const progress = participation.marathon_progress?.find(
-                  (p: any) =>
-                     p.game_index === gameIndex ||
-                     (p.game_index === undefined &&
-                        p.word_length === activeGame?.wordLength),
-               );
-               if (progress) {
-                  let progGuesses = progress.guesses;
-                  serverHintRecord = progress.hint_record;
+         try {
+            if (participation) {
+               if (isMarathon) {
+                  const prog = participation.marathon_progress?.find(
+                     (p: any) =>
+                        p.game_index === gameIndex ||
+                        (p.game_index === undefined &&
+                           p.word_length === activeGame?.wordLength),
+                  );
+                  loadedTargetWords = prog?.target_words || [];
+               } else {
+                  loadedTargetWords = participation.target_words || [];
+               }
+            }
 
-                  if (!Array.isArray(progGuesses)) {
+            localTargetWords = loadedTargetWords;
+            try {
+               const saved = safeLocalStorage.getItem(storageKey);
+               if (saved) {
+                  const parsed = JSON.parse(saved);
+                  if (
+                     parsed.target_words &&
+                     parsed.target_words.length >= loadedTargetWords.length
+                  ) {
+                     localTargetWords = parsed.target_words;
+                  }
+               }
+            } catch (e) {
+               console.error("Local target words recovery failed", e);
+            }
+
+            if (challenge.is_shapeshifter) {
+               const resolvedWords =
+                  localTargetWords.length > 0
+                     ? localTargetWords
+                     : [initialTargetWord];
+               setTargetWords(resolvedWords);
+               setActiveTargetWord(resolvedWords[resolvedWords.length - 1]);
+            } else {
+               setTargetWords([initialTargetWord]);
+               setActiveTargetWord(initialTargetWord);
+            }
+
+            key = getDecryptionKey(participation);
+
+            if (participation) {
+               if (isMarathon) {
+                  const prog = participation.marathon_progress?.find(
+                     (p: any) =>
+                        p.game_index === gameIndex ||
+                        (p.game_index === undefined &&
+                           p.word_length === activeGame?.wordLength),
+                  );
+                  if (prog) {
+                     let progGuesses = prog.guesses;
+                     serverHintRecord = prog.hint_record;
+
+                     if (!Array.isArray(progGuesses)) {
+                        const { data, error } = await supabase
+                           .from("challenge_participants_marathon")
+                           .select("guesses, hint_record")
+                           .eq("participation_id", participation.id)
+                           .eq("game_index", gameIndex!)
+                           .maybeSingle();
+
+                        if (!error && data) {
+                           progGuesses = data.guesses;
+                           serverHintRecord = data.hint_record;
+                        }
+                     }
+                     incoming = decryptGuesses(progGuesses, key);
+                  }
+               } else {
+                  let rootGuesses = participation.guesses;
+                  serverHintRecord = participation.hint_record;
+
+                  if (!Array.isArray(rootGuesses)) {
                      const { data, error } = await supabase
-                        .from("challenge_participants_marathon")
+                        .from("challenge_participants")
                         .select("guesses, hint_record")
-                        .eq("participation_id", participation.id)
-                        .eq("game_index", gameIndex!)
-                        .maybeSingle();
+                        .eq("id", participation.id)
+                        .single();
 
                      if (!error && data) {
-                        progGuesses = data.guesses;
+                        rootGuesses = data.guesses;
                         serverHintRecord = data.hint_record;
                      }
                   }
-                  incoming = decryptGuesses(progGuesses, key);
+                  incoming = decryptGuesses(rootGuesses, key);
                }
-            } else {
-               let rootGuesses = participation.guesses;
-               serverHintRecord = participation.hint_record;
+            }
 
-               if (!Array.isArray(rootGuesses)) {
-                  const { data, error } = await supabase
-                     .from("challenge_participants")
-                     .select("guesses, hint_record")
-                     .eq("id", participation.id)
-                     .single();
+            progress = isMarathon
+               ? participation?.marathon_progress?.find(
+                    (p: any) =>
+                       p.game_index === gameIndex ||
+                       (p.game_index === undefined &&
+                          p.word_length === activeGame?.wordLength),
+                 )
+               : null;
 
-                  if (!error && data) {
-                     rootGuesses = data.guesses;
-                     serverHintRecord = data.hint_record;
+            addLog(`Game Initialized: idx ${gameIndex} (${wordLength}L)`);
+
+            serverStatus = isMarathon
+               ? progress?.status || "playing"
+               : participation?.status || "playing";
+            isFinishedStatus =
+               serverStatus === "completed" || serverStatus === "timed_out";
+
+            if (challenge.mode === "LIVE" && effectiveMaxTime) {
+               const startTime = isMarathon
+                  ? progress?.started_at
+                  : participation.started_at;
+
+               if (isMarathon && !progress?.started_at) {
+                  initialTimeLeft = effectiveMaxTime * 60;
+               } else if (startTime) {
+                  const elapsed = Math.floor(
+                     (Date.now() - new Date(startTime).getTime()) / 1000,
+                  );
+                  initialTimeLeft = Math.max(0, effectiveMaxTime * 60 - elapsed);
+                  if (initialTimeLeft <= 0 && !isFinishedStatus) {
+                     hasTimedOutOffline = true;
                   }
+               } else {
+                  initialTimeLeft = effectiveMaxTime * 60;
                }
-               incoming = decryptGuesses(rootGuesses, key);
             }
-         }
 
-         const progress = isMarathon
-            ? participation?.marathon_progress?.find(
-                 (p: any) =>
-                    p.game_index === gameIndex ||
-                    (p.game_index === undefined &&
-                       p.word_length === activeGame?.wordLength),
-              )
-            : null;
+            initializedRef.current = currentKey;
 
-         addLog(`Game Initialized: idx ${gameIndex} (${wordLength}L)`);
+            localGuesses = incoming;
+            localUsedHint = isMarathon
+               ? progress?.hints_used || false
+               : participation?.hints_used || false;
+            localHintRecord = serverHintRecord;
 
-         const serverStatus = isMarathon
-            ? progress?.status || "playing"
-            : participation?.status || "playing";
-         const isFinishedStatus =
-            serverStatus === "completed" || serverStatus === "timed_out";
-
-         let initialTimeLeft = null;
-         let hasTimedOutOffline = false;
-
-         if (challenge.mode === "LIVE" && effectiveMaxTime) {
-            const startTime = isMarathon
-               ? progress?.started_at
-               : participation.started_at;
-
-            if (isMarathon && !progress?.started_at) {
-               initialTimeLeft = effectiveMaxTime * 60;
-            } else if (startTime) {
-               const elapsed = Math.floor(
-                  (Date.now() - new Date(startTime).getTime()) / 1000,
-               );
-               initialTimeLeft = Math.max(0, effectiveMaxTime * 60 - elapsed);
-               if (initialTimeLeft <= 0 && !isFinishedStatus) {
-                  hasTimedOutOffline = true;
+            try {
+               let saved = safeLocalStorage.getItem(storageKey);
+               if (!saved && isMarathon && activeGame) {
+                  const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                  saved = safeLocalStorage.getItem(legacyKey);
                }
-            } else {
-               initialTimeLeft = effectiveMaxTime * 60;
-            }
-         }
+               if (saved) {
+                  const parsed = JSON.parse(saved);
+                  const localStatus = parsed.status || "playing";
 
-         initializedRef.current = currentKey;
+                  const hasMoreGuesses =
+                     (parsed.guesses?.length || 0) > incoming.length;
+                  const hasNewHint = parsed.hints_used && !localUsedHint;
+                  const hasAdvancedStatus =
+                     (localStatus === "completed" ||
+                        localStatus === "timed_out") &&
+                     serverStatus === "playing";
 
-         let localGuesses = incoming;
-         let localUsedHint = isMarathon
-            ? progress?.hints_used || false
-            : participation?.hints_used || false;
-         let localHintRecord = serverHintRecord;
-         let needsBackgroundSync = false;
-         let recoveredPayload = null;
-
-         try {
-            let saved = safeLocalStorage.getItem(storageKey);
-            if (!saved && isMarathon && activeGame) {
-               const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
-               saved = safeLocalStorage.getItem(legacyKey);
-            }
-            if (saved) {
-               const parsed = JSON.parse(saved);
-               const localStatus = parsed.status || "playing";
-
-               const hasMoreGuesses =
-                  (parsed.guesses?.length || 0) > incoming.length;
-               const hasNewHint = parsed.hints_used && !localUsedHint;
-               const hasAdvancedStatus =
-                  (localStatus === "completed" ||
-                     localStatus === "timed_out") &&
-                  serverStatus === "playing";
-
-               if (
-                  hasMoreGuesses ||
-                  hasNewHint ||
-                  hasAdvancedStatus ||
-                  parsed.needsSync
-               ) {
                   if (
-                     parsed.guesses &&
-                     parsed.guesses.length >= incoming.length
+                     hasMoreGuesses ||
+                     hasNewHint ||
+                     hasAdvancedStatus ||
+                     parsed.needsSync
                   ) {
-                     localGuesses = parsed.guesses;
-                  }
-                  localUsedHint = parsed.hints_used || localUsedHint;
-                  localHintRecord = parsed.hint_record || localHintRecord;
+                     if (
+                        parsed.guesses &&
+                        parsed.guesses.length >= incoming.length
+                     ) {
+                        localGuesses = parsed.guesses;
+                     }
+                     localUsedHint = parsed.hints_used || localUsedHint;
+                     localHintRecord = parsed.hint_record || localHintRecord;
 
-                  needsBackgroundSync = true;
-                  recoveredPayload = parsed;
+                     needsBackgroundSync = true;
+                     recoveredPayload = parsed;
+                  }
+               }
+            } catch (e) {
+               logger.error("Local recovery failed", {
+                  key: storageKey,
+                  error: e,
+               });
+            }
+
+            const currentWordForStarter = challenge.is_shapeshifter
+               ? localTargetWords.length > 0
+                  ? localTargetWords[localTargetWords.length - 1]
+                  : initialTargetWord
+               : targetWord;
+            if (localGuesses.length === 0 && currentWordForStarter) {
+               const starter = isMarathon
+                  ? getHandicapStarter(challenge, gameIndex!, wordLength)
+                  : challenge.handicap_starter;
+               if (starter && challenge.handicap_enforced) {
+                  const upperStarter = starter.toUpperCase();
+                  const result = checkGuess(upperStarter, currentWordForStarter);
+                  localGuesses = [result];
+                  isStarterEnforced = true;
                }
             }
-         } catch (e) {
-            logger.error("Local recovery failed", {
-               key: storageKey,
-               error: e,
+
+            dispatch({
+               type: "START_GAME",
+               payload: {
+                  guesses: localGuesses,
+                  letterStatuses: getLetterStatuses(localGuesses),
+                  usedHint: localUsedHint,
+                  hintRecord: localHintRecord,
+                  isGameOver:
+                     isFinishedStatus ||
+                     (initialTimeLeft !== null && initialTimeLeft <= 0) ||
+                     localGuesses.some((g: any) =>
+                        g.every((r: any) => r.status === "correct"),
+                     ) ||
+                     localGuesses.length >= maxAttempts,
+                  status: serverStatus,
+                  timeLeft: initialTimeLeft,
+               },
             });
+         } catch (e) {
+            logger.error("Challenge initialization failed", { error: e });
+         } finally {
+            setIsSaving(false);
          }
-
-         let isStarterEnforced = false;
-         const currentWordForStarter = challenge.is_shapeshifter
-            ? localTargetWords.length > 0
-               ? localTargetWords[localTargetWords.length - 1]
-               : initialTargetWord
-            : targetWord;
-         if (localGuesses.length === 0 && currentWordForStarter) {
-            const starter = isMarathon
-               ? getHandicapStarter(challenge, gameIndex!, wordLength)
-               : challenge.handicap_starter;
-            if (starter && challenge.handicap_enforced) {
-               const upperStarter = starter.toUpperCase();
-               const result = checkGuess(upperStarter, currentWordForStarter);
-               localGuesses = [result];
-               isStarterEnforced = true;
-            }
-         }
-
-         dispatch({
-            type: "START_GAME",
-            payload: {
-               guesses: localGuesses,
-               letterStatuses: getLetterStatuses(localGuesses),
-               usedHint: localUsedHint,
-               hintRecord: localHintRecord,
-               isGameOver:
-                  isFinishedStatus ||
-                  (initialTimeLeft !== null && initialTimeLeft <= 0) ||
-                  localGuesses.some((g: any) =>
-                     g.every((r: any) => r.status === "correct"),
-                  ) ||
-                  localGuesses.length >= maxAttempts,
-               status: serverStatus,
-               timeLeft: initialTimeLeft,
-            },
-         });
-
-         setIsSaving(false);
 
          try {
             if (

@@ -31,6 +31,7 @@ import {
   getHandicapStarter,
 } from "../../utils/marathon";
 import { deobfuscateWord } from "../../lib/game-logic";
+import { LobbyParticipantsSkeleton } from "./ChallengeUIElements";
 
 const MODE_DEFINITIONS = {
   LIVE: {
@@ -684,9 +685,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                     </button>
                   </div>
                 ) : participants.length === 0 ? (
-                  <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
-                    {loadingParticipants ? "Syncing participants..." : "No participants found"}
-                  </div>
+                  loadingParticipants ? (
+                    <LobbyParticipantsSkeleton />
+                  ) : (
+                    <div className="py-8 text-center text-white/70 text-[10px] font-black uppercase">
+                      No participants found
+                    </div>
+                  )
                 ) : (
                   participants.map((p) => (
                     <ParticipantItem

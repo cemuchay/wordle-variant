@@ -1,6 +1,6 @@
 // src/utils/wordupQuestionGenerator.ts
 
-import { getWordLists } from "../data/words";
+import { loadWordLists } from "../data/words";
 
 export interface WordUpQuestion {
    type:
@@ -853,12 +853,12 @@ export const generateMathQuestion = (): WordUpQuestion => {
    }
 };
 
-export const generateOddOneOutQuestion = (
+export const generateOddOneOutQuestion = async (
    allowedLengths: number[],
-): WordUpQuestion => {
+): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-   const { official, valid } = getWordLists(length);
+   const { official, valid } = await loadWordLists(length);
 
    const randomWord = (lists: { official: string[] }) =>
       lists.official[Math.floor(Math.random() * lists.official.length)];
@@ -912,7 +912,7 @@ export const generateOddOneOutQuestion = (
          );
          const diffLen =
             allOtherLengths[Math.floor(Math.random() * allOtherLengths.length)];
-         const diffList = getWordLists(diffLen);
+         const diffList = await loadWordLists(diffLen);
          wrongOption =
             diffList.official[
                Math.floor(Math.random() * diffList.official.length)
@@ -982,7 +982,7 @@ export const generateOddOneOutQuestion = (
                allOtherLengths[
                   Math.floor(Math.random() * allOtherLengths.length)
                ];
-            const diffList = getWordLists(diffLen);
+            const diffList = await loadWordLists(diffLen);
             const diffWord =
                diffList.official[
                   Math.floor(Math.random() * diffList.official.length)
@@ -1019,7 +1019,7 @@ export const generateOddOneOutQuestion = (
 // 6. New Question Type Generators
 // -------------------------------------------------------------
 
-const generateSynonymMatch = (): WordUpQuestion => {
+const generateSynonymMatch = async (): Promise<WordUpQuestion> => {
    const themeKeys = Object.keys(THEME_GROUPS).filter(
       (k) => THEME_GROUPS[k].length <= 6,
    );
@@ -1066,17 +1066,17 @@ const generateSynonymMatch = (): WordUpQuestion => {
    };
 };
 
-const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
+const generateWordChain = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-   const { official } = getWordLists(length);
+   const { official } = await loadWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
    const suffix = word.substring(word.length - 2);
 
    // Find words that start with the suffix across all lengths
    const candidates: string[] = [];
    for (const len of allowedLengths) {
-      const list = getWordLists(len).official;
+      const list = (await loadWordLists(len)).official;
       candidates.push(
          ...list.filter((w) => w.startsWith(suffix) && w !== word),
       );
@@ -1091,7 +1091,7 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
       fallbackWord = official[Math.floor(Math.random() * official.length)];
       fallbackSuffix = fallbackWord.substring(fallbackWord.length - 2);
       for (const len of allowedLengths) {
-         const list = getWordLists(len).official;
+      const list = (await loadWordLists(len)).official;
          candidates.push(
             ...list.filter(
                (w) => w.startsWith(fallbackSuffix) && w !== fallbackWord,
@@ -1112,7 +1112,7 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
       decoyAttempts++;
       const len =
          allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-      const list = getWordLists(len).official;
+      const list = (await loadWordLists(len)).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       if (!dummy.startsWith(fallbackSuffix)) {
          choices.add(dummy);
@@ -1131,10 +1131,10 @@ const generateWordChain = (allowedLengths: number[]): WordUpQuestion => {
    };
 };
 
-const generateLetterShift = (allowedLengths: number[]): WordUpQuestion => {
+const generateLetterShift = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-   const { official, valid } = getWordLists(length);
+   const { official, valid } = await loadWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
    const shift = rand(1, 3);
    const shifted = word
@@ -1201,7 +1201,7 @@ const generateCompoundBreak = (): WordUpQuestion => {
    };
 };
 
-const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
+const generateWordWithin = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
    const longLengths = allowedLengths.filter((l) => l >= 7);
    if (longLengths.length === 0) {
       // Fallback: use 7+ if none available
@@ -1214,14 +1214,14 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
       };
    }
    const longLen = longLengths[Math.floor(Math.random() * longLengths.length)];
-   const { official } = getWordLists(longLen);
+   const { official } = await loadWordLists(longLen);
    const longWord = official[Math.floor(Math.random() * official.length)];
 
    // Find substring words (3-5 letters) inside longWord
    const subCandidates: string[] = [];
    const shortLengths = allowedLengths.filter((l) => l >= 3 && l <= 5);
    for (const slen of shortLengths) {
-      const list = getWordLists(slen).official;
+      const list = (await loadWordLists(slen)).official;
       for (const w of list) {
          if (w.length < longWord.length && longWord.includes(w)) {
             subCandidates.push(w);
@@ -1236,7 +1236,7 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
       fallbackAttempts++;
       fallbackWord = official[Math.floor(Math.random() * official.length)];
       for (const slen of shortLengths) {
-         const list = getWordLists(slen).official;
+         const list = (await loadWordLists(slen)).official;
          for (const w of list) {
             if (w.length < fallbackWord.length && fallbackWord.includes(w)) {
                subCandidates.push(w);
@@ -1257,7 +1257,7 @@ const generateWordWithin = (allowedLengths: number[]): WordUpQuestion => {
       attempts++;
       const slen =
          shortLengths[Math.floor(Math.random() * shortLengths.length)];
-      const list = getWordLists(slen).official;
+      const list = (await loadWordLists(slen)).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       if (dummy !== correct && !fallbackWord.includes(dummy)) {
          choices.add(dummy);
@@ -1287,10 +1287,10 @@ const scanWordlistForDoubleLetter = (wordlist: string[], patterns: string[]): st
    return null;
 };
 
-const generateCryptogram = (allowedLengths: number[]): WordUpQuestion => {
+const generateCryptogram = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-   const { official, valid } = getWordLists(length);
+   const { official, valid } = await loadWordLists(length);
 
    // Pick a word with at least one adjacent repeated letter
    let word: string;
@@ -1376,10 +1376,10 @@ const generateCategorySort = (): WordUpQuestion => {
    };
 };
 
-const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
+const generateLetterAddRemove = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-   const { official, valid } = getWordLists(length);
+   const { official, valid } = await loadWordLists(length);
    const word = official[Math.floor(Math.random() * official.length)];
 
    // Try removing one letter to make a valid shorter word
@@ -1509,7 +1509,7 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
       attempts++;
       const len =
          allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
-      const list = getWordLists(len).official;
+      const list = (await loadWordLists(len)).official;
       const dummy = list[Math.floor(Math.random() * list.length)];
       const diffLen = Math.abs(dummy.length - correctAnswer.length);
       if (diffLen <= 1 && !pair.base.includes(dummy)) {
@@ -1530,7 +1530,7 @@ const generateLetterAddRemove = (allowedLengths: number[]): WordUpQuestion => {
    };
 };
 
-export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
+export const generateWordUpQuestions = async (category: string): Promise<WordUpQuestion[]> => {
    const specificTypes: WordUpQuestion["type"][] = [
       "real_fake",
       "length",
@@ -1641,7 +1641,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             ? [3, 4, 5, 6, 7, 8, 9, 10]
             : allowedLengths,
       );
-      const { official, valid } = getWordLists(length);
+      const { official, valid } = await loadWordLists(length);
 
       const randomWord = () =>
          official[Math.floor(Math.random() * official.length)];
@@ -1978,7 +1978,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
       } else if (type === "math") {
          questions.push(generateMathQuestion());
       } else if (type === "odd_one_out") {
-         questions.push(generateOddOneOutQuestion(allowedLengths));
+          questions.push(await generateOddOneOutQuestion(allowedLengths));
       } else if (type === "vowel_drop") {
          const word = randomWord();
          const prompt = word.replace(/[AEIOU]/g, "_");
@@ -2020,7 +2020,7 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
          } else {
             const allWords: string[] = [];
             for (let len = 3; len <= 8; len++) {
-               allWords.push(...getWordLists(len).official);
+               allWords.push(...(await loadWordLists(len)).official);
             }
             const fallbackRhymes = allWords.filter(
                (w) => w.endsWith(suffix) && w !== word,
@@ -2180,22 +2180,22 @@ export const generateWordUpQuestions = (category: string): WordUpQuestion[] => {
             answer: correctWord,
             explanation: `Change one letter in "${currentWord}" to get "${correctWord}".`,
          });
-      } else if (type === "synonym_match") {
-         questions.push(generateSynonymMatch());
-      } else if (type === "word_chain") {
-         questions.push(generateWordChain(allowedLengths));
-      } else if (type === "letter_shift") {
-         questions.push(generateLetterShift(allowedLengths));
-      } else if (type === "compound_break") {
-         questions.push(generateCompoundBreak());
-      } else if (type === "word_within") {
-         questions.push(generateWordWithin(allowedLengths));
-      } else if (type === "cryptogram") {
-         questions.push(generateCryptogram(allowedLengths));
-      } else if (type === "category_sort") {
-         questions.push(generateCategorySort());
-      } else if (type === "letter_add_remove") {
-         questions.push(generateLetterAddRemove(allowedLengths));
+       } else if (type === "synonym_match") {
+          questions.push(await generateSynonymMatch());
+       } else if (type === "word_chain") {
+          questions.push(await generateWordChain(allowedLengths));
+       } else if (type === "letter_shift") {
+          questions.push(await generateLetterShift(allowedLengths));
+       } else if (type === "compound_break") {
+          questions.push(generateCompoundBreak());
+       } else if (type === "word_within") {
+          questions.push(await generateWordWithin(allowedLengths));
+       } else if (type === "cryptogram") {
+          questions.push(await generateCryptogram(allowedLengths));
+       } else if (type === "category_sort") {
+          questions.push(generateCategorySort());
+       } else if (type === "letter_add_remove") {
+          questions.push(await generateLetterAddRemove(allowedLengths));
       }
    }
 

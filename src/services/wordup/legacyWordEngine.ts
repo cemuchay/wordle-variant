@@ -1,8 +1,8 @@
 import { generateWordUpQuestions } from "../../utils/wordupQuestionGenerator";
 import { type BaseQuestion } from "../../types/generators";
 
-export function generateLegacyWordQuestion(category: string, seed: string): BaseQuestion {
-   const questions = generateWordUpQuestions(category);
+export async function generateLegacyWordQuestion(category: string, seed: string): Promise<BaseQuestion> {
+   const questions = await generateWordUpQuestions(category);
    const q = questions[0];
    return {
       id: seed,
@@ -14,8 +14,8 @@ export function generateLegacyWordQuestion(category: string, seed: string): Base
    };
 }
 
-export function generateLegacyBatch(category: string, seed: string): BaseQuestion[] {
-   const questions = generateWordUpQuestions(category);
+export async function generateLegacyBatch(category: string, seed: string): Promise<BaseQuestion[]> {
+   const questions = await generateWordUpQuestions(category);
    return questions.map((q, i) => ({
       id: `${seed}-${i}`,
       question: q.prompt,

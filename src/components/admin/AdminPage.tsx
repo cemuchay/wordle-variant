@@ -39,8 +39,11 @@ interface FlaggedWordData {
 }
 
 export const AdminPage: React.FC = () => {
-    const WORDS_3 = useMemo(() => getWORDS_3(), []);
-    const WORDS_4 = useMemo(() => getWORDS_4(), []);
+    const [WORDS_3, setWORDS_3] = useState<string[]>([]);
+    const [WORDS_4, setWORDS_4] = useState<string[]>([]);
+
+    useEffect(() => { getWORDS_3().then(setWORDS_3); }, []);
+    useEffect(() => { getWORDS_4().then(setWORDS_4); }, []);
 
     const { user, loading: authLoading, signInWithEmail, signOut } = useAuth();
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
@@ -354,7 +357,7 @@ SELECT create_admin_user(
                     const playDateStr = currentDay.toISOString().split('T')[0];
 
                     for (let len = 3; len <= 7; len++) {
-                        const pool = OFFICIAL_WORDS[len]();
+                        const pool = await OFFICIAL_WORDS[len]();
                         const word = pool[Math.floor(Math.random() * pool.length)];
                         const salt = Math.random().toString(36).substring(2, 15);
 

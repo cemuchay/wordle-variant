@@ -6,7 +6,7 @@ import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2,
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../../hooks/useAuth";
-import { decryptDM, encryptDM, getDMRoomKey } from "../../hooks/useChat";
+import { decryptDM, encryptDM, getDMRoomKey, compressImage } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
 import { editMessage, deleteMessage, reactToMessage } from "../../hooks/chatActions";
 import { ConnectedAudioPlayer } from "./ChatMessage/ConnectedAudioPlayer";
@@ -320,7 +320,6 @@ export default function FloatingChatBubble() {
        if (!user?.id || !selectedGroupId) return;
        setIsSending(true);
        try {
-          const { compressImage } = await import("../../hooks/useChat");
           const compressedBlob = await compressImage(file);
           // eslint-disable-next-line react-hooks/purity
           const fileName = `${user.id}/${Date.now()}.jpg`;

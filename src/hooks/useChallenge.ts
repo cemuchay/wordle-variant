@@ -127,25 +127,20 @@ export const useChallenge = (_user: AppUser | null) => {
         }
 
         const fetchAndSet = async () => {
-            setLoadingParticipants(true);
+            if (participantsRef.current.length === 0) {
+                setLoadingParticipants(true);
+            }
             setParticipantsError(null);
 
             try {
                 const result = await fetchWithRetry(async () => {
-                    const { data: challengeData, error: cError } = await supabase
-                        .from('challenges')
-                        .select('mode, max_time')
-                        .eq('id', challengeId)
-                        .single();
-
-                    if (cError) throw cError;
-
                     const { data: parts, error: pError } = await supabase
                         .from('challenge_participants')
                         .select(`
                             id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at,
                             profiles(username, avatar_url),
                             guest_profiles(username, avatar_url),
+                            challenge:challenges(mode, max_time),
                             marathon_progress:challenge_participants_marathon(
                                 id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at
                             )
@@ -154,22 +149,21 @@ export const useChallenge = (_user: AppUser | null) => {
                         .order('score', { ascending: false });
 
                     if (pError) throw pError;
-
-                    if (!parts || !challengeData) {
-                        throw new Error("Challenge or participant data not found");
+                    if (!parts) {
+                        throw new Error("Participant data not found");
                     }
 
-                    return { parts, challengeData };
+                    return parts;
                 }, 3, 1000, (attempt) => {
                     console.warn(`[useChallenge] Fetch participants attempt ${attempt} failed.`);
                 });
 
-                const { parts, challengeData } = result;
+                const parts = result;
                 const mappedParts = parts.map((p: any) => ({
                     ...p,
                     profiles: p.profiles || p.guest_profiles || null
                 }));
-                const normalized = mappedParts.map((p: any) => normalizeParticipation(p, challengeData));
+                const normalized = mappedParts.map((p: any) => normalizeParticipation(p, p.challenge));
 
                 const currentStringified = JSON.stringify(participantsRef.current);
                 const newStringified = JSON.stringify(normalized);

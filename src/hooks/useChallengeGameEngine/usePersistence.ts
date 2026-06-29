@@ -132,16 +132,19 @@ export const usePersistence = ({
       setIsSaving(true);
       setRetryCount(0);
 
-      const { payload, wordLen, gIdx } = lastPayloadRef.current;
-      const success = await wrappedSubmitResult(payload, wordLen, gIdx);
+      try {
+         const { payload, wordLen, gIdx } = lastPayloadRef.current;
+         const success = await wrappedSubmitResult(payload, wordLen, gIdx);
 
-      setIsSaving(false);
-      if (success) {
-         setSyncFailed(false);
-         lastPayloadRef.current = null;
-         triggerToast("Sync recovered!", 2000);
-      } else {
-         triggerToast("Sync failed again.", 3000);
+         if (success) {
+            setSyncFailed(false);
+            lastPayloadRef.current = null;
+            triggerToast("Sync recovered!", 2000);
+         } else {
+            triggerToast("Sync failed again.", 3000);
+         }
+      } finally {
+         setIsSaving(false);
       }
    }, [syncFailed, isSaving, wrappedSubmitResult, triggerToast]);
 

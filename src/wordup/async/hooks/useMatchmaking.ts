@@ -50,12 +50,12 @@ export const useAsyncMatchmaking = (
                questionsCol = td.questions;
                key = td.encryption_key;
             } else {
-               const raw = generateWordUpQuestions(cat);
-               key = generateSecretKey();
-               questionsCol = encryptQuestions(raw, key);
-            }
-         } else {
-            const raw = generateWordUpQuestions(cat);
+                const raw = await generateWordUpQuestions(cat);
+                key = generateSecretKey();
+                questionsCol = encryptQuestions(raw, key);
+             }
+          } else {
+             const raw = await generateWordUpQuestions(cat);
             key = generateSecretKey();
             questionsCol = encryptQuestions(raw, key);
          }

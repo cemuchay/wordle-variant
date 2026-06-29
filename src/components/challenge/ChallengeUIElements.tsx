@@ -29,6 +29,28 @@ export const ChallengeSkeleton = memo(function ChallengeSkeleton() {
   );
 });
 
+export const LobbyParticipantsSkeleton = memo(function LobbyParticipantsSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/10" />
+            <div className="space-y-2">
+              <div className="h-4 w-24 bg-white/10 rounded" />
+              <div className="h-3 w-16 bg-white/10 rounded" />
+            </div>
+          </div>
+          <div className="h-6 w-12 bg-white/10 rounded-xl" />
+        </div>
+      ))}
+    </div>
+  );
+});
+
 export const ErrorFallback = memo(function ErrorFallback({
   message,
   onRetry,
