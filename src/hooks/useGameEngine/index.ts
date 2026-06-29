@@ -23,15 +23,21 @@ export const useGameEngine = (date: string) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
    const [config, setConfig] = useState<GameConfig | null>(null);
+   const [isConfigLoading, setIsConfigLoading] = useState(false);
    const hydratedUserRef = useRef<string | undefined>(undefined);
    const hydratedDateRef = useRef<string | null>(null);
+   const hydratedConfigWordRef = useRef<string | undefined>(undefined);
    const { user, loading: isAuthLoading } = useAuth();
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
 
    useEffect(() => {
       if (!date) return;
-      getDailyConfig(!!user, date).then(setConfig);
+      setIsConfigLoading(true);
+      getDailyConfig(!!user, date).then((cfg) => {
+         setConfig(cfg);
+         setIsConfigLoading(false);
+      });
    }, [date, user]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
@@ -72,7 +78,7 @@ export const useGameEngine = (date: string) => {
    }, []);
 
    useEffect(() => {
-      if (!date || !config || isAuthLoading) {
+      if (!date || !config || isAuthLoading || isConfigLoading) {
          // eslint-disable-next-line react-hooks/set-state-in-effect
          setIsHydrated(false);
          return;
@@ -80,7 +86,8 @@ export const useGameEngine = (date: string) => {
 
       const isUserOrDateChanged =
          hydratedUserRef.current !== user?.id ||
-         hydratedDateRef.current !== date;
+         hydratedDateRef.current !== date ||
+         hydratedConfigWordRef.current !== config?.word;
       const isTriggeredByVisibility =
          rehydrateTrigger !== lastProcessedTriggerRef.current;
       lastProcessedTriggerRef.current = rehydrateTrigger;
@@ -95,6 +102,7 @@ export const useGameEngine = (date: string) => {
 
       hydratedUserRef.current = user?.id;
       hydratedDateRef.current = date;
+      hydratedConfigWordRef.current = config?.word;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
