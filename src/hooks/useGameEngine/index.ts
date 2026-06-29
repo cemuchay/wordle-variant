@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { GameConfig } from "../../types/game";
 import { useApp } from "../../context/AppContext";
@@ -33,6 +32,7 @@ export const useGameEngine = (date: string) => {
 
    useEffect(() => {
       if (!date) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigLoading(true);
       getDailyConfig(!!user, date).then((cfg) => {
          setConfig(cfg);
@@ -269,7 +269,8 @@ export const useGameEngine = (date: string) => {
       [state.guesses],
    );
    const isHintBar1Restricted = useMemo(
-      () => config ? isHintDisabled(config.word, state.guesses) : false,
+      () => (config ? isHintDisabled(config.word, state.guesses) : false),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [config?.word, state.guesses],
    );
 
