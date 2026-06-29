@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { type GameStats } from "../types/game";
-import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
+import { safeLocalStorage, safeSessionStorage, asyncStorage } from "../utils/storage";
 
 interface UserPreferences {
    allowRoasts: boolean;
@@ -308,7 +308,7 @@ interface AppState {
       }),
       {
          name: "variant-app-storage",
-         storage: createJSONStorage(() => safeLocalStorage),
+          storage: createJSONStorage(() => asyncStorage),
           // Only persist specific keys to keep it lightweight
           partialize: (state) => ({
              preferences: state.preferences,
