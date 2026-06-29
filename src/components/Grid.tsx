@@ -20,6 +20,9 @@ interface CellProps {
   wordLength: number;
   isCursor?: boolean;
   isEditMode?: boolean;
+  isDesktop: boolean;
+  isSmall: boolean;
+  isSuperTiny: boolean;
 }
 
 // Sizing config supporting different widths/heights for mobile and desktop (sm)
@@ -76,9 +79,8 @@ const TILE_SIZES = [
 
 
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor, isEditMode }: CellProps) => {
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor, isEditMode, isDesktop, isSmall, isSuperTiny }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
-  const { isDesktop, isSmall, isSuperTiny } = useIsResponsive(); // Detect responsive state
   const isPWA = useAppStore(s => s.isPWAInstalled)
 
   // 1. Get the current size profile based on word length
@@ -189,6 +191,7 @@ interface GridProps {
 const LONG_PRESS_MS = 400;
 
 export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, editIndex, onSetCursor, onSetEditIndex }) => {
+  const { isDesktop, isSmall, isSuperTiny } = useIsResponsive();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlePointerDown = useCallback((i: number) => {
     if (wordLength <= 5) return;
@@ -405,6 +408,9 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                       compact={compact}
                       gameplayType={gameplayType}
                       wordLength={wordLength}
+                      isDesktop={isDesktop}
+                      isSmall={isSmall}
+                      isSuperTiny={isSuperTiny}
                     />
                   ))}
                 </div>
@@ -446,6 +452,9 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                         wordLength={wordLength}
                         isCursor={!isWon && !isLost && !isEditMode && cursorIndex === i}
                         isEditMode={isEditMode}
+                        isDesktop={isDesktop}
+                        isSmall={isSmall}
+                        isSuperTiny={isSuperTiny}
                       />
                     </div>
                   );
@@ -475,6 +484,9 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                         compact={compact}
                         gameplayType={gameplayType}
                         wordLength={wordLength}
+                        isDesktop={isDesktop}
+                        isSmall={isSmall}
+                        isSuperTiny={isSuperTiny}
                       />
                     );
                   })}

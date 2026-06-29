@@ -16,11 +16,12 @@ interface KeyProps {
   onClick: (char: string) => void;
   compact?: boolean;
   gameplayType?: 'regular' | 'challenge';
-  wordLength?: number
+  wordLength?: number;
+  isSuperTiny: boolean;
+  isDesktop: boolean;
 }
 
-const Key = memo(({ char, status, onClick, compact, gameplayType, wordLength = 5 }: KeyProps) => {
-  const { isSuperTiny, isDesktop } = useIsResponsive(); // Detect responsive state
+const Key = memo(({ char, status, onClick, compact, gameplayType, wordLength = 5, isSuperTiny, isDesktop }: KeyProps) => {
   const isPWA = useAppStore(s => s.isPWAInstalled)
 
   let localIsSuperTiny = isSuperTiny
@@ -98,6 +99,7 @@ interface Props {
 }
 
 export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, letterStatuses, compact, gameplayType, wordLength }) => {
+  const { isSuperTiny, isDesktop } = useIsResponsive(); // Detect responsive state once
   const handleKeyClick = React.useCallback((key: string) => {
     if (key === 'ENTER') onEnter();
     else if (key === 'DELETE') onDelete();
@@ -119,6 +121,8 @@ export const Keyboard: React.FC<Props> = memo(({ onChar, onDelete, onEnter, lett
               compact={compact}
               gameplayType={gameplayType}
               wordLength={wordLength}
+              isSuperTiny={isSuperTiny}
+              isDesktop={isDesktop}
             />
           ))}
         </div>

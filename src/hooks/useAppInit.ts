@@ -11,6 +11,21 @@ export const useAppInit = () => {
     const setPreferences = useAppStore(state => state.setPreferences);
 
     useEffect(() => {
+        // Prefetch non-critical queries during browser idle time
+        const idleCallback = () => {
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => {
+                    queryClient.prefetchQuery({ queryKey: ['discover-challenges'] });
+                    queryClient.prefetchQuery({ queryKey: ['profiles'] });
+                }, { timeout: 3000 });
+            } else {
+                setTimeout(() => {
+                    queryClient.prefetchQuery({ queryKey: ['discover-challenges'] });
+                    queryClient.prefetchQuery({ queryKey: ['profiles'] });
+                }, 2000);
+            }
+        };
+
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -20,6 +35,13 @@ export const useAppInit = () => {
             } else if (event === 'SIGNED_OUT') {
                 // Clear cache on logout
                 queryClient.clear();
+            }
+        });
+
+        // Check if user is already signed in and schedule idle prefetch
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                idleCallback();
             }
         });
 

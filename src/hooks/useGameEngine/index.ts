@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { GameConfig } from "../../types/game";
+import type { User } from "@supabase/supabase-js";
 import { useApp } from "../../context/AppContext";
-import { useAuth } from "../useAuth";
 import {
    getDailyConfig,
    getLetterStatuses,
@@ -19,7 +18,7 @@ import { getLocalSalt, areGuessesCoherent } from "./utils";
 import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 
-export const useGameEngine = (date: string) => {
+export const useGameEngine = (date: string, user: User | null, isAuthLoading: boolean) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
    const [config, setConfig] = useState<GameConfig | null>(null);
@@ -27,12 +26,36 @@ export const useGameEngine = (date: string) => {
    const hydratedUserRef = useRef<string | undefined>(undefined);
    const hydratedDateRef = useRef<string | null>(null);
    const hydratedConfigWordRef = useRef<string | undefined>(undefined);
-   const { user, loading: isAuthLoading } = useAuth();
+   const cachedHydrationDoneRef = useRef(false);
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
 
+   // EARLY: Cache-first hydration — render immediately if saved state exists for today
+   useEffect(() => {
+      if (!date || cachedHydrationDoneRef.current) return;
+      const saved = safeLocalStorage.getItem(`wordle-${date}`);
+      const lastTimestamp = safeLocalStorage.getItem('wordle_last_hydrated_timestamp');
+      const isSameDay = date && lastTimestamp?.startsWith(date);
+      if (!saved || !isSameDay) return;
+
+      try {
+         const payload = JSON.parse(saved);
+         if (payload.config?.word) {
+            const localSalt = getLocalSalt(date, user?.id);
+            payload.config.word = deobfuscateWord(payload.config.word, localSalt);
+         }
+         setConfig(payload.config);
+         dispatch({ type: "LOAD_STATE", payload });
+         setIsHydrated(true);
+         cachedHydrationDoneRef.current = true;
+      } catch {
+         // Cache corrupted — fall through to normal hydration
+      }
+   }, [date]);
+
    useEffect(() => {
       if (!date) return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigLoading(true);
       getDailyConfig(!!user, date).then((cfg) => {
          setConfig(cfg);
@@ -78,9 +101,11 @@ export const useGameEngine = (date: string) => {
    }, []);
 
    useEffect(() => {
-      if (!date || !config || isAuthLoading || isConfigLoading) {
-         // eslint-disable-next-line react-hooks/set-state-in-effect
-         setIsHydrated(false);
+      if (!date || (!config && !cachedHydrationDoneRef.current) || isAuthLoading || isConfigLoading) {
+         if (!cachedHydrationDoneRef.current) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setIsHydrated(false);
+         }
          return;
       }
 
@@ -93,7 +118,8 @@ export const useGameEngine = (date: string) => {
       lastProcessedTriggerRef.current = rehydrateTrigger;
 
       if (isHydrated && !isUserOrDateChanged && !isTriggeredByVisibility) {
-         return;
+         if (!cachedHydrationDoneRef.current) return;
+         cachedHydrationDoneRef.current = false;
       }
 
       if (isUserOrDateChanged || !isHydrated) {
@@ -106,6 +132,7 @@ export const useGameEngine = (date: string) => {
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
+         const currentConfig = config!;
          const cloudPayload = user ? await loadFromCloud() : null;
 
          if (saved) {
@@ -123,7 +150,7 @@ export const useGameEngine = (date: string) => {
 
                // AUTH SWAP PROTECTION & BACKWARD COMPATIBILITY:
                // Only perform mismatch check once auth state is stable.
-               if (payload.config && payload.config.word !== config.word) {
+               if (payload.config && payload.config.word !== currentConfig.word) {
                   safeLocalStorage.removeItem(`wordle-${date}`);
 
                   // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
@@ -248,6 +275,7 @@ export const useGameEngine = (date: string) => {
          }
 
          setIsHydrated(true);
+         safeLocalStorage.setItem('wordle_last_hydrated_timestamp', `${date}_${Date.now()}`);
       };
 
       hydrate();
@@ -269,7 +297,8 @@ export const useGameEngine = (date: string) => {
       [state.guesses],
    );
    const isHintBar1Restricted = useMemo(
-      () => config ? isHintDisabled(config.word, state.guesses) : false,
+      () => (config ? isHintDisabled(config.word, state.guesses) : false),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [config?.word, state.guesses],
    );
 

@@ -9,7 +9,7 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary.tsx'
 import { logger } from './lib/logger.ts'
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { safeLocalStorage, safeSessionStorage } from './utils/storage'
+import { safeLocalStorage, safeSessionStorage, runLegacyMigration } from './utils/storage'
 
 // Install global storage overrides to catch security and storage full errors globally
 try {
@@ -148,6 +148,13 @@ try {
 } catch (err) {
   console.error('[Boot/Migration] Fatal exception caught in redirect block:', err);
 }
+
+// ==========================================
+// Preload IndexedDB → memoryStore + legacy migration
+// ==========================================
+safeLocalStorage.hydrateFromDB()
+  .then(() => runLegacyMigration())
+  .catch((e) => console.warn('[Boot] IndexedDB init failed, falling back to localStorage', e));
 
 // ==========================================
 // Mount the React Application (only on the new domain)

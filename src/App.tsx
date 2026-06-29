@@ -56,7 +56,7 @@ const fadeVariants = {
 };
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading: isAuthLoading } = useAuth();
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
   const isBattlePlayingLive = useLiveStore((s) => s.isBattlePlaying);
@@ -84,7 +84,7 @@ export default function App() {
   } = useApp();
 
   // Core Game Engine
-  const { state, actions, config, isHydrated } = useGameEngine(date as string);
+  const { state, actions, config, isHydrated } = useGameEngine(date as string, user, isAuthLoading);
 
   // Stabilize UI state to wait for reveal animations
   const [stableGuessesCount, setStableGuessesCount] = useState(state.guesses.length);
@@ -930,6 +930,7 @@ export default function App() {
           challengeUnreadCount={challengeUnreadCount}
           chatUnreadCount={isChatOpen ? 0 : unreadCount}
           wordupUnreadCount={wordupUnreadCount}
+          userId={user?.id}
         />
       )}
 

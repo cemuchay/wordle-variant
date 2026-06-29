@@ -16,6 +16,7 @@ import {
   ChallengeProvider,
   useChallengeContext,
 } from "../context/ChallengeContext";
+import { useChallengeFilters } from "../context/ChallengeFiltersContext";
 import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
 import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
@@ -162,19 +163,11 @@ const AuthenticatedChallengeContent = memo(
       selectedChallenge,
       setSelectedChallenge,
       myParticipation,
-      filteredChallenges,
       myChallenges,
       handleViewChallenge,
       loadMyChallenges,
       loading,
       error,
-      searchQuery,
-      setSearchQuery,
-      modeFilter,
-      setModeFilter,
-      lengthFilter,
-      setLengthFilter,
-      clearFilters,
       previewParticipant,
       setPreviewParticipant,
       setPreviewMarathonLength,
@@ -186,12 +179,23 @@ const AuthenticatedChallengeContent = memo(
       listColumn,
       setListColumn,
       isBackgroundFetching,
-      openChallengesCount,
       dailyMarathonChallenges,
       initialChallengeId,
       activeGameLength,
       bootstrappingMessage,
     } = useChallengeContext();
+
+    const {
+      searchQuery,
+      setSearchQuery,
+      modeFilter,
+      setModeFilter,
+      lengthFilter,
+      setLengthFilter,
+      clearFilters,
+      filteredChallenges,
+      openChallengesCount,
+    } = useChallengeFilters();
 
     // Reset scroll position to top whenever active challenge changes
     useEffect(() => {
@@ -345,15 +349,15 @@ const AuthenticatedChallengeContent = memo(
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-          <AnimatePresence mode="wait">
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col relative">
+          <AnimatePresence mode="popLayout">
             <motion.div
               key={isPlaying ? "gameplay" : "lobby"}
-              initial={{ opacity: 0, x: isPlaying ? 20 : -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: isPlaying ? -20 : 20 }}
-              transition={{ duration: ANIMATION_DURATION.NORMAL / 1000 }}
-              className="flex flex-col h-full overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col h-full overflow-hidden absolute inset-0"
             >
               {isPlaying ? (
                 <div className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -493,7 +497,7 @@ const AuthenticatedChallengeContent = memo(
                       </div>
 
                       <div className="space-y-4">
-                        {loading ? (
+                        {loading && displayChallenges.length === 0 ? (
                           <ChallengeSkeleton />
                         ) : displayChallenges.length === 0 ? (
                           <div className="py-12 text-center text-white">
@@ -873,12 +877,15 @@ const hasRecentChallenges = (): boolean => {
 const ChallengeModalContent = memo(
   ({ onClose, user }: { onClose: () => void; user: any }) => {
     const { effectiveUser, selectedChallenge, loading } = useChallengeContext();
+    const { filteredChallenges } = useChallengeFilters();
+    const hasCachedData = filteredChallenges.length > 0 || !!selectedChallenge;
     if (
       !user &&
       !effectiveUser &&
       !selectedChallenge &&
       !loading &&
-      !hasRecentChallenges()
+      !hasRecentChallenges() &&
+      !hasCachedData
     ) {
       return <GuestChallengeView onClose={onClose} />;
     }
@@ -953,7 +960,7 @@ export const ChallengeModal = ({
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
           className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
             ? "h-svh max-h-svh rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
-            : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
+            : "max-w-xl rounded-3xl h-full max-h-full sm:h-[85vh] sm:max-h-[85vh]"
             }`}
         >
           <ChallengeModalContent onClose={onClose} user={user} />

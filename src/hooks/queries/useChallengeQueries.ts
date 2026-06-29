@@ -71,6 +71,8 @@ export const useMyChallenges = (userId: string | undefined) => {
    }
 
    return useQuery({
+      staleTime: 30_000,
+      gcTime: 300_000,
       // Only enable if we have a logged-in user OR anonymous local items to look up
       enabled: !!userId || recentIds.length > 0,
       queryKey: ["my-challenges", userId],
@@ -177,7 +179,7 @@ export const useMyChallenges = (userId: string | undefined) => {
 
          return sortedResults;
       },
-      initialData: () => {
+      placeholderData: () => {
          if (!userId) return [];
          try {
             const cached = safeSessionStorage.getItem(
@@ -187,7 +189,7 @@ export const useMyChallenges = (userId: string | undefined) => {
                return JSON.parse(cached);
             }
          } catch (e) {
-            console.error("Failed to load initial challenges cache", e);
+            console.error("Failed to load placeholder challenges cache", e);
          }
          return undefined;
       },
@@ -199,6 +201,8 @@ export const useMyChallenges = (userId: string | undefined) => {
  */
 export const useAvailableProfiles = (currentUserId: string | undefined) => {
    return useQuery({
+      staleTime: 120_000,
+      gcTime: 600_000,
       queryKey: ["profiles"],
       queryFn: async () => {
          const { data, error } = await supabase
@@ -237,6 +241,8 @@ export const useChallengeParticipants = (challengeId: string | null) => {
  */
 export const useChallengeData = (challengeId: string | null) => {
    return useQuery({
+      staleTime: 60_000,
+      gcTime: 300_000,
       queryKey: ["challenge", challengeId],
       queryFn: async () => {
          if (!challengeId) return null;
@@ -281,6 +287,8 @@ export const useChallengeData = (challengeId: string | null) => {
  */
 export const useDiscoverChallenges = () => {
    return useQuery({
+      staleTime: 15_000,
+      gcTime: 120_000,
       queryKey: ["discover-challenges"],
       queryFn: async () => {
          const { data, error } = await supabase
@@ -302,6 +310,8 @@ export const useDiscoverChallenges = () => {
  */
 export const useBulkChallengeParticipants = (challengeIds: string[]) => {
    return useQuery({
+      staleTime: 10_000,
+      gcTime: 60_000,
       queryKey: ["bulk-challenge-participants", challengeIds.join(",")],
       queryFn: async () => {
          if (challengeIds.length === 0) return {};
