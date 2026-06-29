@@ -309,28 +309,15 @@ interface AppState {
       {
          name: "variant-app-storage",
          storage: createJSONStorage(() => safeLocalStorage),
-         // Only persist specific keys to keep it lightweight
-         partialize: (state) => ({
-            preferences: state.preferences,
-            stats: state.stats,
-            myParticipations: state.myParticipations,
-            readReceipts: state.readReceipts,
-            joinedGroupIds: state.joinedGroupIds,
-            challengePresets: state.challengePresets,
-            isChallengeOpen: state.isChallengeOpen,
-            isNotificationsOpen: state.isNotificationsOpen,
-            isChatOpen: state.isChatOpen,
-            isChatConversationOpen: state.isChatConversationOpen,
-            isStatsOpen: state.isStatsOpen,
-            isSettingsOpen: state.isSettingsOpen,
-            isInfoOpen: state.isInfoOpen,
-            isWordUpOpen: state.isWordUpOpen,
-            isWeeklyWrappedOpen: state.isWeeklyWrappedOpen,
-            showNotifications: state.showNotifications,
-            statsActiveTab: state.statsActiveTab,
-            pendingDMUserId: state.pendingDMUserId,
-            pendingChatGroupId: state.pendingChatGroupId,
-         }),
+          // Only persist specific keys to keep it lightweight
+          partialize: (state) => ({
+             preferences: state.preferences,
+             stats: state.stats,
+             myParticipations: state.myParticipations,
+             readReceipts: state.readReceipts,
+             joinedGroupIds: state.joinedGroupIds,
+             challengePresets: state.challengePresets,
+          }),
       },
    ),
 );

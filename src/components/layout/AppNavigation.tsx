@@ -1,4 +1,5 @@
 import { Gamepad2, Trophy, BarChart2, Swords, MessageSquare } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/AppContext';
 
 interface AppNavigationProps {
@@ -7,6 +8,7 @@ interface AppNavigationProps {
     challengeUnreadCount: number;
     chatUnreadCount: number;
     wordupUnreadCount?: number;
+    userId?: string;
 }
 
 export const AppNavigation = ({
@@ -14,9 +16,11 @@ export const AppNavigation = ({
     onNavigate,
     challengeUnreadCount,
     chatUnreadCount,
-    wordupUnreadCount
+    wordupUnreadCount,
+    userId
 }: AppNavigationProps) => {
     const { preferences } = useApp();
+    const queryClient = useQueryClient();
 
     const allItems = [
         {
@@ -65,6 +69,7 @@ export const AppNavigation = ({
                         <button
                             key={item.id}
                             onClick={() => onNavigate(item.id)}
+                            onPointerEnter={item.id === 'challenges' && userId ? () => { queryClient.prefetchQuery({ queryKey: ['my-challenges', userId] }); } : undefined}
                             className="flex flex-col items-center justify-center gap-0.5 py-0.5 px-1 sm:px-3 rounded-xl transition-all duration-300 relative group cursor-pointer focus:outline-none min-w-[60px] sm:min-w-[72px]"
                         >
                             {/* Icon Wrapper with bounce-on-hover / active scale */}

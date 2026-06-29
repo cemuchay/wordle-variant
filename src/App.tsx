@@ -930,6 +930,7 @@ export default function App() {
           challengeUnreadCount={challengeUnreadCount}
           chatUnreadCount={isChatOpen ? 0 : unreadCount}
           wordupUnreadCount={wordupUnreadCount}
+          userId={user?.id}
         />
       )}
 
