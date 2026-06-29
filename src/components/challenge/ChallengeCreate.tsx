@@ -1019,6 +1019,16 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         </div>
                     </div>
 
+                    {(length !== 1 ? [3, 4, 5, 0].includes(length) : marathonGames.some(l => [3, 4, 5].includes(l))) && (
+                        <DifficultySelector
+                            mode={length === 1 ? 'marathon' : 'single'}
+                            globalDifficulty={globalDifficulty}
+                            marathonDifficultyMode={marathonDifficultyMode}
+                            onGlobalChange={setGlobalDifficulty}
+                            onModeChange={handleMarathonDifficultyMode}
+                        />
+                    )}
+
                     {length === 1 && (
                         <MarathonGameSequence
                             marathonGames={marathonGames}
@@ -1030,16 +1040,6 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             difficultyMode={marathonDifficultyMode}
                             marathonDifficulties={marathonDifficulties}
                             onMarathonDifficultyChange={handleMarathonDifficultyChange}
-                        />
-                    )}
-                    
-                    {(length !== 1 ? [3, 4, 5, 0].includes(length) : marathonGames.some(l => [3, 4, 5].includes(l))) && (
-                        <DifficultySelector
-                            mode={length === 1 ? 'marathon' : 'single'}
-                            globalDifficulty={globalDifficulty}
-                            marathonDifficultyMode={marathonDifficultyMode}
-                            onGlobalChange={setGlobalDifficulty}
-                            onModeChange={handleMarathonDifficultyMode}
                         />
                     )}
 
