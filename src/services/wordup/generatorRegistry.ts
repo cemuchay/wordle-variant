@@ -61,14 +61,14 @@ export class GeneratorRegistry {
    ): Promise<BaseQuestion[]> {
       // Legacy word categories → client-side engine
       if (isLegacyCategory(category)) {
-         return generateLegacyBatch(category, seed);
+          return await generateLegacyBatch(category, seed);
       }
 
       // Procedural routing
       const generator = this.getProceduralGenerators().get(category);
       if (!generator) {
          console.warn(`[GeneratorRegistry] No generator found for category "${category}". Falling back to legacy.`);
-         return generateLegacyBatch("mixed", seed);
+         return await generateLegacyBatch("mixed", seed);
       }
 
       let entities: any[] = [];

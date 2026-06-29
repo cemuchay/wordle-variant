@@ -745,7 +745,7 @@ export default function App() {
             usedHint={state.usedHint}
             canShowHint={stableGuessesCount >= 2}
             isHintLocked={
-              (stableGuessesCount >= config.maxAttempts - 1 ||
+               (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
                 stableIsHintDisabled) &&
               !state.usedHint
             }
@@ -798,8 +798,8 @@ export default function App() {
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
                 <GameArea
-                  wordLength={config.length}
-                  maxAttempts={config.maxAttempts}
+                   wordLength={config?.length ?? 5}
+                   maxAttempts={config?.maxAttempts ?? 6}
                   guesses={state.guesses}
                   currentGuess={state.currentGuess}
                   cursorIndex={state.cursorIndex}

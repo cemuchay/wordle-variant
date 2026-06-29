@@ -1,19 +1,4 @@
-import raw3Official from "./words_3_official.txt?raw";
-import raw3Allowed from "./words_3_allowed.txt?raw";
-import raw4Official from "./words_4_official.txt?raw";
-import raw4Allowed from "./words_4_allowed.txt?raw";
-import raw5Official from "./words_5_official.txt?raw";
-import raw5Allowed from "./words_5_allowed.txt?raw";
-import raw6Official from "./words_6_official.txt?raw";
-import raw6Allowed from "./words_6_allowed.txt?raw";
-import raw7Official from "./words_7_official.txt?raw";
-import raw7Allowed from "./words_7_allowed.txt?raw";
-import raw8Official from "./words_8_official.txt?raw";
-import raw8Allowed from "./words_8_allowed.txt?raw";
-import raw9Official from "./words_9_official.txt?raw";
-import raw9Allowed from "./words_9_allowed.txt?raw";
-import raw10Official from "./words_10_official.txt?raw";
-import raw10Allowed from "./words_10_allowed.txt?raw";
+import { getCachedWords, cacheWords } from './wordStorage';
 
 const processWords = (rawContent: string): string[] => {
    return Array.from(
@@ -31,80 +16,87 @@ interface WordListCache {
    valid: Set<string>;
 }
 
-const cache: Record<number, WordListCache> = {};
+const memoryCache = new Map<number, WordListCache>();
+const pending = new Map<number, Promise<WordListCache>>();
 
-/**
- * Dynamic getter for game logic (lazily initialized and cached)
- */
-export const getWordLists = (length: number): WordListCache => {
-   if (cache[length]) {
-      return cache[length];
+async function fetchAndCache(length: number): Promise<WordListCache> {
+   // 1. Try to read from IndexedDB cache first
+   try {
+      const cached = await getCachedWords(length);
+      if (cached) {
+         const result: WordListCache = {
+            official: cached.official,
+            valid: new Set(cached.valid),
+         };
+         memoryCache.set(length, result);
+         return result;
+      }
+   } catch (e) {
+      console.warn('Failed to load from IndexedDB cache:', e);
    }
 
-   let official: string[];
-   let valid: Set<string>;
+   // 2. Fallback to network fetch
+   const [officialRaw, allowedRaw] = await Promise.all([
+      fetch(`/words/words_${length}_official.txt`).then(r => r.text()),
+      fetch(`/words/words_${length}_allowed.txt`).then(r => r.text()),
+   ]);
 
-   if (length === 3) {
-      const off = processWords(raw3Official);
-      const all = processWords(raw3Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 4) {
-      const off = processWords(raw4Official);
-      const all = processWords(raw4Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 6) {
-      const off = processWords(raw6Official);
-      const all = processWords(raw6Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 7) {
-      const off = processWords(raw7Official);
-      const all = processWords(raw7Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 8) {
-      const off = processWords(raw8Official);
-      const all = processWords(raw8Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 9) {
-      const off = processWords(raw9Official);
-      const all = processWords(raw9Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else if (length === 10) {
-      const off = processWords(raw10Official);
-      const all = processWords(raw10Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
-   } else {
-      // Default to 5-letter
-      const off = processWords(raw5Official);
-      const all = processWords(raw5Allowed);
-      official = off;
-      valid = new Set([...off, ...all]);
+   const official = processWords(officialRaw);
+   const allWords = processWords(allowedRaw);
+   const result: WordListCache = {
+      official,
+      valid: new Set([...official, ...allWords]),
+   };
+
+   memoryCache.set(length, result);
+   cacheWords(length, official, result.valid);
+
+   return result;
+}
+
+export async function loadWordLists(length: number): Promise<WordListCache> {
+   const len = [3, 4, 5, 6, 7, 8, 9, 10].includes(length) ? length : 5;
+
+   // 1. In-memory hot cache
+   const mem = memoryCache.get(len);
+   if (mem) return mem;
+
+   // 2. Deduplicate in-flight operations (IndexedDB lookup / Network fetch)
+   let inflight = pending.get(len);
+   if (!inflight) {
+      inflight = fetchAndCache(len);
+      pending.set(len, inflight);
    }
 
-   cache[length] = { official, valid };
-   return cache[length];
-};
+   try {
+      const result = await inflight;
+      pending.delete(len);
+      return result;
+   } catch (e) {
+      pending.delete(len);
+      throw e;
+   }
+}
 
-// Lazy getters exported for Admin Dashboard to prevent execution at module startup
-export const getWORDS_3 = () => getWordLists(3).official;
-export const getWORDS_4 = () => getWordLists(4).official;
-export const getWORDS_5 = () => getWordLists(5).official;
-export const getWORDS_6 = () => getWordLists(6).official;
-export const getWORDS_7 = () => getWordLists(7).official;
-export const getWORDS_8 = () => getWordLists(8).official;
-export const getWORDS_9 = () => getWordLists(9).official;
-export const getWORDS_10 = () => getWordLists(10).official;
+// Preload word lists on bootstrap to populate memory cache & IndexedDB
+const PRELOAD_LENGTHS = [4, 5, 6, 7];
+PRELOAD_LENGTHS.forEach(l => {
+   loadWordLists(l).catch(() => {});
+});
+
+export const getWORDS_3 = () => loadWordLists(3).then(r => r.official);
+export const getWORDS_4 = () => loadWordLists(4).then(r => r.official);
+export const getWORDS_5 = () => loadWordLists(5).then(r => r.official);
+export const getWORDS_6 = () => loadWordLists(6).then(r => r.official);
+export const getWORDS_7 = () => loadWordLists(7).then(r => r.official);
+export const getWORDS_8 = () => loadWordLists(8).then(r => r.official);
+export const getWORDS_9 = () => loadWordLists(9).then(r => r.official);
+export const getWORDS_10 = () => loadWordLists(10).then(r => r.official);
 
 /**
- * Mapping of length to getter for dynamic selection.
+ * Mapping of length to async getter for dynamic selection.
  */
-export const OFFICIAL_WORDS: Record<number, () => string[]> = {
+export const OFFICIAL_WORDS: Record<number, () => Promise<string[]>> = {
    3: getWORDS_3,
    4: getWORDS_4,
    5: getWORDS_5,

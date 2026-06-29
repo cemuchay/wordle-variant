@@ -569,12 +569,12 @@ export function useWordUpGameEngine(props: EngineProps) {
                     }
                  } catch (e) {
                     console.error("[WordUp] Edge function for bot match failed, using local fallback:", e);
-                    raw = generateWordUpQuestions(category);
-                    sk = generateSecretKey();
-                    enc = encryptQuestions(raw, sk);
-                 }
-              } else {
-                 raw = generateWordUpQuestions(category);
+                     raw = await generateWordUpQuestions(category);
+                     sk = generateSecretKey();
+                     enc = encryptQuestions(raw, sk);
+                  }
+               } else {
+                  raw = await generateWordUpQuestions(category);
                  sk = generateSecretKey();
                  enc = encryptQuestions(raw, sk);
               }

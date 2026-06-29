@@ -44,7 +44,7 @@ async function generateLocally(matchId: string, category: string): Promise<void>
    const { generateWordUpQuestions, generateSecretKey, encryptQuestions } =
       await import("../../utils/wordupQuestionGenerator");
 
-   const rawQuestions = generateWordUpQuestions(category);
+   const rawQuestions = await generateWordUpQuestions(category);
    const secretKey = generateSecretKey();
    const encryptedStr = encryptQuestions(rawQuestions, secretKey);
 

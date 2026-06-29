@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import type { GameConfig } from "../../types/game";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../useAuth";
 import {
@@ -21,12 +22,23 @@ import { useActions } from "./useActions";
 export const useGameEngine = (date: string) => {
    const [state, dispatch] = useReducer(gameReducer, initialState);
    const [isHydrated, setIsHydrated] = useState(false);
+   const [config, setConfig] = useState<GameConfig | null>(null);
+   const [isConfigLoading, setIsConfigLoading] = useState(false);
    const hydratedUserRef = useRef<string | undefined>(undefined);
    const hydratedDateRef = useRef<string | null>(null);
+   const hydratedConfigWordRef = useRef<string | undefined>(undefined);
    const { user, loading: isAuthLoading } = useAuth();
    const { triggerToast, preferences } = useApp();
    const { ask } = useConfirmation();
-   const config = useMemo(() => getDailyConfig(!!user, date), [date, user]);
+
+   useEffect(() => {
+      if (!date) return;
+      setIsConfigLoading(true);
+      getDailyConfig(!!user, date).then((cfg) => {
+         setConfig(cfg);
+         setIsConfigLoading(false);
+      });
+   }, [date, user]);
 
    const { refresh, updateOptimistically } = useWordleStats(user, false, date);
 
@@ -66,7 +78,7 @@ export const useGameEngine = (date: string) => {
    }, []);
 
    useEffect(() => {
-      if (!date || isAuthLoading) {
+      if (!date || !config || isAuthLoading || isConfigLoading) {
          // eslint-disable-next-line react-hooks/set-state-in-effect
          setIsHydrated(false);
          return;
@@ -74,7 +86,8 @@ export const useGameEngine = (date: string) => {
 
       const isUserOrDateChanged =
          hydratedUserRef.current !== user?.id ||
-         hydratedDateRef.current !== date;
+         hydratedDateRef.current !== date ||
+         hydratedConfigWordRef.current !== config?.word;
       const isTriggeredByVisibility =
          rehydrateTrigger !== lastProcessedTriggerRef.current;
       lastProcessedTriggerRef.current = rehydrateTrigger;
@@ -89,6 +102,7 @@ export const useGameEngine = (date: string) => {
 
       hydratedUserRef.current = user?.id;
       hydratedDateRef.current = date;
+      hydratedConfigWordRef.current = config?.word;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
 
       const hydrate = async () => {
@@ -255,8 +269,8 @@ export const useGameEngine = (date: string) => {
       [state.guesses],
    );
    const isHintBar1Restricted = useMemo(
-      () => isHintDisabled(config.word, state.guesses),
-      [config.word, state.guesses],
+      () => config ? isHintDisabled(config.word, state.guesses) : false,
+      [config?.word, state.guesses],
    );
 
    return {

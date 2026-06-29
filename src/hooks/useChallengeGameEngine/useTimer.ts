@@ -49,41 +49,43 @@ export const useTimer = ({
       triggerToast("Time's up!", 3000);
       setIsSaving(true);
 
-      let timeTaken: number | null = null;
-      if (challenge.mode === "LIVE" && effectiveMaxTime) {
-         timeTaken = effectiveMaxTime * 60; // Max time used if expired
-      }
+      try {
+         let timeTaken: number | null = null;
+         if (challenge.mode === "LIVE" && effectiveMaxTime) {
+            timeTaken = effectiveMaxTime * 60; // Max time used if expired
+         }
 
-      if (isMarathon) {
-         const success = await wrappedSubmitResult(
-            {
+         if (isMarathon) {
+            const success = await wrappedSubmitResult(
+               {
+                  status: "timed_out",
+                  attempts: guesses.length,
+                  guesses: guesses,
+                  score: 0,
+                  hints_used: usedHint,
+                  hint_record: hintRecord,
+                  time_taken: timeTaken,
+               },
+               wordLength,
+               gameIndex!,
+            );
+            if (!success) triggerToast("Failed to save progress.", 3000);
+            if (onLengthComplete) onLengthComplete();
+         } else {
+            const success = await wrappedSubmitResult({
                status: "timed_out",
+               score: 0,
                attempts: guesses.length,
                guesses: guesses,
-               score: 0,
                hints_used: usedHint,
                hint_record: hintRecord,
                time_taken: timeTaken,
-            },
-            wordLength,
-            gameIndex!,
-         );
+            });
+            if (!success) triggerToast("Failed to save result.", 4000);
+            onFinish();
+         }
+      } finally {
          setIsSaving(false);
-         if (!success) triggerToast("Failed to save progress.", 3000);
-         if (onLengthComplete) onLengthComplete();
-      } else {
-         const success = await wrappedSubmitResult({
-            status: "timed_out",
-            score: 0,
-            attempts: guesses.length,
-            guesses: guesses,
-            hints_used: usedHint,
-            hint_record: hintRecord,
-            time_taken: timeTaken,
-         });
-         setIsSaving(false);
-         if (!success) triggerToast("Failed to save result.", 4000);
-         onFinish();
       }
    }, [
       isSaving,
