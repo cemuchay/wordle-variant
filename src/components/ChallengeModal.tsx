@@ -187,9 +187,9 @@ const AuthenticatedChallengeContent = memo(
       setListColumn,
       isBackgroundFetching,
       openChallengesCount,
-      dailyMarathonChallenges,
       initialChallengeId,
       activeGameLength,
+      bootstrappingMessage,
     } = useChallengeContext();
 
     // Reset scroll position to top whenever active challenge changes
@@ -824,6 +824,33 @@ const AuthenticatedChallengeContent = memo(
             isShapeshifter={selectedChallenge?.is_shapeshifter}
           />
         )}
+
+        {/* Bootstrapping Overlay Loader */}
+        <AnimatePresence>
+          {bootstrappingMessage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md z-100 flex flex-col items-center justify-center space-y-6"
+            >
+              <div className="relative flex items-center justify-center">
+                <Loader2 className="w-12 h-12 text-correct animate-spin" />
+                <div className="absolute bg-correct/10 p-2.5 rounded-full">
+                  <Trophy className="w-5 h-5 text-correct animate-pulse" />
+                </div>
+              </div>
+              <div className="text-center space-y-2 max-w-xs px-6">
+                <p className="text-sm font-black uppercase tracking-widest text-white/90 animate-pulse">
+                  {bootstrappingMessage}
+                </p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider leading-relaxed">
+                  Preparing your game environment
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   },
@@ -914,7 +941,7 @@ export const ChallengeModal = ({
     >
       <div
         className={`fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-300 ${isPlaying
-          ? "p-0"
+          ? "p-0 sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
           : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
           }`}
         style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
@@ -924,7 +951,7 @@ export const ChallengeModal = ({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
           className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-all duration-300 ${isPlaying
-            ? "h-svh max-h-svh rounded-none border-none"
+            ? "h-svh max-h-svh rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
             : "max-w-xl rounded-3xl max-h-full sm:max-h-[90vh]"
             }`}
         >
