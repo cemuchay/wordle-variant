@@ -166,10 +166,11 @@ export const useGameEngine = (date: string, user: User | null, isAuthLoading: bo
          return;
       }
 
-      const isUserOrDateChanged =
+      const isDateChanged = hydratedDateRef.current !== null && hydratedDateRef.current !== date;
+      const isUserOrConfigChanged =
          hydratedUserRef.current !== user?.id ||
-         hydratedDateRef.current !== date ||
          hydratedConfigWordRef.current !== config?.word;
+      const isUserOrDateChanged = isDateChanged || isUserOrConfigChanged;
       const isTriggeredByVisibility =
          rehydrateTrigger !== lastProcessedTriggerRef.current;
       lastProcessedTriggerRef.current = rehydrateTrigger;
@@ -178,11 +179,6 @@ export const useGameEngine = (date: string, user: User | null, isAuthLoading: bo
          if (!cachedHydrationDoneRef.current) return;
          cachedHydrationDoneRef.current = false;
       }
-
-      const isDateChanged = hydratedDateRef.current !== null && hydratedDateRef.current !== date;
-      const isUserOrConfigChanged =
-         hydratedUserRef.current !== user?.id ||
-         hydratedConfigWordRef.current !== config?.word;
 
       if (isDateChanged || !isHydrated) {
          setIsHydrated(false);
