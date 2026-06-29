@@ -179,7 +179,12 @@ export const useGameEngine = (date: string, user: User | null, isAuthLoading: bo
          cachedHydrationDoneRef.current = false;
       }
 
-      if (isUserOrDateChanged || !isHydrated) {
+      const isDateChanged = hydratedDateRef.current !== null && hydratedDateRef.current !== date;
+      const isUserOrConfigChanged =
+         hydratedUserRef.current !== user?.id ||
+         hydratedConfigWordRef.current !== config?.word;
+
+      if (isDateChanged || !isHydrated) {
          setIsHydrated(false);
       }
 
