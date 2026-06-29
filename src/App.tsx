@@ -122,6 +122,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!user?.id) { setWordupUnreadCount(0); return; }
     fetchWordupUnreadCount(user.id);
   }, [user?.id, fetchWordupUnreadCount]);
@@ -171,24 +172,24 @@ export default function App() {
   const setIsStatsOpen = useAppStore(s => s.setStatsOpen);
   const statsActiveTab = useAppStore(s => s.statsActiveTab);
   const setStatsActiveTab = useAppStore(s => s.setStatsActiveTab);
-  
+
   const isSettingsOpen = useAppStore(s => s.isSettingsOpen);
   const setIsSettingsOpen = useAppStore(s => s.setSettingsOpen);
-  
+
   const isInfoOpen = useAppStore(s => s.isInfoOpen);
   const setIsInfoOpen = useAppStore(s => s.setInfoOpen);
-  
+
   const isWordUpOpen = useAppStore(s => s.isWordUpOpen);
   const setIsWordUpOpen = useAppStore(s => s.setWordUpOpen);
   const wordupMode = useAppStore(s => s.wordupMode);
   const setWordupMode = useAppStore(s => s.setWordupMode);
-  
+
   const isWeeklyWrappedOpen = useAppStore(s => s.isWeeklyWrappedOpen);
   const setIsWeeklyWrappedOpen = useAppStore(s => s.setWeeklyWrappedOpen);
-  
+
   const showNotifications = useAppStore(s => s.showNotifications);
   const setShowNotifications = useAppStore(s => s.setShowNotifications);
-  
+
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
   const [navLoading] = useState<{ active: boolean; message: string }>({
@@ -681,17 +682,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Board Grid Skeleton */}
-        <div className="flex-1 flex items-center justify-center min-h-0 py-8">
-          <div className="grid grid-rows-6 gap-1.5 w-full max-w-[280px] sm:max-w-[320px] aspect-[5/6] max-h-[350px] sm:max-h-[400px]">
-            {Array.from({ length: 6 }).map((_, r) => (
-              <div key={r} className="grid grid-cols-5 gap-1.5 w-full">
-                {Array.from({ length: 5 }).map((_, c) => (
-                  <div key={c} className="border-2 border-white/10 aspect-square rounded-lg bg-white/2" />
-                ))}
-              </div>
-            ))}
-          </div>
+        {/* Board Grid Skeleton: a full unified pulsing block about the height of the grid */}
+        <div className="flex-1 flex items-center justify-center min-h-0 py-8 w-full px-4">
+          <div className="w-full max-w-[280px] sm:max-w-[320px] aspect-5/6 max-h-[350px] sm:max-h-[400px] bg-white/5 border border-white/10 rounded-3xl" />
         </div>
 
         {/* Keyboard Skeleton */}
@@ -787,7 +780,7 @@ export default function App() {
             usedHint={state.usedHint}
             canShowHint={stableGuessesCount >= 2}
             isHintLocked={
-               (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
+              (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
                 stableIsHintDisabled) &&
               !state.usedHint
             }
@@ -840,8 +833,8 @@ export default function App() {
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
                 <GameArea
-                   wordLength={config?.length ?? 5}
-                   maxAttempts={config?.maxAttempts ?? 6}
+                  wordLength={config?.length ?? 5}
+                  maxAttempts={config?.maxAttempts ?? 6}
                   guesses={state.guesses}
                   currentGuess={state.currentGuess}
                   cursorIndex={state.cursorIndex}
@@ -876,13 +869,13 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <StatsModal
-                     isOpen={true}
-                     inline={true}
-                     stats={stats}
-                     onClose={() => setIsStatsOpen(false)}
-                     user={user as AppUser}
-                     isGameOver={state.isGameOver}
-                     initialTab={statsActiveTab}
+                    isOpen={true}
+                    inline={true}
+                    stats={stats}
+                    onClose={() => setIsStatsOpen(false)}
+                    user={user as AppUser}
+                    isGameOver={state.isGameOver}
+                    initialTab={statsActiveTab}
                   />
                 </Suspense>
               </div>
@@ -892,12 +885,12 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
-                     isOpen={true}
-                     inline={true}
-                     onClose={() => setIsChallengeOpen(false)}
-                     user={user as AppUser}
-                     onChallengeCreated={handleChallengeCreated}
-                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setIsChallengeOpen(false)}
+                    user={user as AppUser}
+                    onChallengeCreated={handleChallengeCreated}
+                    initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
                   />
                 </Suspense>
               </div>

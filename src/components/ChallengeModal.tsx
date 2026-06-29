@@ -19,7 +19,7 @@ import {
 import { useChallengeFilters } from "../context/ChallengeFiltersContext";
 import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
-import { Z_INDEX, ANIMATION_DURATION } from "../constants/ui";
+import { Z_INDEX, } from "../constants/ui";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
@@ -954,17 +954,14 @@ export const ChallengeModal = ({
           }`}
         style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] duration-300 ${isPlaying
+        <div
+          className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
             ? "h-svh max-h-svh rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
             : "max-w-xl rounded-3xl h-full max-h-full sm:h-[85vh] sm:max-h-[85vh]"
             }`}
         >
           <ChallengeModalContent onClose={onClose} user={user} />
-        </motion.div>
+        </div>
       </div>
     </ChallengeProvider>
   );
