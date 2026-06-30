@@ -110,7 +110,7 @@ export const GameArea = ({
                     <MarathonBanner
                         challenges={activeDailyMarathons}
                         onClick={(challenge) => {
-                            setSelectedChallengeId(challenge.id);
+                            setSelectedChallengeId(challenge.challenge_id || challenge.challenge?.id);
                             setIsChallengeOpen(true);
                         }}
                     />
