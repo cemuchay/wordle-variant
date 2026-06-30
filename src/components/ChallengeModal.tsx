@@ -350,13 +350,13 @@ const AuthenticatedChallengeContent = memo(
         </div>
 
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col relative">
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence mode="wait">
             <motion.div
               key={isPlaying ? "gameplay" : "lobby"}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
               className="flex flex-col h-full overflow-hidden absolute inset-0"
             >
               {isPlaying ? (

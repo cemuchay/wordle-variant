@@ -845,6 +845,15 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [initialChallengeId, handleViewChallenge, setSelectedChallenge, setMyParticipation]);
 
+    // Refresh challenge, participants, and user status when finishing/exiting gameplay
+    useEffect(() => {
+        if (!isPlaying && selectedChallenge) {
+            queryClient.invalidateQueries({ queryKey: ['challenge', selectedChallenge.id] });
+            queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
+            retryFetchParticipants();
+        }
+    }, [isPlaying, selectedChallenge, queryClient, retryFetchParticipants]);
+
     const hasSetDefaultTab = useRef(false);
 
     // Dynamic Default View Priority Auto-Selection on Open
