@@ -9,6 +9,7 @@ import { ProtectedAvatar } from "../chat/ProtectedAvatar";
 import { ChatImage } from "../chat/ChatMessage/ChatImage";
 import { ConnectedAudioPlayer } from "../chat/ChatMessage/ConnectedAudioPlayer";
 import { VoiceControlBar } from "../chat/VoiceControlBar";
+import formatUsername from '../../utils/formatUsername';
 
 interface ChallengeChatProps {
   messages: ChallengeMessage[];
@@ -223,7 +224,7 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
           <ProtectedAvatar
             userId={msg.sender_id || undefined}
             src={avatarUrl || undefined}
-            username={msg.sender_name || undefined}
+            username={formatUsername(msg.sender_name) || undefined}
             className="w-4 h-4 rounded-full border border-white/10 cursor-pointer hover:scale-105 transition-transform"
             onClick={(e) => {
               if (msg.sender_id) {
@@ -246,7 +247,7 @@ const ChallengeChatMessage = memo(function ChallengeChatMessage({
               }
             }}
           >
-            {isMe ? 'You' : msg.sender_name}
+            {isMe ? 'You' : formatUsername(msg.sender_name)}
           </span>
         </div>
 

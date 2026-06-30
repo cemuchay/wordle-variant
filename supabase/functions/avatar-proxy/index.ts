@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import formatUsername from "../_shared/formatUsername.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,14 +53,14 @@ serve(async (req) => {
 
     // 3. Fallback to UI-avatars if no url found
     if (!avatarUrl) {
-      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "User")}`;
+      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(formatUsername(username) || "User")}`;
       return Response.redirect(fallbackUrl, 302);
     }
 
     // 4. Fetch the avatar image (bypasses browser CORS constraints)
     const imageRes = await fetch(avatarUrl);
     if (!imageRes.ok) {
-      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "User")}`;
+      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(formatUsername(username) || "User")}`;
       return Response.redirect(fallbackUrl, 302);
     }
 

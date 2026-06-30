@@ -7,6 +7,7 @@ import type { SyncStatus } from '../../types/game';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { CloudSyncMenu } from '../SyncCloudModal';
+import formatUsername from '../../utils/formatUsername';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -172,16 +173,16 @@ export const AppHeader = ({
                                 <ProtectedAvatar
                                     userId={user.id}
                                     src={user.user_metadata.avatar_url}
-                                    username={user.user_metadata.full_name || user.email}
+                                    username={formatUsername(user.user_metadata.full_name) || user.email}
                                     className="w-4 h-4 rounded-full border border-white/10"
                                 />
                             ) : (
                                 <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center bg-white/10 text-[7px] font-black uppercase text-white shrink-0">
-                                    {(user.user_metadata.full_name || user.email || '?').substring(0, 2)}
+                                    {(formatUsername(user.user_metadata.full_name) || user.email || '?').substring(0, 2)}
                                 </div>
                             )}
                             <span className="text-[8px] font-black uppercase text-gray-400 truncate max-w-[30px] min-[360px]:max-w-[50px] min-[400px]:max-w-[70px] sm:max-w-none hidden sm:inline">
-                                {user.user_metadata.full_name || user.email?.split('@')[0]}
+                                {formatUsername(user.user_metadata.full_name) || user.email?.split('@')[0]}
                             </span>
                             <button
                                 onClick={handleSignOut}

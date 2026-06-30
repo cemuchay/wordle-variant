@@ -34,6 +34,7 @@ import { useChallengeStore } from "./store/useChallengeStore";
 import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
+import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
@@ -578,7 +579,7 @@ export default function App() {
           laterChannel.send({
             type: 'broadcast',
             event: 'wordup_invite_later',
-            payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+            payload: { matchId: newMatch.id, senderName: formatUsername(user?.user_metadata?.username) || user?.email?.split('@')[0] || "Opponent" }
           });
           setTimeout(() => supabase.removeChannel(laterChannel), 1000);
         }
@@ -1048,7 +1049,7 @@ export default function App() {
                         acceptChannel.send({
                           type: 'broadcast',
                           event: 'wordup_invite_accepted',
-                          payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+                          payload: { matchId: newMatch.id, senderName: formatUsername(user?.user_metadata?.username) || user?.email?.split('@')[0] || "Opponent" }
                         }).then(() => {
                           // Show connecting screen, then navigate
                           useLiveStore.getState().setMatchId(newMatch.id);

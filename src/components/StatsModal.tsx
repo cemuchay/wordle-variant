@@ -341,7 +341,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
               {isGameOver && user && (
                 <button
                   onClick={() => setSelectedEntry({
-                    username: user.user_metadata?.full_name || 'You',
+                    username: formatUsername(user.user_metadata?.full_name) || 'You',
                     avatar_url: user.user_metadata?.avatar_url || '',
                     user_id: user.id,
                     total_score: 0,
@@ -558,7 +558,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                 {isGameOver && user && (
                   <button
                     onClick={() => setSelectedEntry({
-                      username: user.user_metadata?.full_name || 'You',
+                      username: formatUsername(user.user_metadata?.full_name) || 'You',
                       avatar_url: user.user_metadata?.avatar_url || '',
                       user_id: user.id,
                       total_score: 0,

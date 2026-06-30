@@ -32,6 +32,7 @@ import {
 } from "../../utils/marathon";
 import { deobfuscateWord } from "../../lib/game-logic";
 import { LobbyParticipantsSkeleton } from "./ChallengeUIElements";
+import formatUsername from '../../utils/formatUsername';
 
 const MODE_DEFINITIONS = {
   LIVE: {
@@ -319,7 +320,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
     if (gotMention) {
       const lastMsg = newMessages[newMessages.length - 1];
-      triggerToast(`@${lastMsg.sender_name} mentioned you in chat!`, 4000);
+      triggerToast(`@${formatUsername(lastMsg.sender_name)} mentioned you in chat!`, 4000);
     }
   }, [messages, lobbyTab, effectiveUser, triggerToast]);
 
