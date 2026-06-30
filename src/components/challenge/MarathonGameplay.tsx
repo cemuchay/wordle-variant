@@ -444,12 +444,54 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         );
     }
 
+    const isSentence = challenge.salt?.endsWith('_sentence');
+    const activeSentenceGameIndex = useMemo(() => {
+        if (!isSentence) return null;
+        const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);
+        return nextUnfinished ? nextUnfinished.idx : null;
+    }, [isSentence, gamesWithMetadata]);
+
     return (
         <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
             <div className="text-center space-y-1.5 shrink-0">
-                <h3 className={`text-xl font-black uppercase tracking-tighter ${dayTheme ? dayTheme.textAccent : 'text-white'}`}>{dayTheme ? dayTheme.title : 'Marathon Mode'}</h3>
-                <p className="text-gray-500 text-xs">{dayTheme ? dayTheme.description : 'Complete all lengths to finish the challenge.'}</p>
+                <h3 className={`text-xl font-black uppercase tracking-tighter ${dayTheme ? dayTheme.textAccent : 'text-white'}`}>{isSentence ? 'Sentence Mode' : (dayTheme ? dayTheme.title : 'Marathon Mode')}</h3>
+                <p className="text-gray-500 text-xs">{isSentence ? 'Guess the words in order to form the coherent sentence.' : (dayTheme ? dayTheme.description : 'Complete all lengths to finish the challenge.')}</p>
             </div>
+
+            {isSentence && (
+                <div className="bg-indigo-950/30 border border-indigo-500/25 p-4 rounded-2xl space-y-2 animate-in fade-in duration-200 shrink-0">
+                    <h4 className="text-[9px] font-black uppercase tracking-wider text-indigo-400 pl-1">
+                        Sentence Progress
+                    </h4>
+                    <div className="flex flex-wrap gap-x-3 gap-y-2 items-center pl-1">
+                        {marathonGames.map((g, idx) => {
+                            const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+                            const isCompleted = prog?.status === 'completed';
+                            const isActive = idx === activeSentenceGameIndex;
+
+                            if (isCompleted) {
+                                return (
+                                    <span key={idx} className="text-sm font-black text-correct uppercase tracking-wide border-b-2 border-correct/30 px-1 py-0.5">
+                                        {g.word}
+                                    </span>
+                                );
+                            } else if (isActive) {
+                                return (
+                                    <span key={idx} className="text-xs font-black text-indigo-300 tracking-widest px-1.5 py-0.5 bg-indigo-500/15 border border-indigo-500/40 rounded-md">
+                                        {Array(g.wordLength).fill('_').join(' ')}
+                                    </span>
+                                );
+                            } else {
+                                return (
+                                    <span key={idx} className="text-[10px] font-black text-white/30 uppercase tracking-wide border-b border-dashed border-white/10 px-1 py-0.5">
+                                        {g.wordLength}L
+                                    </span>
+                                );
+                            }
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Daily Challenge - Day Tabs Navigation */}
             {challenge.is_bot_marathon && (
