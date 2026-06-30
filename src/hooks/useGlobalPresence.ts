@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useQueryClient } from '@tanstack/react-query';
 
 export interface PresenceUser {
     id: string;
@@ -15,7 +14,6 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
     const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
     const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
     const channelRef = useRef<any>(null);
-    const queryClient = useQueryClient();
 
     const fetchProfiles = useCallback(async () => {
         const { data } = await supabase
@@ -25,10 +23,8 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             .limit(100);
         if (data) {
             setAllProfiles(data as PresenceUser[]);
-            // Also invalidate global profile queries if they exist to keep entire app in sync
-            queryClient.invalidateQueries({ queryKey: ['profile'] });
         }
-    }, [queryClient]);
+    }, []);
 
     const updateLastSeen = useCallback(async () => {
         if (!userId) return;
