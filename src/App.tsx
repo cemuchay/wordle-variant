@@ -22,7 +22,7 @@ import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { useApp } from "./context/AppContext";
-import { useDiscoverChallenges, useMyChallenges } from "./hooks/queries/useChallengeQueries";
+import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
 import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -34,6 +34,7 @@ import { useChallengeStore } from "./store/useChallengeStore";
 import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
+import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
@@ -141,11 +142,30 @@ export default function App() {
   const { data: myChallenges } = useMyChallenges(user?.id);
   const { data: discoverChallenges } = useDiscoverChallenges();
 
+  const botMarathonIds = useMemo(() =>
+    (discoverChallenges || [])
+      .filter((c: any) => c.is_bot_marathon)
+      .map((c: any) => c.id),
+  [discoverChallenges]);
+
+  const { data: botMarathonParticipants } = useBulkChallengeParticipants(botMarathonIds);
+
   const activeDailyMarathons = useMemo(() => {
     if (!discoverChallenges) return [];
-    const botMarathons = discoverChallenges.filter((c: { is_bot_marathon: boolean, expires_at: Date }) => c.is_bot_marathon && new Date(c.expires_at) > new Date());
-    return botMarathons.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()).slice(0, 2);
-  }, [discoverChallenges]);
+    const botMarathons = discoverChallenges
+      .filter((c: any) => c.is_bot_marathon && new Date(c.expires_at) > new Date())
+      .sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime())
+      .slice(0, 2);
+    return botMarathons.map((c: any) => ({
+      id: `open-${c.id}`,
+      challenge_id: c.id,
+      challenge: { ...c, participants: botMarathonParticipants?.[c.id] || [] },
+      status: 'open',
+      score: 0,
+      attempts: 0,
+      guesses: [],
+    }));
+  }, [discoverChallenges, botMarathonParticipants]);
 
   const isMonday = useMemo(() => {
     if (!date) return false;
@@ -578,7 +598,7 @@ export default function App() {
           laterChannel.send({
             type: 'broadcast',
             event: 'wordup_invite_later',
-            payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+            payload: { matchId: newMatch.id, senderName: formatUsername(user?.user_metadata?.username) || user?.email?.split('@')[0] || "Opponent" }
           });
           setTimeout(() => supabase.removeChannel(laterChannel), 1000);
         }
@@ -1048,7 +1068,7 @@ export default function App() {
                         acceptChannel.send({
                           type: 'broadcast',
                           event: 'wordup_invite_accepted',
-                          payload: { matchId: newMatch.id, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
+                          payload: { matchId: newMatch.id, senderName: formatUsername(user?.user_metadata?.username) || user?.email?.split('@')[0] || "Opponent" }
                         }).then(() => {
                           // Show connecting screen, then navigate
                           useLiveStore.getState().setMatchId(newMatch.id);

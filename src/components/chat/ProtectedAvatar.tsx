@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface ProtectedAvatarProps {
     userId?: string;
@@ -9,6 +9,8 @@ interface ProtectedAvatarProps {
     onClick?: (e: React.MouseEvent) => void;
 }
 
+const avatarUrlCache = new Map<string, string>();
+
 export const ProtectedAvatar: React.FC<ProtectedAvatarProps> = ({
     userId,
     src,
@@ -16,20 +18,29 @@ export const ProtectedAvatar: React.FC<ProtectedAvatarProps> = ({
     className = 'w-8 h-8 rounded-full',
     onClick
 }) => {
-    // Generate fallback UI avatar if src is missing or empty
-    let avatarUrl = src || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
+    const cacheKey = userId || src || username;
 
-    // If userId is provided, route Google and external avatars through the avatar-proxy edge function
-    if (userId) {
-       const isExternal = src && (
-          src.startsWith("http://") || 
-          src.startsWith("https://")
-       ) && !src.includes("supabase.co") && !src.includes("dicebear.com") && !src.includes("ui-avatars.com");
-       
-       if (isExternal || !src) {
-          avatarUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/avatar-proxy?uid=${userId}`;
-       }
-    }
+    const avatarUrl = useMemo(() => {
+        if (cacheKey && avatarUrlCache.has(cacheKey)) {
+            return avatarUrlCache.get(cacheKey)!;
+        }
+
+        let url = src || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}`;
+
+        if (userId) {
+           const isExternal = src && (
+              src.startsWith("http://") || 
+              src.startsWith("https://")
+           ) && !src.includes("supabase.co") && !src.includes("dicebear.com") && !src.includes("ui-avatars.com");
+           
+           if (isExternal || !src) {
+              url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/avatar-proxy?uid=${userId}`;
+           }
+        }
+
+        if (cacheKey) avatarUrlCache.set(cacheKey, url);
+        return url;
+    }, [userId, src, username, cacheKey]);
 
     return (
         <div

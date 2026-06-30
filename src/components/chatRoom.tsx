@@ -13,6 +13,7 @@ import { useAppStore } from "../store/useAppStore";
 import ChatHeader from "./chat/ChatHeader";
 import ChatMessage from "./chat/ChatMessage";
 import { VoiceControlBar } from "./chat/VoiceControlBar";
+import formatUsername from '../utils/formatUsername';
 import MessageInput from "./chat/MessageInput";
 import formatLastSeen from "../utils/formatLastSeen";
 import { ProtectedAvatar } from "./chat/ProtectedAvatar";
@@ -300,7 +301,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         };
     }, [activeRoomId, showSidebar, messages.length, firstUnreadId, scrollNode]); // <-- Watches the element directly
 
-    const nameOfUser = user?.user_metadata?.full_name as string;
+    const nameOfUser = formatUsername(user?.user_metadata?.full_name) as string;
 
     const handleTyping = (isTyping: boolean) => {
         if (user && nameOfUser) {

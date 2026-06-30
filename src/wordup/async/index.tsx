@@ -22,6 +22,7 @@ import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
 import { safeLocalStorage } from "../../utils/storage";
+import formatUsername from '../../utils/formatUsername';
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -161,7 +162,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
       setConnectingMsg("Sending challenge...");
 
-      const myName = effectiveUser.user_metadata?.username || effectiveUser.email?.split("@")[0] || "Someone";
+      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.email?.split("@")[0] || "Someone";
 
       const targetChannel = supabase.channel(`user_signals_${targetUser.id}`);
       challengeChannelsRef.current.push(targetChannel);
@@ -460,7 +461,7 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
 
          {pendingChallenge && (
             <PlayNowLaterPopup
-               opponentName={pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name || "Opponent"}
+               opponentName={formatUsername(pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name) || "Opponent"}
                category={category}
                onPlayNow={() => {
                   const pc = pendingChallenge;

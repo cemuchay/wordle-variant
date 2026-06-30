@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import formatUsername from "../_shared/formatUsername.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = (
@@ -13,7 +14,7 @@ const getAvatarUrl = (
    username: string,
 ): string => {
    if (!avatarUrl) {
-      return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6366f1&color=fff&size=128`;
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(formatUsername(username))}&background=6366f1&color=fff&size=128`;
    }
    if (avatarUrl.includes("api.dicebear.com") && avatarUrl.includes("/svg")) {
       return avatarUrl.replace("/svg", "/png");
@@ -125,7 +126,7 @@ const getEmailHtml = (
           <div class="card">
             <div class="header-accent"></div>
             <h1>${title}</h1>
-            <p>Hey <strong>${username}</strong>,</p>
+            <p>Hey <strong>${formatUsername(username)}</strong>,</p>
             ${contentHtml}
             <div class="footer">
               <p class="footer-text">
@@ -315,7 +316,7 @@ serve(async (req) => {
          log(`Starting action welcome-email`);
 
          const targetEmail = body.email;
-         const targetUsername = body.username || "Player";
+         const targetUsername = formatUsername(body.username) || "Player";
          const targetUserId = body.userId || "welcome-user";
 
          if (!targetEmail) {
@@ -778,7 +779,7 @@ serve(async (req) => {
                 <td style="padding: 12px 8px; font-weight: 800; color: ${rankColor};">${rankLabel}</td>
                 <td style="padding: 12px 8px; font-weight: bold; ${textStyle}">
                   <img src="${avatarSrc}" alt="" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #374151; vertical-align: middle; margin-right: 8px; background-color: #1f2937;" />
-                  <span style="vertical-align: middle;">${entry.username}${isMe ? " (You)" : ""}</span>
+                  <span style="vertical-align: middle;">${formatUsername(entry.username)}${isMe ? " (You)" : ""}</span>
                 </td>
                 <td style="padding: 12px 8px; text-align: right; font-weight: 900; color: #6366f1;">${entry.total_points}</td>
                 <td style="padding: 12px 8px; text-align: right; color: #9ca3af; font-size: 13px;">${entry.days_active}d</td>

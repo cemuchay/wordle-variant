@@ -13,6 +13,7 @@ import { safeLocalStorage } from "../../../../utils/storage";
 import { CategorySelectModal, CATEGORY_STYLE_MAP } from "./CategorySelectModal";
 import { RankingView } from "./RankingView";
 import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
+import formatUsername from '../../../../utils/formatUsername';
 import { WordUpMascot } from "./WordUpMascot";
 
 interface LobbyViewProps {
@@ -444,7 +445,7 @@ export const LobbyView = ({
                event: "wordup_invite",
                payload: {
                   senderId: currentUser.id,
-                  senderName: currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Someone",
+                   senderName: formatUsername(currentUser.user_metadata?.username) || currentUser.email?.split("@")[0] || "Someone",
                   category: category
                }
             });

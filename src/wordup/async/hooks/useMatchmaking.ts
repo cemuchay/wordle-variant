@@ -5,6 +5,7 @@ import { useAsyncStore } from "../store/useAsyncStore";
 import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "../../../utils/wordupQuestionGenerator";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
+import formatUsername from '../../../utils/formatUsername';
 
 export const useAsyncMatchmaking = (
    user: any,
@@ -97,7 +98,7 @@ export const useAsyncMatchmaking = (
                   event: "wordup_async_invite",
                   payload: {
                      senderId: user.id,
-                     senderName: user.user_metadata?.username || user.email?.split("@")[0] || "Someone",
+                      senderName: formatUsername(user.user_metadata?.username) || user.email?.split("@")[0] || "Someone",
                      category: effectiveCategory,
                      matchId: mId,
                   },

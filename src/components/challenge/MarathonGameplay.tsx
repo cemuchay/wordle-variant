@@ -7,6 +7,7 @@ import { formatTime } from './lib';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useApp } from '../../context/AppContext';
 import { MAX_ATTEMPTS, SHAPESHIFTER_MAX_ATTEMPTS, BOT_MARATHON_WORD_LENGTHS } from '../../constants/game';
+import { DAILY_CONFIG } from '../../constants/marathon';
 import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
 import { supabase } from '../../lib/supabaseClient';
 import { deobfuscateWord } from '../../lib/game-logic';
@@ -49,22 +50,26 @@ interface MarathonLengthItemProps {
     onPreview: (p: any, index: number) => void;
     isUnlocked: boolean;
     lockReason?: string;
+    dayTheme?: (typeof DAILY_CONFIG)[number] | null;
 }
 
 const MarathonLengthItem = memo(function MarathonLengthItem({
-    game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked, lockReason
+    game, index, prog, challenge, finishers, onSelect, onPreview, isUnlocked, lockReason, dayTheme
 }: MarathonLengthItemProps) {
     const effectiveMaxAttempts = challenge.is_shapeshifter ? 20 : MAX_ATTEMPTS;
     const isCompleted = prog?.status === 'completed';
     const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
     const isFinished = isCompleted || isFailed;
 
+    const itemHoverFinished = dayTheme ? `${dayTheme.hoverBorder} ${dayTheme.glow.replace('bg-', 'hover:bg-')}` : 'hover:border-correct/50 hover:bg-correct/5';
+    const itemHoverUnfinished = dayTheme ? `${dayTheme.hoverBorder} ${dayTheme.glow.replace('bg-', 'hover:bg-')}` : 'hover:border-yellow-500 hover:bg-yellow-500/5';
+
     return (
         <div className="flex flex-col gap-2">
             <button
                 disabled={!isUnlocked}
                 onClick={() => onSelect(index, isFinished)}
-                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${!isUnlocked ? 'bg-white/2 border-white/5 opacity-40 cursor-not-allowed' : isFinished ? 'bg-white/5 border-white/10 hover:border-correct/50 hover:bg-correct/5' : 'bg-white/5 border-white/10 hover:border-yellow-500 hover:bg-yellow-500/5'}`}
+                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${!isUnlocked ? 'bg-white/2 border-white/5 opacity-40 cursor-not-allowed' : isFinished ? `bg-white/5 border-white/10 ${itemHoverFinished}` : `bg-white/5 border-white/10 ${itemHoverUnfinished}`}`}
             >
                 <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${!isUnlocked ? 'bg-white/5 text-gray-600' : isCompleted ? 'bg-correct text-black' : isFailed ? 'bg-red-500 text-white' : prog ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white'}`}>
@@ -277,6 +282,8 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         return 'all';
     });
 
+    const dayTheme = useMemo(() => challenge.is_bot_marathon ? DAILY_CONFIG[new Date().getDay()] : null, []);
+
     // Sub-filtering tabs state (All, Unplayed, Played)
     const [subFilter, setSubFilter] = useState<'all' | 'unplayed' | 'played'>('all');
 
@@ -440,8 +447,8 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     return (
         <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
             <div className="text-center space-y-1.5 shrink-0">
-                <h3 className="text-xl font-black uppercase tracking-tighter">Marathon Mode</h3>
-                <p className="text-gray-500 text-xs">Complete all lengths to finish the challenge.</p>
+                <h3 className={`text-xl font-black uppercase tracking-tighter ${dayTheme ? dayTheme.textAccent : 'text-white'}`}>{dayTheme ? dayTheme.title : 'Marathon Mode'}</h3>
+                <p className="text-gray-500 text-xs">{dayTheme ? dayTheme.description : 'Complete all lengths to finish the challenge.'}</p>
             </div>
 
             {/* Daily Challenge - Day Tabs Navigation */}
@@ -453,7 +460,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                             setSubFilter('all');
                         }}
                         className={`px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${activeDayTab === 'all'
-                            ? "bg-correct text-black font-extrabold shadow-md"
+                            ? `${dayTheme ? dayTheme.accent : 'bg-correct'} text-black font-extrabold shadow-md`
                             : "text-white/70 hover:text-white hover:bg-white/5"
                             }`}
                     >
@@ -467,7 +474,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                                 setSubFilter('all');
                             }}
                             className={`px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${activeDayTab === dayNum
-                                ? "bg-correct text-black font-extrabold shadow-md"
+                                ? `${dayTheme ? dayTheme.accent : 'bg-correct'} text-black font-extrabold shadow-md`
                                 : "text-white/70 hover:text-white hover:bg-white/5"
                                 }`}
                         >
@@ -504,27 +511,27 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 {/* 1. Featured Next Up Game */}
                 {(subFilter === 'all' || subFilter === 'unplayed') && featuredGame && (
                     <div className="space-y-2 mb-4 animate-in fade-in duration-200">
-                        <h4 className="text-[9px] font-black uppercase tracking-wider text-yellow-500 flex items-center gap-1.5 pl-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-ping" />
+                        <h4 className={`text-[9px] font-black uppercase tracking-wider ${dayTheme ? dayTheme.textAccent : 'text-yellow-500'} flex items-center gap-1.5 pl-1`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${dayTheme ? dayTheme.accent : 'bg-yellow-500'} animate-ping`} />
                             Next Playable Game
                         </h4>
-                        <div className="relative group overflow-hidden rounded-2xl border border-yellow-500/30 bg-linear-to-r from-yellow-500/10 to-transparent p-4 sm:p-5 transition-all hover:border-yellow-500/50">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 blur-2xl -mr-8 -mt-8 pointer-events-none" />
+                        <div className={`relative group overflow-hidden rounded-2xl border ${dayTheme ? dayTheme.border : 'border-yellow-500/30'} ${dayTheme ? `bg-gradient-to-br ${dayTheme.bg}` : 'bg-linear-to-r from-yellow-500/10 to-transparent'} p-4 sm:p-5 transition-all ${dayTheme ? dayTheme.hoverBorder : 'hover:border-yellow-500/50'}`}>
+                            <div className={`absolute top-0 right-0 w-24 h-24 ${dayTheme ? dayTheme.glow : 'bg-yellow-500/5'} blur-2xl -mr-8 -mt-8 pointer-events-none`} />
                             <div className="flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black bg-yellow-500 text-black text-lg shadow-lg shadow-yellow-500/20">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black ${dayTheme ? dayTheme.accent : 'bg-yellow-500'} text-black text-lg shadow-lg ${dayTheme ? dayTheme.shadowAccent : 'shadow-yellow-500/20'}`}>
                                         {featuredGame.wordLength}
                                     </div>
                                     <div className="text-left">
                                         <p className="text-sm font-black uppercase text-white tracking-tight">Game #{featuredGame.idx + 1} ({featuredGame.wordLength}L)</p>
-                                        <p className="text-[10px] text-yellow-500/80 font-black uppercase tracking-wider">
+                                        <p className={`text-[10px] ${dayTheme ? dayTheme.textAccent + '/80' : 'text-yellow-500/80'} font-black uppercase tracking-wider`}>
                                             {featuredGame.prog ? 'In Progress' : 'Ready to Play'}
                                         </p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => handleSelect(featuredGame.idx, false)}
-                                    className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-yellow-500/20"
+                                    className={`${dayTheme ? dayTheme.accent : 'bg-yellow-500'} ${dayTheme ? dayTheme.accentHover : 'hover:bg-yellow-600'} text-black px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg ${dayTheme ? dayTheme.shadowAccent : 'shadow-yellow-500/20'}`}
                                 >
                                     Play <Play size={12} fill="currentColor" />
                                 </button>
@@ -557,6 +564,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                                     onPreview={handlePreview}
                                     isUnlocked={g.isUnlocked}
                                     lockReason={g.lockReason}
+                                    dayTheme={dayTheme}
                                 />
                             ))}
                         </>
@@ -585,6 +593,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                                     onPreview={handlePreview}
                                     isUnlocked={g.isUnlocked}
                                     lockReason={g.lockReason}
+                                    dayTheme={dayTheme}
                                 />
                             ))}
                         </>

@@ -5,6 +5,7 @@ import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
 
 import { type ProfileStats } from "../types";
 import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../../../constants/wordup";
+import formatUsername from '../../../../utils/formatUsername';
 
 interface LeaderboardEntry extends ProfileStats {
    id: string;
@@ -171,14 +172,14 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
                         <ProtectedAvatar
                            userId={entry.id}
                            src={entry.profiles?.avatar_url}
-                           username={entry.profiles?.username || "Player"}
+                           username={formatUsername(entry.profiles?.username) || "Player"}
                            className="w-7 h-7 rounded-full border border-white/10 shrink-0"
                         />
 
                         {/* Username & Rank */}
                         <div className="truncate">
                            <p className="text-xs font-black text-white truncate flex items-center gap-1.5">
-                              {entry.profiles?.username || "Player"}
+                              {formatUsername(entry.profiles?.username) || "Player"}
                               {isMe && (
                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
                               )}
@@ -220,17 +221,17 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
                      </div>
 
                      {/* Avatar */}
-                     <ProtectedAvatar
-                        userId={currentUser?.id}
-                        src={currentUser?.user_metadata?.avatar_url}
-                        username={currentUser?.user_metadata?.full_name || "You"}
-                        className="w-7 h-7 rounded-full border border-correct/30 shrink-0"
-                     />
+                      <ProtectedAvatar
+                         userId={currentUser?.id}
+                         src={currentUser?.user_metadata?.avatar_url}
+                         username={formatUsername(currentUser?.user_metadata?.full_name) || "You"}
+                         className="w-7 h-7 rounded-full border border-correct/30 shrink-0"
+                      />
 
-                     {/* Username & Rank */}
-                     <div className="truncate">
-                        <p className="text-xs font-black text-white truncate flex items-center gap-1.5">
-                           {currentUser?.user_metadata?.full_name || "You"}
+                      {/* Username & Rank */}
+                      <div className="truncate">
+                         <p className="text-xs font-black text-white truncate flex items-center gap-1.5">
+                            {formatUsername(currentUser?.user_metadata?.full_name) || "You"}
                            <span className="bg-correct text-black text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
                         </p>
                         <p className={`text-[8px] font-black uppercase tracking-wider ${getRankNameColor(getDecayedRating(userStats))}`}>
