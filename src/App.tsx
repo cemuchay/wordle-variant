@@ -23,6 +23,7 @@ import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { GuestBanner } from "./components/GuestBanner";
+import { TutorialModal } from "./components/TutorialModal";
 import { useApp } from "./context/AppContext";
 import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
@@ -67,6 +68,12 @@ export default function App() {
   const [guestBannerLastDismissed, setGuestBannerLastDismissed] = useState(() =>
     safeLocalStorage.getItem('wordle_guest_banner_last_dismissed') ?? '',
   );
+
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(() =>
+    safeLocalStorage.getItem('wordle_tutorial_completed') === 'true'
+    || safeLocalStorage.getItem('wordle_last_hydrated_timestamp') !== null,
+  );
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
@@ -271,6 +278,21 @@ export default function App() {
       setGuestBannerLastDismissed(date as string);
     }
   };
+
+  // Trigger tutorial for new users
+  const showTutorial =
+    !isAuthLoading &&
+    isHydrated &&
+    !isLoadingDate &&
+    !isTutorialOpen &&
+    !hasSeenTutorial &&
+    (user || guestOptedIn);
+
+  useEffect(() => {
+    if (showTutorial) {
+      setIsTutorialOpen(true);
+    }
+  }, [showTutorial]);
 
   // Preload ChatRoom in the background when the app is idle
   useEffect(() => {
@@ -1040,6 +1062,21 @@ export default function App() {
           userId={user.id}
           isEasterEgg={false}
           gameDate={date as string}
+        />
+      )}
+
+      {isTutorialOpen && (
+        <TutorialModal
+          onComplete={() => {
+            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+            setHasSeenTutorial(true);
+            setIsTutorialOpen(false);
+          }}
+          onSkip={() => {
+            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+            setHasSeenTutorial(true);
+            setIsTutorialOpen(false);
+          }}
         />
       )}
 
