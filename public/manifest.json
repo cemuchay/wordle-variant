@@ -1,7 +1,7 @@
 {
   "name": "Variant",
   "short_name": "Variant",
-  "description": "Daily word challenge with multi letter words",
+  "description": "Multiplayer word game with daily challenges, live races, async play, and bot marathons.",
   "theme_color": "#121213",
   "background_color": "#121213",
   "display": "standalone",
