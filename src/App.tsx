@@ -847,7 +847,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -1042,7 +1042,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}

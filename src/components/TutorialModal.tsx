@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TutorialCell } from './TutorialCell';
 import { ChevronLeft, ChevronRight, ChevronDown, Lightbulb } from 'lucide-react';
-import { Z_INDEX } from '../constants/ui';
 
 interface TutorialModalProps {
   onComplete: () => void;
@@ -382,7 +381,7 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.AUTH_MODAL }}>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] overflow-hidden">
         {/* Step indicator */}
         <div className="flex items-center justify-between px-6 pt-5 pb-2 shrink-0">
