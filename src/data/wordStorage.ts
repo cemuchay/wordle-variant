@@ -5,7 +5,7 @@ const STORE_NAME = 'word_lists';
 export const WORD_DATA_VERSION = '1';
 
 interface StoredWordList {
-    length: number;
+    length: number | string;
     version: string;
     official: string[];
     valid: string[];
@@ -25,12 +25,13 @@ function openDB(): Promise<IDBDatabase> {
     });
 }
 
-export async function getCachedWords(length: number): Promise<{ official: string[]; valid: string[] } | null> {
+export async function getCachedWords(length: number, isChallenge = false): Promise<{ official: string[]; valid: string[] } | null> {
     try {
         const db = await openDB();
+        const key = isChallenge ? `${length}_challenge` : length;
         return await new Promise((resolve) => {
             const tx = db.transaction(STORE_NAME, 'readonly');
-            const req = tx.objectStore(STORE_NAME).get(length);
+            const req = tx.objectStore(STORE_NAME).get(key);
             req.onsuccess = () => {
                 const data = req.result as StoredWordList | undefined;
                 if (data && data.version === WORD_DATA_VERSION) {
@@ -46,13 +47,14 @@ export async function getCachedWords(length: number): Promise<{ official: string
     }
 }
 
-export async function cacheWords(length: number, official: string[], valid: Set<string>): Promise<void> {
+export async function cacheWords(length: number, official: string[], valid: Set<string>, isChallenge = false): Promise<void> {
     try {
         const db = await openDB();
+        const key = isChallenge ? `${length}_challenge` : length;
         await new Promise<void>((resolve, reject) => {
             const tx = db.transaction(STORE_NAME, 'readwrite');
             tx.objectStore(STORE_NAME).put({
-                length,
+                length: key,
                 version: WORD_DATA_VERSION,
                 official,
                 valid: [...valid],

@@ -399,7 +399,7 @@ const validateCustomWord = async (word: string, len: number) => {
     const trimmed = word.trim();
     if (!trimmed) return "Cannot be empty";
     if (trimmed.length !== len) return `Must be exactly ${len} letters`;
-    const { valid } = await loadWordLists(len);
+    const { valid } = await loadWordLists(len, true);
     if (!valid.has(trimmed.toUpperCase())) return `"${trimmed.toUpperCase()}" is not a valid word`;
     return null;
 };
