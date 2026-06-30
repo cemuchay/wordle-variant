@@ -437,7 +437,7 @@ export const useChallengeMutations = () => {
                sentenceWords = customSentence.split(/\s+/).map((w: string) => w.trim().toUpperCase()).filter(Boolean);
             } else {
                const curated = getRandomCuratedSentence(sentenceWordCount || 5);
-               sentenceWords = curated ? curated.words : ["THE", "CAT", "SLEEPS"];
+               sentenceWords = curated ? curated : ["THE", "CAT", "SLEEPS"];
             }
             resolvedMarathonGames = sentenceWords!.map((w: string) => w.length);
          }
@@ -868,7 +868,7 @@ export const useChallengeMutations = () => {
                sentenceWords = customSentence.split(/\s+/).map((w: string) => w.trim().toUpperCase()).filter(Boolean);
             } else {
                const curated = getRandomCuratedSentence(sentenceWordCount || 5);
-               sentenceWords = curated ? curated.words : ["THE", "CAT", "SLEEPS"];
+               sentenceWords = curated ? curated : ["THE", "CAT", "SLEEPS"];
             }
             resolvedMarathonGames = sentenceWords!.map((w: string) => w.length);
          }
