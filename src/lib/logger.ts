@@ -48,11 +48,28 @@ class Logger {
       };
    }
 
-   private async getUserId(): Promise<string | null> {
-      const {
-         data: { user },
-      } = await supabase.auth.getUser();
-      return user?.id || null;
+   private async getUserDetails(): Promise<{ id: string | null; name: string | null }> {
+      try {
+         const {
+            data: { user },
+         } = await supabase.auth.getUser();
+         if (!user) return { id: null, name: null };
+
+         let name = user.user_metadata?.username || user.user_metadata?.display_name || user.user_metadata?.full_name || null;
+
+         if (!name) {
+            const { data } = await supabase
+               .from("profiles")
+               .select("username")
+               .eq("id", user.id)
+               .single();
+            name = data?.username || null;
+         }
+         return { id: user.id, name };
+      } catch (e) {
+         console.warn("[Logger] Error fetching user details:", e);
+         return { id: null, name: null };
+      }
    }
 
    private addToBuffer(entry: LogEntry) {
@@ -67,7 +84,7 @@ class Logger {
       this.isStreaming = true;
 
       try {
-         const userId = await this.getUserId();
+         const { id: userId, name: username } = await this.getUserDetails();
          const { error } = await supabase.from("client_logs").insert([
             {
                level: entry.level,
@@ -77,6 +94,8 @@ class Logger {
                   browser: navigator.userAgent,
                   url: window.location.href,
                   timestamp: entry.timestamp,
+                  user_id: userId,
+                  username: username,
                },
                session_id: this.sessionId,
                user_id: userId,
@@ -210,11 +229,16 @@ class Logger {
 
       // Also directly invoke the edge function to ensure email delivery
       try {
-         const userId = await this.getUserId();
+         const { id: userId, name: username } = await this.getUserDetails();
          await supabase.functions.invoke("send-error-email", {
             body: {
                record: {
                   ...entry,
+                  context: {
+                     ...entry.context,
+                     user_id: userId,
+                     username: username,
+                  },
                   session_id: this.sessionId,
                   user_id: userId,
                   created_at: entry.timestamp,
