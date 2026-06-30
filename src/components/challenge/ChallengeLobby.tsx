@@ -33,6 +33,7 @@ import {
 import { deobfuscateWord } from "../../lib/game-logic";
 import { LobbyParticipantsSkeleton } from "./ChallengeUIElements";
 import formatUsername from '../../utils/formatUsername';
+import { DAILY_CONFIG } from '../../constants/marathon';
 
 const MODE_DEFINITIONS = {
   LIVE: {
@@ -387,10 +388,12 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
   const isFull =
     currentParts >= maxParts && !myParticipation && !isCreatorOfCustom;
 
+  const dayTheme = useMemo(() => selectedChallenge.is_bot_marathon ? DAILY_CONFIG[new Date().getDay()] : null, []);
+
   return (
     <div className="space-y-6">
-      <div className="bg-white/5 p-2 sm:p-4 rounded-2xl border border-white/10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
+      <div className={`bg-white/5 p-2 sm:p-4 rounded-2xl border border-white/10 relative overflow-hidden ${dayTheme ? dayTheme.hoverBorder : ''}`}>
+        <div className={`absolute top-0 right-0 w-32 h-32 ${dayTheme ? dayTheme.glow : 'bg-correct/5'} blur-3xl -mr-16 -mt-16 pointer-events-none`} />
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -415,7 +418,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
             {selectedChallenge.is_bot_marathon && (
               <ClickableModeLabel type="BOT_MARATHON">
-                <span className="hidden sm:inline">Daily Event</span>
+                <span className="hidden sm:inline">{dayTheme ? dayTheme.title : 'Daily Event'}</span>
                 <span className="sm:hidden">🤖 Daily</span>
               </ClickableModeLabel>
             )}
@@ -451,13 +454,18 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         </div>
         <h3 className="text-xl font-black mb-1">
           {isMarathon
-            ? `The Marathon (${marathonGamesList.length} Games)`
+            ? (dayTheme ? dayTheme.title : `The Marathon (${marathonGamesList.length} Games)`)
             : `${selectedChallenge.word_length} Letter Word`}
         </h3>
         {isMarathon && (
           <>
+            {dayTheme && (
+              <p className={`text-xs font-black uppercase tracking-wider mb-1 ${dayTheme.textAccent}`}>
+                {dayTheme.description}
+              </p>
+            )}
             <p className="text-white text-sm mb-2">
-              Solve sequence : {" "}
+              {dayTheme ? '' : 'Solve sequence : '}
               <span className="text-green-500 text-[0.5rem] sm:text-[0.8rem]">
                 ({marathonGamesList.map((g: { wordLength: number }) => g.wordLength).join("-")}).
               </span>
@@ -647,7 +655,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 <button
                   onClick={handleStartGame}
                   disabled={loading}
-                  className="w-full bg-correct text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className={`w-full ${dayTheme ? dayTheme.accent : 'bg-correct'} text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer`}
                 >
                   <Play size={18} fill="currentColor" />{" "}
                   {myParticipation?.status === "playing"

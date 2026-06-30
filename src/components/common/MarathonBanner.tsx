@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Trophy, Swords, Users } from 'lucide-react';
 import formatUsername from '../../utils/formatUsername';
+import { DAILY_CONFIG, URGENT_CONFIG } from '../../constants/marathon';
 
 interface MarathonBannerProps {
     challenges: any[];
@@ -10,82 +11,6 @@ interface MarathonBannerProps {
     className?: string;
     showTimer?: boolean;
 }
-
-const DAILY_CONFIG = [
-    { // Sunday
-        bg: 'from-rose-500/20 via-pink-500/20 to-rose-600/20',
-        border: 'border-rose-500/30',
-        hoverBorder: 'hover:border-rose-400/50',
-        accent: 'bg-rose-500',
-        textAccent: 'text-rose-400',
-        title: 'Sunday Sprint 🏃‍♂️',
-        description: 'End your week with a marathon victory!'
-    },
-    { // Monday
-        bg: 'from-indigo-600/20 via-blue-600/20 to-indigo-700/20',
-        border: 'border-indigo-500/30',
-        hoverBorder: 'hover:border-indigo-400/50',
-        accent: 'bg-indigo-500',
-        textAccent: 'text-indigo-400',
-        title: 'Monday Motivation 🔋',
-        description: 'Start your week strong with a challenge!'
-    },
-    { // Tuesday
-        bg: 'from-emerald-500/20 via-teal-500/20 to-emerald-600/20',
-        border: 'border-emerald-500/30',
-        hoverBorder: 'hover:border-emerald-400/50',
-        accent: 'bg-emerald-500',
-        textAccent: 'text-emerald-400',
-        title: 'Turbo Tuesday ⚡',
-        description: 'Pick up the pace in today\'s marathon!'
-    },
-    { // Wednesday
-        bg: 'from-amber-500/20 via-orange-500/20 to-amber-600/20',
-        border: 'border-amber-500/30',
-        hoverBorder: 'hover:border-amber-400/50',
-        accent: 'bg-amber-500',
-        textAccent: 'text-amber-400',
-        title: 'Mid-Week Marathon 🐫',
-        description: 'Conquer the hump with a winning streak!'
-    },
-    { // Thursday
-        bg: 'from-purple-600/20 via-fuchsia-600/20 to-purple-700/20',
-        border: 'border-purple-500/30',
-        hoverBorder: 'hover:border-purple-400/50',
-        accent: 'bg-purple-500',
-        textAccent: 'text-purple-400',
-        title: 'Thriving Thursday 🚀',
-        description: 'Push your limits in the daily event!'
-    },
-    { // Friday
-        bg: 'from-cyan-500/20 via-blue-500/20 to-cyan-600/20',
-        border: 'border-cyan-500/30',
-        hoverBorder: 'hover:border-cyan-400/50',
-        accent: 'bg-cyan-500',
-        textAccent: 'text-cyan-400',
-        title: 'Friday Flash ⚡',
-        description: 'Finish the work week with a bang!'
-    },
-    { // Saturday
-        bg: 'from-yellow-500/20 via-amber-500/20 to-yellow-600/20',
-        border: 'border-yellow-500/30',
-        hoverBorder: 'hover:border-yellow-400/50',
-        accent: 'bg-yellow-500',
-        textAccent: 'text-yellow-400',
-        title: 'Weekend Warrior ⚔️',
-        description: 'The ultimate marathon for the weekend!'
-    }
-];
-
-const URGENT_CONFIG = {
-    bg: 'from-red-600/30 via-rose-600/30 to-red-700/30',
-    border: 'border-red-500/40',
-    hoverBorder: 'hover:border-red-400/60',
-    accent: 'bg-red-600',
-    textAccent: 'text-red-400',
-    title: 'Ending Soon! 🔥',
-    description: 'Today\'s marathon is about to expire. Join the race before it\'s too late!'
-};
 
 const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: any, onClick: (c: any) => void, showTimer: boolean, navigation?: React.ReactNode }) => {
     const [timeLeft, setTimeLeft] = useState<string>('');
