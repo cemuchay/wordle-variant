@@ -21,6 +21,8 @@ import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { GuestBanner } from "./components/GuestBanner";
 import { useApp } from "./context/AppContext";
 import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
@@ -58,6 +60,14 @@ const fadeVariants = {
 
 export default function App() {
   const { user, loading: isAuthLoading } = useAuth();
+
+  const [guestOptedIn, setGuestOptedIn] = useState(() =>
+    safeLocalStorage.getItem('wordle_guest_opted_in') === 'true',
+  );
+  const [guestBannerLastDismissed, setGuestBannerLastDismissed] = useState(() =>
+    safeLocalStorage.getItem('wordle_guest_banner_last_dismissed') ?? '',
+  );
+
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
   const isBattlePlayingLive = useLiveStore((s) => s.isBattlePlaying);
@@ -244,6 +254,22 @@ export default function App() {
   const handleDismissNotificationBar = () => {
     safeLocalStorage.setItem('header_notification_dismissed', 'true');
     setShowNotificationBar(false);
+  };
+
+  const handlePlayAsGuest = () => {
+    safeLocalStorage.setItem('wordle_guest_opted_in', 'true');
+    if (date) {
+      safeLocalStorage.setItem('wordle_guest_banner_last_dismissed', date as string);
+      setGuestBannerLastDismissed(date as string);
+    }
+    setGuestOptedIn(true);
+  };
+
+  const handleDismissGuestBanner = () => {
+    if (date) {
+      safeLocalStorage.setItem('wordle_guest_banner_last_dismissed', date as string);
+      setGuestBannerLastDismissed(date as string);
+    }
   };
 
   // Preload ChatRoom in the background when the app is idle
@@ -689,7 +715,7 @@ export default function App() {
   };
 
 
-  if (isLoadingDate || !isHydrated) {
+  if (!isHydrated || isLoadingDate || isAuthLoading) {
     return (
       <div className="h-dvh w-full flex flex-col bg-dark text-white p-4 justify-between animate-pulse select-none">
         {/* Header Skeleton */}
@@ -728,6 +754,15 @@ export default function App() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (!user && !guestOptedIn) {
+    return (
+      <WelcomeScreen
+        onPlayAsGuest={handlePlayAsGuest}
+        onSignIn={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
+      />
     );
   }
 
@@ -780,6 +815,13 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {!user && guestOptedIn && date && guestBannerLastDismissed !== date && (
+        <GuestBanner
+          onSignIn={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
+          onDismiss={handleDismissGuestBanner}
+        />
       )}
 
       {/* Global Persistent Header */}
