@@ -16,19 +16,20 @@ interface WordListCache {
    valid: Set<string>;
 }
 
-const memoryCache = new Map<number, WordListCache>();
-const pending = new Map<number, Promise<WordListCache>>();
+const memoryCache = new Map<string, WordListCache>();
+const pending = new Map<string, Promise<WordListCache>>();
 
-async function fetchAndCache(length: number): Promise<WordListCache> {
+async function fetchAndCache(length: number, isChallenge = false): Promise<WordListCache> {
+   const cacheKey = `${length}_${isChallenge}`;
    // 1. Try to read from IndexedDB cache first
    try {
-      const cached = await getCachedWords(length);
+      const cached = await getCachedWords(length, isChallenge);
       if (cached) {
          const result: WordListCache = {
             official: cached.official,
             valid: new Set(cached.valid),
          };
-         memoryCache.set(length, result);
+         memoryCache.set(cacheKey, result);
          return result;
       }
    } catch (e) {
@@ -36,44 +37,51 @@ async function fetchAndCache(length: number): Promise<WordListCache> {
    }
 
    // 2. Fallback to network fetch
-   const [officialRaw, allowedRaw] = await Promise.all([
+   const hasStrippedFile = [3, 4, 6, 7, 8, 9, 10].includes(length);
+   const [officialRaw, allowedRaw, strippedRaw] = await Promise.all([
       fetch(`/words/words_${length}_official.txt`).then(r => r.text()),
       fetch(`/words/words_${length}_allowed.txt`).then(r => r.text()),
+      (isChallenge && hasStrippedFile)
+         ? fetch(`/words/words_${length}_official_stripped.txt`).then(r => r.text())
+         : Promise.resolve(null),
    ]);
 
-   const official = processWords(officialRaw);
+   const originalOfficial = processWords(officialRaw);
    const allWords = processWords(allowedRaw);
+   const official = strippedRaw ? processWords(strippedRaw) : originalOfficial;
+
    const result: WordListCache = {
       official,
-      valid: new Set([...official, ...allWords]),
+      valid: new Set([...originalOfficial, ...allWords]),
    };
 
-   memoryCache.set(length, result);
-   cacheWords(length, official, result.valid);
+   memoryCache.set(cacheKey, result);
+   cacheWords(length, official, result.valid, isChallenge);
 
    return result;
 }
 
-export async function loadWordLists(length: number): Promise<WordListCache> {
+export async function loadWordLists(length: number, isChallenge = false): Promise<WordListCache> {
    const len = [3, 4, 5, 6, 7, 8, 9, 10].includes(length) ? length : 5;
+   const cacheKey = `${len}_${isChallenge}`;
 
    // 1. In-memory hot cache
-   const mem = memoryCache.get(len);
+   const mem = memoryCache.get(cacheKey);
    if (mem) return mem;
 
    // 2. Deduplicate in-flight operations (IndexedDB lookup / Network fetch)
-   let inflight = pending.get(len);
+   let inflight = pending.get(cacheKey);
    if (!inflight) {
-      inflight = fetchAndCache(len);
-      pending.set(len, inflight);
+      inflight = fetchAndCache(len, isChallenge);
+      pending.set(cacheKey, inflight);
    }
 
    try {
       const result = await inflight;
-      pending.delete(len);
+      pending.delete(cacheKey);
       return result;
    } catch (e) {
-      pending.delete(len);
+      pending.delete(cacheKey);
       throw e;
    }
 }
@@ -81,7 +89,10 @@ export async function loadWordLists(length: number): Promise<WordListCache> {
 // Preload word lists on bootstrap to populate memory cache & IndexedDB
 const PRELOAD_LENGTHS = [4, 5, 6, 7];
 PRELOAD_LENGTHS.forEach(l => {
-   loadWordLists(l).catch(() => {});
+   loadWordLists(l, false).catch(() => {});
+   if (l !== 5) {
+      loadWordLists(l, true).catch(() => {});
+   }
 });
 
 export const getWORDS_3 = () => loadWordLists(3).then(r => r.official);

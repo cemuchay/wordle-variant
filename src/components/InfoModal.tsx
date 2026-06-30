@@ -1,5 +1,6 @@
-import { Lightbulb, X, Zap } from 'lucide-react';
-import React from 'react';
+import { useState } from 'react';
+import { Lightbulb, GraduationCap, X, Zap } from 'lucide-react';
+import { TutorialModal } from './TutorialModal';
 
 interface Props {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) => {
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
   if (!isOpen && !inline) return null;
 
   const renderContent = () => (
@@ -43,6 +46,14 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) 
                   <p><span className="text-gray-200 font-medium">Gray:</span> Not in the word at all.</p>
                 </div>
               </div>
+
+              <button
+                onClick={() => setIsTutorialOpen(true)}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-wider transition-all active:scale-[0.98] cursor-pointer mt-4"
+              >
+                <GraduationCap size={14} />
+                Play Interactive Tutorial
+              </button>
             </div>
           </div>
 
@@ -113,6 +124,13 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) 
           </div>
           {renderContent()}
         </div>
+
+        {isTutorialOpen && (
+          <TutorialModal
+            onComplete={() => setIsTutorialOpen(false)}
+            onSkip={() => setIsTutorialOpen(false)}
+          />
+        )}
       </div>
     );
   }
@@ -141,6 +159,13 @@ export const InfoModal: React.FC<Props> = ({ isOpen, onClose, inline = false }) 
           </button>
         </div>
       </div>
+
+      {isTutorialOpen && (
+        <TutorialModal
+          onComplete={() => setIsTutorialOpen(false)}
+          onSkip={() => setIsTutorialOpen(false)}
+        />
+      )}
     </div>
   );
 };

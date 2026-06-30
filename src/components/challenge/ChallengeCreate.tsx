@@ -243,6 +243,13 @@ const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveToolti
             >
                 Marathon
             </button>
+            <button
+                type="button"
+                onClick={() => setLength(2)} // 2 for sentences
+                className={`px-4 h-11 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all ${length === 2 ? 'border-indigo-500 bg-indigo-500 text-black border-2 shadow-lg shadow-indigo-500/20' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10'}`}
+            >
+                Sentences
+            </button>
         </div>
     </div>
 ));
@@ -399,7 +406,7 @@ const validateCustomWord = async (word: string, len: number) => {
     const trimmed = word.trim();
     if (!trimmed) return "Cannot be empty";
     if (trimmed.length !== len) return `Must be exactly ${len} letters`;
-    const { valid } = await loadWordLists(len);
+    const { valid } = await loadWordLists(len, true);
     if (!valid.has(trimmed.toUpperCase())) return `"${trimmed.toUpperCase()}" is not a valid word`;
     return null;
 };
@@ -444,6 +451,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     // Marathon Mode States
     const [marathonType, setMarathonType] = useState<'standard' | 'custom'>('standard');
+    const [sentenceWordCount, setSentenceWordCount] = useState<number>(5);
+    const [customSentence, setCustomSentence] = useState<string>('');
     const [marathonGames, setMarathonGames] = useState<number[]>([3, 4, 5, 6, 7]);
 
     // Multi-step form state
@@ -824,6 +833,26 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                         }
                     }
+                } else if (length === 2) {
+                    if (!customSentence || !customSentence.trim()) {
+                        if (!editingChallenge) {
+                            errs.push(`Custom Sentence: Cannot be empty.`);
+                        }
+                    } else {
+                        const words = customSentence.split(/\s+/).map(w => w.trim().toUpperCase()).filter(Boolean);
+                        if (words.length < 3 || words.length > 10) {
+                            errs.push("Custom Sentence: Must contain between 3 and 10 words.");
+                        }
+                        for (let idx = 0; idx < words.length; idx++) {
+                            const w = words[idx];
+                            if (w.length < 3 || w.length > 10) {
+                                errs.push(`Word "${w}" in sentence: Length must be between 3 and 10.`);
+                            } else {
+                                const valError = await validateCustomWord(w, w.length);
+                                if (valError) errs.push(`Word "${w}" in sentence: ${valError}`);
+                            }
+                        }
+                    }
                 } else {
                     if (!customWord) {
                         if (!editingChallenge) {
@@ -849,7 +878,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             const valError = await validateCustomWord(w, l);
                             if (valError) errs.push(`Game #${idx + 1} (${l}-letter): ${valError}`);
                             if (isCustomWord && customMarathonWords[idx] && w.toUpperCase() === customMarathonWords[idx].toUpperCase()) {
-                                errs.push(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
+                                alert(`Game #${idx + 1} (${l}-letter): Starter word cannot match target word.`);
                             }
                         }
                     }
@@ -880,7 +909,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         };
 
         validate();
-    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
+    }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, customSentence, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
 
     const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
@@ -904,8 +933,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             disableHints,
             is_bot_marathon: isBotMarathon,
             isBotMarathon: isBotMarathon,
-            isShapeshifter,
-            is_shapeshifter: isShapeshifter,
+            isShapeshifter: length === 2 ? false : isShapeshifter,
+            is_shapeshifter: length === 2 ? false : isShapeshifter,
             difficulty: length === 1 && marathonDifficultyMode === 'custom' ? marathonDifficulties : globalDifficulty,
         };
 
@@ -914,6 +943,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 const wordsList = customMarathonWords.filter(Boolean);
                 if (wordsList.length > 0) {
                     customParams.customWords = customMarathonWords;
+                }
+            } else if (length === 2) {
+                if (customSentence) {
+                    customParams.customSentence = customSentence;
                 }
             } else {
                 if (customWord) {
@@ -942,6 +975,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             if (mode === 'LIVE' && timerType === 'custom') {
                 customParams.marathonTimers = marathonTimersArray;
             }
+        } else if (length === 2) {
+            customParams.isSentences = true;
+            customParams.sentenceWordCount = sentenceWordCount;
+            customParams.marathonForceOrder = true;
         }
 
         if (editingChallenge) {
@@ -953,7 +990,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties]);
 
     const summarySettings = useMemo((): ChallengeFormSettings => ({
         mode,
@@ -1050,6 +1087,29 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             onMarathonDifficultyChange={handleMarathonDifficultyChange}
                         />
                     )}
+                    {length === 2 && (
+                        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
+                            <OptionLabel 
+                                label="Sentence Length (Words)" 
+                                tooltip="Select how many words the coherent sentence should contain (between 3 and 10 words)." 
+                                activeTooltip={activeTooltip} 
+                                setActiveTooltip={setActiveTooltip} 
+                                tooltipId="sentenceLength" 
+                            />
+                            <div className="flex gap-2 flex-wrap">
+                                {[3, 4, 5, 6, 7, 8, 9, 10].map((w) => (
+                                    <button
+                                        key={w}
+                                        type="button"
+                                        onClick={() => setSentenceWordCount(w)}
+                                        className={`w-11 h-11 rounded-xl border font-black transition-all ${sentenceWordCount === w ? 'border-indigo-500 bg-indigo-500 text-black border-2 shadow-lg shadow-indigo-500/20 text-sm' : 'border-white/15 bg-white/5 text-white hover:border-white/30 hover:bg-white/10 text-xs'}`}
+                                    >
+                                        {w}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {mode === 'LIVE' && (
                         <TimeLimitSelector maxTime={maxTime} setMaxTime={setMaxTime} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
@@ -1060,27 +1120,29 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             {step === 1 && (
                 <div className="space-y-5">
                     {/* Shape Shifter Option */}
-                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Shape Shifter Mode" 
-                                tooltip="The target word shifts in the background with each guess. Feedback is respected, and you must uniquely identify the word to win (up to 10 tries)." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="isShapeshifter" 
-                            />
-                            <input
-                                type="checkbox"
-                                checked={isShapeshifter}
-                                onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setIsShapeshifter(checked);
-                                    if (checked) setIsCustomWord(false);
-                                }}
-                                className="w-5 h-5 accent-correct cursor-pointer"
-                            />
+                    {length !== 2 && (
+                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Shape Shifter Mode" 
+                                    tooltip="The target word shifts in the background with each guess. Feedback is respected, and you must uniquely identify the word to win (up to 10 tries)." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="isShapeshifter" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={isShapeshifter}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setIsShapeshifter(checked);
+                                        if (checked) setIsCustomWord(false);
+                                    }}
+                                    className="w-5 h-5 accent-correct cursor-pointer"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Disable Hints Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
@@ -1106,8 +1168,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                             <div className="flex items-center justify-between">
                                 <OptionLabel 
-                                    label="Custom Word Challenge" 
-                                    tooltip="Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)." 
+                                    label={length === 2 ? "Custom Sentence" : "Custom Word Challenge"} 
+                                    tooltip={length === 2 ? "Write your own coherent sentence. Every word must be 3-10 letters and present in the guessable dictionary." : "Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)."} 
                                     activeTooltip={activeTooltip} 
                                     setActiveTooltip={setActiveTooltip} 
                                     tooltipId="customWord" 
@@ -1128,6 +1190,17 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                                             marathonLengths={marathonGames}
                                             onMarathonChange={setCustomMarathonWords}
                                         />
+                                    ) : length === 2 ? (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase font-black tracking-wider text-white/50">Coherent Sentence (3-10 words, 3-10 letters each)</label>
+                                            <input
+                                                type="text"
+                                                value={customSentence}
+                                                onChange={(e) => setCustomSentence(e.target.value)}
+                                                placeholder="e.g. THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
+                                                className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-3 text-sm focus:border-correct outline-none text-white transition-all uppercase"
+                                            />
+                                        </div>
                                     ) : (
                                         <CustomWordGrid
                                             mode="single"

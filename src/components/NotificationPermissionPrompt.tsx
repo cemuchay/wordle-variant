@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { subscribeToPush } from '../lib/pushService';
+import { useAuth } from '../hooks/useAuth';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 export default function NotificationPermissionPrompt() {
+  const { user } = useAuth();
   const [showPrompt, setShowPrompt] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
+    if (!user) { setShowPrompt(false); return; }
+
     // Check if running in standalone mode (PWA is installed and opened)
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||

@@ -21,6 +21,9 @@ import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
 import { UnsubscribePage } from "./components/UnsubscribePage";
 import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { GuestBanner } from "./components/GuestBanner";
+import { TutorialModal } from "./components/TutorialModal";
 import { useApp } from "./context/AppContext";
 import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
@@ -58,6 +61,20 @@ const fadeVariants = {
 
 export default function App() {
   const { user, loading: isAuthLoading } = useAuth();
+
+  const [guestOptedIn, setGuestOptedIn] = useState(() =>
+    safeLocalStorage.getItem('wordle_guest_opted_in') === 'true',
+  );
+  const [guestBannerLastDismissed, setGuestBannerLastDismissed] = useState(() =>
+    safeLocalStorage.getItem('wordle_guest_banner_last_dismissed') ?? '',
+  );
+
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(() =>
+    safeLocalStorage.getItem('wordle_tutorial_completed') === 'true'
+    || safeLocalStorage.getItem('wordle_last_hydrated_timestamp') !== null,
+  );
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
   const isBattlePlayingLive = useLiveStore((s) => s.isBattlePlaying);
@@ -245,6 +262,37 @@ export default function App() {
     safeLocalStorage.setItem('header_notification_dismissed', 'true');
     setShowNotificationBar(false);
   };
+
+  const handlePlayAsGuest = () => {
+    safeLocalStorage.setItem('wordle_guest_opted_in', 'true');
+    if (date) {
+      safeLocalStorage.setItem('wordle_guest_banner_last_dismissed', date as string);
+      setGuestBannerLastDismissed(date as string);
+    }
+    setGuestOptedIn(true);
+  };
+
+  const handleDismissGuestBanner = () => {
+    if (date) {
+      safeLocalStorage.setItem('wordle_guest_banner_last_dismissed', date as string);
+      setGuestBannerLastDismissed(date as string);
+    }
+  };
+
+  // Trigger tutorial for new users
+  const showTutorial =
+    !isAuthLoading &&
+    isHydrated &&
+    !isLoadingDate &&
+    !isTutorialOpen &&
+    !hasSeenTutorial &&
+    (user || guestOptedIn);
+
+  useEffect(() => {
+    if (showTutorial) {
+      setIsTutorialOpen(true);
+    }
+  }, [showTutorial]);
 
   // Preload ChatRoom in the background when the app is idle
   useEffect(() => {
@@ -689,7 +737,7 @@ export default function App() {
   };
 
 
-  if (isLoadingDate || !isHydrated) {
+  if (!isHydrated || isLoadingDate || isAuthLoading) {
     return (
       <div className="h-dvh w-full flex flex-col bg-dark text-white p-4 justify-between animate-pulse select-none">
         {/* Header Skeleton */}
@@ -728,6 +776,15 @@ export default function App() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (!user && !guestOptedIn) {
+    return (
+      <WelcomeScreen
+        onPlayAsGuest={handlePlayAsGuest}
+        onSignIn={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
+      />
     );
   }
 
@@ -782,8 +839,15 @@ export default function App() {
         </div>
       )}
 
+      {!user && guestOptedIn && date && guestBannerLastDismissed !== date && (
+        <GuestBanner
+          onSignIn={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
+          onDismiss={handleDismissGuestBanner}
+        />
+      )}
+
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -978,7 +1042,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}
@@ -998,6 +1062,21 @@ export default function App() {
           userId={user.id}
           isEasterEgg={false}
           gameDate={date as string}
+        />
+      )}
+
+      {isTutorialOpen && (
+        <TutorialModal
+          onComplete={() => {
+            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+            setHasSeenTutorial(true);
+            setIsTutorialOpen(false);
+          }}
+          onSkip={() => {
+            safeLocalStorage.setItem('wordle_tutorial_completed', 'true');
+            setHasSeenTutorial(true);
+            setIsTutorialOpen(false);
+          }}
         />
       )}
 

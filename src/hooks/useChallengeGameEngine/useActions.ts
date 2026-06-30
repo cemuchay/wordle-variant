@@ -128,7 +128,7 @@ export const useActions = ({
       try {
          const upperGuess = state.currentGuess.toUpperCase();
 
-         const { valid } = await loadWordLists(wordLength);
+         const { valid } = await loadWordLists(wordLength, true);
          if (!valid.has(upperGuess)) {
             triggerToast("Not in word list.");
             dispatch({ type: "SHAKE_GUESS" });

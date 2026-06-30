@@ -157,8 +157,8 @@ async function getWordAtDate(
  * @param length - Desired word length.
  * @returns A random official word in uppercase.
  */
-export async function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult'): Promise<string> {
-   const { official, valid } = await loadWordLists(length);
+export async function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult', isChallenge = false): Promise<string> {
+   const { official, valid } = await loadWordLists(length, isChallenge);
    let pool: string[];
    if (difficulty === 'easy' && length >= 3 && length <= 5) {
       pool = getEasyWords(length);

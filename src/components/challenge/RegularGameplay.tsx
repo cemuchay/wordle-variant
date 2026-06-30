@@ -7,10 +7,11 @@ import { useApp } from '../../context/AppContext';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
-import { getHandicapStarter } from '../../utils/marathon';
+import { getHandicapStarter, parseMarathonGames } from '../../utils/marathon';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import { NetworkLog } from './ChallengeUIElements';
+import { useMemo } from 'react';
 
 interface RegularGameplayProps {
     challenge: any;
@@ -105,6 +106,11 @@ export const RegularGameplay = memo(function RegularGameplay({
     const showStarter = starterWord && !challenge.handicap_enforced && guesses.length === 0 && !isGameOver;
     const showHint = stableGuessesCount >= ANIMATION.HINT_MIN_GUESSES && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 
+    const sentenceGames = useMemo(() => {
+        if (!challenge.salt?.endsWith('_sentence')) return null;
+        return parseMarathonGames(challenge.target_word, challenge.salt);
+    }, [challenge.target_word, challenge.salt]);
+
     const lastGuess = guesses[guesses.length - 1];
 
     if (lastGuess) {
@@ -189,7 +195,37 @@ export const RegularGameplay = memo(function RegularGameplay({
                 </div>
             )}
 
-            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+                {sentenceGames && (
+                    <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
+                        {sentenceGames.map((g, idx) => {
+                            const prog = participation?.marathon_progress?.find((p: any) => p.game_index === idx);
+                            const isCompleted = prog?.status === 'completed' || (idx < (gameIndex ?? 0));
+                            const isActive = idx === gameIndex;
+
+                            if (isCompleted) {
+                                return (
+                                    <span key={idx} className="text-xs font-black text-correct uppercase border-b-2 border-correct/30 px-1 py-0.5 animate-in fade-in duration-200">
+                                        {g.word}
+                                    </span>
+                                );
+                            } else if (isActive) {
+                                return (
+                                    <span key={idx} className="text-[10px] font-black text-indigo-300 tracking-wider px-1.5 py-0.5 bg-indigo-500/15 border border-indigo-500/40 rounded-md">
+                                        {Array(g.wordLength).fill('_').join(' ')}
+                                    </span>
+                                );
+                            } else {
+                                return (
+                                    <span key={idx} className="text-[9px] font-black text-white/30 uppercase border-b border-dashed border-white/10 px-1 py-0.5">
+                                        {g.wordLength}L
+                                    </span>
+                                );
+                            }
+                        })}
+                    </div>
+                )}
+
                 <Grid
                     wordLength={wordLength}
                     maxAttempts={maxAttempts}
