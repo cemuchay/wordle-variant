@@ -134,11 +134,7 @@ export function useGameEngine(props: EngineProps) {
       }
    }, [state.phase, triggerToast]);
 
-   useEffect(() => {
-      if (state.phase === "countdown" || state.phase === "playing" || state.phase === "reveal") wordupAudio.startAmbient();
-      else wordupAudio.stopAmbient();
-      return () => wordupAudio.stopAmbient();
-   }, [state.phase]);
+
 
    // ══════════════════════════════════════════════════════════════════════
    // CORE GAME FLOW
