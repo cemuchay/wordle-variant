@@ -27,6 +27,7 @@ Tech stack:
 - Keep components small and focused.
 - Keep business logic outside UI components whenever possible.
 - Use existing utilities before creating new ones.
+- No modifications to existing sql_scripts, new change new file
 
 ---
 

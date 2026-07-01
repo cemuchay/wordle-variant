@@ -74,6 +74,7 @@ export default function App() {
     || safeLocalStorage.getItem('wordle_last_hydrated_timestamp') !== null,
   );
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isLeavingWelcome, setIsLeavingWelcome] = useState(false);
 
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
@@ -270,6 +271,13 @@ export default function App() {
       setGuestBannerLastDismissed(date as string);
     }
     setGuestOptedIn(true);
+    setIsLeavingWelcome(false);
+    setIsAuthOpen(false);
+  };
+
+  const handleSignInFromWelcome = () => {
+    setIsLeavingWelcome(true);
+    setIsAuthOpen(true);
   };
 
   const handleDismissGuestBanner = () => {
@@ -415,6 +423,13 @@ export default function App() {
     window.addEventListener("open-auth-modal", handleOpenAuth);
     return () => window.removeEventListener("open-auth-modal", handleOpenAuth);
   }, []);
+
+  // Reset isLeavingWelcome when auth modal closes without sign-in
+  useEffect(() => {
+    if (!isAuthOpen && isLeavingWelcome && !user) {
+      setIsLeavingWelcome(false);
+    }
+  }, [isAuthOpen, isLeavingWelcome, user]);
 
   // Handle URL query parameters for notifications routing
   useEffect(() => {
@@ -779,11 +794,11 @@ export default function App() {
     );
   }
 
-  if (!user && !guestOptedIn) {
+  if (!user && !guestOptedIn && !isLeavingWelcome) {
     return (
       <WelcomeScreen
         onPlayAsGuest={handlePlayAsGuest}
-        onSignIn={() => window.dispatchEvent(new CustomEvent("open-auth-modal"))}
+        onSignIn={handleSignInFromWelcome}
       />
     );
   }
