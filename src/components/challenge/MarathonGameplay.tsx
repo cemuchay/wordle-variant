@@ -206,10 +206,10 @@ export const MarathonGameplay = memo(function MarathonGameplay({
 
         for (const p of participants) {
             if (p.user_id === participation.user_id) continue;
-            if (!p.marathon_progress) continue;
+            if (!Array.isArray(p.marathon_progress)) continue;
 
             for (const mp of p.marathon_progress) {
-                if (mp.status === 'completed' || mp.status === 'timed_out') {
+                if (mp && (mp.status === 'completed' || mp.status === 'timed_out')) {
                     const idx = mp.game_index;
                     if (map[idx]) {
                         map[idx].push(p);
@@ -293,6 +293,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         if (!challenge.is_bot_marathon || marathonGames.length === 0 || hasInitializedTabRef.current) return;
 
         const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+        const progressArray = Array.isArray(participation.marathon_progress) ? participation.marathon_progress : [];
         
         for (let d = 1; d <= currentDay; d++) {
             const dayGamesRangeStart = (d - 1) * baseSequenceLength;
@@ -300,8 +301,8 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             
             let hasUnfinished = false;
             for (let idx = dayGamesRangeStart; idx < dayGamesRangeEnd; idx++) {
-                const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-    const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
+                const prog = progressArray.find((p: any) => p.game_index === idx);
+                const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
                 const isCompleted = prog?.status === 'completed';
                 const isFailed = prog?.attempts >= effectiveMaxAttempts && !isCompleted;
                 const isFinished = isCompleted || isFailed || prog?.status === 'timed_out';
@@ -325,10 +326,11 @@ export const MarathonGameplay = memo(function MarathonGameplay({
     // Compute basic statuses sequentially to build an enhanced list of games
     const gamesWithMetadata = useMemo(() => {
         const results: any[] = [];
+        const progressArray = Array.isArray(participation.marathon_progress) ? participation.marathon_progress : [];
         for (let idx = 0; idx < marathonGames.length; idx++) {
             const game = marathonGames[idx];
-            const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
-    const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
+            const prog = progressArray.find((p: any) => p.game_index === idx);
+            const effectiveMaxAttempts = challenge.is_shapeshifter ? SHAPESHIFTER_MAX_ATTEMPTS : MAX_ATTEMPTS;
             const isCompleted = prog?.status === 'completed';
             const isFailed = prog?.status === 'timed_out' || (prog?.attempts >= effectiveMaxAttempts && !isCompleted);
             const isFinished = isCompleted || isFailed;
@@ -430,6 +432,13 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         return { featuredGame, remainingUnplayed, playedGames };
     }, [filteredGames, gamesWithMetadata]);
 
+    const isSentence = challenge.salt?.endsWith('_sentence');
+    const activeSentenceGameIndex = useMemo(() => {
+        if (!isSentence) return null;
+        const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);
+        return nextUnfinished ? nextUnfinished.idx : null;
+    }, [isSentence, gamesWithMetadata]);
+
     if (selectedGameIndex !== null) {
         return (
             <RegularGameplay
@@ -443,13 +452,6 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             />
         );
     }
-
-    const isSentence = challenge.salt?.endsWith('_sentence');
-    const activeSentenceGameIndex = useMemo(() => {
-        if (!isSentence) return null;
-        const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);
-        return nextUnfinished ? nextUnfinished.idx : null;
-    }, [isSentence, gamesWithMetadata]);
 
     return (
         <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
@@ -465,7 +467,8 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                     </h4>
                     <div className="flex flex-wrap gap-x-3 gap-y-2 items-center pl-1">
                         {marathonGames.map((g, idx) => {
-                            const prog = participation.marathon_progress?.find((p: any) => p.game_index === idx);
+                            const progressArray = Array.isArray(participation.marathon_progress) ? participation.marathon_progress : [];
+                            const prog = progressArray.find((p: any) => p.game_index === idx);
                             const isCompleted = prog?.status === 'completed';
                             const isActive = idx === activeSentenceGameIndex;
 

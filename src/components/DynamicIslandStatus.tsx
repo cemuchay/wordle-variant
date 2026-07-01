@@ -272,17 +272,22 @@ export const DynamicIslandStatus = () => {
             >
                 {showRainbowBorder && (
                     <div className="absolute -inset-[1.5px] pointer-events-none z-0">
-                        {/* Glow overlay */}
+                        {/* Glow overlay - masked to bleed only outwards */}
                         <motion.div
-                            className="absolute inset-0"
+                            className="absolute -inset-[4px]"
                             style={{
-                                borderRadius: isExpanded ? '33px' : '21px',
+                                borderRadius: isExpanded ? '37px' : '25px',
+                                padding: '5.5px',
                                 background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
-                                filter: 'blur(4px)',
-                                opacity: 0.8,
+                                filter: 'blur(3px)',
+                                opacity: 0.75,
+                                mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                maskComposite: 'exclude',
+                                WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                WebkitMaskComposite: 'xor',
                             }}
                             animate={{
-                                filter: ['blur(4px) hue-rotate(0deg)', 'blur(4px) hue-rotate(360deg)']
+                                filter: ['blur(3px) hue-rotate(0deg)', 'blur(3px) hue-rotate(360deg)']
                             }}
                             transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
                         />

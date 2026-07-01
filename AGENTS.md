@@ -49,6 +49,7 @@ Tech stack:
 - Memoize only when profiling shows benefit.
 - Avoid unnecessary effects.
 - Derive state instead of duplicating it.
+- Adhere to the rules of react
 
 ---
 
