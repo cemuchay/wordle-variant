@@ -438,15 +438,13 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                />
             )}
             {view === "turn_submitted" && (
-               <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                  <h2 className="text-xl font-black text-white tracking-wider">Game Complete!</h2>
-                  <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
-                     All questions answered. Waiting for your opponent to finish their turn.
-                  </p>
-                  <button onClick={resetGame} className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer">
-                     Back to Lobby
-                  </button>
-               </div>
+               <GameOverView
+                  matchData={matchData}
+                  setView={(newView) => {
+                     if (newView === "menu") resetGame();
+                  }}
+                  role={role}
+               />
             )}
             {view === "gameover" && (
                <GameOverView

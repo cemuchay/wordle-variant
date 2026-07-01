@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { AlertTriangle, Eye, EyeOff, WifiOff } from "lucide-react";
@@ -6,6 +6,7 @@ import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestion
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
 import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
+import { PreloadedImage } from "../../../components/wordup/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
@@ -507,12 +508,12 @@ export const BattleView = ({
                      animate={{ opacity: 1, scale: 1 }}
                      className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
-                     <img
-                        src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
-                        alt="Question Clue"
-                        className="max-h-full max-w-full object-contain rounded-lg select-none"
-                        draggable={false}
-                     />
+                      <PreloadedImage
+                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
+                         alt="Question Clue"
+                         className="max-h-full max-w-full object-contain rounded-lg select-none"
+                         draggable={false}
+                      />
                   </motion.div>
                </div>
             )}
@@ -573,12 +574,12 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={cardClass}
                         >
-                           <img
-                              src={imageUrl}
-                              alt={`Flag Option ${optionLetter}`}
-                              className="w-full h-full object-cover rounded-lg"
-                              draggable={false}
-                           />
+                            <PreloadedImage
+                               src={imageUrl}
+                               alt={`Flag Option ${optionLetter}`}
+                               className="w-full h-full object-cover rounded-lg"
+                               draggable={false}
+                            />
 
                            <div className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md select-none">
                               {optionLetter}
@@ -729,6 +730,22 @@ export const BattleView = ({
             </div>
          )}
 
-      </motion.div>
+          {/* Pre-render upcoming round images to keep decoded bitmaps ready */}
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-0 -z-10">
+             {questions.map((q, idx) => {
+                if (idx <= currentIdx) return null;
+                return (
+                   <Fragment key={idx}>
+                      {q.imageUrl && (
+                         <img src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl} alt="" />
+                      )}
+                      {q.imageUrls?.map((url, i) => (
+                         <img key={`${idx}-${i}`} src={getCachedFlagUrl(url)} alt="" />
+                      ))}
+                   </Fragment>
+                );
+             })}
+          </div>
+       </motion.div>
    );
 };
