@@ -164,10 +164,10 @@ export const BattleView = ({
    };
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-base sm:text-lg" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-lg sm:text-xl" : "text-xl sm:text-2xl";
+    const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-   const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[8px] sm:text-[10px]" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-[10px] sm:text-xs" : "text-xs";
+    const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[10px] sm:text-xs" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xs sm:text-sm" : "text-sm sm:text-base";
 
    return (
       <motion.div
@@ -224,14 +224,6 @@ export const BattleView = ({
                </motion.div>
             </motion.div>
          )}
-          {/* Score Bars */}
-          <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
-             <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
-          </div>
-          <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-             <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
-          </div>
-
           {/* Top Bar: Player | Timer | Opponent */}
           <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
              <div className="flex items-center gap-2 min-w-0 relative">
@@ -258,26 +250,7 @@ export const BattleView = ({
                 ))}
              </div>
 
-             <div className="flex items-center gap-2">
-                <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} selectedAnswer={selectedAnswer} revealAnswers={revealAnswers} />
-                <button
-                   onClick={async () => {
-                      const confirmed = await ask({
-                         title: "Forfeit Match",
-                         message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
-                         confirmLabel: "Forfeit",
-                         type: "danger"
-                      });
-                      if (confirmed) {
-                         onAbort();
-                      }
-                   }}
-                   className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-                >
-                   <AlertTriangle size={12} />
-                   <span>Abort</span>
-                </button>
-             </div>
+             <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} selectedAnswer={selectedAnswer} revealAnswers={revealAnswers} />
 
              <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
                 <div className="truncate">
@@ -304,14 +277,40 @@ export const BattleView = ({
              </div>
           </div>
 
+          {/* Floating Abort Button */}
+          <button
+             onClick={async () => {
+                const confirmed = await ask({
+                   title: "Forfeit Match",
+                   message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                   confirmLabel: "Forfeit",
+                   type: "danger"
+                });
+                if (confirmed) {
+                   onAbort();
+                }
+             }}
+             className="absolute bottom-3 right-3 z-40 flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+          >
+             <AlertTriangle size={12} />
+             <span>Abort</span>
+          </button>
+
          {/* Question Container */}
-         <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
+         <div className="relative flex-1 flex flex-col justify-between sm:justify-center gap-1 sm:gap-2 md:gap-3 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
+            {/* Score Bars */}
+            <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+               <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
+            </div>
+            <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+               <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+            </div>
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
-               <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
+                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
@@ -349,9 +348,9 @@ export const BattleView = ({
                      const imageUrl = getCachedFlagUrl(flagCode);
                      const optionLetter = String.fromCharCode(65 + index);
 
-                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-1 transition-all shadow-md select-none shrink-0 ";
+                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
                      if (selectedAnswer === null) {
-                        cardClass += " cursor-pointer bg-slate-950/40 border-white/10 hover:border-cyan-400 hover:bg-slate-950/60";
+                        cardClass += " cursor-pointer bg-white border-gray-200 hover:border-cyan-400 hover:bg-gray-50";
                      } else {
                         cardClass += " cursor-default";
                         if (isCorrect) {
@@ -359,7 +358,7 @@ export const BattleView = ({
                         } else if (isSelected) {
                            cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
                         } else {
-                           cardClass += " border-white/5 bg-slate-950/20 opacity-40";
+                           cardClass += " border-gray-200 bg-gray-100 opacity-40";
                         }
                      }
 
@@ -426,18 +425,18 @@ export const BattleView = ({
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
 
-                     let btnClass = `p-3 sm:p-5 rounded-xl sm:rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
                      if (selectedAnswer === null) {
-                        btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                        btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {
                         btnClass += " cursor-default";
                         if (isCorrect) {
                            btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
-                        } else {
-                           btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
-                        }
+                         } else {
+                            btnClass += " bg-gray-100 border-gray-200 text-gray-400 opacity-60";
+                         }
                      }
 
                      if (isOppSelected) {

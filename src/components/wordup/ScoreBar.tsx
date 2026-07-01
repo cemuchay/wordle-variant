@@ -5,7 +5,7 @@ interface ScoreBarProps {
    themeColor: string;
 }
 
-const MAX_SCORE = 200;
+const MAX_SCORE = 160;
 
 export const ScoreBar = ({
    score,
