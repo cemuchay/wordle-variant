@@ -9,7 +9,7 @@ import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useWordUpGameEngine } from "./hooks/useWordUpGameEngine";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { supabase } from "../../../lib/supabaseClient";
-import { Swords } from "lucide-react";
+import { Swords, Volume2, VolumeX } from "lucide-react";
 
 import { decryptMatchQuestions } from "../../../utils/wordupQuestionGenerator";
 
@@ -408,8 +408,17 @@ export const WordUpView = () => {
                />
             )}
          </AnimatePresence>
-         <ConnectionOverlay realtimeStatus={realtimeStatus} view={view} />
-      </div>
+          <ConnectionOverlay realtimeStatus={realtimeStatus} view={view} />
+          {view !== "menu" && (
+             <button
+                onClick={handleToggleSound}
+                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                title="Toggle Sound"
+             >
+                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+             </button>
+          )}
+       </div>
    );
 };
 

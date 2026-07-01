@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Swords } from "lucide-react";
+import { Swords, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useApp } from "../../context/AppContext";
 import { useServerTime } from "../shared/useServerTime";
@@ -409,8 +409,17 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                         className="bg-indigo-500 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer">Play</button>
                   </div>
                </div>
-            )}
-         </div>
+          )}
+          {view !== "menu" && (
+             <button
+                onClick={handleToggleSound}
+                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                title="Toggle Sound"
+             >
+                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+             </button>
+          )}
+       </div>
       );
    }
 
