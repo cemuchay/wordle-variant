@@ -7,6 +7,7 @@ import { type ProfileStats } from "../../shared/types";
 import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
 import { PreloadedImage } from "../../../components/wordup/PreloadedImage";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { ScoreBar } from "../../../components/wordup/ScoreBar";
 import { CATEGORIES } from "../../shared/constants";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
 
@@ -171,16 +172,27 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-base sm:text-lg" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-lg sm:text-xl" : "text-xl sm:text-2xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-   const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[8px] sm:text-[10px]" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-[10px] sm:text-xs" : "text-xs";
+   const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
+   const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
+   const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
+   const choiceLUT: Record<string, Record<string, string>> = {
+      a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
+      b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+      c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+   };
+   const isFewChoices = activeQuestion.choices.length <= 2;
+   const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
+
+   const choicesGapClass = activeQuestion.choices.length <= 2 ? "gap-4 sm:gap-6" : "gap-1 sm:gap-2 md:gap-3";
 
    return (
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-4 pb-3 relative overflow-hidden"
+           className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
       >
          {lastRoundPopup && (
             <motion.div
@@ -209,54 +221,65 @@ export const BattleView = ({
             </motion.div>
          )}
 
-         {/* Players Panel */}
-         <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
-            <div className="flex items-center gap-2 min-w-0 relative">
-               <ProtectedAvatar
-                  userId={playerProfile?.id || undefined}
-                  src={playerProfile?.avatar_url || undefined}
-                  username={playerProfile?.username || "You"}
-                  className="w-10 h-10 rounded-full border border-indigo-500/30 shrink-0"
-               />
-               <div className="truncate">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                  <p className="text-base font-black text-white">{myScore} pts</p>
-               </div>
-               {scorePopups.filter((p) => p.side === "my").map((p) => (
-                  <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 right-0 text-indigo-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(99,102,241,0.8)] pointer-events-none"
-                  >
-                     +{p.points}
-                  </motion.span>
-               ))}
-            </div>
-            <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
-               <div className="truncate">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
-                  <p className="text-base font-black text-white">{oppScore} pts</p>
-               </div>
-               {scorePopups.filter((p) => p.side === "opp").map((p) => (
-                  <motion.span
-                     key={p.id}
-                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                     transition={{ duration: 2.5, ease: "easeOut" }}
-                     className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
-                  >
-                     +{p.points}
-                  </motion.span>
-               ))}
-               <ProtectedAvatar
-                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
-                  username={opponentName}
-                  className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
-               />
-            </div>
+          {/* Top Bar: Player | Round/Category | Opponent */}
+          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
+             <div className="flex items-center gap-2 min-w-0 relative">
+                <ProtectedAvatar
+                   userId={playerProfile?.id || undefined}
+                   src={playerProfile?.avatar_url || undefined}
+                   username={playerProfile?.username || "You"}
+                   className="w-10 h-10 rounded-full border border-indigo-500/30 shrink-0"
+                />
+                <div className="truncate">
+                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                   <p className="text-base font-black text-white">{myScore} pts</p>
+                </div>
+                {scorePopups.filter((p) => p.side === "my").map((p) => (
+                   <motion.span
+                      key={p.id}
+                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                      transition={{ duration: 2.5, ease: "easeOut" }}
+                      className="absolute -top-1 right-0 text-indigo-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(99,102,241,0.8)] pointer-events-none"
+                   >
+                      +{p.points}
+                   </motion.span>
+                ))}
+             </div>
+
+             <div className="flex flex-col items-center">
+                {categoryName && (
+                   <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider mb-0.5">{categoryName}</span>
+                )}
+                <span className="text-xs font-black text-gray-400">Q{currentIdx + 1}/{WORDUP_GAME.TOTAL_ROUNDS}</span>
+                {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
+                   <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ 2X</span>
+                )}
+             </div>
+
+             <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
+                <div className="truncate">
+                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
+                   <p className="text-base font-black text-white">{oppScore} pts</p>
+                </div>
+                {scorePopups.filter((p) => p.side === "opp").map((p) => (
+                   <motion.span
+                      key={p.id}
+                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                      transition={{ duration: 2.5, ease: "easeOut" }}
+                      className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
+                   >
+                      +{p.points}
+                   </motion.span>
+                ))}
+                <ProtectedAvatar
+                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                   src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                   username={opponentName}
+                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
+                />
+             </div>
           </div>
 
           {/* Timer Bar */}
@@ -267,29 +290,16 @@ export const BattleView = ({
                    className="h-full rounded-full"
                 />
              )}
-          </div>
+           </div>
 
-          {/* Round Indicator */}
-         <div className="flex justify-center items-center px-1 py-3 shrink-0">
-            <div className="flex flex-col items-center">
-               {categoryName && (
-                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider mb-0.5">{categoryName}</span>
-               )}
-               <span className="text-xs font-black text-gray-400">Question {currentIdx + 1} of {WORDUP_GAME.TOTAL_ROUNDS}</span>
-               {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
-                  <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ DOUBLE POINTS</span>
-               )}
-            </div>
-         </div>
-
-         {/* Question Container */}
-          <div className="flex-1 flex flex-col justify-between sm:justify-center gap-2 sm:gap-4 md:gap-6 pt-4 sm:pt-8 md:pt-10 pb-2 sm:pb-6 md:pb-8 overflow-y-auto scrollbar-hide min-h-0">
+           {/* Question Container */}
+           <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
-               <h2 className={`${promptSizeClass} font-black tracking-tight leading-normal sm:leading-relaxed text-white whitespace-pre-line`}>
+                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
@@ -317,7 +327,13 @@ export const BattleView = ({
             )}
 
             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-               <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto">
+               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5 min-h-[180px]">
+                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-indigo-500" />
+                  </div>
+                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                  </div>
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
@@ -326,9 +342,9 @@ export const BattleView = ({
                      const imageUrl = getCachedFlagUrl(flagCode);
                      const optionLetter = String.fromCharCode(65 + index);
 
-                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-1 transition-all shadow-md select-none shrink-0 ";
+                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
                      if (selectedAnswer === null) {
-                        cardClass += " cursor-pointer bg-slate-950/40 border-white/10 hover:border-cyan-400 hover:bg-slate-950/60";
+                        cardClass += " cursor-pointer bg-white border-gray-200 hover:border-cyan-400 hover:bg-gray-50";
                      } else {
                         cardClass += " cursor-default";
                         if (isCorrect) {
@@ -336,7 +352,7 @@ export const BattleView = ({
                         } else if (isSelected) {
                            cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
                         } else {
-                           cardClass += " border-white/5 bg-slate-950/20 opacity-40";
+                           cardClass += " border-gray-200 bg-gray-100 opacity-40";
                         }
                      }
 
@@ -395,15 +411,21 @@ export const BattleView = ({
                   })}
                </div>
             ) : (
-               <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0">
+               <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5 min-h-[180px]">
+                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-indigo-500" />
+                  </div>
+                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                  </div>
                   {activeQuestion.choices.map((choice) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
 
-                     let btnClass = `p-3 sm:p-5 rounded-xl sm:rounded-2xl border text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
                      if (selectedAnswer === null) {
-                        btnClass += " cursor-pointer bg-white/5 border-white/10 text-white hover:bg-white/10";
+                        btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {
                         btnClass += " cursor-default";
                         if (isCorrect) {
@@ -411,7 +433,7 @@ export const BattleView = ({
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
                         } else {
-                           btnClass += " bg-white/5 border-white/10 text-gray-500 opacity-60";
+                           btnClass += " bg-gray-100 border-gray-200 text-gray-400 opacity-60";
                         }
                      }
 
@@ -459,9 +481,10 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={btnClass}
                         >
-                           <span className="flex-1 text-center pr-8">
+                           <span className="text-center">
                               <FormulaRenderer text={choice} />
                            </span>
+
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (
                                  <span className="bg-indigo-500 text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
