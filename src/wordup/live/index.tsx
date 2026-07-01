@@ -175,7 +175,7 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
       setView("menu");
    }, [cancelMatchmaking, resetGame, setView]);
 
-   const { handleAnswerSelect, sendRematch, acceptRematch, sendQuickChat, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
+   const { handleAnswerSelect, sendRematch, acceptRematch, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
    const phase = engine.state.phase;
 
@@ -312,13 +312,12 @@ export const LiveView = ({ onBack, onSwitchMode }: LiveViewProps) => {
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                  role={role} playerProfile={profile} sendQuickChat={sendQuickChat}
+                   role={role} playerProfile={profile}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
-                  waitingForOpponent={waitingForOpponent}
-                  isConnected={engine.isConnected}
-               />
-            )}
-            {view === "gameover" && (
+                   waitingForOpponent={waitingForOpponent}
+                />
+             )}
+             {view === "gameover" && (
                <GameOverView
                   matchData={matchData}
                   setView={(newView) => {
