@@ -166,8 +166,17 @@ export const BattleView = ({
    const promptLen = activeQuestion.prompt.length;
     const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
 
-   const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-    const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[10px] sm:text-xs" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xs sm:text-sm" : "text-sm sm:text-base";
+    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
+    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
+    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
+    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
+    const choiceLUT: Record<string, Record<string, string>> = {
+       a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
+       b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+       c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+    };
+    const isFewChoices = activeQuestion.choices.length <= 2;
+    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
 
     const choicesGapClass = activeQuestion.choices.length <= 2 ? "gap-4 sm:gap-6" : "gap-1 sm:gap-2 md:gap-3";
 
@@ -175,7 +184,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-4 pb-3 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-1 pb-0 relative overflow-hidden"
       >
          {lastRoundPopup && (
             <motion.div
@@ -299,7 +308,7 @@ export const BattleView = ({
           </button>
 
           {/* Question Container */}
-          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0`}>
+          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
@@ -334,7 +343,7 @@ export const BattleView = ({
 
             {/* Choices Grid */}
             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5">
+               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5 min-h-[180px]">
                   <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
@@ -420,7 +429,7 @@ export const BattleView = ({
                   })}
                </div>
             ) : (
-               <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5">
+               <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5 min-h-[180px]">
                   <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
@@ -432,7 +441,7 @@ export const BattleView = ({
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
 
-                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-between min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
                      if (selectedAnswer === null) {
                         btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {
