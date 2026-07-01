@@ -11,6 +11,8 @@ import {
   decryptGuesses,
 } from "../../lib/game-logic";
 import { supabase } from "../../lib/supabaseClient";
+import { generateShareText } from "../../lib/share";
+import { ShareButton } from "../ShareButton";
 import { parseMarathonGames } from "../../utils/marathon";
 import { getTileSizeClass } from "./types";
 import type { GuessPreviewData } from "./types";
@@ -66,6 +68,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     const challenge = challengeProp || context?.selectedChallenge;
 
     const isMarathon = lengthOfWord === 1;
+    const isChallenge = !!myParticipation || !!entry.challenge_id;
     const [marathonGameIndex, setMarathonGameIndex] = useState<number>(
       initialMarathonGameIndex ?? 0,
     );
@@ -399,6 +402,39 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       hintRecord: gameData?.hint_record || null,
     });
 
+    const challengeShortId = useMemo(() => {
+      if (!isChallenge) return "";
+      const id = entry.challenge_id || challenge?.id || "";
+      return id.length > 8 ? id.slice(0, 8) : id;
+    }, [isChallenge, entry.challenge_id, challenge]);
+
+    const shareText = useMemo(() => {
+      if (!gameData?.guesses || !isChallenge) return "";
+      const won = gameData.guesses[gameData.guesses.length - 1]?.every(
+        (r: any) => r.status === "correct",
+      ) ?? false;
+      const text = generateShareText({
+        date: date || "",
+        guesses: gameData.guesses,
+        maxAttempts: MAX_ATTEMPTS,
+        won,
+        usedHint: gameData.hint_record !== null,
+        gameMessage: "",
+        wordLength: targetWordToUse.length,
+      });
+      if (isMarathon) {
+        return text.replace(
+          /^Variant - .+\n/,
+          `Challenge - Marathon #${marathonGameIndex + 1} (${date})\n`,
+        );
+      }
+      return text.replace(
+        /^Variant - .+\n/,
+        `Challenge - #${challengeShortId} (${date})\n`,
+      );
+    }, [gameData, isChallenge, isMarathon, marathonGameIndex, date, challengeShortId, targetWordToUse]);
+
+    const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
     const username = entry.username || entry.profiles?.username || "Player";
     const canSeeDetails = viewerHasFinished || isCreator;
 
@@ -532,6 +568,12 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 canSeeDetails={canSeeDetails}
                 targetWordLength={targetWordToUse.length}
               />
+
+              {isChallenge && isOwnEntry && shareText && (
+                <div className="mb-4">
+                  <ShareButton text={shareText} />
+                </div>
+              )}
 
               {isMarathon && (
                 <MarathonGameList
