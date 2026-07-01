@@ -282,7 +282,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         return 'all';
     });
 
-    const dayTheme = useMemo(() => challenge.is_bot_marathon ? DAILY_CONFIG[new Date().getDay()] : null, []);
+    const dayTheme = useMemo(() => challenge.is_bot_marathon ? DAILY_CONFIG[new Date().getDay()] : null, [challenge.is_bot_marathon]);
 
     // Sub-filtering tabs state (All, Unplayed, Played)
     const [subFilter, setSubFilter] = useState<'all' | 'unplayed' | 'played'>('all');
@@ -294,11 +294,11 @@ export const MarathonGameplay = memo(function MarathonGameplay({
 
         const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
         const progressArray = Array.isArray(participation.marathon_progress) ? participation.marathon_progress : [];
-        
+
         for (let d = 1; d <= currentDay; d++) {
             const dayGamesRangeStart = (d - 1) * baseSequenceLength;
             const dayGamesRangeEnd = Math.min(marathonGames.length, d * baseSequenceLength);
-            
+
             let hasUnfinished = false;
             for (let idx = dayGamesRangeStart; idx < dayGamesRangeEnd; idx++) {
                 const prog = progressArray.find((p: any) => p.game_index === idx);
@@ -306,7 +306,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 const isCompleted = prog?.status === 'completed';
                 const isFailed = prog?.attempts >= effectiveMaxAttempts && !isCompleted;
                 const isFinished = isCompleted || isFailed || prog?.status === 'timed_out';
-                
+
                 if (!isFinished) {
                     hasUnfinished = true;
                     break;
@@ -318,7 +318,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
                 return;
             }
         }
-        
+
         setActiveDayTab(currentDay);
         hasInitializedTabRef.current = true;
     }, [challenge.is_bot_marathon, marathonGames, participation.marathon_progress, numDays, currentDay, challenge.is_shapeshifter]);
@@ -367,6 +367,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             });
         }
         return results;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [marathonGames, participation.marathon_progress, challenge.is_bot_marathon, challenge.marathon_force_order, numDays, currentDay]);
 
     // Compute stats/counts for sub-filters dynamically based on active day tab selection
@@ -453,12 +454,6 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         );
     }
 
-    const isSentence = challenge.salt?.endsWith('_sentence');
-    const activeSentenceGameIndex = useMemo(() => {
-        if (!isSentence) return null;
-        const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);
-        return nextUnfinished ? nextUnfinished.idx : null;
-    }, [isSentence, gamesWithMetadata]);
 
     return (
         <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
