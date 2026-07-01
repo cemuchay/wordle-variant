@@ -169,6 +169,8 @@ export const BattleView = ({
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
     const choiceSizeClass = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD ? "text-[10px] sm:text-xs" : maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xs sm:text-sm" : "text-sm sm:text-base";
 
+    const choicesGapClass = activeQuestion.choices.length <= 2 ? "gap-4 sm:gap-6" : "gap-1 sm:gap-2 md:gap-3";
+
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -296,15 +298,8 @@ export const BattleView = ({
              <span>Abort</span>
           </button>
 
-         {/* Question Container */}
-         <div className="relative flex-1 flex flex-col justify-between sm:justify-center gap-1 sm:gap-2 md:gap-3 py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0">
-            {/* Score Bars */}
-            <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
-               <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
-            </div>
-            <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-               <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
-            </div>
+          {/* Question Container */}
+          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-2 sm:py-6 md:py-8 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
@@ -339,7 +334,13 @@ export const BattleView = ({
 
             {/* Choices Grid */}
             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-               <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto">
+               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5">
+                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
+                  </div>
+                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                  </div>
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
@@ -419,7 +420,13 @@ export const BattleView = ({
                   })}
                </div>
             ) : (
-               <div className="flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0">
+               <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5">
+                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
+                  </div>
+                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                  </div>
                   {activeQuestion.choices.map((choice) => {
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
