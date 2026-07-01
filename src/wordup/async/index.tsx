@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Swords } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useApp } from "../../context/AppContext";
@@ -13,7 +13,6 @@ import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { useAppStore } from "../../store/useAppStore";
 import { useAsyncStore } from "./store/useAsyncStore";
-import { useLiveStore } from "../live/store/useLiveStore";
 import { LobbyView } from "./components/LobbyView";
 import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
@@ -70,7 +69,6 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
    const [isLoadingData, setIsLoadingData] = useState(false);
    const [soundEnabled, setSoundEnabled] = useState(wordupAudio.isEnabled());
    const [pendingChallenge, setPendingChallenge] = useState<{ matchId: string; targetUser: any } | null>(null);
-   const [liveConfirmTarget, setLiveConfirmTarget] = useState<any>(null);
    const [connectingMsg, setConnectingMsg] = useState("Loading...");
    const challengeResolvedRef = useRef(false);
    const challengeChannelsRef = useRef<any[]>([]);
@@ -139,15 +137,8 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       triggerToast("Challenge cancelled.", WORDUP_TIMEOUT.TOAST_DURATION);
    }, [clearChallengeResources, setView, triggerToast]);
 
-   const handleChallengePlayer = useCallback(async (targetUser: any, forceAsync = false) => {
+   const handleChallengePlayer = useCallback(async (targetUser: any) => {
       if (!effectiveUser) return;
-
-      const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
-      if (isOnline && !forceAsync && effectiveUser.id !== targetUser.id) {
-         setLiveConfirmTarget(targetUser);
-         return;
-      }
-
       clearChallengeResources();
       challengeResolvedRef.current = false;
 
@@ -160,6 +151,8 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          triggerToast("Failed to create challenge.", 4000);
          return;
       }
+
+      const isOnline = onlineUsers.some((u: any) => u.id === targetUser.id);
 
       if (!isOnline) {
          setPendingChallenge({ matchId: mId, targetUser });
@@ -238,42 +231,6 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          setView("menu");
       }, 15000));
    }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
-
-   const handleStartLive = useCallback(async () => {
-      const target = liveConfirmTarget;
-      setLiveConfirmTarget(null);
-      if (!target || !effectiveUser) return;
-
-      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.email?.split("@")[0] || "Someone";
-
-      useLiveStore.getState().setView("connecting");
-
-      const channel = supabase.channel(`user_signals_${target.id}`);
-      channel.subscribe((status) => {
-         if (status === "SUBSCRIBED") {
-            channel.send({
-               type: "broadcast",
-               event: "wordup_invite",
-               payload: {
-                  senderId: effectiveUser.id,
-                  senderName: myName,
-                  category,
-                  sourceMode: "async",
-               },
-            });
-            setTimeout(() => supabase.removeChannel(channel), 1000);
-         }
-      });
-
-      onSwitchMode?.("live");
-   }, [liveConfirmTarget, effectiveUser, category, onSwitchMode]);
-
-   const handleStartAsync = useCallback(async () => {
-      const target = liveConfirmTarget;
-      setLiveConfirmTarget(null);
-      if (!target) return;
-      await handleChallengePlayer(target, true);
-   }, [liveConfirmTarget, handleChallengePlayer]);
 
    // Hide global headers during battle
    useEffect(() => {
@@ -506,51 +463,9 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   role={role}
                />
             )}
-          </AnimatePresence>
+         </AnimatePresence>
 
-          {liveConfirmTarget && (
-             <div
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                onClick={() => setLiveConfirmTarget(null)}
-             >
-                <motion.div
-                   initial={{ scale: 0.9, opacity: 0 }}
-                   animate={{ scale: 1, opacity: 1 }}
-                   className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-sm mx-4 text-center space-y-4"
-                   onClick={(e) => e.stopPropagation()}
-                >
-                   <div className="inline-flex p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 mx-auto">
-                      <Swords size={24} />
-                   </div>
-                   <p className="text-white font-black text-lg">Opponent is Online!</p>
-                   <p className="text-gray-400 text-sm leading-relaxed">
-                      Play in real-time as a live battle?
-                   </p>
-                   <div className="grid grid-cols-2 gap-3 pt-2">
-                      <button
-                         onClick={handleStartLive}
-                         className="bg-indigo-500 hover:brightness-110 text-black font-black py-3.5 rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
-                      >
-                         Yes, Live!
-                      </button>
-                      <button
-                         onClick={handleStartAsync}
-                         className="bg-white/10 hover:bg-white/15 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
-                      >
-                         No, Async
-                      </button>
-                   </div>
-                   <button
-                      onClick={() => setLiveConfirmTarget(null)}
-                      className="text-gray-500 hover:text-gray-300 text-xs underline transition-colors cursor-pointer"
-                   >
-                      Cancel
-                   </button>
-                </motion.div>
-             </div>
-          )}
-
-          {pendingChallenge && (
+         {pendingChallenge && (
             <PlayNowLaterPopup
                opponentName={formatUsername(pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name) || "Opponent"}
                category={category}
