@@ -27,6 +27,7 @@ Tech stack:
 - Keep components small and focused.
 - Keep business logic outside UI components whenever possible.
 - Use existing utilities before creating new ones.
+- No modifications to existing sql_scripts, new change new file
 
 ---
 
@@ -48,6 +49,7 @@ Tech stack:
 - Memoize only when profiling shows benefit.
 - Avoid unnecessary effects.
 - Derive state instead of duplicating it.
+- Adhere to the rules of react
 
 ---
 

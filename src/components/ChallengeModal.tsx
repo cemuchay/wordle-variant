@@ -17,6 +17,7 @@ import {
   useChallengeContext,
 } from "../context/ChallengeContext";
 import { useChallengeFilters } from "../context/ChallengeFiltersContext";
+import { usePlayedChallenges, PLAYED_PAGE_SIZE } from "../hooks/queries/useChallengeQueries";
 import GuessPreviewModal from "./guess-preview";
 import { AudioChatControls } from "./challenge/AudioChatControls";
 import { Z_INDEX, } from "../constants/ui";
@@ -197,6 +198,12 @@ const AuthenticatedChallengeContent = memo(
       openChallengesCount,
     } = useChallengeFilters();
 
+    const [playedPage, setPlayedPage] = useState(1);
+    const { data: playedData, isFetching: isPlayedFetching } = usePlayedChallenges(
+      listColumn === 'played' ? user?.id : undefined,
+      playedPage,
+    );
+
     // Reset scroll position to top whenever active challenge changes
     useEffect(() => {
       if (scrollContainerRef.current) {
@@ -241,11 +248,14 @@ const AuthenticatedChallengeContent = memo(
     const unplayedCount = activeCount + openChallengesCount;
 
     const displayChallenges = useMemo(() => {
+      if (listColumn === 'played') {
+        return playedData?.items || [];
+      }
       const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
       return filteredChallenges.filter(
         (item: any) => !marathonIds.includes(item.challenge_id || item.challenge?.id)
       );
-    }, [filteredChallenges, dailyMarathonChallenges]);
+    }, [listColumn, playedData, filteredChallenges, dailyMarathonChallenges]);
 
     const toggleFilters = () => {
       if (showFilters) clearFilters();
@@ -260,6 +270,11 @@ const AuthenticatedChallengeContent = memo(
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    // Reset played page when navigating tabs or changing filters
+    useEffect(() => {
+      setPlayedPage(1);
+    }, [listColumn, modeFilter, lengthFilter, searchQuery]);
 
     return (
       <div className="flex flex-col h-full overflow-hidden relative">
@@ -381,7 +396,7 @@ const AuthenticatedChallengeContent = memo(
                       {/* Segmented Switcher for Columns */}
                       <div className="flex bg-white/5 p-0.5 sm:p-1 rounded-xl border border-white/10 gap-1 shrink-0">
                         {(["unplayed", "played"] as const).map((tab) => {
-                          const count = tab === "unplayed" ? unplayedCount : playedCount + expiredCount;
+                          const count = tab === "unplayed" ? unplayedCount : (playedData?.total ?? playedCount + expiredCount);
                           const label = tab === "unplayed" ? `Unplayed (${count})` : `Played (${count})`;
                           return (
                             <button
@@ -499,11 +514,17 @@ const AuthenticatedChallengeContent = memo(
                       <div className="space-y-4">
                         {loading && displayChallenges.length === 0 ? (
                           <ChallengeSkeleton />
+                        ) : (isPlayedFetching && listColumn === 'played') || (loading && listColumn !== 'played') ? (
+                          <ChallengeSkeleton />
                         ) : displayChallenges.length === 0 ? (
                           <div className="py-12 text-center text-white">
-                            {myChallenges.length === 0
-                              ? "No challenges yet."
-                              : "No matching challenges found."}
+                            {listColumn === 'played'
+                              ? (playedData && playedData.total === 0
+                                ? "No challenges played yet."
+                                : "No matching challenges found.")
+                              : myChallenges.length === 0
+                                ? "No challenges yet."
+                                : "No matching challenges found."}
                           </div>
                         ) : listColumn === 'unplayed' ? (
                           <>
@@ -539,15 +560,51 @@ const AuthenticatedChallengeContent = memo(
                             ))}
                           </>
                         ) : (
-                          displayChallenges.map((item: any, idx: number) => (
-                            <ChallengeItem
-                              key={item.id}
-                              item={item}
-                              user={user}
-                              onSelect={handleViewChallenge}
-                              index={idx}
-                            />
-                          ))
+                          <>
+                            {displayChallenges.map((item: any, idx: number) => (
+                              <ChallengeItem
+                                key={item.id}
+                                item={item}
+                                user={user}
+                                onSelect={handleViewChallenge}
+                                index={idx}
+                              />
+                            ))}
+                            {listColumn === 'played' && playedData && playedData.total > PLAYED_PAGE_SIZE && (
+                              <div className="flex items-center justify-center gap-2 pt-4 pb-2">
+                                <button
+                                  onClick={() => setPlayedPage(p => Math.max(1, p - 1))}
+                                  disabled={playedPage === 1}
+                                  className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white/5 text-white disabled:opacity-30 hover:bg-white/10 transition-all cursor-pointer disabled:cursor-default"
+                                >
+                                  Prev
+                                </button>
+                                {Array.from(
+                                  { length: Math.ceil(playedData.total / PLAYED_PAGE_SIZE) },
+                                  (_, i) => i + 1,
+                                ).map(p => (
+                                  <button
+                                    key={p}
+                                    onClick={() => setPlayedPage(p)}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                                      p === playedPage
+                                        ? 'bg-correct text-black'
+                                        : 'bg-white/5 text-white hover:bg-white/10'
+                                    }`}
+                                  >
+                                    {p}
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => setPlayedPage(p => p + 1)}
+                                  disabled={playedPage >= Math.ceil(playedData.total / PLAYED_PAGE_SIZE)}
+                                  className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white/5 text-white disabled:opacity-30 hover:bg-white/10 transition-all cursor-pointer disabled:cursor-default"
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
