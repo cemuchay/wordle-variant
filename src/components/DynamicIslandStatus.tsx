@@ -37,7 +37,10 @@ export const DynamicIslandStatus = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [mascot, setMascot] = useState<{ expression: MascotExpression; label: string } | null>(null);
     const [showOnlineNotification, setShowOnlineNotification] = useState(false);
+    const [showRainbowBorder, setShowRainbowBorder] = useState(false);
     const toastTimerRef = useRef<number>(null);
+    const prevMascotKeyRef = useRef<string>('');
+    const mascotRainbowTimerRef = useRef<number>(null);
 
     // Filter out the current user from the online count
     const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
@@ -114,11 +117,20 @@ export const DynamicIslandStatus = () => {
         }
     }, [activeCall?.status]);
 
-    // Listen to mascot changes from Grid gameplay
+    // Listen to mascot changes from Grid gameplay + trigger rainbow border
     useEffect(() => {
         const handleMascot = (e: Event) => {
             const detail = (e as CustomEvent)?.detail;
             if (detail) {
+                const key = `${detail.expression}_${detail.label}`;
+                if (key !== prevMascotKeyRef.current) {
+                    prevMascotKeyRef.current = key;
+                    setShowRainbowBorder(true);
+                    if (mascotRainbowTimerRef.current) clearTimeout(mascotRainbowTimerRef.current);
+                    mascotRainbowTimerRef.current = setTimeout(() => {
+                        setShowRainbowBorder(false);
+                    }, 4000);
+                }
                 setMascot(detail);
             } else {
                 setMascot(null);
@@ -126,6 +138,13 @@ export const DynamicIslandStatus = () => {
         };
         window.addEventListener('mascot-changed', handleMascot);
         return () => window.removeEventListener('mascot-changed', handleMascot);
+    }, []);
+
+    // Clean up rainbow timer on unmount
+    useEffect(() => {
+        return () => {
+            if (mascotRainbowTimerRef.current) clearTimeout(mascotRainbowTimerRef.current);
+        };
     }, []);
 
     // Clear mascot after 90 seconds (1.5 minutes) of inactivity
@@ -187,7 +206,12 @@ export const DynamicIslandStatus = () => {
     // Dynamically calculate pill width based on current call status
     const getPillWidth = () => {
         if (isExpanded) return 'min(95vw, 340px)';
-        if (toast.show) return toast.isLarge ? 'min(95vw, 400px)' : 'min(90vw, 300px)'; // Toasts get a larger pill
+        if (toast.show) {
+            const len = toast.message?.length || 0;
+            // Expand dynamically if text is long
+            const dynamicWidth = Math.max(280, Math.min(420, 160 + len * 5.5));
+            return `min(95vw, ${dynamicWidth}px)`;
+        }
         if (activeCall) {
             if (activeCall.status === 'ringing') return '240px';
             if (activeCall.status === 'calling') return '180px';
@@ -195,7 +219,7 @@ export const DynamicIslandStatus = () => {
         }
         if (currentVoiceSession) return '180px';
         if (mascot && (!showOnlineNotification || otherOnlineUsers.length === 0)) {
-            return '180px';
+            return '195px';
         }
         if (otherOnlineUsers.length === 1) return '160px';
         if (otherOnlineUsers.length > 1) return '145px';
@@ -212,7 +236,7 @@ export const DynamicIslandStatus = () => {
                 animate={{
                     opacity: 1,
                     scale: 1,
-                    y: isExpanded ? 8 : 0
+                    y: isExpanded ? 8 : 0,
                 }}
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
@@ -229,7 +253,7 @@ export const DynamicIslandStatus = () => {
                     },
                     opacity: { duration: 0.15 },
                     scale: { duration: 0.15 },
-                    y: { type: 'spring', stiffness: 380, damping: 35 }
+                    y: { type: 'spring', stiffness: 380, damping: 35 },
                 }}
                 onClick={() => {
                     if (toast.show) {
@@ -240,13 +264,49 @@ export const DynamicIslandStatus = () => {
                     }
                 }}
                 className={`
-                    pointer-events-auto cursor-pointer overflow-hidden
+                    pointer-events-auto cursor-pointer overflow-visible
                     bg-black/20 backdrop-blur-md border border-white/10
                     shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                     flex flex-col items-center justify-center
                 `}
             >
-                {!isExpanded ? (
+                {showRainbowBorder && (
+                    <div className="absolute -inset-[1.5px] pointer-events-none z-0">
+                        {/* Glow overlay */}
+                        <motion.div
+                            className="absolute inset-0"
+                            style={{
+                                borderRadius: isExpanded ? '33px' : '21px',
+                                background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
+                                filter: 'blur(4px)',
+                                opacity: 0.8,
+                            }}
+                            animate={{
+                                filter: ['blur(4px) hue-rotate(0deg)', 'blur(4px) hue-rotate(360deg)']
+                            }}
+                            transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
+                        />
+                        {/* Sharp border overlay */}
+                        <motion.div
+                            className="absolute inset-0"
+                            style={{
+                                borderRadius: isExpanded ? '33px' : '21px',
+                                padding: '1.5px',
+                                background: 'linear-gradient(90deg, #ff3366, #ff9933, #33cc66, #3399ff, #9933ff, #ff3366)',
+                                mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                maskComposite: 'exclude',
+                                WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+                                WebkitMaskComposite: 'xor',
+                            }}
+                            animate={{
+                                filter: ['hue-rotate(0deg)', 'hue-rotate(360deg)']
+                            }}
+                            transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
+                        />
+                    </div>
+                )}
+                <div className="relative z-[1] w-full h-full">
+                    {!isExpanded ? (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -262,8 +322,8 @@ export const DynamicIslandStatus = () => {
                                     exit={{ opacity: 0, y: -10 }}
                                     className={`flex items-center gap-2 w-full px-1 ${toast.isLarge ? 'flex-col sm:flex-row text-center sm:text-left' : ''}`}
                                 >
-                                    <BellRing size={toast.isLarge ? 14 : 12} className="text-emerald-400 shrink-0 animate-bounce" />
-                                    <span className={`text-[10px] font-bold text-white flex-1 ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
+                                    <BellRing size={toast.isLarge ? 12 : 10} className="text-emerald-400 shrink-0 animate-bounce" />
+                                    <span className={`text-[8.5px] font-bold text-white flex-1 leading-relaxed ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
                                         {toast.message}
                                     </span>
                                 </motion.div>
@@ -277,7 +337,7 @@ export const DynamicIslandStatus = () => {
                                                 username={activeCall.targetUser?.username || ''}
                                                 className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                             />
-                                            <span className="text-[9px] font-bold text-white truncate max-w-[80px]">
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">
                                                 {activeCall.targetUser?.username} calls
                                             </span>
                                         </div>
@@ -300,7 +360,7 @@ export const DynamicIslandStatus = () => {
                                     <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                                            <span className="text-[9px] font-bold text-zinc-400 truncate max-w-[90px]">
+                                            <span className="text-[8px] font-bold text-zinc-400 truncate max-w-[90px]">
                                                 Calling {activeCall.targetUser?.username}...
                                             </span>
                                         </div>
@@ -313,9 +373,9 @@ export const DynamicIslandStatus = () => {
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
-                                        <Phone size={12} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
-                                        <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                                        <Phone size={10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
+                                        <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
                                             {isConnected ? 'On Call' : 'Connecting...'}
                                         </span>
                                     </div>
@@ -328,7 +388,7 @@ export const DynamicIslandStatus = () => {
                                         username={currentVoiceSession.user.username}
                                         className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                     />
-                                    <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                    <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
                                         {currentVoiceSession.user.username} in Voice
                                     </span>
                                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -342,14 +402,14 @@ export const DynamicIslandStatus = () => {
                                             username={otherOnlineUsers[0].username}
                                             className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                         />
-                                        <span className="text-[9px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
+                                        <span className="text-[8px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
                                             {otherOnlineUsers[0].username} online
                                         </span>
                                     </>
                                 ) : (
                                     <>
                                         <div className="flex -space-x-1 shrink-0">
-                                            {otherOnlineUsers.slice(0, 2).map((u,) => (
+                                            {otherOnlineUsers.slice(0, 2).map((u) => (
                                                 <ProtectedAvatar
                                                     key={u.id}
                                                     userId={u.id}
@@ -359,7 +419,7 @@ export const DynamicIslandStatus = () => {
                                                 />
                                             ))}
                                         </div>
-                                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider whitespace-nowrap">
+                                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-wider whitespace-nowrap">
                                             {otherOnlineUsers.length} ONLINE
                                         </span>
                                     </>
@@ -367,12 +427,12 @@ export const DynamicIslandStatus = () => {
                             ) : mascot ? (
                                 <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
                                     <WordUpMascot expression={mascot.expression} size={18} />
-                                    <span className="text-[8px] uppercase font-black tracking-widest text-white/80 truncate max-w-[115px] select-none">{mascot.label}</span>
+                                    <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-[110px] select-none">{mascot.label}</span>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                    <WordUpMascot expression="idle" size={16} />
-                                    <span className="text-[10px] font-black tracking-widest text-white/80 tabular-nums select-none">{localTime}</span>
+                                    <WordUpMascot expression="idle" size={15} />
+                                    <span className="text-[8.5px] font-black tracking-[0.08em] text-white/85 tabular-nums select-none">{localTime}</span>
                                 </div>
                             )}
                         </AnimatePresence>
@@ -641,6 +701,7 @@ export const DynamicIslandStatus = () => {
                         </div>
                     </motion.div>
                 )}
+                </div>
             </motion.div>
         </div>
     );
