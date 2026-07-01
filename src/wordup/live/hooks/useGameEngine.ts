@@ -416,12 +416,17 @@ export function useGameEngine(props: EngineProps) {
          const startTime = _match?.question_started_at && _match?.status === "active"
           ? new Date(_match.question_started_at).getTime()
           : getSyncedNow();
-       let lastTicked = Math.ceil(remaining) + 1;
-       T.current.roundInterval = window.setInterval(() => {
-          const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-          dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
-          const cs = Math.ceil(remainingTime);
-          if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
+        let lastTickRemaining = duration;
+        T.current.roundInterval = window.setInterval(() => {
+           const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+           dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
+           if (remainingTime <= 5.0) {
+              const desiredInterval = Math.max(0.08, remainingTime * 0.2);
+              if (lastTickRemaining - remainingTime >= desiredInterval) {
+                 lastTickRemaining = remainingTime;
+                 wordupAudio.playTicking();
+              }
+           }
             if (remainingTime <= 0) {
                clearT("roundInterval");
                if (useLiveStore.getState().selectedAnswer === null) { wordupAudio.playTimeUp(); cb.current.handleAnswerSelect?.(""); }

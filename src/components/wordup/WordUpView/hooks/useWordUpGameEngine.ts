@@ -435,12 +435,17 @@ export function useWordUpGameEngine(props: EngineProps) {
         }
 
          const startTime = getSyncedNow();
-       let lastTicked = Math.ceil(duration) + 1;
-       T.current.roundInterval = window.setInterval(() => {
-          const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-          dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
-          const cs = Math.ceil(remaining);
-          if (remaining <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
+        let lastTickRemaining = duration;
+        T.current.roundInterval = window.setInterval(() => {
+           const remaining = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+           dispatch({ type: "TICK", timeLeft: parseFloat(remaining.toFixed(2)) });
+           if (remaining <= 5.0) {
+              const desiredInterval = Math.max(0.08, remaining * 0.2);
+              if (lastTickRemaining - remaining >= desiredInterval) {
+                 lastTickRemaining = remaining;
+                 wordupAudio.playTicking();
+              }
+           }
            if (remaining <= 0) { clearT("roundInterval"); if (useWordUpStore.getState().selectedAnswer === null) { wordupAudio.playTimeUp(); cb.current.handleAnswerSelect?.(""); } }
        }, 50);
 
