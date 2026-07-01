@@ -40,6 +40,8 @@ export const mapChallenge = (challenge: any) => {
    };
 };
 
+export const PLAYED_PAGE_SIZE = 30;
+
 export const mapParticipation = (participation: any) => {
    if (!participation) return participation;
    return {
@@ -98,7 +100,8 @@ export const useMyChallenges = (userId: string | undefined) => {
                         challenge:challenges(${CHALLENGE_DETAILS_SELECT})
                     `,
                )
-               .or(`user_id.eq.${userId},guest_id.eq.${userId}`);
+                .or(`user_id.eq.${userId},guest_id.eq.${userId}`)
+                .not("status", "in", '("completed","timed_out","declined")');
 
             if (pError) throw pError;
             participations = pData || [];
@@ -196,6 +199,61 @@ export const useMyChallenges = (userId: string | undefined) => {
       },
    });
 };
+
+/**
+ * Hook to fetch a paginated page of played challenges (completed/timed_out/declined).
+ * Returns 30 items per page with a total count for pagination.
+ * `_section` is set to 'expired' if the challenge has expired, 'played' otherwise.
+ */
+export const usePlayedChallenges = (userId: string | undefined, page: number) =>
+   useQuery({
+      queryKey: ["played-challenges", userId, page],
+      enabled: !!userId,
+      staleTime: 30_000,
+      gcTime: 300_000,
+      queryFn: async () => {
+         if (!userId) return { items: [], total: 0 };
+
+         const from = (page - 1) * PLAYED_PAGE_SIZE;
+         const to = from + PLAYED_PAGE_SIZE - 1;
+
+         const { count: total, error: countError } = await supabase
+            .from("challenge_participants")
+            .select("id", { count: "exact", head: true })
+            .or(`user_id.eq.${userId},guest_id.eq.${userId}`)
+            .in("status", ["completed", "timed_out", "declined"]);
+
+         if (countError) throw countError;
+
+         const { data: raw, error: dataError } = await supabase
+            .from("challenge_participants")
+            .select(`
+               id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words,
+               guest_profiles(username, avatar_url),
+               profiles(username, avatar_url),
+               marathon_progress:challenge_participants_marathon(
+                  id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words
+               ),
+               challenge:challenges(${CHALLENGE_DETAILS_SELECT})
+            `)
+            .or(`user_id.eq.${userId},guest_id.eq.${userId}`)
+            .in("status", ["completed", "timed_out", "declined"])
+            .order("completed_at", { ascending: false })
+            .range(from, to);
+
+         if (dataError) throw dataError;
+
+         const now = new Date();
+
+         const items = (raw || []).map((p: any) => {
+            const mapped = mapParticipation(p);
+            const isExpired = mapped.challenge && new Date(mapped.challenge.expires_at) < now;
+            return { ...mapped, _section: isExpired ? 'expired' : 'played' };
+         });
+
+         return { items, total: total || 0 };
+      },
+   });
 
 /**
  * Hook to fetch all user profiles (for invitations).
