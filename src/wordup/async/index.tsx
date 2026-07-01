@@ -139,42 +139,6 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       triggerToast("Challenge cancelled.", WORDUP_TIMEOUT.TOAST_DURATION);
    }, [clearChallengeResources, setView, triggerToast]);
 
-   const handleStartLive = useCallback(async () => {
-      const target = liveConfirmTarget;
-      setLiveConfirmTarget(null);
-      if (!target || !effectiveUser) return;
-
-      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.email?.split("@")[0] || "Someone";
-
-      useLiveStore.getState().setView("connecting");
-
-      const channel = supabase.channel(`user_signals_${target.id}`);
-      channel.subscribe((status) => {
-         if (status === "SUBSCRIBED") {
-            channel.send({
-               type: "broadcast",
-               event: "wordup_invite",
-               payload: {
-                  senderId: effectiveUser.id,
-                  senderName: myName,
-                  category,
-                  sourceMode: "async",
-               },
-            });
-            setTimeout(() => supabase.removeChannel(channel), 1000);
-         }
-      });
-
-      onSwitchMode?.("live");
-   }, [liveConfirmTarget, effectiveUser, category, onSwitchMode]);
-
-   const handleStartAsync = useCallback(async () => {
-      const target = liveConfirmTarget;
-      setLiveConfirmTarget(null);
-      if (!target) return;
-      await handleChallengePlayer(target, true);
-   }, [liveConfirmTarget, handleChallengePlayer]);
-
    const handleChallengePlayer = useCallback(async (targetUser: any, forceAsync = false) => {
       if (!effectiveUser) return;
 
@@ -274,6 +238,42 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
          setView("menu");
       }, 15000));
    }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
+
+   const handleStartLive = useCallback(async () => {
+      const target = liveConfirmTarget;
+      setLiveConfirmTarget(null);
+      if (!target || !effectiveUser) return;
+
+      const myName = formatUsername(effectiveUser.user_metadata?.username) || effectiveUser.email?.split("@")[0] || "Someone";
+
+      useLiveStore.getState().setView("connecting");
+
+      const channel = supabase.channel(`user_signals_${target.id}`);
+      channel.subscribe((status) => {
+         if (status === "SUBSCRIBED") {
+            channel.send({
+               type: "broadcast",
+               event: "wordup_invite",
+               payload: {
+                  senderId: effectiveUser.id,
+                  senderName: myName,
+                  category,
+                  sourceMode: "async",
+               },
+            });
+            setTimeout(() => supabase.removeChannel(channel), 1000);
+         }
+      });
+
+      onSwitchMode?.("live");
+   }, [liveConfirmTarget, effectiveUser, category, onSwitchMode]);
+
+   const handleStartAsync = useCallback(async () => {
+      const target = liveConfirmTarget;
+      setLiveConfirmTarget(null);
+      if (!target) return;
+      await handleChallengePlayer(target, true);
+   }, [liveConfirmTarget, handleChallengePlayer]);
 
    // Hide global headers during battle
    useEffect(() => {
