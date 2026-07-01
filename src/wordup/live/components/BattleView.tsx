@@ -499,7 +499,7 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={btnClass}
                         >
-                            <span className="flex-1 text-center pr-8">
+                            <span className="text-center">
                                <FormulaRenderer text={choice} />
                             </span>
 
