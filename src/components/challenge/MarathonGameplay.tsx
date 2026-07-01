@@ -453,6 +453,13 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         );
     }
 
+    const isSentence = challenge.salt?.endsWith('_sentence');
+    const activeSentenceGameIndex = useMemo(() => {
+        if (!isSentence) return null;
+        const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);
+        return nextUnfinished ? nextUnfinished.idx : null;
+    }, [isSentence, gamesWithMetadata]);
+
     return (
         <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 sm:gap-6 overflow-y-auto">
             <div className="text-center space-y-1.5 shrink-0">
