@@ -1066,7 +1066,9 @@ const generateSynonymMatch = async (): Promise<WordUpQuestion> => {
    };
 };
 
-const generateWordChain = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
+const generateWordChain = async (
+   allowedLengths: number[],
+): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official } = await loadWordLists(length);
@@ -1091,7 +1093,7 @@ const generateWordChain = async (allowedLengths: number[]): Promise<WordUpQuesti
       fallbackWord = official[Math.floor(Math.random() * official.length)];
       fallbackSuffix = fallbackWord.substring(fallbackWord.length - 2);
       for (const len of allowedLengths) {
-      const list = (await loadWordLists(len)).official;
+         const list = (await loadWordLists(len)).official;
          candidates.push(
             ...list.filter(
                (w) => w.startsWith(fallbackSuffix) && w !== fallbackWord,
@@ -1131,7 +1133,9 @@ const generateWordChain = async (allowedLengths: number[]): Promise<WordUpQuesti
    };
 };
 
-const generateLetterShift = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
+const generateLetterShift = async (
+   allowedLengths: number[],
+): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = await loadWordLists(length);
@@ -1201,7 +1205,9 @@ const generateCompoundBreak = (): WordUpQuestion => {
    };
 };
 
-const generateWordWithin = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
+const generateWordWithin = async (
+   allowedLengths: number[],
+): Promise<WordUpQuestion> => {
    const longLengths = allowedLengths.filter((l) => l >= 7);
    if (longLengths.length === 0) {
       // Fallback: use 7+ if none available
@@ -1277,7 +1283,10 @@ const generateWordWithin = async (allowedLengths: number[]): Promise<WordUpQuest
 
 const DOUBLE_LETTER_PATTERNS = ["LL", "SS", "EE", "OO", "TT"];
 
-const scanWordlistForDoubleLetter = (wordlist: string[], patterns: string[]): string | null => {
+const scanWordlistForDoubleLetter = (
+   wordlist: string[],
+   patterns: string[],
+): string | null => {
    if (wordlist.length === 0) return null;
    const start = Math.floor(Math.random() * wordlist.length);
    for (let i = 0; i < wordlist.length; i++) {
@@ -1287,7 +1296,9 @@ const scanWordlistForDoubleLetter = (wordlist: string[], patterns: string[]): st
    return null;
 };
 
-const generateCryptogram = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
+const generateCryptogram = async (
+   allowedLengths: number[],
+): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = await loadWordLists(length);
@@ -1301,7 +1312,10 @@ const generateCryptogram = async (allowedLengths: number[]): Promise<WordUpQuest
    } while (attempts < 50 && !/([A-Z])\1/.test(word));
 
    if (!/([A-Z])\1/.test(word)) {
-      const scanned = scanWordlistForDoubleLetter(official, DOUBLE_LETTER_PATTERNS);
+      const scanned = scanWordlistForDoubleLetter(
+         official,
+         DOUBLE_LETTER_PATTERNS,
+      );
       if (scanned) word = scanned;
    }
 
@@ -1376,7 +1390,9 @@ const generateCategorySort = (): WordUpQuestion => {
    };
 };
 
-const generateLetterAddRemove = async (allowedLengths: number[]): Promise<WordUpQuestion> => {
+const generateLetterAddRemove = async (
+   allowedLengths: number[],
+): Promise<WordUpQuestion> => {
    const length =
       allowedLengths[Math.floor(Math.random() * allowedLengths.length)];
    const { official, valid } = await loadWordLists(length);
@@ -1530,7 +1546,9 @@ const generateLetterAddRemove = async (allowedLengths: number[]): Promise<WordUp
    };
 };
 
-export const generateWordUpQuestions = async (category: string): Promise<WordUpQuestion[]> => {
+export const generateWordUpQuestions = async (
+   category: string,
+): Promise<WordUpQuestion[]> => {
    const specificTypes: WordUpQuestion["type"][] = [
       "real_fake",
       "length",
@@ -1735,7 +1753,7 @@ export const generateWordUpQuestions = async (category: string): Promise<WordUpQ
          let guess = randomWord();
          let pattern = calculateWordlePattern(target, guess);
 
-         let minColored = 1;
+         let minColored;
          if (target.length <= 3) {
             minColored = 1;
          } else if (target.length <= 5) {
@@ -1973,12 +1991,12 @@ export const generateWordUpQuestions = async (category: string): Promise<WordUpQ
             subPrompt: p.query,
             choices: ["True", "False"],
             answer: answerBool ? "True" : "False",
-            explanation: `The word "${word}" ${answerBool ? 'does' : 'does not'} satisfy: ${p.query}`,
+            explanation: `The word "${word}" ${answerBool ? "does" : "does not"} satisfy: ${p.query}`,
          });
       } else if (type === "math") {
          questions.push(generateMathQuestion());
       } else if (type === "odd_one_out") {
-          questions.push(await generateOddOneOutQuestion(allowedLengths));
+         questions.push(await generateOddOneOutQuestion(allowedLengths));
       } else if (type === "vowel_drop") {
          const word = randomWord();
          const prompt = word.replace(/[AEIOU]/g, "_");
@@ -2117,7 +2135,7 @@ export const generateWordUpQuestions = async (category: string): Promise<WordUpQ
             prompt,
             choices: Array.from(choices).sort((a, b) => Number(a) - Number(b)),
             answer: String(count),
-            explanation: `The word "${word}" has ${count} ${isVowelCount ? 'vowel' : 'consonant'}${count !== 1 ? 's' : ''}.`,
+            explanation: `The word "${word}" has ${count} ${isVowelCount ? "vowel" : "consonant"}${count !== 1 ? "s" : ""}.`,
          });
       } else if (type === "word_ladder") {
          const word = randomWord();
@@ -2180,22 +2198,22 @@ export const generateWordUpQuestions = async (category: string): Promise<WordUpQ
             answer: correctWord,
             explanation: `Change one letter in "${currentWord}" to get "${correctWord}".`,
          });
-       } else if (type === "synonym_match") {
-          questions.push(await generateSynonymMatch());
-       } else if (type === "word_chain") {
-          questions.push(await generateWordChain(allowedLengths));
-       } else if (type === "letter_shift") {
-          questions.push(await generateLetterShift(allowedLengths));
-       } else if (type === "compound_break") {
-          questions.push(generateCompoundBreak());
-       } else if (type === "word_within") {
-          questions.push(await generateWordWithin(allowedLengths));
-       } else if (type === "cryptogram") {
-          questions.push(await generateCryptogram(allowedLengths));
-       } else if (type === "category_sort") {
-          questions.push(generateCategorySort());
-       } else if (type === "letter_add_remove") {
-          questions.push(await generateLetterAddRemove(allowedLengths));
+      } else if (type === "synonym_match") {
+         questions.push(await generateSynonymMatch());
+      } else if (type === "word_chain") {
+         questions.push(await generateWordChain(allowedLengths));
+      } else if (type === "letter_shift") {
+         questions.push(await generateLetterShift(allowedLengths));
+      } else if (type === "compound_break") {
+         questions.push(generateCompoundBreak());
+      } else if (type === "word_within") {
+         questions.push(await generateWordWithin(allowedLengths));
+      } else if (type === "cryptogram") {
+         questions.push(await generateCryptogram(allowedLengths));
+      } else if (type === "category_sort") {
+         questions.push(generateCategorySort());
+      } else if (type === "letter_add_remove") {
+         questions.push(await generateLetterAddRemove(allowedLengths));
       }
    }
 
@@ -2232,7 +2250,7 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
    },
    fast: { name: "Speedy", accuracy: 0.85, minDelay: 1.5, maxDelay: 2 },
    master: {
-      name: "Zeeny",
+      name: "Zinny",
       accuracy: 0.97,
       minDelay: 1,
       maxDelay: 2,
@@ -2294,7 +2312,7 @@ export const BOT_PROFILES: Record<string, BotProfile> = {
       maxDelay: 5.5,
    },
    ogbonge_mind: {
-      name: "Ogbeni",
+      name: "Shelly",
       accuracy: 0.9,
       minDelay: 1.8,
       maxDelay: 4.0,
@@ -2330,7 +2348,10 @@ export const simulateBotResponse = (
    if (correct) {
       const eff = Math.max(0, time_taken - 1.5);
       const denom = duration - 1.5;
-      points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
+      points = Math.max(
+         11,
+         Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
+      );
    }
 
    return { correct, time_taken, points };

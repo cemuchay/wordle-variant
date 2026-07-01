@@ -121,8 +121,8 @@ Always consider bundle size.
 - verify each unit works
 - write tests for each unit
 - run tests and make sure they pass
-- run build via npm run build using cmd and make sure it works
-- run lint via npm run lint and make sure it works
+- run build via npm run build using cmd.exe and make sure it works
+- run lint via npm run lint using cmd.exe and make sure it works
 
 ## Git
 
