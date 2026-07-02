@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RotateCcw, Search, UserPlus, Shuffle } from "lucide-react";
+import { Swords, HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RotateCcw, Search, UserPlus, Shuffle, GraduationCap } from "lucide-react";
 import { CATEGORIES } from "../../shared/constants";
 import { type ProfileStats } from "../../shared/types";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
@@ -29,6 +29,7 @@ interface AsyncLobbyViewProps {
    onRefreshHistory: () => void;
    onSwitchMode?: () => void;
    onBack?: () => void;
+   onTutorial?: () => void;
 }
 
 export const LobbyView = ({
@@ -51,6 +52,7 @@ export const LobbyView = ({
    onRefreshPending,
    onRefreshHistory,
    onSwitchMode,
+   onTutorial,
 }: AsyncLobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -444,12 +446,21 @@ export const LobbyView = ({
                            <div className="bg-indigo-950/20 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Missing Letter</strong> Complete the blank to spell a valid word.
                            </div>
-                           <div className="bg-indigo-950/20 p-2 rounded-lg">
-                              <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
-                           </div>
-                        </div>
-                     </div>
-                  </motion.div>
+                            <div className="bg-indigo-950/20 p-2 rounded-lg">
+                               <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
+                            </div>
+                         </div>
+                      </div>
+                      {onTutorial && (
+                         <button
+                            onClick={onTutorial}
+                            className="w-full flex items-center justify-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all border border-indigo-500/20 cursor-pointer"
+                         >
+                            <GraduationCap size={13} />
+                            Play Tutorial
+                         </button>
+                      )}
+                   </motion.div>
                )}
             </AnimatePresence>
          </div>

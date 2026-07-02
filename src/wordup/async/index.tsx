@@ -27,9 +27,10 @@ import formatUsername from '../../utils/formatUsername';
 interface AsyncViewProps {
    onBack?: () => void;
    onSwitchMode?: (mode: "live" | "async") => void;
+   onTutorial?: () => void;
 }
 
-export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
+export const AsyncView = ({ onBack, onSwitchMode, onTutorial }: AsyncViewProps) => {
    const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
@@ -440,8 +441,9 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
-                  onSwitchMode={() => onSwitchMode?.("live")}
-                  onBack={() => onBack?.()}
+                   onSwitchMode={() => onSwitchMode?.("live")}
+                   onBack={() => onBack?.()}
+                   onTutorial={onTutorial}
                />
             )}
             {view === "loading" && <LoadingView message={connectingMsg} onCancel={handleCancelChallenge} />}

@@ -1,18 +1,29 @@
 import { motion } from "framer-motion";
-import { Swords, Zap } from "lucide-react";
+import { Swords, Zap, GraduationCap } from "lucide-react";
 
 interface ModeSelectProps {
    onSelect: (mode: "live" | "async") => void;
+   onTutorial?: () => void;
 }
 
-export const ModeSelect = ({ onSelect }: ModeSelectProps) => {
+export const ModeSelect = ({ onSelect, onTutorial }: ModeSelectProps) => {
    return (
       <motion.div
          initial={{ opacity: 0, y: 15 }}
          animate={{ opacity: 1, y: 0 }}
          exit={{ opacity: 0, y: -15 }}
-         className="flex flex-col items-center justify-center flex-1 gap-8 px-6 py-12"
+         className="flex flex-col items-center justify-center flex-1 gap-8 px-6 py-12 relative"
       >
+         {onTutorial && (
+            <button
+               onClick={onTutorial}
+               className="absolute top-4 right-4 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+               title="Play Tutorial"
+            >
+               <GraduationCap size={16} />
+            </button>
+         )}
+
          <div className="text-center space-y-2">
             {/* Flex container to place icon and heading side-by-side */}
             <div className="flex items-center justify-center gap-4">
