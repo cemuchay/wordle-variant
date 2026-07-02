@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Swords } from "lucide-react";
+import { Swords, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useApp } from "../../context/AppContext";
 import { useServerTime } from "../shared/useServerTime";
@@ -27,9 +27,10 @@ import formatUsername from '../../utils/formatUsername';
 interface AsyncViewProps {
    onBack?: () => void;
    onSwitchMode?: (mode: "live" | "async") => void;
+   onTutorial?: () => void;
 }
 
-export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
+export const AsyncView = ({ onBack, onSwitchMode, onTutorial }: AsyncViewProps) => {
    const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
@@ -237,6 +238,14 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
       setIsBattlePlaying(view === "battle");
    }, [view, setIsBattlePlaying]);
 
+   // Auto-trigger startMatch when store is set externally (e.g., invite accept)
+   useEffect(() => {
+      if (view === "loading" && matchId && role && engine.state.phase === "idle") {
+         startMatch?.(matchId, role);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [view, matchId, role, startMatch]);
+
    // Load pending and history matches
    const refreshPending = useCallback(async () => {
       setIsLoadingData(true);
@@ -401,8 +410,17 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                         className="bg-indigo-500 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer">Play</button>
                   </div>
                </div>
-            )}
-         </div>
+          )}
+          {view !== "menu" && (
+             <button
+                onClick={handleToggleSound}
+                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                title="Toggle Sound"
+             >
+                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+             </button>
+          )}
+       </div>
       );
    }
 
@@ -423,8 +441,9 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                   onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
-                  onSwitchMode={() => onSwitchMode?.("live")}
-                  onBack={() => onBack?.()}
+                   onSwitchMode={() => onSwitchMode?.("live")}
+                   onBack={() => onBack?.()}
+                   onTutorial={onTutorial}
                />
             )}
             {view === "loading" && <LoadingView message={connectingMsg} onCancel={handleCancelChallenge} />}
@@ -438,15 +457,13 @@ export const AsyncView = ({ onBack, onSwitchMode }: AsyncViewProps) => {
                />
             )}
             {view === "turn_submitted" && (
-               <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                  <h2 className="text-xl font-black text-white tracking-wider">Game Complete!</h2>
-                  <p className="text-sm text-gray-400 mt-3 leading-relaxed max-w-xs">
-                     All questions answered. Waiting for your opponent to finish their turn.
-                  </p>
-                  <button onClick={resetGame} className="mt-8 text-xs text-gray-500 hover:text-white font-bold uppercase tracking-wider underline transition-colors cursor-pointer">
-                     Back to Lobby
-                  </button>
-               </div>
+               <GameOverView
+                  matchData={matchData}
+                  setView={(newView) => {
+                     if (newView === "menu") resetGame();
+                  }}
+                  role={role}
+               />
             )}
             {view === "gameover" && (
                <GameOverView

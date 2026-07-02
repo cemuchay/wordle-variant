@@ -24,6 +24,7 @@ import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { GuestBanner } from "./components/GuestBanner";
 import { TutorialModal } from "./components/TutorialModal";
+import { WordupTutorialModal } from "./wordup/components/WordupTutorialModal";
 import { useApp } from "./context/AppContext";
 import { useDiscoverChallenges, useMyChallenges, useBulkChallengeParticipants } from "./hooks/queries/useChallengeQueries";
 import { useAuth } from "./hooks/useAuth";
@@ -75,6 +76,11 @@ export default function App() {
   );
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isLeavingWelcome, setIsLeavingWelcome] = useState(false);
+
+  const [hasSeenWordupTutorial, setHasSeenWordupTutorial] = useState(() =>
+    safeLocalStorage.getItem('wordup_tutorial_completed') === 'true',
+  );
+  const [isWordupTutorialOpen, setIsWordupTutorialOpen] = useState(false);
 
   const isPlayingChallenge = useChallengeStore((s) => s.isPlaying);
   const selectedChallenge = useChallengeStore((s) => s.selectedChallenge);
@@ -301,6 +307,20 @@ export default function App() {
       setIsTutorialOpen(true);
     }
   }, [showTutorial]);
+
+  // Trigger Wordup tutorial for first-time Wordup visitors
+  const showWordupTutorial =
+    isWordUpOpen &&
+    !isWordupTutorialOpen &&
+    !hasSeenWordupTutorial &&
+    !isTutorialOpen &&
+    (user || guestOptedIn);
+
+  useEffect(() => {
+    if (showWordupTutorial) {
+      setIsWordupTutorialOpen(true);
+    }
+  }, [showWordupTutorial]);
 
   // Preload ChatRoom in the background when the app is idle
   useEffect(() => {
@@ -862,7 +882,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -999,15 +1019,41 @@ export default function App() {
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   {wordupMode === null ? (
-                    <ModeSelect onSelect={(mode: "live" | "async") => {
-                      setWordupMode(mode);
-                    }} />
+                    <ModeSelect
+                      onSelect={(mode: "live" | "async") => {
+                        setWordupMode(mode);
+                      }}
+                      onTutorial={() => setIsWordupTutorialOpen(true)}
+                    />
                   ) : wordupMode === "live" ? (
-                    <LiveView onBack={() => setWordupMode(null)} onSwitchMode={setWordupMode} />
+                    <LiveView
+                      onBack={() => setWordupMode(null)}
+                      onSwitchMode={setWordupMode}
+                      onTutorial={() => setIsWordupTutorialOpen(true)}
+                    />
                   ) : (
-                    <AsyncView onBack={() => setWordupMode(null)} onSwitchMode={setWordupMode} />
+                    <AsyncView
+                      onBack={() => setWordupMode(null)}
+                      onSwitchMode={setWordupMode}
+                      onTutorial={() => setIsWordupTutorialOpen(true)}
+                    />
                   )}
                 </Suspense>
+
+                {isWordupTutorialOpen && (
+                  <WordupTutorialModal
+                    onComplete={() => {
+                      safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
+                      setHasSeenWordupTutorial(true);
+                      setIsWordupTutorialOpen(false);
+                    }}
+                    onSkip={() => {
+                      safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
+                      setHasSeenWordupTutorial(true);
+                      setIsWordupTutorialOpen(false);
+                    }}
+                  />
+                )}
               </div>
             )}
 
@@ -1057,7 +1103,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}

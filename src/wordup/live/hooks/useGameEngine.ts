@@ -145,12 +145,7 @@ export function useGameEngine(props: EngineProps) {
       }
    }, [state.phase, triggerToast]);
 
-   // ── Ambient audio ─────────────────────────────────────────────────────
-   useEffect(() => {
-      if (state.phase === "countdown" || state.phase === "playing" || state.phase === "reveal") wordupAudio.startAmbient();
-      else wordupAudio.stopAmbient();
-      return () => wordupAudio.stopAmbient();
-   }, [state.phase]);
+
 
    // ══════════════════════════════════════════════════════════════════════
    // CORE GAME FLOW
@@ -317,6 +312,9 @@ export function useGameEngine(props: EngineProps) {
       const finalMatch = { ...match, status: "completed", p1_answered: true, p2_answered: true, completed_at: completedAt };
 
       if (gameType === "live") {
+         const myScore = S.current.role === "player1" ? match.p1_score : match.p2_score;
+         const oppScore = S.current.role === "player1" ? match.p2_score : match.p1_score;
+         if (myScore > oppScore) wordupAudio.playVictory(); else if (myScore < oppScore) wordupAudio.playDefeat();
          dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
          dispatch({ type: "SET_PHASE", phase: "gameover" });
          onGameOver(finalMatch);
@@ -374,6 +372,9 @@ export function useGameEngine(props: EngineProps) {
          }
       }
       if (gameType !== "live") {
+         const myScore = S.current.role === "player1" ? finalMatch.p1_score : finalMatch.p2_score;
+         const oppScore = S.current.role === "player1" ? finalMatch.p2_score : finalMatch.p1_score;
+         if (myScore > oppScore) wordupAudio.playVictory(); else if (myScore < oppScore) wordupAudio.playDefeat();
          dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
          dispatch({ type: "SET_PHASE", phase: "gameover" });
          onGameOver(finalMatch);
@@ -399,20 +400,31 @@ export function useGameEngine(props: EngineProps) {
 
        dispatch({ type: "SET_ROUND", round: index, timeLeft: remaining, maxTime: duration });
        dispatch({ type: "CLEAR_ANSWER" }); dispatch({ type: "HIDE_REVEAL" });
-       G.current.isSubmitting = false;
+        G.current.isSubmitting = false;
 
-       const startTime = _match?.question_started_at && _match?.status === "active"
+        if (index === 6) {
+           wordupAudio.playFinalRound();
+        } else if (index > 0) {
+           wordupAudio.playRoundTransition();
+        }
+
+         const startTime = _match?.question_started_at && _match?.status === "active"
           ? new Date(_match.question_started_at).getTime()
           : getSyncedNow();
-       let lastTicked = Math.ceil(remaining) + 1;
-       T.current.roundInterval = window.setInterval(() => {
-          const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-          dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
-          const cs = Math.ceil(remainingTime);
-          if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-           if (remainingTime <= 0) {
-              clearT("roundInterval");
-              if (useLiveStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.("");
+        let lastTickRemaining = duration;
+        T.current.roundInterval = window.setInterval(() => {
+           const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+           dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
+           if (remainingTime <= 5.0) {
+              const desiredInterval = Math.max(0.08, remainingTime * 0.2);
+              if (lastTickRemaining - remainingTime >= desiredInterval) {
+                 lastTickRemaining = remainingTime;
+                 wordupAudio.playTicking();
+              }
+           }
+            if (remainingTime <= 0) {
+               clearT("roundInterval");
+               if (useLiveStore.getState().selectedAnswer === null) { wordupAudio.playTimeUp(); cb.current.handleAnswerSelect?.(""); }
               const cur = S.current.matchData;
               if (cur && gameType === "live") {
                  const isP1 = S.current.role === "player1";
@@ -489,10 +501,11 @@ export function useGameEngine(props: EngineProps) {
                 dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(display || "0") });
              }
 
-             if (remaining <= 0) {
-                clearT("countdownInterval");
-                dispatch({ type: "SET_PHASE", phase: "playing" });
-                if (role === "player2" && !match.id?.startsWith("bot-match-"))
+              if (remaining <= 0) {
+                 clearT("countdownInterval");
+                 dispatch({ type: "SET_PHASE", phase: "playing" });
+                 wordupAudio.playGameStart();
+                 if (role === "player2" && !match.id?.startsWith("bot-match-"))
                    supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id)
                       .then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
                 channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);
@@ -504,10 +517,11 @@ export function useGameEngine(props: EngineProps) {
           dispatch({ type: "SET_COUNTDOWN_TEXT", text: "3" });
           T.current.countdownInterval = window.setInterval(() => {
              c--;
-             if (c === 0) {
-                clearT("countdownInterval");
-                dispatch({ type: "SET_PHASE", phase: "playing" });
-                if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-"))
+              if (c === 0) {
+                 clearT("countdownInterval");
+                 dispatch({ type: "SET_PHASE", phase: "playing" });
+                 wordupAudio.playGameStart();
+                 if ((role === "player2" || match.is_bot_match) && match.status !== "waiting" && !match.id?.startsWith("bot-match-"))
                    supabase.from("wordup_matches").update({ status: "active" }).eq("id", match.id)
                       .then(({ error }: any) => { if (error) console.error("Failed to set active:", error); });
                 if (match.game_type === "live") channel.current?.send({ type: "broadcast", event: "game_active", payload: {} }).catch(console.error);

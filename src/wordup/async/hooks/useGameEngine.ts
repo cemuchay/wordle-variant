@@ -134,11 +134,7 @@ export function useGameEngine(props: EngineProps) {
       }
    }, [state.phase, triggerToast]);
 
-   useEffect(() => {
-      if (state.phase === "countdown" || state.phase === "playing" || state.phase === "reveal") wordupAudio.startAmbient();
-      else wordupAudio.stopAmbient();
-      return () => wordupAudio.stopAmbient();
-   }, [state.phase]);
+
 
    // ══════════════════════════════════════════════════════════════════════
    // CORE GAME FLOW
@@ -281,11 +277,14 @@ export function useGameEngine(props: EngineProps) {
                }
             }, 3, 1000), true);
 
-         if (myDone && oppDone) {
-            safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
-            safeLocalStorage.removeItem("wordup_async_active_game");
-            dispatch({ type: "SET_PHASE", phase: "gameover" });
-            onGameOver(upd);
+          if (myDone && oppDone) {
+             safeSessionStorage.setItem("wordup_completed_" + upd.id, "true");
+             safeLocalStorage.removeItem("wordup_async_active_game");
+             const myScore = S.current.role === "player1" ? upd.p1_score : upd.p2_score;
+             const oppScore = S.current.role === "player1" ? upd.p2_score : upd.p1_score;
+             if (myScore > oppScore) wordupAudio.playVictory(); else if (myScore < oppScore) wordupAudio.playDefeat();
+             dispatch({ type: "SET_PHASE", phase: "gameover" });
+             onGameOver(upd);
          } else if (myDone) {
             safeLocalStorage.removeItem("wordup_async_active_game");
             dispatch({ type: "SET_PHASE", phase: "turn_submitted" });
@@ -351,19 +350,30 @@ export function useGameEngine(props: EngineProps) {
       dispatch({ type: "HIDE_REVEAL" });
       G.current.isSubmitting = false;
 
+      if (index === 6) {
+         wordupAudio.playFinalRound();
+      } else if (index > 0) {
+         wordupAudio.playRoundTransition();
+      }
+
       const startTime = getSyncedNow() - (elapsed * 1000);
       S.current.roundStartedAt = startTime;
 
-      let lastTicked = Math.ceil(remaining) + 1;
-      T.current.roundInterval = window.setInterval(() => {
-         const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
-         dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
-         const cs = Math.ceil(remainingTime);
-         if (remainingTime <= 3.0 && cs < lastTicked) { lastTicked = cs; wordupAudio.playTicking(); }
-         if (remainingTime <= 0) {
-            clearT("roundInterval");
-            if (useAsyncStore.getState().selectedAnswer === null) cb.current.handleAnswerSelect?.("");
-         }
+        let lastTickRemaining = duration;
+        T.current.roundInterval = window.setInterval(() => {
+           const remainingTime = Math.max(0, duration - (getSyncedNow() - startTime) / 1000);
+           dispatch({ type: "TICK", timeLeft: parseFloat(remainingTime.toFixed(2)) });
+           if (remainingTime <= 5.0) {
+              const desiredInterval = Math.max(0.08, remainingTime * 0.2);
+              if (lastTickRemaining - remainingTime >= desiredInterval) {
+                 lastTickRemaining = remainingTime;
+                 wordupAudio.playTicking();
+              }
+           }
+          if (remainingTime <= 0) {
+             clearT("roundInterval");
+             if (useAsyncStore.getState().selectedAnswer === null) { wordupAudio.playTimeUp(); cb.current.handleAnswerSelect?.(""); }
+          }
       }, 50);
    }, [getSyncedNow]);
    cb.current.startQuestionRound = startQuestionRound;
@@ -377,8 +387,9 @@ export function useGameEngine(props: EngineProps) {
          c--;
          if (c <= 0) {
             clearT("countdownInterval");
-            dispatch({ type: "SET_PHASE", phase: "playing" });
-            cb.current.startQuestionRound?.(match, 0);
+             dispatch({ type: "SET_PHASE", phase: "playing" });
+             wordupAudio.playGameStart();
+             cb.current.startQuestionRound?.(match, 0);
          } else {
             dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
          }

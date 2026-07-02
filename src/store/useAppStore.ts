@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { type GameStats } from "../types/game";
-import { safeLocalStorage, safeSessionStorage, asyncStorage } from "../utils/storage";
+import { safeLocalStorage, asyncStorage } from "../utils/storage";
 
 interface UserPreferences {
    allowRoasts: boolean;
@@ -184,7 +184,7 @@ interface AppState {
          previewImage: null,
           challengePresets: [],
            isPWAInstalled: false,
-            wordupMode: (safeSessionStorage.getItem("wordup_mode") as "live" | "async" | null) || null,
+            wordupMode: (safeLocalStorage.getItem("wordup_mode") as "live" | "async" | null) || null,
             pendingAsyncMatchId: null,
 
           // Actions
@@ -300,7 +300,7 @@ interface AppState {
             })),
           setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
            setWordupMode: (wordupMode) => {
-              safeSessionStorage.setItem("wordup_mode", wordupMode ?? "");
+              safeLocalStorage.setItem("wordup_mode", wordupMode ?? "");
               set({ wordupMode });
            },
            setPendingAsyncMatchId: (pendingAsyncMatchId) => set({ pendingAsyncMatchId }),
