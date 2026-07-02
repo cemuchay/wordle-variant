@@ -124,7 +124,7 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   const tileClass = `
     flex items-center justify-center 
     font-bold uppercase transition-colors duration-300
-    border-2 text-white rounded-md
+    border-2 text-white
   `;
 
   let statusClass = 'border-gray-800';
