@@ -115,16 +115,43 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
     scale = { h: 0.7, w: 0.7 }
   }
 
-  if (isDesktop && wordLength > 6) {
-    scale = { h: 0.85, w: 0.85 }
+  if (isSuperTiny && !isChallenge) {
+    scale = { h: 0.8, w: 0.8 }
   }
+
+
+  if (isDesktop && wordLength > 6 && !isChallenge) {
+    scale = { h: 1.05, w: 1.05 }
+  }
+
+  /* challenge specific */
+  if (isChallenge) {
+    if (wordLength === 7) {
+      if (!isPWA && isSuperTiny) {
+        scale = {
+          h: 1.05, w: 1.05
+        }
+      }
+      if (!isPWA && isSmall) {
+        scale = {
+          h: 1.2, w: 1.2
+        }
+      }
+      if (!isPWA && !isDesktop && !isSuperTiny && !isSmall) {
+        scale = {
+          h: 1.1, w: 1.1
+        }
+      }
+    }
+  }
+
   const finalWidth = dimensions.w * scale.w;
   const finalHeight = dimensions.h * scale.h;
 
   const tileClass = `
     flex items-center justify-center 
     font-bold uppercase transition-colors duration-300
-    border-2 text-white
+    border-2 text-white ${wordLength > 5 ? "rounded-md" : ""}
   `;
 
   let statusClass = 'border-gray-800';

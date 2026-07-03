@@ -358,7 +358,29 @@ export const useDiscoverChallenges = () => {
             .order("created_at", { ascending: false });
 
          if (error) throw error;
-         return (data || []).map(mapChallenge);
+         const mapped = (data || []).map(mapChallenge);
+         try {
+            safeLocalStorage.setItem(
+               "wordle_discover_challenges_cache",
+               JSON.stringify(mapped),
+            );
+         } catch (e) {
+            console.error("Failed to cache discover challenges", e);
+         }
+         return mapped;
+      },
+      placeholderData: () => {
+         try {
+            const cached = safeLocalStorage.getItem(
+               "wordle_discover_challenges_cache",
+            );
+            if (cached) {
+               return JSON.parse(cached);
+            }
+         } catch (e) {
+            console.error("Failed to load placeholder discover challenges cache", e);
+         }
+         return undefined;
       },
    });
 };

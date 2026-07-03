@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
 import { HelpCircle, X } from 'lucide-react';
 import { Grid } from '../Grid';
 import { Keyboard } from '../Keyboard';
 import type { GuessResult, LetterStatus } from '../../types/game';
 import { ANIMATION_DURATION } from '../../constants/ui';
-import { MarathonBanner } from '../common/MarathonBanner';
+
 import { useApp } from '../../context/AppContext';
 
 interface GameAreaProps {
@@ -25,10 +24,7 @@ interface GameAreaProps {
     onEnter: () => void;
     onSetCursor?: (index: number) => void;
     onSetEditIndex?: (index: number | null) => void;
-    activeDailyMarathons: any[];
-    setIsChallengeOpen: any;
-    setSelectedChallengeId: any;
-    isAuthenticated: boolean;
+    isAlreadyPlayed?: boolean;
 }
 
 export const GameArea = ({
@@ -48,13 +44,10 @@ export const GameArea = ({
     onEnter,
     onSetCursor,
     onSetEditIndex,
-    activeDailyMarathons,
-    setIsChallengeOpen,
-    setSelectedChallengeId,
-    isAuthenticated,
+    isAlreadyPlayed = false,
 }: GameAreaProps) => {
     const { preferences } = useApp();
-    const wasGameOverOnMount = useRef(isGameOver);
+    const wasGameOverOnMount = useRef(isGameOver || isAlreadyPlayed);
     // eslint-disable-next-line react-hooks/refs
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
     const [showHelp, setShowHelp] = useState(false);
@@ -86,8 +79,8 @@ export const GameArea = ({
     }, [showHelp]);
 
     useEffect(() => {
-        if (isGameOver) {
-            if (wasGameOverOnMount.current) {
+        if (isGameOver || isAlreadyPlayed) {
+            if (wasGameOverOnMount.current || isAlreadyPlayed) {
                 setHideKeyboard(true);
             } else {
                 const hideDelay = wordLength * 400 + 400; // Match TILE_REVEAL + padding
@@ -101,21 +94,11 @@ export const GameArea = ({
             setHideKeyboard(false);
             wasGameOverOnMount.current = false;
         }
-    }, [isGameOver, wordLength]);
+    }, [isGameOver, isAlreadyPlayed, wordLength]);
 
     return (
         <div className="gameplay-container flex-1 flex flex-col justify-between min-h-0 w-full px-2 pt-2 pb-0.5 sm:pt-2 sm:pb-1 gap-2 sm:gap-4">
-            {isGameOver && activeDailyMarathons.length > 0 && hideKeyboard && isAuthenticated && (
-                <div className="mb-2 mx-auto w-full max-w-md shrink-0">
-                    <MarathonBanner
-                        challenges={activeDailyMarathons}
-                        onClick={(challenge) => {
-                            setSelectedChallengeId(challenge.challenge_id || challenge.challenge?.id);
-                            setIsChallengeOpen(true);
-                        }}
-                    />
-                </div>
-            )}
+
 
 
             <div className="flex-1 flex items-center justify-center min-h-0 w-full relative pt-6 sm:pt-2">

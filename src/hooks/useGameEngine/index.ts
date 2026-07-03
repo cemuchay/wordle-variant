@@ -24,7 +24,7 @@ export const useGameEngine = (
    isAuthLoading: boolean,
 ) => {
    const [state, dispatch] = useReducer(gameReducer, initialState, () => {
-      if (!date) return initialState;
+      if (!date || isAuthLoading) return initialState;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
@@ -51,7 +51,7 @@ export const useGameEngine = (
    });
 
    const [isHydrated, setIsHydrated] = useState(() => {
-      if (!date) return false;
+      if (!date || isAuthLoading) return false;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
@@ -64,7 +64,7 @@ export const useGameEngine = (
    });
 
    const [config, setConfig] = useState<GameConfig | null>(() => {
-      if (!date) return null;
+      if (!date || isAuthLoading) return null;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
@@ -100,7 +100,7 @@ export const useGameEngine = (
 
    // EARLY: Cache-first hydration — render immediately if saved state exists for today
    useEffect(() => {
-      if (!date || cachedHydrationDoneRef.current) return;
+      if (!date || isAuthLoading || cachedHydrationDoneRef.current) return;
       const saved = safeLocalStorage.getItem(`wordle-${date}`);
       const lastTimestamp = safeLocalStorage.getItem(
          "wordle_last_hydrated_timestamp",
@@ -110,6 +110,10 @@ export const useGameEngine = (
 
       try {
          const payload = JSON.parse(saved);
+         const savedIsGuest = !!payload.isGuest;
+         const currentIsGuest = !user;
+         if (savedIsGuest !== currentIsGuest) return;
+
          if (payload.config?.word) {
             const localSalt = getLocalSalt(date, user?.id);
             payload.config.word = deobfuscateWord(
@@ -125,8 +129,7 @@ export const useGameEngine = (
       } catch {
          // Cache corrupted — fall through to normal hydration
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [date]);
+   }, [date, isAuthLoading, user]);
 
    useEffect(() => {
       if (!date) return;
@@ -213,7 +216,7 @@ export const useGameEngine = (
          cachedHydrationDoneRef.current = false;
       }
 
-      if (isDateChanged || !isHydrated) {
+      if (isDateChanged || (isUserOrConfigChanged && !cachedHydrationDoneRef.current) || !isHydrated) {
          setIsHydrated(false);
       }
 
