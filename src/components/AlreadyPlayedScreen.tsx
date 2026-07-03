@@ -66,7 +66,7 @@ export const AlreadyPlayedScreen = ({
           <div className="inline-flex p-3 bg-indigo-500/10 rounded-full border border-indigo-500/20 text-indigo-400 mb-2">
             <Sparkles className="animate-pulse" size={28} />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
+          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-gray-200 to-gray-400">
             Already Played
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 font-medium max-w-xs mx-auto">

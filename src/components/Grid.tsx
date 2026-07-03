@@ -112,11 +112,7 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
 
   }
   if (isSuperTiny) {
-    scale = { h: 0.7, w: 0.7 }
-  }
-
-  if (isSuperTiny && !isChallenge) {
-    scale = { h: 0.8, w: 0.8 }
+    scale = { h: 0.65, w: 0.65 }
   }
 
 
