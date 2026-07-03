@@ -65,13 +65,13 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
     return (
         <div
             onClick={() => onClick(challenge)}
-            className={`w-full text-left bg-linear-to-r ${config.bg} border ${config.border} p-3 sm:p-4 rounded-2xl ${config.hoverBorder} transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-xl backdrop-blur-md group cursor-pointer`}
+            className={`w-full text-left bg-linear-to-r ${config.bg} border ${config.border} p-2 sm:p-2 sm:px-3 rounded-2xl ${config.hoverBorder} transition-all duration-300 relative overflow-hidden flex flex-col gap-3 shadow-xl backdrop-blur-md group cursor-pointer`}
         >
-            <div className={`absolute top-0 right-0 h-16 w-36 bg-white/5 blur-3xl -mr-12 -mt-12 pointer-events-none group-hover:bg-white/10 transition-colors duration-500`} />
+            <div className={`absolute top-0 right-0 h-14 w-30 bg-white/5 blur-3xl -mr-12 -mt-12 pointer-events-none group-hover:bg-white/10 transition-colors duration-500`} />
 
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-2">
-                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${config.accent} text-white border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+                    <span className={`flex items-center gap-1.5 px-1.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest ${config.accent} text-white border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
                         <Sparkles size={12} className="animate-pulse" />
                         Daily Marathon
                     </span>
