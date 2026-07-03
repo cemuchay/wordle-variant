@@ -40,6 +40,7 @@ import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
+import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -164,7 +165,7 @@ export default function App() {
 
   // Initial Challenges Fetch using TanStack Query
   const { data: myChallenges } = useMyChallenges(user?.id);
-  const { data: discoverChallenges } = useDiscoverChallenges();
+  const { data: discoverChallenges, isLoading: isMarathonLoading, isError: isMarathonError } = useDiscoverChallenges();
 
   const botMarathonIds = useMemo(() =>
     (discoverChallenges || [])
@@ -236,6 +237,26 @@ export default function App() {
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
+  
+  const [dismissedAlreadyPlayed, setDismissedAlreadyPlayed] = useState(() => {
+    return safeSessionStorage.getItem("wordle_already_played_dismissed") === "true";
+  });
+
+  const isAlreadyPlayedTodayOnLoad = useMemo(() => {
+    if (!isHydrated || !date || !user) return false;
+    const saved = safeLocalStorage.getItem(`wordle-${date}`);
+    if (!saved) return false;
+    try {
+      const payload = JSON.parse(saved);
+      const isFinished = payload.status === "won" || payload.status === "lost" || (payload.guesses && payload.guesses.length >= (payload.config?.maxAttempts ?? 6));
+      return !!isFinished;
+    } catch {
+      return false;
+    }
+  }, [isHydrated, date, user]);
+
+  const showAlreadyPlayedScreen = !!(user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
+
   const [navLoading] = useState<{ active: boolean; message: string }>({
     active: false,
     message: "",
@@ -758,6 +779,11 @@ export default function App() {
       return;
     }
 
+    if (item !== "play") {
+      safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
+      setDismissedAlreadyPlayed(true);
+    }
+
     setIsChatOpen(item === "chat");
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
@@ -882,7 +908,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
@@ -951,28 +977,40 @@ export default function App() {
           >
             {activeNavigationItem === "play" && (
               <main className="h-full flex flex-col bg-dark text-white p-2 sm:p-4">
-                <GameArea
-                  wordLength={config?.length ?? 5}
-                  maxAttempts={config?.maxAttempts ?? 6}
-                  guesses={state.guesses}
-                  currentGuess={state.currentGuess}
-                  cursorIndex={state.cursorIndex}
-                  editIndex={state.editIndex}
-                  letterStatuses={state.letterStatuses}
-                  hintRecord={state.hintRecord}
-                  isGameOver={state.isGameOver}
-                  isShake={state.isShake}
-                  isSaving={state.syncStatus === "syncing"}
-                  onChar={actions.onChar}
-                  onDelete={actions.onDelete}
-                  onEnter={actions.onEnter}
-                  onSetCursor={actions.onSetCursor}
-                  onSetEditIndex={actions.onSetEditIndex}
-                  activeDailyMarathons={activeDailyMarathons}
-                  setSelectedChallengeId={setSelectedChallengeId}
-                  setIsChallengeOpen={setIsChallengeOpen}
-                  isAuthenticated={user ? true : false}
-                />
+                {user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed ? (
+                  <AlreadyPlayedScreen
+                    onNavigate={handleNavigation}
+                    onAdmirePuzzle={() => {
+                      safeSessionStorage.setItem("wordle_already_played_dismissed", "true");
+                      setDismissedAlreadyPlayed(true);
+                    }}
+                    activeDailyMarathons={activeDailyMarathons}
+                    isMarathonLoading={isMarathonLoading}
+                    isMarathonError={isMarathonError}
+                    setSelectedChallengeId={setSelectedChallengeId}
+                    setIsChallengeOpen={setIsChallengeOpen}
+                  />
+                ) : (
+                  <GameArea
+                    wordLength={config?.length ?? 5}
+                    maxAttempts={config?.maxAttempts ?? 6}
+                    guesses={state.guesses}
+                    currentGuess={state.currentGuess}
+                    cursorIndex={state.cursorIndex}
+                    editIndex={state.editIndex}
+                    letterStatuses={state.letterStatuses}
+                    hintRecord={state.hintRecord}
+                    isGameOver={state.isGameOver}
+                    isShake={state.isShake}
+                    isSaving={state.syncStatus === "syncing"}
+                    onChar={actions.onChar}
+                    onDelete={actions.onDelete}
+                    onEnter={actions.onEnter}
+                    onSetCursor={actions.onSetCursor}
+                    onSetEditIndex={actions.onSetEditIndex}
+                    isAlreadyPlayed={isAlreadyPlayedTodayOnLoad}
+                  />
+                )}
               </main>
             )}
 
@@ -1103,7 +1141,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}
