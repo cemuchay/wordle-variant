@@ -9,6 +9,7 @@ import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
+import { isCurrentPeriod, formatAwardPeriod } from '../utils/isoWeek';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -86,6 +87,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [allChallengeParticipations, setAllChallengeParticipations] = useState<{ challenge_id: string; user_id: string; score: number; status: string }[]>([]);
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
     const [awards, setAwards] = useState<UserAward[]>([]);
+    const [visibleAwardsCount, setVisibleAwardsCount] = useState(20);
 
     useEffect(() => {
         let isMounted = true;
@@ -336,7 +338,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 className="w-full max-w-lg bg-gray-950/95 border border-white/10 rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]"
             >
                 {/* Header Profile Section */}
-                <div className="p-6 border-b border-white/5 relative overflow-hidden bg-white/5">
+                <div className="p-6 border-b border-white/5 relative overflow-hidden bg-white/5 shrink-0 z-10">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-12 -mt-12 pointer-events-none" />
 
                     <button
@@ -369,7 +371,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-6">@{profile.username}</h2>
+                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-2 sm:pr-6">@{profile.username}</h2>
                                     {profile.full_name && (
                                         <div className="text-[11px] font-bold text-gray-500 mt-0.5">{profile.full_name}</div>
                                     )}
@@ -559,48 +561,60 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     </div>
 
                                     {/* Awards History */}
-                                    {awards.length > 0 && (
-                                        <div className="space-y-2">
-                                            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">
-                                                Awards History ({awards.length})
-                                            </h3>
-                                            <div className="space-y-1">
-                                                {awards.map(a => {
-                                                    let icon, label, colorClass, bgClass;
-                                                    switch (a.award_type) {
-                                                        case 'weekly_champion':
-                                                            icon = <Trophy size={12} className="text-blue-400 shrink-0" />;
-                                                            label = 'Weekly Champion';
-                                                            colorClass = 'text-blue-300';
-                                                            bgClass = 'bg-blue-500/10';
-                                                            break;
-                                                        case 'monthly_champion':
-                                                            icon = <Trophy size={12} className="text-purple-400 shrink-0" />;
-                                                            label = 'Monthly Dominator';
-                                                            colorClass = 'text-purple-300';
-                                                            bgClass = 'bg-purple-500/10';
-                                                            break;
-                                                        case 'bot_marathon_weekly':
-                                                            icon = <Zap size={12} className="text-emerald-400 shrink-0" />;
-                                                            label = 'Bot Marathon Champ';
-                                                            colorClass = 'text-emerald-300';
-                                                            bgClass = 'bg-emerald-500/10';
-                                                            break;
-                                                    }
-                                                    return (
-                                                        <div key={a.id} className={`flex items-center gap-2 ${bgClass} rounded-xl px-3 py-2 border border-white/5`}>
-                                                            {icon}
-                                                            <div className="flex-1 min-w-0">
-                                                                <span className={`text-[10px] font-bold ${colorClass}`}>{label}</span>
-                                                                <span className="text-[8px] text-gray-500 ml-2">{a.period_key}</span>
+                                    {awards.length > 0 && (() => {
+                                        const completedAwards = awards.filter(a => !isCurrentPeriod(a.award_type, a.period_key));
+                                        if (completedAwards.length === 0) return null;
+                                        return (
+                                            <div className="space-y-2">
+                                                <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">
+                                                    Awards History ({completedAwards.length})
+                                                </h3>
+                                                <div className="space-y-1">
+                                                    {completedAwards.slice(0, visibleAwardsCount).map(a => {
+                                                        let icon, label, colorClass, bgClass;
+                                                        switch (a.award_type) {
+                                                            case 'weekly_champion':
+                                                                icon = <Trophy size={12} className="text-blue-400 shrink-0" />;
+                                                                label = 'Weekly Champion';
+                                                                colorClass = 'text-blue-300';
+                                                                bgClass = 'bg-blue-500/10';
+                                                                break;
+                                                            case 'monthly_champion':
+                                                                icon = <Trophy size={12} className="text-purple-400 shrink-0" />;
+                                                                label = 'Monthly Dominator';
+                                                                colorClass = 'text-purple-300';
+                                                                bgClass = 'bg-purple-500/10';
+                                                                break;
+                                                            case 'bot_marathon_weekly':
+                                                                icon = <Zap size={12} className="text-emerald-400 shrink-0" />;
+                                                                label = 'Bot Marathon Champ';
+                                                                colorClass = 'text-emerald-300';
+                                                                bgClass = 'bg-emerald-500/10';
+                                                                break;
+                                                        }
+                                                        return (
+                                                            <div key={a.id} className={`flex items-center gap-2 ${bgClass} rounded-xl px-3 py-2 border border-white/5`}>
+                                                                {icon}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <span className={`text-[11px] font-semibold ${colorClass}`}>{label}</span>
+                                                                    <span className="text-[9px] text-white ml-1.5">{formatAwardPeriod(a.award_type, a.period_key)}</span>
+                                                                </div>
+                                                                <span className="text-[10px] font-black text-white/70 shrink-0">{a.score} pts</span>
                                                             </div>
-                                                            <span className="text-[10px] font-black text-white/70">{a.score} pts</span>
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })}
+                                                </div>
+                                                {visibleAwardsCount < completedAwards.length && (
+                                                    <button
+                                                        onClick={() => setVisibleAwardsCount(prev => Math.min(prev + 20, completedAwards.length))}
+                                                        className="w-full text-[10px] font-black uppercase text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl py-2 transition-colors cursor-pointer"
+                                                    >
+                                                        Load More ({completedAwards.length - visibleAwardsCount} remaining)
+                                                    </button>
+                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             ) : (
                                 <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300">
