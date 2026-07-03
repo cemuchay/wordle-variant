@@ -58,6 +58,16 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     }, [preferences]);
 
+    const [editUsername, setEditUsername] = useState('');
+    const [editFullName, setEditFullName] = useState('');
+
+    useEffect(() => {
+        if (profile) {
+            setEditUsername(profile.username || '');
+            setEditFullName(profile.full_name || '');
+        }
+    }, [profile]);
+
     useEffect(() => {
         if (isOpen) {
             const fetchAuthData = async () => {
@@ -203,10 +213,42 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         let success = true;
 
         if (profile?.id) {
+            const usernameClean = editUsername.trim();
+            const fullNameClean = editFullName.trim();
+
+            if (usernameClean) {
+                if (usernameClean.length < 3 || usernameClean.length > 15) {
+                    triggerToast('Username must be between 3 and 15 characters.');
+                    setLoading(false);
+                    return;
+                }
+                if (!/^[a-zA-Z0-9_]+$/.test(usernameClean)) {
+                    triggerToast('Username can only contain letters, numbers and underscores.');
+                    setLoading(false);
+                    return;
+                }
+
+                // Check uniqueness
+                const { data: existingUser, error: checkError } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('username', usernameClean)
+                    .neq('id', profile.id)
+                    .maybeSingle();
+
+                if (!checkError && existingUser) {
+                    triggerToast('Username is already taken.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    preferences: newPreferences
+                    preferences: newPreferences,
+                    username: usernameClean || profile.username,
+                    full_name: fullNameClean
                 })
                 .eq('id', profile.id);
 
@@ -220,8 +262,14 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
             if (error) {
                 success = false;
-                console.error("[Settings] Failed to sync preferences to Supabase:", error);
+                console.error("[Settings] Failed to sync profile updates to Supabase:", error);
             } else {
+                await supabase.auth.updateUser({
+                    data: {
+                        username: usernameClean || profile.username,
+                        full_name: fullNameClean
+                    }
+                });
                 await refreshProfile();
             }
         }
@@ -253,6 +301,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
     if (!isOpen) return null;
 
+    const showProfile = !!(profile?.id && (matchesSearch('Profile Settings') || matchesSearch('Username') || matchesSearch('Full Name')));
     const showSecurity = matchesSearch('Security & Identity') || matchesSearch('Email', userEmail);
     const showGameplay = matchesSearch('Gameplay Experience') || matchesSearch('Sassy Roasts') || matchesSearch('Compact Mode') || matchesSearch('Remember Last View');
     const showEmail = matchesSearch('Email Notifications') || matchesSearch('Updates & Reminders');
@@ -262,7 +311,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const showDiagnostics = matchesSearch('Diagnostics') || matchesSearch('Session Logs') || matchesSearch('Purge Cache');
     const showLegal = matchesSearch('Legal & Policies') || matchesSearch('Privacy') || matchesSearch('Terms') || matchesSearch('Data Deletion');
 
-    const hasResults = showSecurity || showGameplay || showEmail || showPush || showApp || showNav || showDiagnostics || showLegal;
+    const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showNav || showDiagnostics || showLegal;
 
     return (
         <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
@@ -322,6 +371,46 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 Clear Search
                             </button>
                         </div>
+                    )}
+
+                    {/* Profile Settings */}
+                    {showProfile && (
+                        <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2 mb-1">
+                                <ShieldCheck size={14} className="text-indigo-400" />
+                                <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                                    Profile Settings
+                                </label>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Username</label>
+                                    <div className="relative group">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">@</span>
+                                        <input
+                                            type="text"
+                                            value={editUsername}
+                                            onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                                            placeholder="username"
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600"
+                                        />
+                                    </div>
+                                    <p className="text-[9px] text-gray-600 px-1">
+                                        3-15 characters. Letters, numbers, and underscores only.
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={editFullName}
+                                        onChange={(e) => setEditFullName(e.target.value)}
+                                        placeholder="Full Name"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600"
+                                    />
+                                </div>
+                            </div>
+                        </section>
                     )}
 
                     {/* Security & Identity (Private Data) */}

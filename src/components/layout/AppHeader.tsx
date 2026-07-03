@@ -173,16 +173,16 @@ export const AppHeader = ({
                                 <ProtectedAvatar
                                     userId={user.id}
                                     src={user.user_metadata.avatar_url}
-                                    username={formatUsername(user.user_metadata.full_name) || user.email}
+                                    username={user.user_metadata.username || formatUsername(user.user_metadata.full_name) || user.email}
                                     className="w-4 h-4 rounded-full border border-white/10"
                                 />
                             ) : (
                                 <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center bg-white/10 text-[7px] font-black uppercase text-white shrink-0">
-                                    {(formatUsername(user.user_metadata.full_name) || user.email || '?').substring(0, 2)}
+                                    {(user.user_metadata.username || formatUsername(user.user_metadata.full_name) || user.email || '?').substring(0, 2)}
                                 </div>
                             )}
                             <span className="text-[8px] font-black uppercase text-gray-400 truncate max-w-[30px] min-[360px]:max-w-[50px] min-[400px]:max-w-[70px] sm:max-w-none hidden sm:inline">
-                                {formatUsername(user.user_metadata.full_name) || user.email?.split('@')[0]}
+                                {user.user_metadata.username || formatUsername(user.user_metadata.full_name) || user.email?.split('@')[0]}
                             </span>
                             <button
                                 onClick={handleSignOut}

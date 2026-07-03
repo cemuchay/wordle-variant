@@ -16,6 +16,7 @@ interface UserProfileModalProps {
 interface ProfileData {
     id: string;
     username: string;
+    full_name?: string;
     avatar_url: string;
     updated_at: string;
     last_seen_at: string;
@@ -354,7 +355,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-6">{profile.username}</h2>
+                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-6">@{profile.username}</h2>
+                                    {profile.full_name && (
+                                        <div className="text-[11px] font-bold text-gray-500 mt-0.5">{profile.full_name}</div>
+                                    )}
                                     <div className="flex flex-wrap items-center gap-y-1 gap-x-2 sm:gap-x-3 text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
                                         <span className="flex items-center gap-1">
                                             <Calendar size={11} className="text-correct" />

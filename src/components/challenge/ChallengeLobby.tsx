@@ -304,7 +304,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         }
 
         // Scan for mention of the current user: @username
-        const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+        const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.username || effectiveUser?.user_metadata?.full_name || '';
         if (myUsername) {
           const escapedUsername = myUsername.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
           const mentionRegex = new RegExp(`@${escapedUsername}\\b`, 'i');

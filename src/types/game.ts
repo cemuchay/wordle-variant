@@ -23,6 +23,7 @@ export interface GuessResult {
 interface UserMetadata {
    full_name?: string;
    avatar_url?: string;
+   username?: string;
 }
 
 export interface AppUser {
