@@ -176,11 +176,24 @@ export const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </button>
         </div>
 
-        {/* Signup Restricted Warning */}
-        <div className="mt-6 text-center border-t border-white/5 pt-4">
+        {/* Signup Restricted Warning & Legal Links */}
+        <div className="mt-6 text-center border-t border-white/5 pt-4 space-y-3">
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-relaxed">
             Email signup is currently restricted.
           </p>
+          <div className="flex items-center justify-center gap-2 text-[9px] text-gray-600 font-bold uppercase tracking-wide">
+            <a href="/privacy.html" className="hover:underline hover:text-gray-400 transition-colors">
+              Privacy Policy
+            </a>
+            <span>•</span>
+            <a href="/tos.html" className="hover:underline hover:text-gray-400 transition-colors">
+              Terms of Service
+            </a>
+            <span>•</span>
+            <a href="/deletion.html" className="hover:underline hover:text-gray-400 transition-colors">
+              Data Deletion
+            </a>
+          </div>
         </div>
       </motion.div>
     </div>
