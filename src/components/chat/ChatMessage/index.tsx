@@ -2,6 +2,7 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
 import { Reply, CheckCheck, Smile, Pencil, Trash2 } from "lucide-react";
+import { ReigningBadge } from "../../common/ReigningBadge";
 import { ProtectedAvatar } from "../ProtectedAvatar";
 import { useAppStore } from '../../../store/useAppStore';
 
@@ -334,6 +335,8 @@ const ChatMessage = memo(({
                         >
                             {isMe ? 'You' : msg.profiles?.username}
                         </span>
+                        {!isMe && msg.user_id && <ReigningBadge userId={msg.user_id} type="weekly" />}
+                        {!isMe && msg.user_id && <ReigningBadge userId={msg.user_id} type="bot_marathon" />}
                     </div>
 
                     <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap wrap-break-word text-left">

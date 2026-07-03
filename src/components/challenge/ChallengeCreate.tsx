@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Clock, Play, Plus, Search, X, HelpCircle, Save, Download, Trash2 } from 'lucide-react';
+import { ReigningBadge } from '../common/ReigningBadge';
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -330,6 +331,8 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                             <div key={p.id} className="bg-correct/20 border border-correct/30 px-3 py-1.5 rounded-full flex items-center gap-2 animate-in fade-in zoom-in duration-200">
                                 <ProtectedAvatar userId={p.id} src={p.avatar_url} username={p.username} className="w-4 h-4 rounded-full" />
                                 <span className="text-[10px] font-black uppercase text-correct">{p.username}</span>
+                                <ReigningBadge userId={p.id} type="weekly" />
+                                <ReigningBadge userId={p.id} type="bot_marathon" />
                                 <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors">
                                     <X size={12} />
                                 </button>

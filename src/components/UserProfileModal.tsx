@@ -8,6 +8,7 @@ import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
+import type { UserAward } from '../types/awards';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -84,6 +85,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [challengeParticipations, setChallengeParticipations] = useState<ChallengeParticipation[]>([]);
     const [allChallengeParticipations, setAllChallengeParticipations] = useState<{ challenge_id: string; user_id: string; score: number; status: string }[]>([]);
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
+    const [awards, setAwards] = useState<UserAward[]>([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -111,11 +113,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                         .eq('user_id', currentUser.id)
                     : Promise.resolve({ data: null, error: null });
 
+                // 4. Fetch awards history
+                const awardsPromise = supabase
+                    .from('user_awards')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('awarded_at', { ascending: false });
+
                 // Fire all requests in parallel
-                const [edgeResult, viewResult, h2hResult] = await Promise.all([
+                const [edgeResult, viewResult, h2hResult, awardsResult] = await Promise.all([
                     edgePromise,
                     viewPromise,
-                    h2hPromise
+                    h2hPromise,
+                    awardsPromise
                 ]);
 
                 // Error Handling
@@ -137,6 +147,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
                     if (h2hResult.data) {
                         setCurrentUserChallenges(h2hResult.data);
+                    }
+
+                    if (awardsResult.data) {
+                        setAwards(awardsResult.data as UserAward[]);
                     }
                 }
 
@@ -543,6 +557,50 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Awards History */}
+                                    {awards.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">
+                                                Awards History ({awards.length})
+                                            </h3>
+                                            <div className="space-y-1">
+                                                {awards.map(a => {
+                                                    let icon, label, colorClass, bgClass;
+                                                    switch (a.award_type) {
+                                                        case 'weekly_champion':
+                                                            icon = <Trophy size={12} className="text-blue-400 shrink-0" />;
+                                                            label = 'Weekly Champion';
+                                                            colorClass = 'text-blue-300';
+                                                            bgClass = 'bg-blue-500/10';
+                                                            break;
+                                                        case 'monthly_champion':
+                                                            icon = <Trophy size={12} className="text-purple-400 shrink-0" />;
+                                                            label = 'Monthly Dominator';
+                                                            colorClass = 'text-purple-300';
+                                                            bgClass = 'bg-purple-500/10';
+                                                            break;
+                                                        case 'bot_marathon_weekly':
+                                                            icon = <Zap size={12} className="text-emerald-400 shrink-0" />;
+                                                            label = 'Bot Marathon Champ';
+                                                            colorClass = 'text-emerald-300';
+                                                            bgClass = 'bg-emerald-500/10';
+                                                            break;
+                                                    }
+                                                    return (
+                                                        <div key={a.id} className={`flex items-center gap-2 ${bgClass} rounded-xl px-3 py-2 border border-white/5`}>
+                                                            {icon}
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className={`text-[10px] font-bold ${colorClass}`}>{label}</span>
+                                                                <span className="text-[8px] text-gray-500 ml-2">{a.period_key}</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-white/70">{a.score} pts</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300">

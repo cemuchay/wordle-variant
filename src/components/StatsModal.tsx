@@ -11,6 +11,7 @@ import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
 import { LeaderboardSkeleton } from './common/Skeletons';
 import formatUsername from '../utils/formatUsername';
+import { ReigningBadge } from './common/ReigningBadge';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -776,6 +777,8 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
             >
               {formatUsername(entry.username)}
             </span>
+            {entry.user_id && <ReigningBadge userId={entry.user_id} type="weekly" />}
+            {entry.user_id && <ReigningBadge userId={entry.user_id} type="bot_marathon" />}
             {entry.user_id && (
               <button
                 onClick={(e) => {

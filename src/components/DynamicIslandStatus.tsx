@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { AudioChatControls } from './challenge/AudioChatControls';
 import formatLastSeen from '../utils/formatLastSeen';
+import { ReigningBadge } from './common/ReigningBadge';
 
 import { useAppStore } from '../store/useAppStore';
 import { WordUpMascot } from './wordup/WordUpView/components/WordUpMascot';
@@ -624,6 +625,8 @@ export const DynamicIslandStatus = () => {
                                                         }}
                                                     >
                                                         {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
+                                                        <ReigningBadge userId={p.id} type="weekly" />
+                                                        <ReigningBadge userId={p.id} type="bot_marathon" />
                                                     </span>
                                                     <div className="flex items-center gap-1 text-[9px] text-gray-500">
                                                         {inVoiceRoom ? (

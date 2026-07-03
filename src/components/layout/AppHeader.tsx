@@ -8,6 +8,7 @@ import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { CloudSyncMenu } from '../SyncCloudModal';
 import formatUsername from '../../utils/formatUsername';
+import { ReigningBadge } from '../common/ReigningBadge';
 
 interface AppHeaderProps {
     onOpenSettings: () => void;
@@ -184,6 +185,8 @@ export const AppHeader = ({
                             <span className="text-[8px] font-black uppercase text-gray-400 truncate max-w-[30px] min-[360px]:max-w-[50px] min-[400px]:max-w-[70px] sm:max-w-none hidden sm:inline">
                                 {user.user_metadata.username || formatUsername(user.user_metadata.full_name) || user.email?.split('@')[0]}
                             </span>
+                            <ReigningBadge userId={user.id} type="weekly" className="hidden sm:inline-flex" />
+                            <ReigningBadge userId={user.id} type="bot_marathon" className="hidden sm:inline-flex" />
                             <button
                                 onClick={handleSignOut}
                                 className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-[8px] font-black px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap cursor-pointer"
