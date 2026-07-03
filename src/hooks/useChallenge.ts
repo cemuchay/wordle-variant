@@ -21,6 +21,7 @@ export interface Challenge {
     creator?: any;
     participants?: ChallengeParticipant[];
     is_public?: boolean;
+    notify_creator?: boolean;
     is_bot_marathon?: boolean;
     max_participants?: number | null;
     is_custom_word?: boolean;

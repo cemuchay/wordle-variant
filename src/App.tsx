@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { AdminPage } from "./components/admin/AdminPage";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
 import { ChatSkeleton } from "./components/common/Skeletons";
@@ -256,6 +256,35 @@ export default function App() {
   }, [isHydrated, date, user]);
 
   const showAlreadyPlayedScreen = !!(user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
+
+  const tabRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (!isHydrated || !date || tabRestoredRef.current) return;
+    const stored = safeLocalStorage.getItem("wordle_last_viewed_tab");
+    if (stored) {
+      try {
+        const { tab, date: savedDate } = JSON.parse(stored);
+        if (savedDate === date) {
+          tabRestoredRef.current = true;
+          setIsChatOpen(tab === "chat");
+          setIsChallengeOpen(tab === "challenges");
+          setIsStatsOpen(tab === "leaderboard");
+          setIsWordUpOpen(tab === "wordup");
+          if (tab !== "wordup") {
+            setWordupMode(null);
+          }
+          if (tab === "leaderboard") {
+            setStatsActiveTab("leaderboard");
+          }
+        } else {
+          safeLocalStorage.removeItem("wordle_last_viewed_tab");
+        }
+      } catch (e) {
+        console.error("Failed to restore last active tab", e);
+      }
+    }
+  }, [isHydrated, date]);
 
   const [navLoading] = useState<{ active: boolean; message: string }>({
     active: false,
@@ -794,6 +823,13 @@ export default function App() {
     setIsInfoOpen(false);
     if (item === "leaderboard") {
       setStatsActiveTab("leaderboard");
+    }
+
+    if (date) {
+      safeLocalStorage.setItem(
+        "wordle_last_viewed_tab",
+        JSON.stringify({ tab: item, date })
+      );
     }
   };
 

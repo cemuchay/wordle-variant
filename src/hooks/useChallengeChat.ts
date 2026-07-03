@@ -90,6 +90,7 @@ export const useChallengeChat = (
             const typingNames = new Set<string>();
             const currentUsername =
                effectiveUser?.username ||
+               effectiveUser?.user_metadata?.username ||
                effectiveUser?.user_metadata?.full_name ||
                "Player";
 
@@ -123,6 +124,7 @@ export const useChallengeChat = (
          if (!channelRef.current || !effectiveUser) return;
          const username =
             effectiveUser.username ||
+            effectiveUser.user_metadata?.username ||
             effectiveUser.user_metadata?.full_name ||
             "Player";
 
@@ -193,6 +195,7 @@ export const useChallengeChat = (
             challenge_id: challengeId,
             sender_name:
                effectiveUser.username ||
+               effectiveUser.user_metadata?.username ||
                effectiveUser.user_metadata?.full_name ||
                "Player",
             content: content.trim() || "[Voice Message]",

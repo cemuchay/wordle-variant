@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Clock, Play, Plus, Search, X, HelpCircle, Save, Download, Trash2 } from 'lucide-react';
+import { ReigningBadge } from '../common/ReigningBadge';
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { useChallengeContext } from '../../context/ChallengeContext';
 import { useConfirmation } from '../../hooks/useConfirmation';
@@ -330,6 +331,8 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                             <div key={p.id} className="bg-correct/20 border border-correct/30 px-3 py-1.5 rounded-full flex items-center gap-2 animate-in fade-in zoom-in duration-200">
                                 <ProtectedAvatar userId={p.id} src={p.avatar_url} username={p.username} className="w-4 h-4 rounded-full" />
                                 <span className="text-[10px] font-black uppercase text-correct">{p.username}</span>
+                                <ReigningBadge userId={p.id} type="weekly" />
+                                <ReigningBadge userId={p.id} type="bot_marathon" />
                                 <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors">
                                     <X size={12} />
                                 </button>
@@ -485,6 +488,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     const [maxParticipants, setMaxParticipants] = useState<number>(10);
     const [maxParticipantsInput, setMaxParticipantsInput] = useState<string>("10");
     const [lifespanHours, setLifespanHours] = useState<number>(24);
+    const [notifyCreator, setNotifyCreator] = useState(false);
 
     // Custom Target Word States
     const [isCustomWord, setIsCustomWord] = useState(false);
@@ -666,6 +670,8 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             setMaxParticipantsInput(String(c.maxParticipants));
         }
         if (c.lifespanHours !== undefined) setLifespanHours(c.lifespanHours);
+        if (c.notifyCreator !== undefined) setNotifyCreator(c.notifyCreator);
+        if (c.notify_creator !== undefined) setNotifyCreator(c.notify_creator);
         if (c.isCustomWord !== undefined) setIsCustomWord(c.isCustomWord);
         if (c.customWord !== undefined) setCustomWord(c.customWord);
         if (c.customMarathonWords !== undefined) setCustomMarathonWords(c.customMarathonWords);
@@ -936,6 +942,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             isShapeshifter: length === 2 ? false : isShapeshifter,
             is_shapeshifter: length === 2 ? false : isShapeshifter,
             difficulty: length === 1 && marathonDifficultyMode === 'custom' ? marathonDifficulties : globalDifficulty,
+            notifyCreator,
         };
 
         if (isCustomWord) {
@@ -990,7 +997,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties, notifyCreator]);
 
     const summarySettings = useMemo((): ChallengeFormSettings => ({
         mode,
@@ -1016,7 +1023,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         isBotMarathon,
         isEditing: !!editingChallenge,
         errorCount: errors.length,
-    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
+    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors, notifyCreator]);
 
     const handleNextStep = useCallback(() => {
         setStep(s => Math.min(s + 1, 3));
@@ -1353,6 +1360,27 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             </div>
                         )}
                     </div>
+
+                    {/* Notify Creator Option */}
+                    {(isPublic || isCustomWord) && (
+                        <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5 animate-in fade-in duration-200">
+                            <div className="flex items-center justify-between">
+                                <OptionLabel 
+                                    label="Notify Me of Progress" 
+                                    tooltip="Get notifications when a new participant joins, completes a game, or finishes the challenge." 
+                                    activeTooltip={activeTooltip} 
+                                    setActiveTooltip={setActiveTooltip} 
+                                    tooltipId="notifyCreator" 
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={notifyCreator}
+                                    onChange={(e) => setNotifyCreator(e.target.checked)}
+                                    className="w-5 h-5 accent-correct cursor-pointer"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Lifespan Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">

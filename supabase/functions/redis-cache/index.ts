@@ -192,8 +192,15 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Cache for 1 hour
+      // Augment with reigning badge info from user_awards
       if (profile) {
+        const { data: badges } = await supabaseClient
+          .rpc("get_user_reigning_badges", { p_user_id: userId });
+
+        profile.is_reigning_weekly = badges?.[0]?.is_reigning_weekly ?? false;
+        profile.is_reigning_bot_marathon = badges?.[0]?.is_reigning_bot_marathon ?? false;
+
+        // Cache for 1 hour
         await runRedisCommand(["SET", cacheKey, JSON.stringify(profile), "EX", 3600]);
       }
 

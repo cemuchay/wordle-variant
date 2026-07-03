@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import { ANIMATION_DURATION } from '../../constants/ui';
 import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
@@ -54,6 +54,44 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+    const [gridDimensions, setGridDimensions] = useState({ maxWidth: 320, maxHeight: 400 });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const keyboardRef = useRef<HTMLDivElement>(null);
+
+    const updateDimensions = useCallback(() => {
+        if (!containerRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        
+        let keyboardHeight = 0;
+        if (keyboardRef.current && !hideKeyboard) {
+            keyboardHeight = keyboardRef.current.getBoundingClientRect().height;
+        }
+        
+        const paddingBuffer = 48;
+        const availableHeight = containerRect.height - keyboardHeight - paddingBuffer;
+        const availableWidth = containerRect.width - 24;
+
+        setGridDimensions({
+            maxWidth: Math.max(150, availableWidth),
+            maxHeight: Math.max(150, availableHeight)
+        });
+    }, [hideKeyboard]);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        
+        const observer = new ResizeObserver(() => {
+            updateDimensions();
+        });
+        observer.observe(containerRef.current);
+        if (keyboardRef.current) {
+            observer.observe(keyboardRef.current);
+        }
+        
+        updateDimensions();
+        return () => observer.disconnect();
+    }, [updateDimensions, hideKeyboard]);
+
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
 
     useEffect(() => {
@@ -129,7 +167,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
 
     return (
-        <div className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
+        <div ref={containerRef} className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
 
             {/* Sync Status Overlay */}
@@ -241,11 +279,13 @@ export const RegularGameplay = memo(function RegularGameplay({
                     gameplayType="challenge"
                     onSetCursor={actions.onSetCursor}
                     onSetEditIndex={actions.onSetEditIndex}
+                    maxGridWidth={gridDimensions.maxWidth}
+                    maxGridHeight={gridDimensions.maxHeight}
                 />
             </div>
 
             {!hideKeyboard && (
-                <div className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] shrink-0 px-2">
+                <div ref={keyboardRef} className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] shrink-0 px-2">
                     <Keyboard
                         onChar={actions.onChar}
                         onDelete={actions.onDelete}

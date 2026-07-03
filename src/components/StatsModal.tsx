@@ -11,6 +11,7 @@ import { useApp } from '../context/AppContext';
 import { safeSessionStorage } from '../utils/storage';
 import { LeaderboardSkeleton } from './common/Skeletons';
 import formatUsername from '../utils/formatUsername';
+import { ReigningBadge } from './common/ReigningBadge';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -341,7 +342,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
               {isGameOver && user && (
                 <button
                   onClick={() => setSelectedEntry({
-                    username: formatUsername(user.user_metadata?.full_name) || 'You',
+                    username: user.user_metadata?.username || formatUsername(user.user_metadata?.full_name) || 'You',
                     avatar_url: user.user_metadata?.avatar_url || '',
                     user_id: user.id,
                     total_score: 0,
@@ -558,7 +559,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                 {isGameOver && user && (
                   <button
                     onClick={() => setSelectedEntry({
-                      username: formatUsername(user.user_metadata?.full_name) || 'You',
+                      username: user.user_metadata?.username || formatUsername(user.user_metadata?.full_name) || 'You',
                       avatar_url: user.user_metadata?.avatar_url || '',
                       user_id: user.id,
                       total_score: 0,
@@ -776,6 +777,8 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
             >
               {formatUsername(entry.username)}
             </span>
+            {entry.user_id && <ReigningBadge userId={entry.user_id} type="weekly" />}
+            {entry.user_id && <ReigningBadge userId={entry.user_id} type="bot_marathon" />}
             {entry.user_id && (
               <button
                 onClick={(e) => {

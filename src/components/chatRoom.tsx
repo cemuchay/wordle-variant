@@ -301,7 +301,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
         };
     }, [activeRoomId, showSidebar, messages.length, firstUnreadId, scrollNode]); // <-- Watches the element directly
 
-    const nameOfUser = formatUsername(user?.user_metadata?.full_name) as string;
+    const nameOfUser = user?.user_metadata?.username || (formatUsername(user?.user_metadata?.full_name) as string);
 
     const handleTyping = (isTyping: boolean) => {
         if (user && nameOfUser) {

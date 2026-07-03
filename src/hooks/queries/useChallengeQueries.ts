@@ -481,6 +481,8 @@ export const useChallengeMutations = () => {
          isSentences = false,
          sentenceWordCount = 5,
          customSentence = "",
+         notifyCreator = false,
+         notify_creator = false,
        }: any) => {
           const salt = Math.random().toString(36).substring(2, 15) + (isSentences ? '_sentence' : '');
           const resolveDiff = (idx?: number) => Array.isArray(difficulty) ? difficulty[idx ?? 0] ?? 'normal' : difficulty;
@@ -655,6 +657,7 @@ export const useChallengeMutations = () => {
                   marathon_force_order: effectiveForceOrder,
                   is_bot_marathon: resolvedIsBotMarathon,
                   is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
+                  notify_creator: !!(notifyCreator || notify_creator),
                },
             ])
             .select()

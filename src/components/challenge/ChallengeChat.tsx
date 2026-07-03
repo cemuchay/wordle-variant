@@ -474,7 +474,7 @@ export const ChallengeChat = memo(function ChallengeChat({
       });
     }
     const myName =
-      effectiveUser?.username || effectiveUser?.user_metadata?.full_name || "";
+      effectiveUser?.username || effectiveUser?.user_metadata?.username || effectiveUser?.user_metadata?.full_name || "";
     if (myName) set.add(myName);
     return Array.from(set).sort((a, b) => b.length - a.length);
   }, [participants, effectiveUser]);
@@ -495,7 +495,7 @@ export const ChallengeChat = memo(function ChallengeChat({
 
     const suggestionsSet = new Set<string>();
     const myUsername =
-      effectiveUser?.username || effectiveUser?.user_metadata?.full_name || "";
+      effectiveUser?.username || effectiveUser?.user_metadata?.username || effectiveUser?.user_metadata?.full_name || "";
 
     participants.forEach((p) => {
       const username = p.profiles?.username || p.guest_profiles?.username || "";

@@ -25,6 +25,7 @@ import { SHAPESHIFTER_MAX_ATTEMPTS, DEFAULT_MAX_PARTICIPANTS, MAX_ATTEMPTS } fro
 import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
 import { ChallengeChat } from "./ChallengeChat";
 import { useChallengeChat } from "../../hooks/useChallengeChat";
+import { ReigningBadge } from "../common/ReigningBadge";
 import {
   parseMarathonGames,
   getMarathonTimer,
@@ -179,6 +180,8 @@ const ParticipantItem = memo(function ParticipantItem({
             }}
           >
             {p.profiles?.username || "Player"}
+            {p.user_id && <ReigningBadge userId={p.user_id} type="weekly" />}
+            {p.user_id && <ReigningBadge userId={p.user_id} type="bot_marathon" />}
           </p>
           <p
             className={`text-[9px] font-black uppercase ${pIsFinished ? "text-white/60" : "text-yellow-500"}`}
@@ -304,7 +307,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         }
 
         // Scan for mention of the current user: @username
-        const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.full_name || '';
+        const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.username || effectiveUser?.user_metadata?.full_name || '';
         if (myUsername) {
           const escapedUsername = myUsername.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
           const mentionRegex = new RegExp(`@${escapedUsername}\\b`, 'i');
