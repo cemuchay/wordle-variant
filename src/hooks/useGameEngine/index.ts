@@ -216,7 +216,11 @@ export const useGameEngine = (
          cachedHydrationDoneRef.current = false;
       }
 
-      if (isDateChanged || (isUserOrConfigChanged && !cachedHydrationDoneRef.current) || !isHydrated) {
+      if (
+         isDateChanged ||
+         (isUserOrConfigChanged && !cachedHydrationDoneRef.current) ||
+         !isHydrated
+      ) {
          setIsHydrated(false);
       }
 
