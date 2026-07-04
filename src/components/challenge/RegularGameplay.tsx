@@ -111,11 +111,10 @@ export const RegularGameplay = memo(function RegularGameplay({
         const minHeightFallback = window.innerHeight * 0.35;
         availableHeight = Math.max(minHeightFallback, availableHeight);
 
-        // Apply a 15% size reduction factor on desktop to prevent clipping/crowding
-        if (window.innerWidth >= 768) {
-            availableHeight = availableHeight * 0.85;
-            availableWidth = availableWidth * 0.85;
-        }
+        // Apply a universal 15% size reduction factor to prevent clipping/crowding
+        availableHeight = availableHeight * 0.85;
+        availableWidth = availableWidth * 0.85;
+
 
         setGridDimensions({
             maxWidth: Math.max(150, availableWidth),
