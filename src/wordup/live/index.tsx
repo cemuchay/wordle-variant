@@ -34,7 +34,7 @@ interface LiveViewProps {
 
 export const LiveView = ({ onBack, onSwitchMode, onTutorial }: LiveViewProps) => {
    const { user: authUser, loading: authLoading } = useAuth();
-   const { triggerToast, realtimeStatus, profile } = useApp();
+   const { triggerToast, realtimeStatus, profile, onlineUsers } = useApp();
 
    const [guestUser, setGuestUser] = useState<any>(() => {
       const id = localStorage.getItem('wordle_anon_id');
@@ -164,11 +164,13 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial }: LiveViewProps) =>
       setIsBattlePlaying(view === "battle");
    }, [view, setIsBattlePlaying]);
 
+   const otherOnlineCount = onlineUsers.filter(u => u.id !== effectiveUser?.id).length;
+
    const {
       countdownSecs,
       startMatchmaking,
       cancelMatchmaking
-   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); });
+   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); }, otherOnlineCount);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();

@@ -167,11 +167,13 @@ export const WordUpView = () => {
    }, [view, setIsBattlePlaying]);
 
    // ── Matchmaking ───────────────────────────────────────────────────────
+   const otherOnlineCount = onlineUsers.filter(u => u.id !== effectiveUser?.id).length;
+
    const {
       countdownSecs,
       startMatchmaking,
       cancelMatchmaking
-   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); });
+   } = useWordUpMatchmaking(effectiveUser, category, getSyncedNow, triggerToast, onMatchFound, () => { engine.cleanup(); }, otherOnlineCount);
 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
