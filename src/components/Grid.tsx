@@ -3,7 +3,6 @@ import type { GuessResult } from '../types/game';
 import { HelpCircle, X } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
 import returnAnimationTime from '../utils/returnAnimationTime';
-import { useAppStore } from '../store/useAppStore';
 import { useIsResponsive } from '../hooks/useResponsive';
 
 interface CellProps {
@@ -79,9 +78,8 @@ const TILE_SIZES = [
   },
 ];
 
-const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor, isEditMode, isDesktop, isSmall, isSuperTiny, cellSizePx }: CellProps) => {
+const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPop, isHinted, isWinner, compact, gameplayType, wordLength, isCursor, isEditMode, isDesktop, isSmall, cellSizePx }: CellProps) => {
   const isChallenge = gameplayType === 'challenge' || compact;
-  const isPWA = useAppStore(s => s.isPWAInstalled)
 
   // 1. Get the current size profile based on word length
   const sizeConfig = TILE_SIZES.find((s) => s.length === wordLength) || TILE_SIZES[TILE_SIZES.length - 1];
@@ -89,56 +87,10 @@ const Cell = memo(({ letter, status, isRevealing, revealIndex = 0, isShake, isPo
   // 2. Select dimensions based on device size
   const dimensions = isDesktop ? sizeConfig.desktop : (isSmall ? sizeConfig.small : sizeConfig.mobile);
 
-  // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size)
-  let scale: {
-    h: number,
-    w: number
-  } = isChallenge ? { h: 0.85, w: 0.85 } : { h: 1, w: 1 };
-
-  if (isPWA && !isDesktop) {
-    scale = isChallenge ? { h: 1, w: 1 } : { h: 1.3, w: 1.3 }
-    if (isChallenge && wordLength > 9) {
-      scale = { h: 0.85, w: 0.85 }
-    }
-
-    if (!isChallenge && wordLength > 5) {
-      scale = { h: 1.2, w: 1.2 }
-    }
-  } else if (!isPWA && !isDesktop) {
-
-    if (!isChallenge) {
-      scale = { h: 1.1, w: 1.1 }
-    }
-
-  }
-  if (isSuperTiny) {
-    scale = { h: 0.65, w: 0.65 }
-  }
-
-
-  if (isDesktop && wordLength > 6 && !isChallenge) {
-    scale = { h: 1.05, w: 1.05 }
-  }
-
-  /* challenge specific */
-  if (isChallenge) {
-    if (wordLength === 7) {
-      if (!isPWA && isSuperTiny) {
-        scale = {
-          h: 1.05, w: 1.05
-        }
-      }
-      if (!isPWA && isSmall) {
-        scale = {
-          h: 1.2, w: 1.2
-        }
-      }
-      if (!isPWA && !isDesktop && !isSuperTiny && !isSmall) {
-        scale = {
-          h: 1.1, w: 1.1
-        }
-      }
-    }
+  // 3. Optional: If challenge mode needs a slight reduction scale (e.g., 85% size) on desktop
+  let scale = { h: 1, w: 1 };
+  if (isDesktop && isChallenge) {
+    scale = { h: 0.85, w: 0.85 };
   }
 
   const finalWidth = dimensions.w * scale.w;
@@ -234,6 +186,12 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
     const cellHeightLimit = (usableHeight - (maxAttempts - 1) * gapSize) / maxAttempts;
 
     cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
+
+    // On desktop in challenge mode, apply the 85% resize scale
+    const isChallenge = gameplayType === 'challenge' || compact;
+    if (isDesktop && isChallenge) {
+      cellSizePx = Math.floor(cellSizePx * 0.85);
+    }
   }
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

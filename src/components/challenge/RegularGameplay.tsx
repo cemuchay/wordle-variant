@@ -8,7 +8,7 @@ import { useChallengeContext } from '../../context/ChallengeContext';
 import { useChallengeGameEngine } from '../../hooks/useChallengeGameEngine';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { getHandicapStarter, parseMarathonGames } from '../../utils/marathon';
-import { Grid } from '../Grid';
+import { NewGrid } from '../NewGrid';
 import { Keyboard } from '../Keyboard';
 import { NetworkLog } from './ChallengeUIElements';
 import { useMemo } from 'react';
@@ -54,6 +54,12 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
+    const [debugInfo, setDebugInfo] = useState({
+        siblingHeights: 0,
+        containerGap: 0,
+        headerOverlap: 0,
+        containerPadding: 0
+    });
     const [gridDimensions, setGridDimensions] = useState({ maxWidth: 320, maxHeight: 400 });
     const containerRef = useRef<HTMLDivElement>(null);
     const keyboardRef = useRef<HTMLDivElement>(null);
@@ -63,11 +69,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         const container = containerRef.current;
         const containerRect = container.getBoundingClientRect();
         const computedStyle = window.getComputedStyle(container);
-        const containerPadding = 
-            (parseFloat(computedStyle.paddingTop) || 0) + 
-            (parseFloat(computedStyle.paddingBottom) || 0) +
-            (parseFloat(computedStyle.borderTopWidth) || 0) + 
-            (parseFloat(computedStyle.borderBottomWidth) || 0);
+        const containerPadding = (parseFloat(computedStyle.paddingTop) || 0) + (parseFloat(computedStyle.paddingBottom) || 0);
         
         let siblingHeights = 0;
         let flowChildrenCount = 0;
@@ -80,34 +82,8 @@ export const RegularGameplay = memo(function RegularGameplay({
             }
             flowChildrenCount++;
             
-            const gridEl = child.classList.contains('game-board-grid') ? child : child.querySelector('.game-board-grid');
-            if (gridEl) {
-                const innerComputed = window.getComputedStyle(child);
-                siblingHeights += (parseFloat(innerComputed.paddingTop) || 0) + 
-                                  (parseFloat(innerComputed.paddingBottom) || 0) +
-                                  (parseFloat(innerComputed.borderTopWidth) || 0) + 
-                                  (parseFloat(innerComputed.borderBottomWidth) || 0);
-                
-                let innerFlowChildrenCount = 0;
-                for (let j = 0; j < child.children.length; j++) {
-                    const innerChild = child.children[j] as HTMLElement;
-                    const innerStyle = window.getComputedStyle(innerChild);
-                    if (innerStyle.position === 'absolute' || innerStyle.position === 'fixed') {
-                        continue;
-                    }
-                    innerFlowChildrenCount++;
-                    
-                    const innerGrid = innerChild.classList.contains('game-board-grid') ? innerChild : innerChild.querySelector('.game-board-grid');
-                    if (!innerGrid) {
-                        siblingHeights += innerChild.getBoundingClientRect().height;
-                        siblingHeights += (parseFloat(innerStyle.marginTop) || 0) + (parseFloat(innerStyle.marginBottom) || 0);
-                    }
-                }
-                if (innerFlowChildrenCount > 1 && (innerComputed.display === 'flex' || innerComputed.display === 'grid')) {
-                    const innerGap = parseFloat(innerComputed.gap) || 0;
-                    siblingHeights += innerGap * (innerFlowChildrenCount - 1);
-                }
-            } else {
+            const isGridParent = child.classList.contains('grid-wrapper-parent') || child.querySelector('.grid-wrapper-parent');
+            if (!isGridParent) {
                 siblingHeights += child.getBoundingClientRect().height;
                 siblingHeights += (parseFloat(childStyle.marginTop) || 0) + (parseFloat(childStyle.marginBottom) || 0);
             }
@@ -131,6 +107,10 @@ export const RegularGameplay = memo(function RegularGameplay({
         let availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - headerOverlap - 8;
         let availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
 
+        // Safeguard to prevent collapsing grids on iOS/iPhone WebKit sizing bugs
+        const minHeightFallback = window.innerHeight * 0.35;
+        availableHeight = Math.max(minHeightFallback, availableHeight);
+
         // Apply a 15% size reduction factor on desktop to prevent clipping/crowding
         if (window.innerWidth >= 768) {
             availableHeight = availableHeight * 0.85;
@@ -140,6 +120,13 @@ export const RegularGameplay = memo(function RegularGameplay({
         setGridDimensions({
             maxWidth: Math.max(150, availableWidth),
             maxHeight: Math.max(150, availableHeight)
+        });
+
+        setDebugInfo({
+            siblingHeights,
+            containerGap,
+            headerOverlap,
+            containerPadding
         });
     }, []);
 
@@ -162,15 +149,23 @@ export const RegularGameplay = memo(function RegularGameplay({
             window.visualViewport.addEventListener('scroll', handleViewportResize);
         }
         
+        // Initial triggers
         updateDimensions();
+        
+        // Timeout fallbacks to handle WebKit layout delays on mount
+        const t1 = setTimeout(updateDimensions, 80);
+        const t2 = setTimeout(updateDimensions, 350);
+        
         return () => {
             observer.disconnect();
+            clearTimeout(t1);
+            clearTimeout(t2);
             if (window.visualViewport) {
                 window.visualViewport.removeEventListener('resize', handleViewportResize);
                 window.visualViewport.removeEventListener('scroll', handleViewportResize);
             }
         };
-    }, [updateDimensions, hideKeyboard]);
+    }, [updateDimensions]);
 
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);
 
@@ -247,7 +242,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
 
     return (
-        <div ref={containerRef} className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
+        <div className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
 
             {/* Sync Status Overlay */}
@@ -311,16 +306,14 @@ export const RegularGameplay = memo(function RegularGameplay({
                         </button>
                     )}
                 </div>
-            )}
-
-            <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+            )}            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
                 {sentenceGames && (
                     <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
                         {sentenceGames.map((g, idx) => {
                             const prog = participation?.marathon_progress?.find((p: any) => p.game_index === idx);
                             const isCompleted = prog?.status === 'completed' || (idx < (gameIndex ?? 0));
                             const isActive = idx === gameIndex;
-
+ 
                             if (isCompleted) {
                                 return (
                                     <span key={idx} className="text-xs font-black text-correct uppercase border-b-2 border-correct/30 px-1 py-0.5 animate-in fade-in duration-200">
@@ -343,25 +336,26 @@ export const RegularGameplay = memo(function RegularGameplay({
                         })}
                     </div>
                 )}
-
-                <Grid
-                    wordLength={wordLength}
-                    maxAttempts={maxAttempts}
-                    guesses={guesses}
-                    currentGuess={currentGuess}
-                    cursorIndex={cursorIndex}
-                    editIndex={editIndex}
-                    hintRecord={hintRecord}
-                    isChallengeMode={true}
-                    isShake={isShake}
-                    isSaving={isSaving}
-                    compact={true}
-                    gameplayType="challenge"
-                    onSetCursor={actions.onSetCursor}
-                    onSetEditIndex={actions.onSetEditIndex}
-                    maxGridWidth={gridDimensions.maxWidth}
-                    maxGridHeight={gridDimensions.maxHeight}
-                />
+ 
+                <div className="relative grid-wrapper-parent">
+                    <NewGrid
+                        wordLength={wordLength}
+                        maxAttempts={maxAttempts}
+                        guesses={guesses}
+                        currentGuess={currentGuess}
+                        cursorIndex={cursorIndex}
+                        editIndex={editIndex}
+                        hintRecord={hintRecord}
+                        isChallengeMode={true}
+                        isShake={isShake}
+                        compact={true}
+                        gameplayType="challenge"
+                        onSetCursor={actions.onSetCursor}
+                        onSetEditIndex={actions.onSetEditIndex}
+                        maxGridWidth={gridDimensions.maxWidth}
+                        maxGridHeight={gridDimensions.maxHeight}
+                    />
+                </div>
             </div>
 
             {!hideKeyboard && (
@@ -375,6 +369,26 @@ export const RegularGameplay = memo(function RegularGameplay({
                     />
                 </div>
             )}
+
+            {/* Visual Sizing Diagnostics */}
+            <div className="absolute inset-0 pointer-events-none z-50 border border-dashed border-red-500/20">
+                <div 
+                    className="absolute left-0 right-0 border-t border-b border-dashed border-green-500/40 bg-green-500/5 flex items-center justify-center text-[10px] font-mono text-green-400"
+                    style={{
+                        top: `${debugInfo.containerPadding / 2}px`,
+                        height: `${gridDimensions.maxHeight}px`
+                    }}
+                >
+                    Available Height: {gridDimensions.maxHeight}px
+                </div>
+                <div className="absolute bottom-2 left-2 bg-black/90 p-2 rounded-md border border-white/10 text-[9px] font-mono text-yellow-400 space-y-0.5 pointer-events-auto">
+                    <div>CONTAINER H: {containerRef.current?.getBoundingClientRect().height.toFixed(1)}px</div>
+                    <div>SIBLINGS: {debugInfo.siblingHeights.toFixed(1)}px</div>
+                    <div>GAPS: {debugInfo.containerGap.toFixed(1)}px</div>
+                    <div>OVERLAP: {debugInfo.headerOverlap.toFixed(1)}px</div>
+                    <div>PADDING: {debugInfo.containerPadding.toFixed(1)}px</div>
+                </div>
+            </div>
         </div>
     );
 });
