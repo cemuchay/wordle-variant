@@ -293,17 +293,23 @@ export const useGameEngine = (
                         if (
                            cloudPayload.guesses.length > payload.guesses.length
                         ) {
+                           const mergedPayload = {
+                              ...cloudPayload,
+                              usedHint: cloudPayload.usedHint || payload.usedHint,
+                              hintRecord:
+                                 cloudPayload.hintRecord || payload.hintRecord,
+                           };
                            dispatch({
                               type: "LOAD_STATE",
-                              payload: cloudPayload,
+                              payload: mergedPayload,
                            });
                            const localSalt = getLocalSalt(date, user.id);
                            const savedPayload = {
-                              ...cloudPayload,
+                              ...mergedPayload,
                               config: {
-                                 ...cloudPayload.config,
+                                 ...mergedPayload.config,
                                  word: obfuscateWord(
-                                    cloudPayload.config.word,
+                                    mergedPayload.config.word,
                                     localSalt,
                                  ),
                               },
@@ -315,11 +321,23 @@ export const useGameEngine = (
                         } else if (
                            payload.guesses.length > cloudPayload.guesses.length
                         ) {
-                           dispatch({ type: "LOAD_STATE", payload });
-                           performSync(payload);
+                           const mergedPayload = {
+                              ...payload,
+                              usedHint: payload.usedHint || cloudPayload.usedHint,
+                              hintRecord:
+                                 payload.hintRecord || cloudPayload.hintRecord,
+                           };
+                           dispatch({ type: "LOAD_STATE", payload: mergedPayload });
+                           performSync(mergedPayload);
                         } else {
                            // Equal and coherent
-                           dispatch({ type: "LOAD_STATE", payload });
+                           const mergedPayload = {
+                              ...payload,
+                              usedHint: payload.usedHint || cloudPayload.usedHint,
+                              hintRecord:
+                                 payload.hintRecord || cloudPayload.hintRecord,
+                           };
+                           dispatch({ type: "LOAD_STATE", payload: mergedPayload });
                         }
                      } else {
                         // Conflict/tampering: overwrite local with cloud data (cloud is authoritative)
