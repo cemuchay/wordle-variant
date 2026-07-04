@@ -60,22 +60,73 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const updateDimensions = useCallback(() => {
         if (!containerRef.current) return;
-        const containerRect = containerRef.current.getBoundingClientRect();
+        const container = containerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(container);
+        const containerPadding = 
+            (parseFloat(computedStyle.paddingTop) || 0) + 
+            (parseFloat(computedStyle.paddingBottom) || 0) +
+            (parseFloat(computedStyle.borderTopWidth) || 0) + 
+            (parseFloat(computedStyle.borderBottomWidth) || 0);
         
-        let keyboardHeight = 0;
-        if (keyboardRef.current && !hideKeyboard) {
-            keyboardHeight = keyboardRef.current.getBoundingClientRect().height;
+        let siblingHeights = 0;
+        let flowChildrenCount = 0;
+        
+        for (let i = 0; i < container.children.length; i++) {
+            const child = container.children[i] as HTMLElement;
+            const childStyle = window.getComputedStyle(child);
+            if (childStyle.position === 'absolute' || childStyle.position === 'fixed') {
+                continue;
+            }
+            flowChildrenCount++;
+            
+            const gridEl = child.classList.contains('game-board-grid') ? child : child.querySelector('.game-board-grid');
+            if (gridEl) {
+                const innerComputed = window.getComputedStyle(child);
+                siblingHeights += (parseFloat(innerComputed.paddingTop) || 0) + 
+                                  (parseFloat(innerComputed.paddingBottom) || 0) +
+                                  (parseFloat(innerComputed.borderTopWidth) || 0) + 
+                                  (parseFloat(innerComputed.borderBottomWidth) || 0);
+                
+                let innerFlowChildrenCount = 0;
+                for (let j = 0; j < child.children.length; j++) {
+                    const innerChild = child.children[j] as HTMLElement;
+                    const innerStyle = window.getComputedStyle(innerChild);
+                    if (innerStyle.position === 'absolute' || innerStyle.position === 'fixed') {
+                        continue;
+                    }
+                    innerFlowChildrenCount++;
+                    
+                    const innerGrid = innerChild.classList.contains('game-board-grid') ? innerChild : innerChild.querySelector('.game-board-grid');
+                    if (!innerGrid) {
+                        siblingHeights += innerChild.getBoundingClientRect().height;
+                        siblingHeights += (parseFloat(innerStyle.marginTop) || 0) + (parseFloat(innerStyle.marginBottom) || 0);
+                    }
+                }
+                if (innerFlowChildrenCount > 1 && (innerComputed.display === 'flex' || innerComputed.display === 'grid')) {
+                    const innerGap = parseFloat(innerComputed.gap) || 0;
+                    siblingHeights += innerGap * (innerFlowChildrenCount - 1);
+                }
+            } else {
+                siblingHeights += child.getBoundingClientRect().height;
+                siblingHeights += (parseFloat(childStyle.marginTop) || 0) + (parseFloat(childStyle.marginBottom) || 0);
+            }
         }
         
-        const paddingBuffer = 48;
-        const availableHeight = containerRect.height - keyboardHeight - paddingBuffer;
-        const availableWidth = containerRect.width - 24;
+        let containerGap = 0;
+        if (flowChildrenCount > 1 && (computedStyle.display === 'flex' || computedStyle.display === 'grid')) {
+            const gapVal = parseFloat(computedStyle.gap) || 0;
+            containerGap = gapVal * (flowChildrenCount - 1);
+        }
+        
+        const availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - 8;
+        const availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
 
         setGridDimensions({
             maxWidth: Math.max(150, availableWidth),
             maxHeight: Math.max(150, availableHeight)
         });
-    }, [hideKeyboard]);
+    }, []);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -88,8 +139,22 @@ export const RegularGameplay = memo(function RegularGameplay({
             observer.observe(keyboardRef.current);
         }
         
+        const handleViewportResize = () => {
+            updateDimensions();
+        };
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+            window.visualViewport.addEventListener('scroll', handleViewportResize);
+        }
+        
         updateDimensions();
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', handleViewportResize);
+                window.visualViewport.removeEventListener('scroll', handleViewportResize);
+            }
+        };
     }, [updateDimensions, hideKeyboard]);
 
     const [keyboardStatuses, setKeyboardStatuses] = useState(letterStatuses);

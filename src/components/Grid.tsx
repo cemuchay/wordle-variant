@@ -219,7 +219,7 @@ const LONG_PRESS_MS = 400;
 
 export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesses, currentGuess, hintRecord, isChallengeMode, isShake, compact, gameplayType, cursorIndex, editIndex, onSetCursor, onSetEditIndex, maxGridWidth, maxGridHeight, onToggleRules, showRules }) => {
   const { isDesktop, isSmall, isSuperTiny } = useIsResponsive();
-  
+
   // Calculate dynamic square cell size if constraints are provided
   let cellSizePx: number | null = null;
   if (maxGridWidth && maxGridHeight) {
@@ -387,9 +387,10 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   const [showEditHelp, setShowEditHelp] = useState(false);
 
   return (
-    <div className="relative mx-auto w-fit select-none shrink-0">
-      {(onToggleRules || wordLength > 5) && (
-        <div className="flex items-center justify-end gap-1.5 mb-1.5 w-full px-0.5">
+    <div className={`relative mx-auto select-none shrink-0 flex ${isDesktop ? 'flex-row items-start gap-3' : 'flex-col items-center'}`}>
+      {/* Mobile Header Rules */}
+      {!isDesktop && (onToggleRules || wordLength > 5) && (
+        <div className="flex items-center justify-end gap-1.5 mb-1 w-full px-0.5">
           {onToggleRules && (
             <div className="relative">
               <button
@@ -465,11 +466,11 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
       )}
       <div
         ref={scrollContainerRef}
-        className={maxAttempts > 6 ? "overflow-y-auto overflow-hidden py-6 scrollbar-thin pr-1.5" : ""}
+        className={maxAttempts > 6 ? "overflow-y-auto overflow-hidden py-2 sm:py-4 scrollbar-thin pr-1.5" : ""}
         style={maxAttempts > 6 ? { maxHeight: 'min(360px, 60vh)', overflowY: 'auto' } : undefined}
       >
         <div
-          className={`game-board-grid flex flex-col mx-auto h-fit max-h-full items-center justify-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-4'}`}
+          className={`game-board-grid flex flex-col mx-auto h-fit max-h-full items-center justify-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-2 sm:p-4'}`}
           style={{
             width: 'max-content'
           }}
@@ -588,9 +589,87 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
             );
           })}
         </div>
+
+        {/* Desktop Right Side Rules */}
+        {isDesktop && (onToggleRules || wordLength > 5) && (
+          <div className="flex flex-col items-center justify-start gap-2 pt-2 shrink-0">
+            {onToggleRules && (
+              <div className="relative">
+                <button
+                  onClick={onToggleRules}
+                  className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/10 text-white/50 hover:bg-white/20 hover:text-white/80 transition-all cursor-pointer"
+                  title="Quick rules"
+                >
+                  <HelpCircle size={15} />
+                </button>
+                {showRules && (
+                  <>
+                    <div className="absolute left-full top-0 ml-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-left-1 duration-150">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-correct">Quick Rules</span>
+                        <button onClick={onToggleRules} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
+                          <X size={10} />
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-gray-400 uppercase font-black tracking-wide mb-2 leading-relaxed">
+                        Guess the word in {maxAttempts} tries. Colors show status:
+                      </p>
+                      <ul className="text-[9px] text-gray-300 space-y-1 font-black uppercase tracking-wide">
+                        <li className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded bg-correct shrink-0 border border-white/10" />
+                          <span>Correct Spot</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded bg-present shrink-0 border border-white/10" />
+                          <span>Wrong Spot</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded bg-absent shrink-0 border border-white/10" />
+                          <span>Not In Word</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="fixed inset-0 z-40" onClick={onToggleRules} />
+                  </>
+                )}
+              </div>
+            )}
+
+            {wordLength > 5 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowEditHelp(!showEditHelp)}
+                  className="w-7 h-7 flex items-center justify-center rounded-xl bg-white/10 text-white/50 hover:bg-white/20 hover:text-white/80 text-xs font-bold transition-all cursor-pointer"
+                  title="Edit controls help"
+                >
+                  ?
+                </button>
+                {showEditHelp && (
+                  <>
+                    <div className="absolute left-full top-0 ml-2 z-50 w-60 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5 animate-in fade-in slide-in-from-left-1 duration-150">
+                      <div className="font-bold text-white/90 text-xs mb-1.5">Editing Controls</div>
+                      <p><span className="text-blue-400 font-bold">Tap</span> a cell to move the cursor there.</p>
+                      <p><span className="text-red-400 font-bold">Backspace</span> deletes the letter at cursor and shifts remaining left.</p>
+                      <p><span className="text-yellow-400 font-bold">Double-click</span> or <span className="text-yellow-400 font-bold">long-press</span> a cell to enter <span className="text-yellow-400">edit mode</span>.</p>
+                      <p>In edit mode, <span className="text-red-400 font-bold">Backspace</span> clears that cell without shifting. Type a letter to fill it.</p>
+                      <button
+                        onClick={() => setShowEditHelp(false)}
+                        className="mt-2 w-full text-center text-[10px] text-white/40 hover:text-white/70 uppercase tracking-wider font-bold cursor-pointer"
+                      >
+                        Got it
+                      </button>
+                    </div>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowEditHelp(false)} />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 });
+
 
 Grid.displayName = 'Grid';
