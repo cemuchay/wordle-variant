@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
+import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import { ANIMATION_DURATION } from '../../constants/ui';
 import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
@@ -70,10 +71,10 @@ export const RegularGameplay = memo(function RegularGameplay({
         const containerRect = container.getBoundingClientRect();
         const computedStyle = window.getComputedStyle(container);
         const containerPadding = (parseFloat(computedStyle.paddingTop) || 0) + (parseFloat(computedStyle.paddingBottom) || 0);
-        
+
         let siblingHeights = 0;
         let flowChildrenCount = 0;
-        
+
         for (let i = 0; i < container.children.length; i++) {
             const child = container.children[i] as HTMLElement;
             const childStyle = window.getComputedStyle(child);
@@ -81,20 +82,20 @@ export const RegularGameplay = memo(function RegularGameplay({
                 continue;
             }
             flowChildrenCount++;
-            
+
             const isGridParent = child.classList.contains('grid-wrapper-parent') || child.querySelector('.grid-wrapper-parent');
             if (!isGridParent) {
                 siblingHeights += child.getBoundingClientRect().height;
                 siblingHeights += (parseFloat(childStyle.marginTop) || 0) + (parseFloat(childStyle.marginBottom) || 0);
             }
         }
-        
+
         let containerGap = 0;
         if (flowChildrenCount > 1 && (computedStyle.display === 'flex' || computedStyle.display === 'grid')) {
             const gapVal = parseFloat(computedStyle.gap) || 0;
             containerGap = gapVal * (flowChildrenCount - 1);
         }
-        
+
         let headerOverlap = 0;
         const headerEl = document.getElementById('challenge-modal-header');
         if (headerEl) {
@@ -103,7 +104,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                 headerOverlap = headerRect.bottom - containerRect.top;
             }
         }
-        
+
         let availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - headerOverlap - 8;
         let availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
 
@@ -132,7 +133,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     useEffect(() => {
         if (!containerRef.current) return;
-        
+
         const observer = new ResizeObserver(() => {
             updateDimensions();
         });
@@ -140,7 +141,7 @@ export const RegularGameplay = memo(function RegularGameplay({
         if (keyboardRef.current) {
             observer.observe(keyboardRef.current);
         }
-        
+
         const handleViewportResize = () => {
             updateDimensions();
         };
@@ -148,14 +149,14 @@ export const RegularGameplay = memo(function RegularGameplay({
             window.visualViewport.addEventListener('resize', handleViewportResize);
             window.visualViewport.addEventListener('scroll', handleViewportResize);
         }
-        
+
         // Initial triggers
         updateDimensions();
-        
+
         // Timeout fallbacks to handle WebKit layout delays on mount
         const t1 = setTimeout(updateDimensions, 80);
         const t2 = setTimeout(updateDimensions, 350);
-        
+
         return () => {
             observer.disconnect();
             clearTimeout(t1);
@@ -242,7 +243,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
 
     return (
-        <div className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
+        <div ref={containerRef} className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
 
             {/* Sync Status Overlay */}
@@ -306,14 +307,15 @@ export const RegularGameplay = memo(function RegularGameplay({
                         </button>
                     )}
                 </div>
-            )}            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+            )}
+            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
                 {sentenceGames && (
                     <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
                         {sentenceGames.map((g, idx) => {
                             const prog = participation?.marathon_progress?.find((p: any) => p.game_index === idx);
                             const isCompleted = prog?.status === 'completed' || (idx < (gameIndex ?? 0));
                             const isActive = idx === gameIndex;
- 
+
                             if (isCompleted) {
                                 return (
                                     <span key={idx} className="text-xs font-black text-correct uppercase border-b-2 border-correct/30 px-1 py-0.5 animate-in fade-in duration-200">
@@ -336,7 +338,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                         })}
                     </div>
                 )}
- 
+
                 <div className="relative grid-wrapper-parent">
                     <NewGrid
                         wordLength={wordLength}
@@ -372,7 +374,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
             {/* Visual Sizing Diagnostics */}
             <div className="absolute inset-0 pointer-events-none z-50 border border-dashed border-red-500/20">
-                <div 
+                <div
                     className="absolute left-0 right-0 border-t border-b border-dashed border-green-500/40 bg-green-500/5 flex items-center justify-center text-[10px] font-mono text-green-400"
                     style={{
                         top: `${debugInfo.containerPadding / 2}px`,
