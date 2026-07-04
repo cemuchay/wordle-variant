@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AlertTriangle, Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, useEffect, useRef, useState, useCallback } from 'react';
-import { memo, useEffect, useRef, useState, useCallback } from 'react';
 import { ANIMATION_DURATION } from '../../constants/ui';
 import { ANIMATION } from '../../constants/game';
 import { useApp } from '../../context/AppContext';
