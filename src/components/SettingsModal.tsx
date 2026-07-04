@@ -689,10 +689,10 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                                     <p className="text-sm font-bold text-gray-100">Live Push Updates</p>
                                                     {pushSupported && (
                                                         <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${pushPermission === 'granted' && pushEnabled
-                                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                                                : pushPermission === 'denied'
-                                                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                            : pushPermission === 'denied'
+                                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                                : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                                                             }`}>
                                                             {pushPermission === 'granted' && pushEnabled
                                                                 ? 'Active'
@@ -712,8 +712,8 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                                 <button
                                                     onClick={handlePushToggle}
                                                     className={`w-12 h-6 rounded-full transition-all duration-300 relative ${pushEnabled && pushPermission === 'granted'
-                                                            ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
-                                                            : 'bg-gray-800'
+                                                        ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]'
+                                                        : 'bg-gray-800'
                                                         }`}
                                                 >
                                                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${pushEnabled && pushPermission === 'granted' ? 'left-7' : 'left-1'
