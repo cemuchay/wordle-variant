@@ -95,6 +95,16 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     }
 
+    const [editUsername, setEditUsername] = useState('');
+    const [editFullName, setEditFullName] = useState('');
+
+    useEffect(() => {
+        if (profile) {
+            setEditUsername(profile.username || '');
+            setEditFullName(profile.full_name || '');
+        }
+    }, [profile]);
+
     useEffect(() => {
         if (isOpen) {
             const fetchAuthData = async () => {

@@ -242,7 +242,7 @@ export const RegularGameplay = memo(function RegularGameplay({
 
 
     return (
-        <div className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
+        <div ref={containerRef} className="gameplay-container flex-1 flex flex-col p-2 sm:p-3 gap-2 sm:gap-3 relative overflow-hidden min-h-0">
             <NetworkLog logs={networkLogs} />
 
             {/* Sync Status Overlay */}
@@ -306,7 +306,8 @@ export const RegularGameplay = memo(function RegularGameplay({
                         </button>
                     )}
                 </div>
-            )}            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
+            )}
+            <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden gap-3">
                 {sentenceGames && (
                     <div className="bg-indigo-950/30 border border-indigo-500/25 p-3 rounded-xl max-w-md w-full shrink-0 flex flex-wrap gap-x-2.5 gap-y-1.5 items-center justify-center text-center">
                         {sentenceGames.map((g, idx) => {
