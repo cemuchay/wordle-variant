@@ -119,8 +119,23 @@ export const RegularGameplay = memo(function RegularGameplay({
             containerGap = gapVal * (flowChildrenCount - 1);
         }
         
-        const availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - 8;
-        const availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
+        let headerOverlap = 0;
+        const headerEl = document.getElementById('challenge-modal-header');
+        if (headerEl) {
+            const headerRect = headerEl.getBoundingClientRect();
+            if (containerRect.top < headerRect.bottom) {
+                headerOverlap = headerRect.bottom - containerRect.top;
+            }
+        }
+        
+        let availableHeight = containerRect.height - containerPadding - siblingHeights - containerGap - headerOverlap - 8;
+        let availableWidth = containerRect.width - (parseFloat(computedStyle.paddingLeft) || 0) - (parseFloat(computedStyle.paddingRight) || 0) - 16;
+
+        // Apply a 15% size reduction factor on desktop to prevent clipping/crowding
+        if (window.innerWidth >= 768) {
+            availableHeight = availableHeight * 0.85;
+            availableWidth = availableWidth * 0.85;
+        }
 
         setGridDimensions({
             maxWidth: Math.max(150, availableWidth),

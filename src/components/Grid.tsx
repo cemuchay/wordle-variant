@@ -387,7 +387,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
   const [showEditHelp, setShowEditHelp] = useState(false);
 
   return (
-    <div className={`relative mx-auto select-none shrink-0 flex ${isDesktop ? 'flex-row items-start gap-3' : 'flex-col items-center'}`}>
+    <div className="relative mx-auto w-fit select-none shrink-0">
       {/* Mobile Header Rules */}
       {!isDesktop && (onToggleRules || wordLength > 5) && (
         <div className="flex items-center justify-end gap-1.5 mb-1 w-full px-0.5">
@@ -590,9 +590,9 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
           })}
         </div>
 
-        {/* Desktop Right Side Rules */}
-        {isDesktop && (onToggleRules || wordLength > 5) && (
-          <div className="flex flex-col items-center justify-start gap-2 pt-2 shrink-0">
+      {/* Desktop Right Side Rules */}
+      {isDesktop && (onToggleRules || wordLength > 5) && (
+        <div className="absolute left-full ml-3 top-2 flex flex-col items-center gap-2 shrink-0">
             {onToggleRules && (
               <div className="relative">
                 <button
@@ -602,9 +602,9 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                 >
                   <HelpCircle size={15} />
                 </button>
-                {showRules && (
+                 {showRules && (
                   <>
-                    <div className="absolute left-full top-0 ml-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-left-1 duration-150">
+                    <div className="absolute left-full bottom-0 ml-2 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-left-1 duration-150">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[9px] font-black uppercase tracking-wider text-correct">Quick Rules</span>
                         <button onClick={onToggleRules} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
@@ -646,7 +646,7 @@ export const Grid: React.FC<GridProps> = memo(({ wordLength, maxAttempts, guesse
                 </button>
                 {showEditHelp && (
                   <>
-                    <div className="absolute left-full top-0 ml-2 z-50 w-60 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5 animate-in fade-in slide-in-from-left-1 duration-150">
+                    <div className="absolute left-full bottom-0 ml-2 z-50 w-60 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5 animate-in fade-in slide-in-from-left-1 duration-150">
                       <div className="font-bold text-white/90 text-xs mb-1.5">Editing Controls</div>
                       <p><span className="text-blue-400 font-bold">Tap</span> a cell to move the cursor there.</p>
                       <p><span className="text-red-400 font-bold">Backspace</span> deletes the letter at cursor and shifts remaining left.</p>
