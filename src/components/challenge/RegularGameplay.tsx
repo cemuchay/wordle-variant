@@ -54,12 +54,12 @@ export const RegularGameplay = memo(function RegularGameplay({
 
     const wasGameOverOnMount = useRef(isGameOver);
     const [hideKeyboard, setHideKeyboard] = useState(wasGameOverOnMount.current);
-    const [debugInfo, setDebugInfo] = useState({
-        siblingHeights: 0,
-        containerGap: 0,
-        headerOverlap: 0,
-        containerPadding: 0
-    });
+    // const [debugInfo, setDebugInfo] = useState({
+    //     siblingHeights: 0,
+    //     containerGap: 0,
+    //     headerOverlap: 0,
+    //     containerPadding: 0
+    // });
     const [gridDimensions, setGridDimensions] = useState({ maxWidth: 320, maxHeight: 400 });
     const containerRef = useRef<HTMLDivElement>(null);
     const keyboardRef = useRef<HTMLDivElement>(null);
@@ -122,12 +122,12 @@ export const RegularGameplay = memo(function RegularGameplay({
             maxHeight: Math.max(150, availableHeight)
         });
 
-        setDebugInfo({
-            siblingHeights,
-            containerGap,
-            headerOverlap,
-            containerPadding
-        });
+        // setDebugInfo({
+        //     siblingHeights,
+        //     containerGap,
+        //     headerOverlap,
+        //     containerPadding
+        // });
     }, []);
 
     useEffect(() => {
@@ -372,7 +372,7 @@ export const RegularGameplay = memo(function RegularGameplay({
             )}
 
             {/* Visual Sizing Diagnostics */}
-            <div className="absolute inset-0 pointer-events-none z-50 border border-dashed border-red-500/20">
+            {/* <div className="absolute inset-0 pointer-events-none z-50 border border-dashed border-red-500/20">
                 <div
                     className="absolute left-0 right-0 border-t border-b border-dashed border-green-500/40 bg-green-500/5 flex items-center justify-center text-[10px] font-mono text-green-400"
                     style={{
@@ -389,7 +389,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                     <div>OVERLAP: {debugInfo.headerOverlap.toFixed(1)}px</div>
                     <div>PADDING: {debugInfo.containerPadding.toFixed(1)}px</div>
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 });
