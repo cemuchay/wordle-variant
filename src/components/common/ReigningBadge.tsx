@@ -51,7 +51,7 @@ export const ReigningBadge: React.FC<ReigningBadgeProps> = ({ userId, type, clas
       title={tooltip}
     >
       <Icon
-        size={10}
+        size={15}
         className={`${iconColor} drop-shadow-[0_0_3px_var(--tw-shadow-color)] ${glowColor}`}
         style={{ filter: `drop-shadow(0 0 2px currentColor)` }}
       />

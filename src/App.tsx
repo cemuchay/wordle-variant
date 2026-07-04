@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { AdminPage } from "./components/admin/AdminPage";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
@@ -171,7 +172,7 @@ export default function App() {
     (discoverChallenges || [])
       .filter((c: any) => c.is_bot_marathon)
       .map((c: any) => c.id),
-  [discoverChallenges]);
+    [discoverChallenges]);
 
   const { data: botMarathonParticipants } = useBulkChallengeParticipants(botMarathonIds);
 
@@ -237,7 +238,7 @@ export default function App() {
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
-  
+
   const [dismissedAlreadyPlayed, setDismissedAlreadyPlayed] = useState(() => {
     return safeSessionStorage.getItem("wordle_already_played_dismissed") === "true";
   });
@@ -284,6 +285,7 @@ export default function App() {
         console.error("Failed to restore last active tab", e);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHydrated, date]);
 
   const [navLoading] = useState<{ active: boolean; message: string }>({
@@ -354,6 +356,7 @@ export default function App() {
 
   useEffect(() => {
     if (showTutorial) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsTutorialOpen(true);
     }
   }, [showTutorial]);
@@ -368,6 +371,7 @@ export default function App() {
 
   useEffect(() => {
     if (showWordupTutorial) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsWordupTutorialOpen(true);
     }
   }, [showWordupTutorial]);
@@ -379,7 +383,6 @@ export default function App() {
     };
 
     if ("requestIdleCallback" in window) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).requestIdleCallback(preloadChat);
     } else {
       const timer = setTimeout(preloadChat, 2000);
@@ -497,6 +500,7 @@ export default function App() {
   // Reset isLeavingWelcome when auth modal closes without sign-in
   useEffect(() => {
     if (!isAuthOpen && isLeavingWelcome && !user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLeavingWelcome(false);
     }
   }, [isAuthOpen, isLeavingWelcome, user]);
@@ -892,7 +896,7 @@ export default function App() {
       <AudioConnectionLog />
       <GlobalAudioPlayer />
       <NotificationsManager />
-      <FloatingChatBubble />
+      {user && <FloatingChatBubble />}
       {/* Toast component has been migrated to DynamicIslandStatus */}
       {user && showDisconnectedUI && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">

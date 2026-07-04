@@ -213,17 +213,17 @@ export const DynamicIslandStatus = () => {
             const dynamicWidth = Math.max(280, Math.min(420, 160 + len * 5.5));
             return `min(95vw, ${dynamicWidth}px)`;
         }
-        if (activeCall) {
+        if (user && activeCall) {
             if (activeCall.status === 'ringing') return '240px';
             if (activeCall.status === 'calling') return '180px';
             return '140px'; // connecting / connected
         }
-        if (currentVoiceSession) return '180px';
-        if (mascot && (!showOnlineNotification || otherOnlineUsers.length === 0)) {
+        if (user && currentVoiceSession) return '180px';
+        if (mascot && (!showOnlineNotification || !user || otherOnlineUsers.length === 0)) {
             return '195px';
         }
-        if (otherOnlineUsers.length === 1) return '160px';
-        if (otherOnlineUsers.length > 1) return '145px';
+        if (user && otherOnlineUsers.length === 1) return '160px';
+        if (user && otherOnlineUsers.length > 1) return '145px';
 
         // Persistent default state (Smiley + Time)
         return '150px';
@@ -399,7 +399,7 @@ export const DynamicIslandStatus = () => {
                                     </span>
                                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                                 </div>
-                            ) : (otherOnlineUsers.length > 0 && (showOnlineNotification || !mascot)) ? (
+                            ) : (user && otherOnlineUsers.length > 0 && (showOnlineNotification || !mascot)) ? (
                                 otherOnlineUsers.length === 1 ? (
                                     <>
                                         <ProtectedAvatar
@@ -586,37 +586,25 @@ export const DynamicIslandStatus = () => {
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
-                            <div className="space-y-4">
-                                {sortedProfiles.map((p) => {
-                                    const isOnline = onlineUsers.some(u => u.id === p.id);
-                                    const inVoiceRoom = onlineUsers.find(u => u.id === p.id)?.activeVoiceRoomId;
+                        {!user ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-4 space-y-3">
+                                <Users size={32} className="text-zinc-500 animate-pulse" />
+                                <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider leading-relaxed">
+                                    Sign in to see online users & join voice chats
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                                <div className="space-y-4">
+                                    {sortedProfiles.map((p) => {
+                                        const isOnline = onlineUsers.some(u => u.id === p.id);
+                                        const inVoiceRoom = onlineUsers.find(u => u.id === p.id)?.activeVoiceRoomId;
 
-                                    return (
-                                        <div key={p.id} className="flex items-center justify-between group">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="relative cursor-pointer hover:scale-105 transition-transform"
-                                                    onClick={(e) => {
-                                                        if (p.id) {
-                                                            e.stopPropagation();
-                                                            window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
-                                                        }
-                                                    }}
-                                                >
-                                                    <ProtectedAvatar
-                                                        userId={p.id}
-                                                        src={p.avatar_url}
-                                                        username={p.username}
-                                                        className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}
-                                                    />
-                                                    {isOnline && (
-                                                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black" />
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span
-                                                        className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                        return (
+                                            <div key={p.id} className="flex items-center justify-between group">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className="relative cursor-pointer hover:scale-105 transition-transform"
                                                         onClick={(e) => {
                                                             if (p.id) {
                                                                 e.stopPropagation();
@@ -624,89 +612,110 @@ export const DynamicIslandStatus = () => {
                                                             }
                                                         }}
                                                     >
-                                                        {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
-                                                        <ReigningBadge userId={p.id} type="weekly" />
-                                                        <ReigningBadge userId={p.id} type="bot_marathon" />
-                                                    </span>
-                                                    <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                                                        {inVoiceRoom ? (
-                                                            <span className="text-emerald-500 font-bold uppercase tracking-tighter">In Voice Chat</span>
-                                                        ) : isOnline ? (
-                                                            <span className="text-emerald-500 font-bold uppercase tracking-tighter">Active Now</span>
-                                                        ) : (
-                                                            <>
-                                                                <Clock size={8} />
-                                                                <span>Seen {formatLastSeen(p.last_seen_at)}</span>
-                                                            </>
+                                                        <ProtectedAvatar
+                                                            userId={p.id}
+                                                            src={p.avatar_url}
+                                                            username={p.username}
+                                                            className={`w-10 h-10 rounded-full border transition-all ${isOnline ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-white/10'}`}
+                                                        />
+                                                        {isOnline && (
+                                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black" />
                                                         )}
                                                     </div>
+                                                    <div className="flex flex-col">
+                                                        <span
+                                                            className="text-left text-xs font-bold text-white group-hover:text-emerald-400 cursor-pointer hover:underline transition-colors"
+                                                            onClick={(e) => {
+                                                                if (p.id) {
+                                                                    e.stopPropagation();
+                                                                    window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: p.id } }));
+                                                                }
+                                                            }}
+                                                        >
+                                                            {formatUsername(p.username)} {p.id === user?.id && <span className="text-[8px] text-gray-500 ml-1">(YOU)</span>}
+                                                            <ReigningBadge userId={p.id} type="weekly" />
+                                                            <ReigningBadge userId={p.id} type="bot_marathon" />
+                                                        </span>
+                                                        <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                                                            {inVoiceRoom ? (
+                                                                <span className="text-emerald-500 font-bold uppercase tracking-tighter">In Voice Chat</span>
+                                                            ) : isOnline ? (
+                                                                <span className="text-emerald-500 font-bold uppercase tracking-tighter">Active Now</span>
+                                                            ) : (
+                                                                <>
+                                                                    <Clock size={8} />
+                                                                    <span>Seen {formatLastSeen(p.last_seen_at)}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                    {p.id !== user?.id && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setPendingChallengeUserId(p.id);
+                                                                setIsChallengeOpen(true);
+                                                                setIsExpanded(false);
+                                                            }}
+                                                            className="p-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black rounded-lg transition-all"
+                                                            title={`Challenge ${p.username}`}
+                                                        >
+                                                            <Trophy size={10} />
+                                                        </button>
+                                                    )}
+
+                                                    {p.id !== user?.id && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setPendingDMUserId(p.id);
+                                                                setIsChatOpen(true);
+                                                                setIsExpanded(false);
+                                                            }}
+                                                            className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
+                                                            title={`Message ${p.username}`}
+                                                        >
+                                                            <MessageCircle size={10} />
+                                                        </button>
+                                                    )}
+
+                                                    {isOnline && p.id !== user?.id && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (activeCall) {
+                                                                    triggerToast("You are already in a call.", 4000);
+                                                                    return;
+                                                                }
+                                                                initiatePrivateCall({
+                                                                    id: p.id,
+                                                                    username: p.username,
+                                                                    avatar_url: p.avatar_url
+                                                                });
+                                                                setIsExpanded(false);
+                                                            }}
+                                                            className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-500 hover:text-black rounded-lg transition-all"
+                                                            title={`Call ${p.username}`}
+                                                        >
+                                                            <Phone size={10} />
+                                                        </button>
+                                                    )}
+
+                                                    {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
+                                                        <button
+                                                            onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
+                                                            className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
+                                                        >
+                                                            Join
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                                {p.id !== user?.id && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setPendingChallengeUserId(p.id);
-                                                            setIsChallengeOpen(true);
-                                                            setIsExpanded(false);
-                                                        }}
-                                                        className="p-1.5 bg-correct/10 hover:bg-correct text-correct hover:text-black rounded-lg transition-all"
-                                                        title={`Challenge ${p.username}`}
-                                                    >
-                                                        <Trophy size={10} />
-                                                    </button>
-                                                )}
-
-                                                {p.id !== user?.id && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setPendingDMUserId(p.id);
-                                                            setIsChatOpen(true);
-                                                            setIsExpanded(false);
-                                                        }}
-                                                        className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all"
-                                                        title={`Message ${p.username}`}
-                                                    >
-                                                        <MessageCircle size={10} />
-                                                    </button>
-                                                )}
-
-                                                {isOnline && p.id !== user?.id && (
-                                                    <button
-                                                        onClick={() => {
-                                                            if (activeCall) {
-                                                                triggerToast("You are already in a call.", 4000);
-                                                                return;
-                                                            }
-                                                            initiatePrivateCall({
-                                                                id: p.id,
-                                                                username: p.username,
-                                                                avatar_url: p.avatar_url
-                                                            });
-                                                            setIsExpanded(false);
-                                                        }}
-                                                        className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-500 hover:text-black rounded-lg transition-all"
-                                                        title={`Call ${p.username}`}
-                                                    >
-                                                        <Phone size={10} />
-                                                    </button>
-                                                )}
-
-                                                {inVoiceRoom && inVoiceRoom !== activeCall?.channelId && (
-                                                    <button
-                                                        onClick={(e) => handleGoToLobby(e, inVoiceRoom)}
-                                                        className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
-                                                    >
-                                                        Join
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </motion.div>
                 )}
                 </div>

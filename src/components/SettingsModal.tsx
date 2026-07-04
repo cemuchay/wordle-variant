@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search, Shield } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search, Shield, Pencil, Check } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -26,6 +26,16 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
     const [rememberLastView, setRememberLastView] = useState(preferences.rememberLastView || false);
     const [navOrder, setNavOrder] = useState<string[]>(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
+    const [prevPreferences, setPrevPreferences] = useState(preferences);
+
+    if (preferences !== prevPreferences) {
+        setPrevPreferences(preferences);
+        setAllowRoasts(preferences.allowRoasts);
+        setCompactMode(preferences.compactMode);
+        setRememberLastView(preferences.rememberLastView || false);
+        setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
+    }
+
     const [receiveEmails, setReceiveEmails] = useState(true);
     const [pushSupported, setPushSupported] = useState(false);
     const [pushEnabled, setPushEnabled] = useState(false);
@@ -50,13 +60,40 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
-    // Sync internal state when preferences change
-    useEffect(() => {
+    const usernameInputRef = useRef<HTMLInputElement>(null);
+    const [editUsername, setEditUsername] = useState(profile?.username || '');
+    const [isUsernameEditable, setIsUsernameEditable] = useState(false);
+    const [prevProfile, setPrevProfile] = useState(profile);
+
+    if (profile !== prevProfile) {
+        setPrevProfile(profile);
+        if (profile) {
+            setEditUsername(profile.username || '');
+        }
+    }
+
+    const [showConfirmSummary, setShowConfirmSummary] = useState(false);
+    const [initialReceiveEmails, setInitialReceiveEmails] = useState(false);
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+
+    const handleReset = () => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
         setRememberLastView(preferences.rememberLastView || false);
         setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
-    }, [preferences]);
+        setEditUsername(profile?.username || '');
+        setIsUsernameEditable(false);
+        setReceiveEmails(initialReceiveEmails);
+        triggerToast('Changes Discarded');
+    };
+
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen) {
+            setShowConfirmSummary(false);
+            setIsUsernameEditable(false);
+        }
+    }
 
     const [editUsername, setEditUsername] = useState('');
     const [editFullName, setEditFullName] = useState('');
@@ -83,6 +120,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                         .maybeSingle();
                     if (!error && data) {
                         setReceiveEmails(data.receive_emails);
+                        setInitialReceiveEmails(data.receive_emails);
                     }
                 }
             };
@@ -196,6 +234,66 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setNavOrder(newOrder);
     };
 
+    const getChanges = () => {
+        const changes: { name: string; from: string; to: string }[] = [];
+
+        if (profile?.id) {
+            const usernameClean = editUsername.trim();
+            const originalUsername = profile.username || '';
+            if (usernameClean !== originalUsername) {
+                changes.push({
+                    name: 'Username',
+                    from: originalUsername ? `@${originalUsername}` : 'None',
+                    to: usernameClean ? `@${usernameClean}` : 'None'
+                });
+            }
+        }
+
+        if (allowRoasts !== (preferences.allowRoasts ?? true)) {
+            changes.push({
+                name: 'Allow Roasts',
+                from: (preferences.allowRoasts ?? true) ? 'Enabled' : 'Disabled',
+                to: allowRoasts ? 'Enabled' : 'Disabled'
+            });
+        }
+
+        if (compactMode !== (preferences.compactMode ?? false)) {
+            changes.push({
+                name: 'Compact Mode',
+                from: (preferences.compactMode ?? false) ? 'Enabled' : 'Disabled',
+                to: compactMode ? 'Enabled' : 'Disabled'
+            });
+        }
+
+        if (rememberLastView !== (preferences.rememberLastView ?? true)) {
+            changes.push({
+                name: 'Restore Last Tab',
+                from: (preferences.rememberLastView ?? true) ? 'Enabled' : 'Disabled',
+                to: rememberLastView ? 'Enabled' : 'Disabled'
+            });
+        }
+
+        if (receiveEmails !== initialReceiveEmails) {
+            changes.push({
+                name: 'Email Notifications',
+                from: initialReceiveEmails ? 'Subscribed' : 'Unsubscribed',
+                to: receiveEmails ? 'Subscribed' : 'Unsubscribed'
+            });
+        }
+
+        const originalOrder = preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"];
+        if (JSON.stringify(navOrder) !== JSON.stringify(originalOrder)) {
+            const formatOrder = (order: string[]) => order.map(item => navItemLabels[item] || item).join(' → ');
+            changes.push({
+                name: 'Navigation Tabs Order',
+                from: formatOrder(originalOrder),
+                to: formatOrder(navOrder)
+            });
+        }
+
+        return changes;
+    };
+
     const handleSave = async () => {
         setLoading(true);
 
@@ -214,7 +312,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
 
         if (profile?.id) {
             const usernameClean = editUsername.trim();
-            const fullNameClean = editFullName.trim();
 
             if (usernameClean) {
                 if (usernameClean.length < 3 || usernameClean.length > 15) {
@@ -247,8 +344,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 .from('profiles')
                 .update({
                     preferences: newPreferences,
-                    username: usernameClean || profile.username,
-                    full_name: fullNameClean
+                    username: usernameClean || profile.username
                 })
                 .eq('id', profile.id);
 
@@ -266,8 +362,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             } else {
                 await supabase.auth.updateUser({
                     data: {
-                        username: usernameClean || profile.username,
-                        full_name: fullNameClean
+                        username: usernameClean || profile.username
                     }
                 });
                 await refreshProfile();
@@ -322,7 +417,15 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300">
+            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
+                <style dangerouslySetInnerHTML={{__html: `
+                    .settings-modal-content *:not(svg):not(path) {
+                        color: #ffffff !important;
+                    }
+                    .settings-modal-content input::placeholder {
+                        color: rgba(255, 255, 255, 0.4) !important;
+                    }
+                `}} />
 
                 {/* Header */}
                 <div className="flex flex-col border-b border-gray-900 bg-gray-900/20 shrink-0">
@@ -357,8 +460,29 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 </div>
 
                 <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                    {!hasResults && (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                    {showConfirmSummary ? (
+                        <div className="space-y-6 py-4 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="text-center space-y-2">
+                                <h3 className="text-sm font-black uppercase tracking-wider text-indigo-400">Review Changes</h3>
+                                <p className="text-[10px] text-gray-400 leading-relaxed">Please review the modified settings before saving.</p>
+                            </div>
+                            <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+                                {getChanges().map((change, idx) => (
+                                    <div key={idx} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-1.5">
+                                        <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">{change.name}</span>
+                                        <div className="flex items-center justify-between text-xs gap-3 font-medium">
+                                            <span className="text-gray-400 line-through truncate max-w-[45%]">{change.from}</span>
+                                            <span className="text-indigo-400 font-bold font-mono">→</span>
+                                            <span className="text-correct font-bold truncate max-w-[45%]">{change.to}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {!hasResults && (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
                             <div className="w-12 h-12 bg-gray-900 rounded-full flex items-center justify-center mb-4 border border-gray-800">
                                 <Search size={20} className="text-gray-600" />
                             </div>
@@ -385,29 +509,46 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             <div className="space-y-3">
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Username</label>
-                                    <div className="relative group">
+                                    <div className="relative group flex items-center">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">@</span>
                                         <input
+                                            ref={usernameInputRef}
                                             type="text"
                                             value={editUsername}
-                                            onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                                            placeholder="username"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600"
+                                            readOnly={!isUsernameEditable}
+                                            onChange={(e) => {
+                                                const clean = e.target.value.replace(/\s+/g, '');
+                                                if (clean.length > 0) {
+                                                    setEditUsername(clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase());
+                                                } else {
+                                                    setEditUsername('');
+                                                }
+                                            }}
+                                            placeholder="Username"
+                                            className={`w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-8 pr-12 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600 ${!isUsernameEditable ? 'opacity-70 cursor-default select-none' : ''}`}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const nextEditable = !isUsernameEditable;
+                                                setIsUsernameEditable(nextEditable);
+                                                if (nextEditable) {
+                                                    setTimeout(() => usernameInputRef.current?.focus(), 50);
+                                                }
+                                            }}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                            title={isUsernameEditable ? "Save username" : "Edit username"}
+                                        >
+                                            {isUsernameEditable ? (
+                                                <Check size={14} className="text-indigo-400 animate-pulse" />
+                                            ) : (
+                                                <Pencil size={14} className="text-gray-500" />
+                                            )}
+                                        </button>
                                     </div>
                                     <p className="text-[9px] text-gray-600 px-1">
                                         3-15 characters. Letters, numbers, and underscores only.
                                     </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Full Name</label>
-                                    <input
-                                        type="text"
-                                        value={editFullName}
-                                        onChange={(e) => setEditFullName(e.target.value)}
-                                        placeholder="Full Name"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all text-white placeholder-gray-600"
-                                    />
                                 </div>
                             </div>
                         </section>
@@ -815,25 +956,64 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             </div>
                         </section>
                     )}
+                        </>
+                    )}
                 </div>
 
                 {/* Action Area */}
                 <div className="p-4 bg-gray-900/30 border-t border-gray-900 flex flex-col gap-3 shrink-0">
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-black text-sm rounded-xl transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-50"
-                    >
-                        {loading ? 'SYNCING...' : 'SAVE PREFERENCES'}
-                    </button>
+                    {showConfirmSummary ? (
+                        <>
+                            <button
+                                onClick={handleSave}
+                                disabled={loading}
+                                className="w-full py-3.5 bg-correct hover:bg-correct/85 active:scale-[0.98] text-black font-black text-sm rounded-xl transition-all shadow-lg shadow-correct/10 disabled:opacity-50"
+                            >
+                                {loading ? 'SYNCING...' : 'CONFIRM & SAVE'}
+                            </button>
+                            <button
+                                onClick={() => setShowConfirmSummary(false)}
+                                disabled={loading}
+                                className="w-full py-3.5 bg-gray-900 border border-white/10 hover:bg-gray-800 text-white font-black text-sm rounded-xl transition-all"
+                            >
+                                BACK TO EDIT
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex gap-2 w-full">
+                                <button
+                                    onClick={handleReset}
+                                    type="button"
+                                    className="w-1/3 py-3.5 bg-gray-900 border border-white/10 hover:bg-gray-800 text-white font-black text-sm rounded-xl transition-all uppercase tracking-wider"
+                                >
+                                    Reset
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const changes = getChanges();
+                                        if (changes.length === 0) {
+                                            handleSave();
+                                        } else {
+                                            setShowConfirmSummary(true);
+                                        }
+                                    }}
+                                    disabled={loading}
+                                    className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-black text-sm rounded-xl transition-all shadow-lg shadow-indigo-900/20 disabled:opacity-50"
+                                >
+                                    SAVE PREFERENCES
+                                </button>
+                            </div>
 
-                    <button
-                        onClick={handleSignOut}
-                        className="flex items-center justify-center gap-2 w-full py-2.5 text-gray-500 hover:text-red-400 text-[11px] font-bold transition-colors uppercase tracking-widest"
-                    >
-                        <LogOut size={12} />
-                        Sign Out
-                    </button>
+                            <button
+                                onClick={handleSignOut}
+                                className="flex items-center justify-center gap-2 w-full py-2.5 text-gray-500 hover:text-red-400 text-[11px] font-bold transition-colors uppercase tracking-widest"
+                            >
+                                <LogOut size={12} />
+                                Sign Out
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
