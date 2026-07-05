@@ -73,6 +73,8 @@ export const WORDUP_TIMEOUT = {
    SAFETY: 15000,
    /** Matchmaking search timeout (ms) before falling back to bot. */
    MATCHMAKING: 8000,
+   /** Matchmaking search timeout (ms) when no other users are online. */
+   MATCHMAKING_NO_USERS: 2000,
    /** Delay (ms) before auto-matching with a bot after queue expires. */
    BOT_FALLBACK: 30000,
    /** How long (ms) an invite ring notification is shown. */

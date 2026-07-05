@@ -44,7 +44,7 @@ export const useAsyncStore = create<AsyncState>((set) => ({
    isBattlePlaying: false,
    activeTab: (safeSessionStorage.getItem("wordup_async_tab") as AsyncTab) || "play",
    view: "menu",
-   category: safeSessionStorage.getItem("wordup_async_selected_category") || "mixed",
+   category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
    role: null,
    questions: [],
@@ -59,7 +59,7 @@ export const useAsyncStore = create<AsyncState>((set) => ({
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
    setCategory: (category) => {
-      safeSessionStorage.setItem("wordup_async_selected_category", category);
+      safeSessionStorage.setItem("wordup_selected_category", category);
       set({ category });
    },
    setMatchId: (matchId) => set({ matchId }),

@@ -13,7 +13,8 @@ export const useWordUpMatchmaking = (
    _getSyncedNow: () => number,
    triggerToast: (msg: string, dur?: number) => void,
    onMatchFound: (matchId: string, role: "player1" | "player2") => void,
-   cleanUpIntervals: () => void
+   cleanUpIntervals: () => void,
+   onlineUserCount: number = 0
 ) => {
    const matchId = useLiveStore((s) => s.matchId);
    const setMatchId = useLiveStore((s) => s.setMatchId);
@@ -171,7 +172,9 @@ export const useWordUpMatchmaking = (
              useLiveStore.getState().setView("matchmaking");
              setRole("player1");
              setMatchId(null);
-             setCountdownSecs(Math.floor(WORDUP_TIMEOUT.MATCHMAKING / 1000));
+              const isNoUsersOnline = onlineUserCount === 0;
+              const matchmakingTimeout = isNoUsersOnline ? WORDUP_TIMEOUT.MATCHMAKING_NO_USERS : WORDUP_TIMEOUT.MATCHMAKING;
+              setCountdownSecs(Math.floor(matchmakingTimeout / 1000));
 
              matchmakingIntervalRef.current = window.setInterval(() => {
                 const current = useLiveStore.getState().countdownSecs;

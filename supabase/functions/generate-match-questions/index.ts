@@ -123,6 +123,7 @@ function generateQuestion(
    variantOverride?: number,
    category?: string,
    variantWeights?: number[],
+   customTemplates?: any[],
 ): any {
    const qObj = _generateQuestion(
       seed,
@@ -131,6 +132,7 @@ function generateQuestion(
       variantOverride,
       category,
       variantWeights,
+      customTemplates,
    );
    const meta = entity?.metadata || {};
    const rng = createSeededRandom(hashSeed(seed));
@@ -199,6 +201,7 @@ function _generateQuestion(
    variantOverride?: number,
    category?: string,
    variantWeights?: number[],
+   customTemplates?: any[],
 ): any {
    const rng = createSeededRandom(hashSeed(seed));
    const label = entity?.label || "Unknown";
@@ -216,13 +219,19 @@ function _generateQuestion(
    }
 
    // ── Check if a handcrafted matrix template is available ──
-   const template = getRandomMatchingTemplate(entity, categoryType, rng);
+   const template = getRandomMatchingTemplate(entity, categoryType, rng, customTemplates);
    if (template) {
       const promptPattern = seededShuffle(template.prompts, rng)[0];
       const explanationPattern = seededShuffle(template.explanations, rng)[0];
 
       const interpolate = (pattern: string) => {
          let result = pattern.replace(/{label}/g, label);
+         // Also support type-name placeholders dynamically (e.g. {club}, {element})
+         const entityTypeName = meta._entity_type;
+         if (entityTypeName) {
+            const rxType = new RegExp(`{${entityTypeName.toLowerCase()}}`, "g");
+            result = result.replace(rxType, label);
+         }
          template.requiredKeys.forEach((key) => {
             let val = cleanVal(String(meta[key] ?? ""));
             if (
@@ -242,9 +251,17 @@ function _generateQuestion(
 
       const promptText = interpolate(promptPattern);
       const explanationText = interpolate(explanationPattern);
+      const answerKey = template.answerKey;
+      let answerVal = label;
+      let distValues: string[] = [];
 
-      const distractors = seededShuffle(
-         allEntities
+      if (answerKey && meta[answerKey]) {
+         answerVal = cleanVal(String(meta[answerKey]));
+         distValues = allEntities
+            .filter((e) => e.id !== entity.id && e.metadata?.[answerKey])
+            .map((e) => cleanVal(String(e.metadata[answerKey])));
+      } else {
+         distValues = allEntities
             .filter((e) => {
                if (e.label === label) return false;
                // Exclude other entities that share the exact same key criteria value(s) to avoid double-correct options
@@ -256,16 +273,22 @@ function _generateQuestion(
                });
                return !isDuplicateMatch;
             })
-            .map((e) => e.label),
+            .map((e) => e.label);
+      }
+
+      const distractors = seededShuffle(
+         [...new Set(distValues)].filter((v) => v !== answerVal),
          rng,
       ).slice(0, 3);
 
       return {
          type: "definition",
          prompt: promptText,
-         choices: seededShuffle([label, ...distractors], rng),
-         answer: label,
+         choices: seededShuffle([answerVal, ...distractors], rng),
+         answer: answerVal,
          explanation: explanationText,
+         imageUrl: entity.metadata?.image || undefined,
+         imageUrls: entity.metadata?.images || undefined,
       };
    }
 
@@ -857,7 +880,14 @@ serve(async (req) => {
       try {
          const { data: hcData, error: hcError } = await supabaseClient
             .from("wordup_handcrafted_questions")
-            .select("prompt, choices, answer, explanation")
+            .select(`
+               id,
+               prompt,
+               choices,
+               answer,
+               explanation,
+               history:wordup_user_handcrafted_history(user_id, seen_at)
+            `)
             .eq("category", category)
             .or("expires_at.is.null,expires_at.gt.now()");
 
@@ -867,13 +897,64 @@ serve(async (req) => {
                hcError,
             );
          } else {
-            handcraftedList = hcData || [];
+            const filteredHc = (hcData || []).map((hq: any) => {
+               const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
+               const lastSeen = playerHistory.length > 0 
+                  ? Math.max(...playerHistory.map((h: any) => new Date(h.seen_at).getTime()))
+                  : 0;
+               return {
+                  id: hq.id,
+                  prompt: hq.prompt,
+                  choices: hq.choices,
+                  answer: hq.answer,
+                  explanation: hq.explanation,
+                  lastSeen
+               };
+            });
+
+            filteredHc.sort((a: any, b: any) => a.lastSeen - b.lastSeen);
+            handcraftedList = filteredHc;
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
       }
       console.log(
          `${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions`,
+      );
+
+      // Fetch custom templates for this topic from DB
+      let dbTemplatesList: any[] = [];
+      const queryCategory = (category === "element_arena" || category === "periodic-table" || category === "periodic_table") ? "chemistry" : category;
+      try {
+         const { data: qTemplates, error: qTemplatesError } = await supabaseClient
+            .from("question_templates")
+            .select(`
+               id,
+               answer_key,
+               required_keys,
+               prompts,
+               explanations,
+               topics!inner(slug)
+            `)
+            .eq("topics.slug", queryCategory);
+
+         if (qTemplatesError) {
+            console.warn(`${logPrefix} Error fetching question templates:`, qTemplatesError);
+         } else {
+            dbTemplatesList = (qTemplates || []).map((t: any) => ({
+               id: t.id,
+               category: category,
+               answerKey: t.answer_key,
+               requiredKeys: t.required_keys,
+               prompts: t.prompts,
+               explanations: t.explanations,
+            }));
+         }
+      } catch (e: any) {
+         console.warn(`${logPrefix} Question templates query exception:`, e.message);
+      }
+      console.log(
+         `${logPrefix} Fetched ${dbTemplatesList.length} database question templates`,
       );
 
       const matchRng = createSeededRandom(hashSeed(seed));
@@ -904,177 +985,144 @@ serve(async (req) => {
                return e;
             }
          }
-         // if all used, cycle anyway
          const e = shuffledEntities[entityCursor % shuffledEntities.length];
          entityCursor++;
          return e;
       };
 
-      console.log(
-         `${logPrefix} Variant sequence: [${variantSequence.join(", ")}]`,
-      );
-      console.log(
-         `${logPrefix} Config: proceduralWeight=${config.proceduralWeight} variantWeights=[${config.variantWeights.join(", ")}]`,
-      );
+      const generatedPrompts = new Set<string>();
+      const chosenHandcraftedIds: string[] = [];
 
       for (let i = 0; i < 7; i++) {
-         const roundSeed = `${seed}-${i}`;
-         const roundRng = createSeededRandom(hashSeed(roundSeed));
-         const variant = variantSequence[i] ?? 0;
+         let attempts = 5;
+         let q: any = null;
+         let chosenEntity: any = null;
+         let hqChosen: any = null;
 
-         console.log(
-            `${logPrefix} Round ${i}: variant=${variant} category=${category}`,
-         );
+         for (let attempt = 0; attempt < attempts; attempt++) {
+            const roundSeed = attempt === 0 ? `${seed}-${i}` : `${seed}-${i}-retry-${attempt}`;
+            const roundRng = createSeededRandom(hashSeed(roundSeed));
+            const variant = variantSequence[i] ?? 0;
 
-         // ── Mix Strategy: Weave unexpired handcrafted questions from DB (40% chance if available) ──
-         if (
-            shuffledHandcrafted.length > handcraftedCursor &&
-            roundRng() < 0.8
-         ) {
-            const hq = shuffledHandcrafted[handcraftedCursor];
-            handcraftedCursor++;
-            console.log(
-               `${logPrefix} Round ${i}: weaving handcrafted question: "${hq.prompt}"`,
-            );
-            questions.push({
-               type: "definition", // default type for frontend rendering
-               ...hq,
-            });
-            continue;
-         }
-
-         // Route by category: hybrid algorithmic logic takes precedence
-         if (category === "maths") {
-            const entity = entityList.length > 0 ? getNextEntity() : null;
-            chosenEntities.push(entity);
-            console.log(
-               `${logPrefix} Round ${i} [maths]: entity=${entity?.label ?? "null"}`,
-            );
-            const q = generateMathsQuestion(
-               roundSeed,
-               entity,
-               entityList,
-               roundRng,
-               variant,
-               config.proceduralWeight,
-            );
-            if (q) {
-               console.log(
-                  `${logPrefix} Round ${i} [maths]: generated procedural question type=${q.type}`,
-               );
-               questions.push(q);
-               continue;
-            }
-            if (entity) {
-               console.log(
-                  `${logPrefix} Round ${i} [maths]: falling back to entity question for ${entity.label}`,
-               );
-               questions.push(
-                  generateQuestion(
-                     roundSeed,
-                     entity,
-                     entityList,
-                     variant,
-                     category,
-                     config.variantWeights,
-                  ),
-               );
-               continue;
-            }
-            console.warn(
-               `${logPrefix} Round ${i} [maths]: no question generated at all!`,
-            );
-         }
-
-         if (category === "english_language") {
-            const entity = entityList.length > 0 ? getNextEntity() : null;
-            chosenEntities.push(entity);
-            console.log(
-               `${logPrefix} Round ${i} [english]: entity=${entity?.label ?? "null"}`,
-            );
-            const q = generateEnglishQuestion(
-               roundSeed,
-               entity,
-               entityList,
-               roundRng,
-               variant,
-               config.proceduralWeight,
-            );
-            if (q) {
-               console.log(
-                  `${logPrefix} Round ${i} [english]: generated procedural question type=${q.type}`,
-               );
-               questions.push(q);
-               continue;
-            }
-            if (entity) {
-               console.log(
-                  `${logPrefix} Round ${i} [english]: falling back to entity question for ${entity.label}`,
-               );
-               questions.push(
-                  generateQuestion(
-                     roundSeed,
-                     entity,
-                     entityList,
-                     variant,
-                     category,
-                     config.variantWeights,
-                  ),
-               );
-               continue;
-            }
-            console.warn(
-               `${logPrefix} Round ${i} [english]: no question generated at all!`,
-            );
-         }
-
-         // Standard entity-based procedural category logic
-         if (entityList.length === 0) {
-            if (shuffledHandcrafted.length > 0) {
-               const hq = shuffledHandcrafted[handcraftedCursor % shuffledHandcrafted.length];
+            const weaveProb = config.handcraftedWeaveProbability ?? 0.4;
+            // ── Mix Strategy: Weave unexpired handcrafted questions from DB ──
+            if (
+               shuffledHandcrafted.length > handcraftedCursor &&
+               roundRng() < weaveProb
+            ) {
+               let hq = shuffledHandcrafted[handcraftedCursor];
                handcraftedCursor++;
-               console.log(
-                  `${logPrefix} Round ${i} [standard]: no entities — falling back to handcrafted question`,
-               );
-               questions.push({
+               while (generatedPrompts.has(hq.prompt.trim().toLowerCase()) && handcraftedCursor < shuffledHandcrafted.length) {
+                  hq = shuffledHandcrafted[handcraftedCursor];
+                  handcraftedCursor++;
+               }
+               q = {
                   type: "definition",
                   ...hq,
-               });
-            } else {
-               console.log(
-                  `${logPrefix} Round ${i} [standard]: no entities & no handcrafted — fallback to maths procedural`,
-               );
-               const q = generateMathsQuestion(
+               };
+               chosenEntity = null;
+               hqChosen = hq;
+            } else if (category === "maths") {
+               chosenEntity = entityList.length > 0 ? getNextEntity() : null;
+               q = generateMathsQuestion(
                   roundSeed,
-                  null,
-                  [],
+                  chosenEntity,
+                  entityList,
                   roundRng,
                   variant,
                   config.proceduralWeight,
                );
-               questions.push(q);
-            }
-         } else {
-            const entity = getNextEntity();
-            chosenEntities.push(entity);
-            console.log(
-               `${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`,
-            );
-            questions.push(
-               generateQuestion(
+               hqChosen = null;
+            } else if (category === "english_language") {
+               chosenEntity = entityList.length > 0 ? getNextEntity() : null;
+               q = generateEnglishQuestion(
                   roundSeed,
-                  entity,
+                  chosenEntity,
                   entityList,
+                  roundRng,
                   variant,
-                  category,
-                  config.variantWeights,
-               ),
-            );
+                  config.proceduralWeight,
+               );
+               if (!q && chosenEntity) {
+                  q = generateQuestion(
+                     roundSeed,
+                     chosenEntity,
+                     entityList,
+                     variant,
+                     category,
+                     config.variantWeights,
+                     dbTemplatesList,
+                  );
+               }
+               hqChosen = null;
+            } else {
+               // Standard entity-based procedural category logic
+               if (entityList.length === 0) {
+                  if (shuffledHandcrafted.length > 0) {
+                     const hq = shuffledHandcrafted[handcraftedCursor % shuffledHandcrafted.length];
+                     handcraftedCursor++;
+                     q = {
+                        type: "definition",
+                        ...hq,
+                     };
+                     hqChosen = hq;
+                  } else {
+                     q = generateMathsQuestion(
+                        roundSeed,
+                        null,
+                        [],
+                        roundRng,
+                        variant,
+                        config.proceduralWeight,
+                     );
+                     hqChosen = null;
+                  }
+                  chosenEntity = null;
+               } else {
+                  chosenEntity = getNextEntity();
+                  q = generateQuestion(
+                     roundSeed,
+                     chosenEntity,
+                     entityList,
+                     variant,
+                     category,
+                     config.variantWeights,
+                     dbTemplatesList,
+                  );
+                  hqChosen = null;
+               }
+            }
+
+            if (q) {
+               const cleanedPrompt = q.prompt.trim().toLowerCase();
+               // Allow duplicates only if we run out of unique entities to prevent infinite loops
+               if (!generatedPrompts.has(cleanedPrompt) || shuffledEntities.length <= questions.length) {
+                  generatedPrompts.add(cleanedPrompt);
+                  if (chosenEntity) {
+                     chosenEntities.push(chosenEntity);
+                  }
+                  if (hqChosen && hqChosen.id) {
+                     chosenHandcraftedIds.push(hqChosen.id);
+                  }
+                  break;
+               } else {
+                  // Revert entity mapping for duplicate prompts so they can be tried with other variations/rounds
+                  if (chosenEntity) {
+                     usedIds.delete(chosenEntity.id);
+                  }
+                  q = null;
+               }
+            }
          }
 
-         console.log(
-            `${logPrefix} Round ${i}: question generated successfully`,
-         );
+         if (q) {
+            questions.push(q);
+            console.log(
+               `${logPrefix} Round ${i}: question generated successfully (prompt="${q.prompt}")`,
+            );
+         } else {
+            console.warn(`${logPrefix} Round ${i}: failed to generate any unique question`);
+         }
       }
 
       console.log(`${logPrefix} Generated ${questions.length} questions total`);
@@ -1151,6 +1199,29 @@ serve(async (req) => {
                );
             } else {
                console.log(`${logPrefix} Entity history recorded`);
+            }
+         }
+
+         // Log the chosen handcrafted questions in the user history table for tracking
+         if (chosenHandcraftedIds.length > 0 && playerIds.length > 0) {
+            console.log(
+               `${logPrefix} Recording handcrafted history for ${playerIds.length} user(s)`,
+            );
+            const { error: hcHistoryError } = await supabaseClient.rpc(
+               "record_user_handcrafted_seen",
+               {
+                  p_user_ids: playerIds,
+                  p_question_ids: chosenHandcraftedIds,
+               },
+            );
+
+            if (hcHistoryError) {
+               console.error(
+                  `${logPrefix} Failed to record handcrafted history:`,
+                  hcHistoryError,
+               );
+            } else {
+               console.log(`${logPrefix} Handcrafted history recorded`);
             }
          }
       }
