@@ -1,7 +1,7 @@
 export const CATEGORIES = [
    {
       id: "mixed",
-      name: "Words (Mixed)",
+      name: "Words",
       desc: "All formats, random word lengths",
       featured: true,
    },
@@ -61,12 +61,12 @@ export const CATEGORIES = [
    //    name: "Currencies",
    //    desc: "Match currencies to their countries",
    // },
-   {
-      id: "flag_bearer",
-      name: "Flags",
-      desc: "Identify countries by their flag colors",
-      featured: true,
-   },
+   // {
+   //    id: "flag_bearer",
+   //    name: "Flags",
+   //    desc: "Identify countries by their flag colors",
+   //    featured: true,
+   // },
    {
       id: "element_arena",
       name: "Periodic Table",

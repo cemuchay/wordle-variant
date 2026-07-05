@@ -133,12 +133,12 @@ export async function preloadMatchImages(
 
    if (flagCodes.size > 0) {
       tasks.push(
-         ...Array.from(flagCodes).map((code) => preloadFlagImage(code)),
+         ...Array.from(flagCodes).map((code) => preloadFlagImage(code).catch((err) => console.warn(err))),
       );
    }
    if (generalUrls.size > 0) {
       tasks.push(
-         ...Array.from(generalUrls).map((url) => preloadGeneralImage(url)),
+         ...Array.from(generalUrls).map((url) => preloadGeneralImage(url).catch((err) => console.warn(err))),
       );
    }
 
@@ -158,97 +158,5 @@ export function postProcessQuestions(
    questions: WordUpQuestion[],
    category: string,
 ): WordUpQuestion[] {
-   if (category !== "flag_bearer") return questions;
-
-   return questions.map((q) => {
-      // Create a shallow copy
-      const processed: WordUpQuestion = { ...q };
-
-      // 1. Is this a choices-are-flag-codes question? (Variant 0 or 5 for flag_code key)
-      const choicesAreCodes = q.choices.every((choice) => {
-         const code = getFlagCode(choice);
-         return code !== null && code.length === 2;
-      });
-
-      if (choicesAreCodes && q.choices.length > 1) {
-         const targetCode = getFlagCode(q.answer) || q.answer;
-         const countryName = getCountryName(targetCode);
-
-         processed.prompt = `Identify the flag of ${countryName}:`;
-         processed.imageUrls = q.choices.map((c) => getFlagCode(c) || c);
-         // Keep processed.choices and answer as the codes so they match client-side selections,
-         // but the BattleView UI will render the images using the corresponding code indices.
-         return processed;
-      }
-
-      // 2. Is this a True/False flag matching question?
-      const isTrueFalse =
-         q.choices.length === 2 &&
-         q.choices.includes("True") &&
-         q.choices.includes("False");
-      if (isTrueFalse) {
-         // Attempt to find country name and flag code in prompt
-         let countryName = "";
-         let countryCode: string | null = null;
-
-         for (const [name, code] of Object.entries(FLAG_MAP)) {
-            const regex = new RegExp(`\\b${name}\\b`, "i");
-            if (regex.test(q.prompt)) {
-               countryName = name
-                  .split(" ")
-                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ");
-               countryCode = code;
-               break;
-            }
-         }
-
-         // Look for code mentioned in prompt (e.g. 'ng' or 'fr')
-          let mentionedCode = countryCode;
-          const codeMatches = q.prompt.match(/'([a-z]{2})'/i);
-          if (codeMatches && codeMatches[1]) {
-             mentionedCode = codeMatches[1].toLowerCase();
-          }
-
-          // Fallback: try extracting country name directly from prompt text
-          if (!countryName) {
-             const nounMatch = q.prompt.match(
-                /\b(?:of|about|regarding)\s+(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/,
-             );
-             if (nounMatch) {
-                const rawName = nounMatch[1];
-                const lowerName = rawName.toLowerCase();
-                countryName = rawName;
-                 mentionedCode = FLAG_MAP[lowerName] || null;
-             }
-          }
-
-          if (countryName && mentionedCode) {
-             processed.prompt = `True or False: This is the flag of ${countryName}.`;
-             processed.imageUrl = mentionedCode;
-             processed.answer = "True";
-             return processed;
-          }
-      }
-
-      // 3. Choices are country names (Variant 1 for flag_code, or general matching)
-      const answerCode = getFlagCode(q.answer);
-      if (answerCode) {
-         processed.prompt = "Which country does this flag belong to?";
-         processed.imageUrl = answerCode;
-         return processed;
-      }
-
-      // 4. Fallback visual clues for other questions (e.g. capitals, colors)
-      // If we find the country name anywhere in the prompt or answer, attach its flag
-      for (const [name, code] of Object.entries(FLAG_MAP)) {
-         const regex = new RegExp(`\\b${name}\\b`, "i");
-         if (regex.test(q.prompt) || regex.test(q.answer)) {
-            processed.imageUrl = code;
-            break;
-         }
-      }
-
-      return processed;
-   });
+   return questions;
 }

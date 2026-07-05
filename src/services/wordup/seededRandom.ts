@@ -1,5 +1,8 @@
 export function createSeededRandom(seed: number): () => number {
    let s = seed;
+   for (let i = 0; i < 5; i++) {
+      s = (s * 1664525 + 1013904223) & 0xffffffff;
+   }
    return () => {
       s = (s * 1664525 + 1013904223) & 0xffffffff;
       return (s >>> 0) / 4294967296;

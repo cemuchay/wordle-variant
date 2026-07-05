@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
-   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+   "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
 };
 
 function decodeHTML(html: string): string {
@@ -35,7 +36,8 @@ serve(async (req) => {
 
       // Validate signature to prevent public spamming
       const tokenProvided = authHeader.replace(/Bearer /i, "").trim();
-      const isValid = tokenProvided === internalSecret || tokenProvided === serviceRoleKey;
+      const isValid =
+         tokenProvided === internalSecret || tokenProvided === serviceRoleKey;
 
       if (!isValid) {
          return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -48,7 +50,9 @@ serve(async (req) => {
       const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
 
       console.log("[sync-otdb-trivia] Fetching OTDB Session Token...");
-      const tokenRes = await fetch("https://opentdb.com/api_token.php?command=request");
+      const tokenRes = await fetch(
+         "https://opentdb.com/api_token.php?command=request",
+      );
       const tokenData = await tokenRes.json();
       const token = tokenData.token;
 
@@ -64,7 +68,7 @@ serve(async (req) => {
          { id: 14, label: "Television", internal: "television" },
          { id: 15, label: "Video Games", internal: "video_games" },
          { id: 12, label: "Music", internal: "music" },
-         { id: 27, label: "Animals", internal: "animals" }
+         { id: 27, label: "Animals", internal: "animals" },
       ];
 
       // Randomly select 4 categories to fetch per run to stay well within Deno timeout limits
@@ -77,11 +81,13 @@ serve(async (req) => {
       for (const cat of categoriesToFetch) {
          console.log(`[sync-otdb-trivia] Fetching category: ${cat.label}`);
          const url = `https://opentdb.com/api.php?amount=30&category=${cat.id}&type=multiple${token ? `&token=${token}` : ""}`;
-         
+
          const res = await fetch(url);
          const data = await res.json();
          if (data.response_code !== 0) {
-            console.warn(`[sync-otdb-trivia] API returned code ${data.response_code} for ${cat.label}`);
+            console.warn(
+               `[sync-otdb-trivia] API returned code ${data.response_code} for ${cat.label}`,
+            );
             continue;
          }
 
@@ -97,33 +103,33 @@ serve(async (req) => {
 
             let internalCategory = "";
 
-             if (cat.id === 17) {
-                const promptLower = prompt.toLowerCase();
-                if (
-                   promptLower.includes("chemistry") || 
-                   promptLower.includes("element") || 
-                   promptLower.includes("atom") || 
-                   promptLower.includes("molecule") || 
-                   promptLower.includes("compound") ||
-                   promptLower.includes("acid")
-                ) {
-                   internalCategory = "chemistry";
-                } else if (
-                   promptLower.includes("biology") || 
-                   promptLower.includes("cell") || 
-                   promptLower.includes("gene") || 
-                   promptLower.includes("dna") || 
-                   promptLower.includes("organism") || 
-                   promptLower.includes("plant") ||
-                   promptLower.includes("species")
-                ) {
-                   internalCategory = "biology";
-                } else {
-                   internalCategory = "physics";
-                }
-             } else {
-                internalCategory = cat.internal;
-             }
+            if (cat.id === 17) {
+               const promptLower = prompt.toLowerCase();
+               if (
+                  promptLower.includes("chemistry") ||
+                  promptLower.includes("element") ||
+                  promptLower.includes("atom") ||
+                  promptLower.includes("molecule") ||
+                  promptLower.includes("compound") ||
+                  promptLower.includes("acid")
+               ) {
+                  internalCategory = "chemistry";
+               } else if (
+                  promptLower.includes("biology") ||
+                  promptLower.includes("cell") ||
+                  promptLower.includes("gene") ||
+                  promptLower.includes("dna") ||
+                  promptLower.includes("organism") ||
+                  promptLower.includes("plant") ||
+                  promptLower.includes("species")
+               ) {
+                  internalCategory = "biology";
+               } else {
+                  internalCategory = "physics";
+               }
+            } else {
+               internalCategory = cat.internal;
+            }
 
             if (internalCategory) {
                records.push({
@@ -131,7 +137,8 @@ serve(async (req) => {
                   prompt,
                   choices,
                   answer,
-                  explanation: `The correct answer is indeed "${answer}". (Curated via Open Trivia DB)`
+                  // explanation: `The correct answer is indeed "${answer}". (Curated via Open Trivia DB)`
+                  explanation: `The correct answer is indeed "${answer}".`,
                });
             }
          }
@@ -142,10 +149,15 @@ serve(async (req) => {
                .upsert(records, { onConflict: "prompt" });
 
             if (error) {
-               console.error(`[sync-otdb-trivia] DB insert error for ${cat.label}:`, error.message);
+               console.error(
+                  `[sync-otdb-trivia] DB insert error for ${cat.label}:`,
+                  error.message,
+               );
             } else {
                totalInserted += records.length;
-               console.log(`[sync-otdb-trivia] Mapped and upserted ${records.length} questions for ${cat.label}`);
+               console.log(
+                  `[sync-otdb-trivia] Mapped and upserted ${records.length} questions for ${cat.label}`,
+               );
             }
          }
 
@@ -156,7 +168,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, totalInserted }), {
          headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
    } catch (err: any) {
       console.error("[sync-otdb-trivia] Exception:", err.message);
       return new Response(JSON.stringify({ error: err.message }), {
