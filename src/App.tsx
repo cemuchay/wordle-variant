@@ -256,7 +256,17 @@ export default function App() {
     }
   }, [isHydrated, date, user]);
 
-  const showAlreadyPlayedScreen = !!(user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
+  const activeNavigationItem = isChatOpen
+    ? "chat"
+    : isChallengeOpen
+      ? "challenges"
+      : isStatsOpen
+        ? "leaderboard"
+        : isWordUpOpen
+          ? "wordup"
+          : "play";
+
+  const showAlreadyPlayedScreen = !!(activeNavigationItem === "play" && user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
 
   const tabRestoredRef = useRef(false);
 
@@ -789,18 +799,6 @@ export default function App() {
   if (isPageUnsubscribe) {
     return <UnsubscribePage />;
   }
-
-  const activeNavigationItem = isChatOpen
-    ? "chat"
-    : isChallengeOpen
-      ? "challenges"
-      : isStatsOpen
-        ? "leaderboard"
-        : isWordUpOpen
-          ? "wordup"
-          : "play";
-
-
 
   const handleNavigation = (
     item: "play" | "chat" | "leaderboard" | "challenges" | "wordup",
