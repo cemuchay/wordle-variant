@@ -17,6 +17,7 @@ import { ProtectedAvatar } from "./ProtectedAvatar";
 import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
+import { MessageInfoModal } from "./ChatMessage/MessageInfoModal";
 import { safeLocalStorage } from "../../utils/storage";
 
 const CLOSE_DELAY = 10000;
@@ -81,6 +82,7 @@ export default function FloatingChatBubble() {
     const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
     const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
     const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
+    const [showMessageInfoId, setShowMessageInfoId] = useState<string | null>(null);
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
@@ -1252,6 +1254,14 @@ export default function FloatingChatBubble() {
                                                        }}
                                                        onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
                                                        onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
+                                                       onReply={() => {
+                                                          handleReply(msg);
+                                                          setReactingMessageId(null);
+                                                       }}
+                                                       onInfo={() => {
+                                                          setShowMessageInfoId(msg.id);
+                                                          setReactingMessageId(null);
+                                                       }}
                                                     />
                                                 </>
                                              )}
@@ -1348,37 +1358,38 @@ export default function FloatingChatBubble() {
                                                              </div>
                                                           );
                                                        })()}
-                                                        {msg.voice_url ? (
-                                                          <ConnectedAudioPlayer
-                                                             url={msg.voice_url}
-                                                             messageId={msg.id}
-                                                             allMessageIds={activeRoomMessages.map((m: any) => m.id)}
-                                                             allMessages={activeRoomMessages}
-                                                             userId={user?.id || ""}
-                                                          />
-                                                       ) : msg.image_url ? (
-                                                          <ChatImage url={msg.image_url} />
-                                                       ) : (
-                                                         <motion.div
-                                                            drag={!msg.is_deleted && !isEditing ? "x" : false}
-                                                            dragDirectionLock
-                                                            dragConstraints={{ left: 0, right: 0 }}
-                                                            dragSnapToOrigin
-                                                            dragElastic={{ left: 0, right: 0.6 }}
-                                                            onDragEnd={(_, info) => {
-                                                               if (info.offset.x > 50) {
-                                                                  handleSwipeToReply(msg);
-                                                               }
-                                                            }}
-                                                         >
+                                                       <motion.div
+                                                          drag={!msg.is_deleted && !isEditing ? "x" : false}
+                                                          dragDirectionLock
+                                                          dragConstraints={{ left: 0, right: 0 }}
+                                                          dragSnapToOrigin
+                                                          dragElastic={{ left: 0, right: 0.6 }}
+                                                          onDragEnd={(_, info) => {
+                                                             if (info.offset.x > 50) {
+                                                                handleSwipeToReply(msg);
+                                                             }
+                                                          }}
+                                                          className="select-none"
+                                                       >
+                                                          {msg.voice_url ? (
+                                                             <ConnectedAudioPlayer
+                                                                url={msg.voice_url}
+                                                                messageId={msg.id}
+                                                                allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                                allMessages={activeRoomMessages}
+                                                                userId={user?.id || ""}
+                                                             />
+                                                          ) : msg.image_url ? (
+                                                             <ChatImage url={msg.image_url} />
+                                                          ) : (
                                                              <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
                                                                )}
-                                                            </p>
-                                                         </motion.div>
-                                                      )}
+                                                             </p>
+                                                          )}
+                                                       </motion.div>
 
                                                       {/* Action buttons (Reply, React, Edit, Delete) */}
                                                       {!msg.is_deleted && !isEditing && (
@@ -1611,7 +1622,29 @@ export default function FloatingChatBubble() {
                       onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
                       onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
                       onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                      onReply={() => {
+                         handleReply(modalMsg);
+                         setReactingModalMessageId(null);
+                      }}
+                      onInfo={() => {
+                         setShowMessageInfoId(modalMsg.id);
+                         setReactingModalMessageId(null);
+                      }}
                       onClose={() => setReactingModalMessageId(null)}
+                   />
+                );
+             })()}
+          </AnimatePresence>
+
+          <AnimatePresence>
+             {showMessageInfoId && (() => {
+                const infoMsg = activeRoomMessages.find((m: any) => m.id === showMessageInfoId);
+                if (!infoMsg) return null;
+                return (
+                   <MessageInfoModal
+                      msg={infoMsg}
+                      currentUserId={user?.id || ""}
+                      onClose={() => setShowMessageInfoId(null)}
                    />
                 );
              })()}

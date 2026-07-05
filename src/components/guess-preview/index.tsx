@@ -436,7 +436,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
     const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
     const username = entry.username || entry.profiles?.username || "Player";
-    const canSeeDetails = viewerHasFinished || isCreator;
+    const canSeeDetails = viewerHasFinished || isCreator || isOwnEntry;
 
     useEffect(() => {
       if (canSeeDetails) {
@@ -540,6 +540,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 isShapeshifter={!!isShapeshifter}
                 gameData={gameData}
                 targetWordToUse={targetWordToUse}
+                challenge={challenge}
+                marathonGameIndex={marathonGameIndex}
               />
 
               {/* Roast Message */}

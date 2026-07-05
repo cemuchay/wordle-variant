@@ -345,9 +345,6 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   const isMarathon = selectedChallenge.word_length === 1;
   const isLive = selectedChallenge.mode === "LIVE";
-  const myHasFinished =
-    myParticipation?.status === "completed" ||
-    myParticipation?.status === "timed_out";
   const isCreatorOfCustom =
     selectedChallenge.creator_id === effectiveUser?.id &&
     selectedChallenge.is_custom_word;
@@ -376,6 +373,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     }
     return count;
   }, [isMarathon, myParticipation?.marathon_progress]);
+
+  const myHasFinished =
+    myParticipation?.status === "completed" ||
+    myParticipation?.status === "timed_out" ||
+    (isMarathon &&
+      marathonCompletedCount === marathonGamesList.length &&
+      marathonGamesList.length > 0);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const deobfuscatedTargetWord = useMemo(() => {

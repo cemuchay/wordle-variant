@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { Copy, Edit2, Trash2 } from "lucide-react";
+import { Copy, Edit2, Trash2, Reply, Info } from "lucide-react";
 import { EMOJIS } from './constants';
 
 interface ReactionPickerProps {
@@ -9,9 +9,11 @@ interface ReactionPickerProps {
     isMe: boolean;
     onEdit?: () => void;
     onDelete?: () => void;
+    onReply?: () => void;
+    onInfo?: () => void;
 }
 
-export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({ onReact, currentReaction, onCopy, isMe, onEdit, onDelete }, ref) => (
+export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({ onReact, currentReaction, onCopy, isMe, onEdit, onDelete, onReply, onInfo }, ref) => (
     <div
         ref={ref}
         onClick={(e) => e.stopPropagation()}
@@ -33,6 +35,20 @@ export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({
                 </button>
             ))}
         </div>
+        {onReply && (
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onReply();
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-correct/20 text-correct rounded-xl transition-all cursor-pointer"
+                title="Reply"
+            >
+                <Reply size={14} />
+                <span className="text-[10px] font-black uppercase tracking-wider">Reply</span>
+            </button>
+        )}
         {onEdit && (
             <button
                 type="button"
@@ -73,6 +89,20 @@ export const ReactionPicker = forwardRef<HTMLDivElement, ReactionPickerProps>(({
             <Copy size={14} className="group-hover/copy:scale-110 transition-transform" />
             <span className="text-[10px] font-black uppercase tracking-wider">Copy</span>
         </button>
+        {onInfo && (
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onInfo();
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
+                title="Message Info"
+            >
+                <Info size={14} />
+                <span className="text-[10px] font-black uppercase tracking-wider">Info</span>
+            </button>
+        )}
     </div>
 ));
 

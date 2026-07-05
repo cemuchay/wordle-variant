@@ -211,9 +211,9 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
          })
          .join("");
 
-      // If the result contains non-printable characters or is not uppercase A-Z,
+      // If the result contains non-printable characters or is not within the allowed characters range,
       // it's likely already deobfuscated or the salt is wrong.
-      if (/^[A-Z]+$/.test(result)) {
+      if (/^[A-Z0-9\s.,!?'"\-()]+$/i.test(result)) {
          return result;
       }
       return obfuscated;
