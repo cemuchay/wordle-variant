@@ -14,6 +14,7 @@ import { ReactionBadge } from './ReactionBadge';
 import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
 import { ChatImage } from './ChatImage';
 import { MessageContent } from './MessageContent';
+import { MessageInfoModal } from './MessageInfoModal';
 
 const ChatMessage = memo(({
     msg,
@@ -43,6 +44,7 @@ const ChatMessage = memo(({
     const [showReactionsMenu, setShowReactionsMenu] = useState(false);
     const [showReactionsModal, setShowReactionsModal] = useState(false);
     const [showReactionDetails, setShowReactionDetails] = useState(false);
+    const [showMessageInfo, setShowMessageInfo] = useState(false);
     const reactionsRef = useRef<HTMLDivElement>(null);
     const detailsRef = useRef<HTMLDivElement>(null);
 
@@ -163,6 +165,14 @@ const ChatMessage = memo(({
                         }}
                         onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsModal(false); } : undefined}
                         onDelete={isEditable ? () => { onDelete(); setShowReactionsModal(false); } : undefined}
+                        onReply={() => {
+                            onReply(msg);
+                            setShowReactionsModal(false);
+                        }}
+                        onInfo={() => {
+                            setShowMessageInfo(true);
+                            setShowReactionsModal(false);
+                        }}
                         onClose={() => setShowReactionsModal(false)}
                     />
                 )}
@@ -196,6 +206,14 @@ const ChatMessage = memo(({
                         }}
                         onEdit={isEditable ? () => { setEditText(msg.content); setIsEditing(true); setShowReactionsMenu(false); } : undefined}
                         onDelete={isEditable ? () => { onDelete(); setShowReactionsMenu(false); } : undefined}
+                        onReply={() => {
+                            onReply(msg);
+                            setShowReactionsMenu(false);
+                        }}
+                        onInfo={() => {
+                            setShowMessageInfo(true);
+                            setShowReactionsMenu(false);
+                        }}
                     />
                 )}
             </AnimatePresence>
@@ -303,7 +321,7 @@ const ChatMessage = memo(({
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
                     onTouchCancel={handleTouchEnd}
-                    className={`relative max-w-[85%] p-1.5 pb-2 sm:pb-3 px-2 sm:p-3 sm:px-4 shadow-lg transition-all ${isMe
+                    className={`relative max-w-[85%] p-1.5 pb-2 sm:pb-3 px-2 sm:p-3 sm:px-4 shadow-lg transition-all select-none ${isMe
                         ? 'bg-[#005c4b] text-white rounded-2xl rounded-tr-none'
                         : 'bg-[#202c33] border border-white/5 text-white rounded-2xl rounded-tl-none hover:bg-[#2a3942]'
                         }`}
@@ -468,6 +486,15 @@ const ChatMessage = memo(({
                     )}
                 </div>
             </motion.div>
+            <AnimatePresence>
+                {showMessageInfo && (
+                    <MessageInfoModal
+                        msg={msg}
+                        currentUserId={currentUserId}
+                        onClose={() => setShowMessageInfo(false)}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 });
