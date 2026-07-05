@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { AdminPage } from "./components/admin/AdminPage";
 import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
 import { ChatSkeleton } from "./components/common/Skeletons";
 import { DynamicIslandStatus } from "./components/DynamicIslandStatus";
@@ -20,9 +19,6 @@ import { Bell, Swords } from "lucide-react";
 import { useLiveStore } from "./wordup/live/store/useLiveStore";
 import { useAsyncStore } from "./wordup/async/store/useAsyncStore";
 import { subscribeToPush } from "./lib/pushService";
-import { UnsubscribePage } from "./components/UnsubscribePage";
-import { WeeklyWrappedModal } from "./components/WeeklyWrappedModal";
-import { WelcomeScreen } from "./components/WelcomeScreen";
 import { GuestBanner } from "./components/GuestBanner";
 import { TutorialModal } from "./components/TutorialModal";
 import { WordupTutorialModal } from "./wordup/components/WordupTutorialModal";
@@ -46,9 +42,11 @@ import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
-const ModeSelect = safeLazy(() => import("./wordup/mode-select").then(m => ({ default: m.ModeSelect })));
-const LiveView = safeLazy(() => import("./wordup/live").then(m => ({ default: m.LiveView })));
-const AsyncView = safeLazy(() => import("./wordup/async").then(m => ({ default: m.AsyncView })));
+const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
+const AdminPage = safeLazy(() => import("./components/admin/AdminPage").then(m => ({ default: m.AdminPage })));
+const UnsubscribePage = safeLazy(() => import("./components/UnsubscribePage").then(m => ({ default: m.UnsubscribePage })));
+const WeeklyWrappedModal = safeLazy(() => import("./components/WeeklyWrappedModal").then(m => ({ default: m.WeeklyWrappedModal })));
+const WelcomeScreen = safeLazy(() => import("./components/WelcomeScreen").then(m => ({ default: m.WelcomeScreen })));
 
 const fadeVariants = {
   initial: {
@@ -386,16 +384,19 @@ export default function App() {
     }
   }, [showWordupTutorial]);
 
-  // Preload ChatRoom in the background when the app is idle
+  // Preload ChatRoom and other lazy chunks in the background when the app is idle
   useEffect(() => {
-    const preloadChat = () => {
+    const preloadLazyComponents = () => {
       ChatRoom.preload?.();
+      WordUpContainer.preload?.();
+      StatsModal.preload?.();
+      ChallengeModal.preload?.();
     };
 
     if ("requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(preloadChat);
+      (window as any).requestIdleCallback(preloadLazyComponents);
     } else {
-      const timer = setTimeout(preloadChat, 2000);
+      const timer = setTimeout(preloadLazyComponents, 2000);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -1094,26 +1095,11 @@ export default function App() {
             {activeNavigationItem === "wordup" && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
-                  {wordupMode === null ? (
-                    <ModeSelect
-                      onSelect={(mode: "live" | "async") => {
-                        setWordupMode(mode);
-                      }}
-                      onTutorial={() => setIsWordupTutorialOpen(true)}
-                    />
-                  ) : wordupMode === "live" ? (
-                    <LiveView
-                      onBack={() => setWordupMode(null)}
-                      onSwitchMode={setWordupMode}
-                      onTutorial={() => setIsWordupTutorialOpen(true)}
-                    />
-                  ) : (
-                    <AsyncView
-                      onBack={() => setWordupMode(null)}
-                      onSwitchMode={setWordupMode}
-                      onTutorial={() => setIsWordupTutorialOpen(true)}
-                    />
-                  )}
+                  <WordUpContainer
+                    wordupMode={wordupMode}
+                    setWordupMode={setWordupMode}
+                    onTutorial={() => setIsWordupTutorialOpen(true)}
+                  />
                 </Suspense>
 
                 {isWordupTutorialOpen && (
