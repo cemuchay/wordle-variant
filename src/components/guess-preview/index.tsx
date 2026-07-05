@@ -542,6 +542,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 targetWordToUse={targetWordToUse}
                 challenge={challenge}
                 marathonGameIndex={marathonGameIndex}
+                entry={entry}
               />
 
               {/* Roast Message */}

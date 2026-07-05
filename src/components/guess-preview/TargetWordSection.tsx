@@ -13,6 +13,7 @@ interface TargetWordSectionProps {
     targetWordToUse: string;
     challenge?: any;
     marathonGameIndex?: number;
+    entry?: any;
 }
 
 export const TargetWordSection = memo(({
@@ -24,6 +25,7 @@ export const TargetWordSection = memo(({
     targetWordToUse,
     challenge,
     marathonGameIndex,
+    entry,
 }: TargetWordSectionProps) => {
     if (!canSeeDetails) {
         return (
@@ -88,6 +90,11 @@ export const TargetWordSection = memo(({
                     <div className="flex flex-wrap gap-x-4 gap-y-3 justify-center items-center">
                         {marathonGames.map((game, wIdx) => {
                             const isCurrent = wIdx === marathonGameIndex;
+                            const prog = entry?.marathon_progress?.find((p: any) => p.game_index === wIdx);
+                            const isWordFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
+                            const isEntryFullyPlayed = entry?.status === 'completed' || entry?.status === 'timed_out';
+                            const shouldRevealWord = isEntryFullyPlayed || isWordFinished;
+
                             return (
                                 <div key={wIdx} className={`flex gap-0.5 pb-1 relative ${isCurrent ? 'border-b-2 border-correct' : ''}`}>
                                     {game.word.split("").map((letter, lIdx) => (
@@ -95,7 +102,7 @@ export const TargetWordSection = memo(({
                                             key={lIdx}
                                             className={`flex items-center justify-center font-black ${isCurrent ? 'bg-correct text-black border border-correct font-extrabold shadow-lg shadow-correct/20' : 'bg-white/5 border border-white/10 text-white/50'} w-6 h-6 sm:w-8 sm:h-8 text-xs sm:text-sm rounded`}
                                         >
-                                            {letter}
+                                            {shouldRevealWord ? letter : '•'}
                                         </div>
                                     ))}
                                 </div>
