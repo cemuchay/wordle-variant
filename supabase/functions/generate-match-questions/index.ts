@@ -880,7 +880,14 @@ serve(async (req) => {
       try {
          const { data: hcData, error: hcError } = await supabaseClient
             .from("wordup_handcrafted_questions")
-            .select("prompt, choices, answer, explanation")
+            .select(`
+               id,
+               prompt,
+               choices,
+               answer,
+               explanation,
+               history:wordup_user_handcrafted_history(user_id, seen_at)
+            `)
             .eq("category", category)
             .or("expires_at.is.null,expires_at.gt.now()");
 
@@ -890,7 +897,23 @@ serve(async (req) => {
                hcError,
             );
          } else {
-            handcraftedList = hcData || [];
+            const filteredHc = (hcData || []).map((hq: any) => {
+               const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
+               const lastSeen = playerHistory.length > 0 
+                  ? Math.max(...playerHistory.map((h: any) => new Date(h.seen_at).getTime()))
+                  : 0;
+               return {
+                  id: hq.id,
+                  prompt: hq.prompt,
+                  choices: hq.choices,
+                  answer: hq.answer,
+                  explanation: hq.explanation,
+                  lastSeen
+               };
+            });
+
+            filteredHc.sort((a: any, b: any) => a.lastSeen - b.lastSeen);
+            handcraftedList = filteredHc;
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
@@ -968,21 +991,24 @@ serve(async (req) => {
       };
 
       const generatedPrompts = new Set<string>();
+      const chosenHandcraftedIds: string[] = [];
 
       for (let i = 0; i < 7; i++) {
          let attempts = 5;
          let q: any = null;
          let chosenEntity: any = null;
+         let hqChosen: any = null;
 
          for (let attempt = 0; attempt < attempts; attempt++) {
             const roundSeed = attempt === 0 ? `${seed}-${i}` : `${seed}-${i}-retry-${attempt}`;
             const roundRng = createSeededRandom(hashSeed(roundSeed));
             const variant = variantSequence[i] ?? 0;
 
-            // ── Mix Strategy: Weave unexpired handcrafted questions from DB (40% chance if available) ──
+            const weaveProb = config.handcraftedWeaveProbability ?? 0.4;
+            // ── Mix Strategy: Weave unexpired handcrafted questions from DB ──
             if (
                shuffledHandcrafted.length > handcraftedCursor &&
-               roundRng() < 0.8
+               roundRng() < weaveProb
             ) {
                let hq = shuffledHandcrafted[handcraftedCursor];
                handcraftedCursor++;
@@ -995,6 +1021,7 @@ serve(async (req) => {
                   ...hq,
                };
                chosenEntity = null;
+               hqChosen = hq;
             } else if (category === "maths") {
                chosenEntity = entityList.length > 0 ? getNextEntity() : null;
                q = generateMathsQuestion(
@@ -1005,6 +1032,7 @@ serve(async (req) => {
                   variant,
                   config.proceduralWeight,
                );
+               hqChosen = null;
             } else if (category === "english_language") {
                chosenEntity = entityList.length > 0 ? getNextEntity() : null;
                q = generateEnglishQuestion(
@@ -1026,6 +1054,7 @@ serve(async (req) => {
                      dbTemplatesList,
                   );
                }
+               hqChosen = null;
             } else {
                // Standard entity-based procedural category logic
                if (entityList.length === 0) {
@@ -1036,6 +1065,7 @@ serve(async (req) => {
                         type: "definition",
                         ...hq,
                      };
+                     hqChosen = hq;
                   } else {
                      q = generateMathsQuestion(
                         roundSeed,
@@ -1045,6 +1075,7 @@ serve(async (req) => {
                         variant,
                         config.proceduralWeight,
                      );
+                     hqChosen = null;
                   }
                   chosenEntity = null;
                } else {
@@ -1058,6 +1089,7 @@ serve(async (req) => {
                      config.variantWeights,
                      dbTemplatesList,
                   );
+                  hqChosen = null;
                }
             }
 
@@ -1068,6 +1100,9 @@ serve(async (req) => {
                   generatedPrompts.add(cleanedPrompt);
                   if (chosenEntity) {
                      chosenEntities.push(chosenEntity);
+                  }
+                  if (hqChosen && hqChosen.id) {
+                     chosenHandcraftedIds.push(hqChosen.id);
                   }
                   break;
                } else {
@@ -1088,31 +1123,6 @@ serve(async (req) => {
          } else {
             console.warn(`${logPrefix} Round ${i}: failed to generate any unique question`);
          }
-      }   );
-               questions.push(q);
-            }
-         } else {
-            const entity = getNextEntity();
-            chosenEntities.push(entity);
-            console.log(
-               `${logPrefix} Round ${i} [standard]: entity=${entity?.label ?? "null"}`,
-            );
-            questions.push(
-               generateQuestion(
-                  roundSeed,
-                  entity,
-                  entityList,
-                  variant,
-                  category,
-                  config.variantWeights,
-                  dbTemplatesList,
-               ),
-            );
-         }
-
-         console.log(
-            `${logPrefix} Round ${i}: question generated successfully`,
-         );
       }
 
       console.log(`${logPrefix} Generated ${questions.length} questions total`);
@@ -1189,6 +1199,29 @@ serve(async (req) => {
                );
             } else {
                console.log(`${logPrefix} Entity history recorded`);
+            }
+         }
+
+         // Log the chosen handcrafted questions in the user history table for tracking
+         if (chosenHandcraftedIds.length > 0 && playerIds.length > 0) {
+            console.log(
+               `${logPrefix} Recording handcrafted history for ${playerIds.length} user(s)`,
+            );
+            const { error: hcHistoryError } = await supabaseClient.rpc(
+               "record_user_handcrafted_seen",
+               {
+                  p_user_ids: playerIds,
+                  p_question_ids: chosenHandcraftedIds,
+               },
+            );
+
+            if (hcHistoryError) {
+               console.error(
+                  `${logPrefix} Failed to record handcrafted history:`,
+                  hcHistoryError,
+               );
+            } else {
+               console.log(`${logPrefix} Handcrafted history recorded`);
             }
          }
       }

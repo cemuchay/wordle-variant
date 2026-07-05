@@ -2,6 +2,7 @@ export const VARIANT_COUNT = 9;
 
 export interface CategoryQuestionConfig {
    proceduralWeight: number;
+   handcraftedWeaveProbability: number;
    variantWeights: number[];
 }
 
@@ -31,12 +32,17 @@ const VARIANT_ORDER: (keyof VariantWeights)[] = [
 
 function define(
    id: string,
-   config: { proceduralWeight?: number; weights: VariantWeights },
+   config: {
+      proceduralWeight?: number;
+      handcraftedWeaveProbability?: number;
+      weights: VariantWeights;
+   },
 ): [string, Partial<CategoryQuestionConfig>] {
    return [
       id,
       {
          proceduralWeight: config.proceduralWeight,
+         handcraftedWeaveProbability: config.handcraftedWeaveProbability,
          variantWeights: VARIANT_ORDER.map((k) => config.weights[k]),
       },
    ];
@@ -44,6 +50,7 @@ function define(
 
 const DEFAULT_CONFIG: CategoryQuestionConfig = {
    proceduralWeight: 0.5,
+   handcraftedWeaveProbability: 0.4,
    variantWeights: [1, 1, 1, 1, 1, 1, 1, 1, 1],
 };
 
@@ -166,6 +173,7 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
    }),
    define("football", {
       proceduralWeight: 0.0,
+      handcraftedWeaveProbability: 1,
       weights: {
          forward: 2.5,
          reverse: 1.5,
@@ -396,13 +404,24 @@ function validateConfig(
    category: string,
    config: CategoryQuestionConfig,
 ): void {
-   const { proceduralWeight, variantWeights } = config;
+   const { proceduralWeight, handcraftedWeaveProbability, variantWeights } =
+      config;
 
    if (proceduralWeight < 0 || proceduralWeight > 1) {
       console.warn(
          `[questionConfig] "${category}": proceduralWeight ${proceduralWeight} is out of range [0,1]. Clamping.`,
       );
       config.proceduralWeight = Math.max(0, Math.min(1, proceduralWeight));
+   }
+
+   if (handcraftedWeaveProbability < 0 || handcraftedWeaveProbability > 1) {
+      console.warn(
+         `[questionConfig] "${category}": handcraftedWeaveProbability ${handcraftedWeaveProbability} is out of range [0,1]. Clamping.`,
+      );
+      config.handcraftedWeaveProbability = Math.max(
+         0,
+         Math.min(1, handcraftedWeaveProbability),
+      );
    }
 
    if (variantWeights.length !== VARIANT_COUNT) {
