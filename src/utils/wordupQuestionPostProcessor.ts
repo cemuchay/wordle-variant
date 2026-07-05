@@ -34,6 +34,7 @@ export function getFlagCode(name: string): string | null {
  */
 export function getCountryName(code: string): string {
    const lower = code.toLowerCase();
+   // eslint-disable-next-line @typescript-eslint/no-unused-vars
    const entry = Object.entries(FLAG_MAP).find(([_, v]) => v === lower);
    if (entry) {
       return entry[0]
@@ -133,12 +134,16 @@ export async function preloadMatchImages(
 
    if (flagCodes.size > 0) {
       tasks.push(
-         ...Array.from(flagCodes).map((code) => preloadFlagImage(code).catch((err) => console.warn(err))),
+         ...Array.from(flagCodes).map((code) =>
+            preloadFlagImage(code).catch((err) => console.warn(err)),
+         ),
       );
    }
    if (generalUrls.size > 0) {
       tasks.push(
-         ...Array.from(generalUrls).map((url) => preloadGeneralImage(url).catch((err) => console.warn(err))),
+         ...Array.from(generalUrls).map((url) =>
+            preloadGeneralImage(url).catch((err) => console.warn(err)),
+         ),
       );
    }
 
@@ -156,7 +161,8 @@ export const preloadMatchFlags = preloadMatchImages;
  */
 export function postProcessQuestions(
    questions: WordUpQuestion[],
-   category: string,
+   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   _category: string,
 ): WordUpQuestion[] {
    return questions;
 }
