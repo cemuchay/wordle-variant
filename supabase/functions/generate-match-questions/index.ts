@@ -886,6 +886,7 @@ serve(async (req) => {
                choices,
                answer,
                explanation,
+               variations,
                history:wordup_user_handcrafted_history(user_id, seen_at)
             `)
             .eq("category", category)
@@ -908,6 +909,7 @@ serve(async (req) => {
                   choices: hq.choices,
                   answer: hq.answer,
                   explanation: hq.explanation,
+                  variations: hq.variations,
                   lastSeen
                };
             });
@@ -1016,9 +1018,41 @@ serve(async (req) => {
                   hq = shuffledHandcrafted[handcraftedCursor];
                   handcraftedCursor++;
                }
+               let finalPrompt = hq.prompt;
+               let finalAnswer = hq.answer;
+               let finalChoices = hq.choices || [];
+               let finalExplanation = hq.explanation;
+
+               // If variations exist, resolve a variation
+               if (hq.variations && Array.isArray(hq.variations) && hq.variations.length > 0) {
+                  const varIdx = Math.floor(roundRng() * hq.variations.length);
+                  const variation = hq.variations[varIdx];
+                  if (variation) {
+                     if (variation.params) {
+                        for (const [k, v] of Object.entries(variation.params)) {
+                           finalPrompt = finalPrompt.replace(new RegExp(`\\$\\{${k}\\}`, "g"), String(v));
+                        }
+                     }
+                     if (variation.answer) finalAnswer = variation.answer;
+                     if (variation.choices) finalChoices = variation.choices;
+                     if (variation.explanation) finalExplanation = variation.explanation;
+                  }
+               }
+
+               // Randomize options (limit to 4: correct + 3 wrong)
+               const wrongChoices = finalChoices.filter((c: string) => c !== finalAnswer);
+               const shuffledWrong = seededShuffle(wrongChoices, roundRng);
+               const chosenWrong = shuffledWrong.slice(0, Math.min(3, shuffledWrong.length));
+               const mergedChoices = [finalAnswer, ...chosenWrong];
+               const shuffledFinalChoices = seededShuffle(mergedChoices, roundRng);
+
                q = {
                   type: "definition",
-                  ...hq,
+                  id: hq.id,
+                  prompt: finalPrompt,
+                  choices: shuffledFinalChoices,
+                  answer: finalAnswer,
+                  explanation: finalExplanation,
                };
                chosenEntity = null;
                hqChosen = hq;
