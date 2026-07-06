@@ -24,11 +24,11 @@ class GlobalErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log fatal UI crash
-    // logger.fatal("CRITICAL UI CRASH", {
-    //   error: error.message,
-    //   stack: error.stack,
-    //   componentStack: errorInfo.componentStack,
-    // });
+    logger.error("CRITICAL UI CRASH", {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   private handleReset = () => {

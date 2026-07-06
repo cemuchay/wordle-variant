@@ -9,6 +9,7 @@ interface ScoreBreakdownProps {
     marathonGameIndex: number;
     activeGame: any;
     canSeeDetails: boolean;
+    onOpenScoringInfo: () => void;
 }
 
 export const ScoreBreakdown = memo(({
@@ -18,6 +19,7 @@ export const ScoreBreakdown = memo(({
     marathonGameIndex,
     activeGame,
     canSeeDetails,
+    onOpenScoringInfo,
 }: ScoreBreakdownProps) => {
     return (
         <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 mb-4 space-y-2">
@@ -46,17 +48,25 @@ export const ScoreBreakdown = memo(({
                     )}
                 </div>
             )}
-            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400">
+            <div className="flex justify-between text-[9px] uppercase font-bold text-gray-400 items-center">
                 <span>Precision Bonus:</span>
-                <span
-                    className={
-                        breakdown.bonus >= 0 ? "text-correct" : "text-red-400"
-                    }
-                >
-                    {breakdown.bonus > 0
-                        ? `+${breakdown.bonus}`
-                        : breakdown.bonus}
-                </span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onOpenScoringInfo}
+                        className="text-[8px] bg-white/5 hover:bg-white/10 hover:text-white text-gray-400 px-1.5 py-0.5 rounded transition-colors flex items-center gap-0.5 cursor-pointer font-black border border-white/5 uppercase tracking-wider"
+                    >
+                        Rules
+                    </button>
+                    <span
+                        className={
+                            breakdown.bonus >= 0 ? "text-correct" : "text-red-400"
+                        }
+                    >
+                        {breakdown.bonus > 0
+                            ? `+${breakdown.bonus}`
+                            : breakdown.bonus}
+                    </span>
+                </div>
             </div>
 
             {gameData?.time_taken !== null &&

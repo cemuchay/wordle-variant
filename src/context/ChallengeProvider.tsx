@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAvailableProfiles, useChallengeMutations, useMyChallenges, useDiscoverChallenges, useBulkChallengeParticipants, CHALLENGE_DETAILS_SELECT } from '../hooks/queries/useChallengeQueries';
-import { useChallenge, type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
+import { useAvailableProfiles, useChallengeMutations, useMyChallenges, useDiscoverChallenges, useBulkChallengeParticipants, mapChallenge } from '../hooks/queries/useChallengeQueries';
+import { useChallenge, type Challenge } from '../hooks/useChallenge';
 import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
 import { safeLocalStorage } from '../utils/storage';
 import { saveChallengeView, loadChallengeView } from '../utils/challengeViewPersistence';
-import { useAppStore } from '../store/useAppStore';
 import { ChallengeFiltersProvider } from './ChallengeFiltersContext';
-import { ChallengeContext, type ChallengeContextType } from './ChallengeContext';
+import { ChallengeContext } from './ChallengeContext';
 
 const addRecentChallenge = (id: string) => {
     try {
@@ -37,7 +36,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     onChallengeCreated?: (challenge: Challenge, invitedUsernames: string[], invitedIds: string[]) => void,
     initialChallengeId?: string | null
 }) => {
-    const { triggerToast, setChallengeUnreadCount } = useApp();
+    const { triggerToast } = useApp();
     const queryClient = useQueryClient();
 
     // Anonymous / Guest User Support
@@ -87,8 +86,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     const setActiveTab = useChallengeStore(s => s.setActiveTab);
     const isPlaying = useChallengeStore(s => s.isPlaying);
     const setIsPlaying = useChallengeStore(s => s.setIsPlaying);
-    const isEditingChallenge = useChallengeStore(s => s.isEditingChallenge);
-    const setIsEditingChallenge = useChallengeStore(s => s.setIsEditingChallenge);
+    const [isEditingChallenge, setIsEditingChallenge] = useState(false);
 
     // Filter Column State ('unplayed' vs 'played')
     const listColumn = useChallengeStore(s => s.listColumn);
@@ -267,7 +265,6 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 subscribeToParticipants(challenge.id);
 
                 // Try to find local match or database match
-                const currentUser = effectiveUserRef.current;
                 const localMatch = myChallengesRef.current.find(
                     (item: any) => item.challenge_id === challenge.id || item.challenge?.id === challenge.id
                 ) || null;
@@ -571,14 +568,17 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             try {
                 await marathonMutation.mutateAsync({
                     participationId: myParticipation.id,
+                    challengeId: selectedChallenge.id,
                     gameIndex,
                     wordLength,
-                    score: result.score || 0,
-                    attempts: result.attempts || 0,
-                    hintsUsed: result.hintsUsed || false,
-                    timeTaken: result.timeTaken || 0,
-                    status: result.status || 'completed',
-                    guesses: result.guesses || []
+                    result: {
+                        score: result.score || 0,
+                        attempts: result.attempts || 0,
+                        hints_used: result.hintsUsed || false,
+                        time_taken: result.timeTaken || 0,
+                        status: result.status || 'completed',
+                        guesses: result.guesses || []
+                    }
                 });
 
                 // Re-evaluate if all marathon games have been played
@@ -597,7 +597,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     hints_used: result.hintsUsed,
                     time_taken: result.timeTaken,
                     guesses: result.guesses
-                };
+                } as any;
 
                 if (existingIdx >= 0) {
                     updatedMarathon[existingIdx] = localProgressEntry;
@@ -701,7 +701,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     }, [setActiveTab, setListColumn]);
 
     useEffect(() => {
-        saveChallengeView({ activeTab, listColumn });
+        saveChallengeView({ activeTab, listColumn } as any);
     }, [activeTab, listColumn]);
 
     const contextValue = useMemo(() => ({
@@ -769,7 +769,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
     return (
         <ChallengeContext.Provider value={contextValue}>
-            <ChallengeFiltersProvider>
+            <ChallengeFiltersProvider
+                myChallenges={myChallenges}
+                openChallengeItems={dailyMarathonChallenges}
+                effectiveUserId={effectiveUser?.id}
+            >
                 {children}
             </ChallengeFiltersProvider>
         </ChallengeContext.Provider>

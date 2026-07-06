@@ -2,11 +2,9 @@
 import { SCORING } from "../../constants/game";
 
 export const calculateSkillIndexJuly2026 = ({
-   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-   attempts,
+   attempts: _attempts,
    maxAttempts,
-   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-   usedHint,
+   usedHint: _usedHint,
    guesses,
    hintRecord,
 }: {
@@ -92,7 +90,7 @@ export const calculateSkillIndexJuly2026 = ({
                   wordsAwardedPoints.push({
                      id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
-                     index: cell.index,
+                     index: i,
                      status: cell.status,
                      awardRow: rowIndex,
                      isChecked: false,
@@ -107,7 +105,7 @@ export const calculateSkillIndexJuly2026 = ({
                   wordsAwardedPoints.push({
                      id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
-                     index: cell.index,
+                     index: i,
                      status: cell.status,
                      awardRow: rowIndex,
                      isChecked: false,
@@ -123,12 +121,13 @@ export const calculateSkillIndexJuly2026 = ({
                   wordsAwardedPoints.push({
                      id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
-                     index: cell.index,
+                     index: i,
                      status: cell.status,
                      awardRow: rowIndex,
                      isChecked: false,
                   });
                }
+               i = i++;
             },
          );
 
@@ -144,10 +143,6 @@ export const calculateSkillIndexJuly2026 = ({
          const relevantAwardedWords = wordsAwardedPoints.filter(
             (item) => item.awardRow < rowIndex,
          );
-
-         if (rowIndex === 1) {
-            console.log(relevantAwardedWords);
-         }
 
          let points = 0;
          const localDecisions: Array<{
@@ -186,7 +181,7 @@ export const calculateSkillIndexJuly2026 = ({
                let freshYellow = !awardedOldYellow;
 
                if (oldGreen && freshYellow) {
-                  freshYellow = false;
+                  freshYellow = true;
                }
 
                const matchedPrevId = awardedOldYellow
