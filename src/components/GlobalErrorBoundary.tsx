@@ -24,7 +24,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log fatal UI crash
-    logger.fatal("CRITICAL UI CRASH", {
+    logger.error("CRITICAL UI CRASH", {
       error: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
@@ -60,7 +60,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
                 <RefreshCcw size={16} />
                 Hard Reset
               </button>
-              
+
               <button
                 onClick={() => window.location.href = '/'}
                 className="w-full bg-white/5 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-2"
@@ -70,7 +70,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
               </button>
             </div>
 
-          
+
           </div>
         </div>
       );

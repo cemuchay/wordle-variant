@@ -40,7 +40,7 @@ export const mapChallenge = (challenge: any) => {
    };
 };
 
-export const PLAYED_PAGE_SIZE = 30;
+export const PLAYED_PAGE_SIZE = 15;
 
 export const mapParticipation = (participation: any) => {
    if (!participation) return participation;
@@ -251,7 +251,32 @@ export const usePlayedChallenges = (userId: string | undefined, page: number) =>
             return { ...mapped, _section: isExpired ? 'expired' : 'played' };
          });
 
-         return { items, total: total || 0 };
+         const resultObj = { items, total: total || 0 };
+         try {
+            safeLocalStorage.setItem(
+               `wordle_played_challenges_${userId}_page_${page}`,
+               JSON.stringify(resultObj),
+            );
+         } catch (e) {
+            console.error("Failed to cache played challenges", e);
+         }
+
+         return resultObj;
+      },
+      placeholderData: (previousData) => {
+         if (previousData) return previousData;
+         if (!userId) return { items: [], total: 0 };
+         try {
+            const cached = safeLocalStorage.getItem(
+               `wordle_played_challenges_${userId}_page_${page}`,
+            );
+            if (cached) {
+               return JSON.parse(cached);
+            }
+         } catch (e) {
+            console.error("Failed to load placeholder played challenges cache", e);
+         }
+         return undefined;
       },
    });
 
