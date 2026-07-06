@@ -346,6 +346,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         }
     }, [subscribeToParticipants, queryClient, joinMutation, normalizeParticipation, triggerToast, setSelectedChallenge, setMyParticipation, setIsPlaying, setActiveTab, setMode, setLength, setMaxAttempts, setMaxTime]);
 
+    const handleViewChallengeRef = useRef(handleViewChallenge);
+    useEffect(() => {
+        handleViewChallengeRef.current = handleViewChallenge;
+    }, [handleViewChallenge]);
+
     // Handle Deep Linking / Query Parameters bootstrap on mount
     useEffect(() => {
         let active = true;
@@ -355,15 +360,27 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
             setBootstrappingMessage("Connecting to challenge...");
             
+            // Safety timeout to clear bootstrapping overlay if it takes too long
+            const safetyTimeout = setTimeout(() => {
+                if (active) {
+                    setBootstrappingMessage(null);
+                    triggerToast("Connecting took too long. Please try again.", 4000);
+                }
+            }, 6000);
+
             // Wait slightly for auth states to settle down
             await new Promise((resolve) => setTimeout(resolve, 800));
-            if (!active) return;
+            if (!active) {
+                clearTimeout(safetyTimeout);
+                return;
+            }
 
             try {
-                await handleViewChallenge(initialChallengeId);
+                await handleViewChallengeRef.current(initialChallengeId);
             } catch (e) {
                 console.error("URL challenge bootstrap error:", e);
             } finally {
+                clearTimeout(safetyTimeout);
                 if (active) {
                     setBootstrappingMessage(null);
                 }
@@ -375,7 +392,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         return () => {
             active = false;
         };
-    }, [initialChallengeId, handleViewChallenge]);
+    }, [initialChallengeId, triggerToast]);
 
     const joinSelectedChallenge = useCallback(async () => {
         const currentUser = effectiveUserRef.current;
