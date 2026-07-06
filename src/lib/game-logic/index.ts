@@ -10,6 +10,7 @@ import { getEasyWords } from "../../data/easy-words";
 import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
 import { safeLocalStorage } from "../../utils/storage";
+import { calculateSkillIndexJuly2026 } from "./scoringJuly2026";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -157,12 +158,16 @@ async function getWordAtDate(
  * @param length - Desired word length.
  * @returns A random official word in uppercase.
  */
-export async function getRandomWord(length: number, difficulty?: 'easy' | 'normal' | 'difficult', isChallenge = false): Promise<string> {
+export async function getRandomWord(
+   length: number,
+   difficulty?: "easy" | "normal" | "difficult",
+   isChallenge = false,
+): Promise<string> {
    const { official, valid } = await loadWordLists(length, isChallenge);
    let pool: string[];
-   if (difficulty === 'easy' && length >= 3 && length <= 5) {
+   if (difficulty === "easy" && length >= 3 && length <= 5) {
       pool = getEasyWords(length);
-   } else if (difficulty === 'difficult' && length >= 3 && length <= 5) {
+   } else if (difficulty === "difficult" && length >= 3 && length <= 5) {
       pool = [...valid];
    } else {
       pool = official;
@@ -211,9 +216,9 @@ export const deobfuscateWord = (obfuscated: string, salt: string) => {
          })
          .join("");
 
-      // If the result contains non-printable characters or is not uppercase A-Z,
+      // If the result contains non-printable characters or is not within the allowed characters range,
       // it's likely already deobfuscated or the salt is wrong.
-      if (/^[A-Z]+$/.test(result)) {
+      if (/^[A-Z0-9\s.,!?'"\-()]+$/i.test(result)) {
          return result;
       }
       return obfuscated;
@@ -376,7 +381,10 @@ export async function getDailyConfig(
 
    // 1. If target date is before the constraint date, use the legacy algorithm directly.
    if (dateStr < START_CONSTRAINT_DATE) {
-      const config = await getUnconstrainedDailyConfig(isAuthenticated, dateStr);
+      const config = await getUnconstrainedDailyConfig(
+         isAuthenticated,
+         dateStr,
+      );
       dailyConfigCache[cacheKey] = config;
       return config;
    }
@@ -858,8 +866,20 @@ export const calculateSkillIndex = ({
    finalScore: number;
 } => {
    const targetDate = new Date("2026-05-18");
+   const julyTargetDate = new Date("2026-07-06");
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
+   const isJuly2026System = currentDate >= julyTargetDate;
+
+   if (isJuly2026System) {
+      return calculateSkillIndexJuly2026({
+         attempts,
+         maxAttempts,
+         usedHint,
+         guesses,
+         hintRecord,
+      });
+   }
 
    if (!isNewSystem) {
       // Legacy scoring logic for backwards compatibility
@@ -1305,8 +1325,14 @@ export const syncWithRetry = async (
  * Shape Shifter Mode compatibility check.
  * Checks if a candidate word is compatible with the feedback of a past guess.
  */
-export function isGuessCompatible(candidate: string, pastGuess: GuessResult[]): boolean {
-   const guessWord = pastGuess.map(g => g.letter).join("").toUpperCase();
+export function isGuessCompatible(
+   candidate: string,
+   pastGuess: GuessResult[],
+): boolean {
+   const guessWord = pastGuess
+      .map((g) => g.letter)
+      .join("")
+      .toUpperCase();
    const feedback = checkGuess(guessWord, candidate);
    for (let i = 0; i < feedback.length; i++) {
       if (feedback[i].status !== pastGuess[i].status) {
@@ -1325,29 +1351,31 @@ export async function getShapeShifterFeedbackAndWord(
    currentTargetWord: string,
    pastGuesses: GuessResult[][],
    wordLength: number,
-   hintRecord?: { letter: string; index: number } | null
+   hintRecord?: { letter: string; index: number } | null,
 ): Promise<{ nextWord: string; feedback: GuessResult[] }> {
    const { official } = await loadWordLists(wordLength);
    const upperCurrent = currentTargetWord.toUpperCase();
    const upperGuess = guess.toUpperCase();
 
    // Filter candidates based on past guesses AND hintRecord
-   let candidates = official.map(w => w.toUpperCase());
+   let candidates = official.map((w) => w.toUpperCase());
    for (const pastGuess of pastGuesses) {
-      candidates = candidates.filter(w => isGuessCompatible(w, pastGuess));
+      candidates = candidates.filter((w) => isGuessCompatible(w, pastGuess));
    }
 
    // If a hint was used, only keep candidates that match the hint
    if (hintRecord && hintRecord.letter) {
       const hintLetter = hintRecord.letter.toUpperCase();
-      candidates = candidates.filter(w => w[hintRecord.index] === hintLetter);
+      candidates = candidates.filter((w) => w[hintRecord.index] === hintLetter);
    }
 
    // Ensure the current target word is at least in the pool if it satisfies constraints
    if (upperCurrent && !candidates.includes(upperCurrent)) {
-      const isCurrentCompatible = pastGuesses.every(g => isGuessCompatible(upperCurrent, g)) &&
-         (!hintRecord || upperCurrent[hintRecord.index] === hintRecord.letter.toUpperCase());
-      
+      const isCurrentCompatible =
+         pastGuesses.every((g) => isGuessCompatible(upperCurrent, g)) &&
+         (!hintRecord ||
+            upperCurrent[hintRecord.index] === hintRecord.letter.toUpperCase());
+
       if (isCurrentCompatible) {
          candidates.push(upperCurrent);
       }
@@ -1363,7 +1391,7 @@ export async function getShapeShifterFeedbackAndWord(
    const buckets = new Map<string, string[]>();
    for (const w of candidates) {
       const feedback = checkGuess(upperGuess, w);
-      const key = feedback.map(f => f.status).join(',');
+      const key = feedback.map((f) => f.status).join(",");
       if (!buckets.has(key)) {
          buckets.set(key, []);
       }
@@ -1375,9 +1403,9 @@ export async function getShapeShifterFeedbackAndWord(
    let bestBucketWords: string[] = [];
 
    for (const [key, words] of buckets.entries()) {
-      const isAllCorrect = key.split(',').every(s => s === 'correct');
+      const isAllCorrect = key.split(",").every((s) => s === "correct");
       if (
-         words.length > maxBucketSize || 
+         words.length > maxBucketSize ||
          (words.length === maxBucketSize && !isAllCorrect)
       ) {
          maxBucketSize = words.length;
@@ -1387,12 +1415,12 @@ export async function getShapeShifterFeedbackAndWord(
 
    // Choose the next target word from the selected bucket
    // If the current target word is in the selected bucket, keep it. Otherwise, choose one from the bucket.
-    let nextWord: string;
-    if (bestBucketWords.includes(upperCurrent)) {
-       nextWord = upperCurrent;
-    } else {
-       nextWord = bestBucketWords[0];
-    }
+   let nextWord: string;
+   if (bestBucketWords.includes(upperCurrent)) {
+      nextWord = upperCurrent;
+   } else {
+      nextWord = bestBucketWords[0];
+   }
 
    const feedback = checkGuess(upperGuess, nextWord);
    return { nextWord, feedback };
