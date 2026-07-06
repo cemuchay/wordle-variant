@@ -44,14 +44,14 @@ export const ChallengeFiltersProvider = ({
     const setListColumn = useChallengeStore(s => s.setListColumn);
     const clearFilters = useChallengeStore(s => s.clearFilters);
 
-    const unplayedCount = useMemo(() =>
-        myChallenges.filter((c: any) => {
+    const unplayedCount = useMemo(() => {
+        const activeCount = myChallenges.filter((c: any) => {
             const isBotMarathon = c.challenge?.is_bot_marathon;
             if (isBotMarathon && c.status === 'pending') return false;
             return (c.status === 'pending' || c.status === 'playing') && new Date(c.challenge.expires_at) > new Date();
-        }).length,
-        [myChallenges]
-    );
+        }).length;
+        return activeCount + openChallengeItems.length;
+    }, [myChallenges, openChallengeItems]);
 
     const openChallengesCount = openChallengeItems.length;
 

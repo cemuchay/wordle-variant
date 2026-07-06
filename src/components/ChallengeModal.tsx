@@ -249,9 +249,9 @@ const AuthenticatedChallengeContent = memo(
       if (listColumn === 'played') {
         return playedData?.items || [];
       }
-      const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.challenge_id || c.challenge?.id);
+      const marathonIds = (dailyMarathonChallenges || []).map((c: any) => c.id || c.challenge_id || c.challenge?.id);
       return filteredChallenges.filter(
-        (item: any) => !marathonIds.includes(item.challenge_id || item.challenge?.id)
+        (item: any) => !marathonIds.includes(item.id || item.challenge_id || item.challenge?.id)
       );
     }, [listColumn, playedData, filteredChallenges, dailyMarathonChallenges]);
 
@@ -418,7 +418,7 @@ const AuthenticatedChallengeContent = memo(
                           <MarathonBanner
                             challenges={dailyMarathonChallenges}
                             onClick={(challenge) => {
-                              handleViewChallenge(initialChallengeId ? initialChallengeId : (challenge.challenge_id || challenge.challenge?.id))
+                              handleViewChallenge(challenge.id || challenge.challenge_id || challenge.challenge?.id);
                             }}
                           />
                         )}

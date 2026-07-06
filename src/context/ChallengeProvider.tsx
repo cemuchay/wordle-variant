@@ -190,11 +190,9 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     // Discoverable Public Challenges (Filter out creator/already-joined ones)
     const dailyMarathonChallenges = useMemo(() => {
         if (!discoverChallengesData) return [];
-        const joinedSet = new Set(myChallenges.map(c => c.challenge_id));
-
         return discoverChallengesData
             .filter((c: any) => {
-                if (joinedSet.has(c.id)) return false;
+                if (!c.is_bot_marathon) return false;
                 if (c.creator_id === effectiveUser?.id) return false;
                 return true;
             })
@@ -361,10 +359,14 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             await new Promise((resolve) => setTimeout(resolve, 800));
             if (!active) return;
 
-            await handleViewChallenge(initialChallengeId);
-            
-            if (active) {
-                setBootstrappingMessage(null);
+            try {
+                await handleViewChallenge(initialChallengeId);
+            } catch (e) {
+                console.error("URL challenge bootstrap error:", e);
+            } finally {
+                if (active) {
+                    setBootstrappingMessage(null);
+                }
             }
         };
 
@@ -420,24 +422,34 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         const computedExpiresAt = new Date(Date.now() + defaultExpirationHours * 60 * 60 * 1000).toISOString();
 
         const params = {
-            creator_id: userRef.current ? currentUser.id : null,
-            guest_creator_id: !userRef.current ? currentUser.id : null,
+            creatorId: currentUser.id,
             mode: customParams?.mode || mode,
-            word_length: customParams?.word_length || length,
-            max_attempts: customParams?.max_attempts || maxAttempts,
-            max_time: customParams?.max_time || maxTime,
-            expires_at: customParams?.expires_at || computedExpiresAt,
-            target_word: customParams?.target_word || null,
-            salt: customParams?.salt || null,
-            is_custom_word: !!customParams?.target_word,
-            is_public: customParams?.is_public !== undefined ? customParams.is_public : true,
-            disable_hints: customParams?.disable_hints !== undefined ? customParams.disable_hints : false,
-            is_bot_marathon: customParams?.is_bot_marathon !== undefined ? customParams.is_bot_marathon : false,
-            marathon_force_order: customParams?.marathon_force_order !== undefined ? customParams.marathon_force_order : true,
-            handicap_enforced: customParams?.handicap_enforced !== undefined ? customParams.handicap_enforced : false,
-            handicap_starters: customParams?.handicap_starters !== undefined ? customParams.handicap_starters : null,
-            handicap_starter_is_random: customParams?.handicap_starter_is_random !== undefined ? customParams.handicap_starter_is_random : false,
-            is_shapeshifter: customParams?.is_shapeshifter !== undefined ? customParams.is_shapeshifter : false,
+            length: customParams?.length !== undefined ? customParams.length : (customParams?.word_length !== undefined ? customParams.word_length : length),
+            maxAttempts: customParams?.maxAttempts || customParams?.max_attempts || maxAttempts,
+            maxTime: customParams?.maxTime !== undefined ? customParams.maxTime : (customParams?.max_time !== undefined ? customParams.max_time : maxTime),
+            expiresAt: customParams?.expires_at || computedExpiresAt,
+            isCustomWord: customParams?.isCustomWord !== undefined ? customParams.isCustomWord : (customParams?.is_custom_word !== undefined ? customParams.is_custom_word : !!customParams?.target_word),
+            customWord: customParams?.customWord || customParams?.target_word || "",
+            customWords: customParams?.customWords || {},
+            isPublic: customParams?.isPublic !== undefined ? customParams.isPublic : (customParams?.is_public !== undefined ? customParams.is_public : true),
+            maxParticipants: customParams?.maxParticipants !== undefined ? customParams.maxParticipants : (customParams?.max_participants !== undefined ? customParams.max_participants : null),
+            disableHints: customParams?.disableHints !== undefined ? customParams.disableHints : (customParams?.disable_hints !== undefined ? customParams.disable_hints : false),
+            isBotMarathon: customParams?.isBotMarathon !== undefined ? customParams.isBotMarathon : (customParams?.is_bot_marathon !== undefined ? customParams.is_bot_marathon : false),
+            marathonForceOrder: customParams?.marathonForceOrder !== undefined ? customParams.marathonForceOrder : (customParams?.marathon_force_order !== undefined ? customParams.marathon_force_order : true),
+            handicapEnforced: customParams?.handicapEnforced !== undefined ? customParams.handicapEnforced : (customParams?.handicap_enforced !== undefined ? customParams.handicap_enforced : false),
+            handicapStarters: customParams?.handicapStarters || customParams?.handicap_starters || null,
+            handicapStarter: customParams?.handicapStarter || customParams?.handicap_starter || null,
+            isHandicap: customParams?.isHandicap !== undefined ? customParams.isHandicap : (customParams?.is_handicap !== undefined ? customParams.is_handicap : false),
+            isShapeshifter: customParams?.isShapeshifter !== undefined ? customParams.isShapeshifter : (customParams?.is_shapeshifter !== undefined ? customParams.is_shapeshifter : false),
+            invitedIds: customParams?.invitedIds || [],
+            lifespanHours: customParams?.lifespanHours || 24,
+            marathonTimers: customParams?.marathonTimers || null,
+            marathonGames: customParams?.marathonGames || null,
+            isSentences: customParams?.isSentences || false,
+            sentenceWordCount: customParams?.sentenceWordCount || 5,
+            customSentence: customParams?.customSentence || "",
+            difficulty: customParams?.difficulty || 'normal',
+            notifyCreator: customParams?.notifyCreator !== undefined ? customParams.notifyCreator : (customParams?.notify_creator !== undefined ? customParams.notify_creator : false),
         };
 
         try {
@@ -466,8 +478,37 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
     };
 
     const handleEdit = async (challengeId: string, updatedParams: any) => {
+        const params = {
+            mode: updatedParams?.mode || mode,
+            length: updatedParams?.length !== undefined ? updatedParams.length : (updatedParams?.word_length !== undefined ? updatedParams.word_length : length),
+            maxAttempts: updatedParams?.maxAttempts || updatedParams?.max_attempts || maxAttempts,
+            maxTime: updatedParams?.maxTime !== undefined ? updatedParams.maxTime : (updatedParams?.max_time !== undefined ? updatedParams.max_time : maxTime),
+            isCustomWord: updatedParams?.isCustomWord !== undefined ? updatedParams.isCustomWord : (updatedParams?.is_custom_word !== undefined ? updatedParams.is_custom_word : false),
+            customWord: updatedParams?.customWord || updatedParams?.target_word || "",
+            customWords: updatedParams?.customWords || {},
+            isPublic: updatedParams?.isPublic !== undefined ? updatedParams.isPublic : (updatedParams?.is_public !== undefined ? updatedParams.is_public : true),
+            maxParticipants: updatedParams?.maxParticipants !== undefined ? updatedParams.maxParticipants : (updatedParams?.max_participants !== undefined ? updatedParams.max_participants : null),
+            disableHints: updatedParams?.disableHints !== undefined ? updatedParams.disableHints : (updatedParams?.disable_hints !== undefined ? updatedParams.disable_hints : false),
+            isBotMarathon: updatedParams?.isBotMarathon !== undefined ? updatedParams.isBotMarathon : (updatedParams?.is_bot_marathon !== undefined ? updatedParams.is_bot_marathon : false),
+            marathonForceOrder: updatedParams?.marathonForceOrder !== undefined ? updatedParams.marathonForceOrder : (updatedParams?.marathon_force_order !== undefined ? updatedParams.marathon_force_order : true),
+            handicapEnforced: updatedParams?.handicapEnforced !== undefined ? updatedParams.handicapEnforced : (updatedParams?.handicap_enforced !== undefined ? updatedParams.handicap_enforced : false),
+            handicapStarters: updatedParams?.handicapStarters || updatedParams?.handicap_starters || null,
+            handicapStarter: updatedParams?.handicapStarter || updatedParams?.handicap_starter || null,
+            isHandicap: updatedParams?.isHandicap !== undefined ? updatedParams.isHandicap : (updatedParams?.is_handicap !== undefined ? updatedParams.is_handicap : false),
+            isShapeshifter: updatedParams?.isShapeshifter !== undefined ? updatedParams.isShapeshifter : (updatedParams?.is_shapeshifter !== undefined ? updatedParams.is_shapeshifter : false),
+            invitedIds: updatedParams?.invitedIds || [],
+            lifespanHours: updatedParams?.lifespanHours || 24,
+            marathonTimers: updatedParams?.marathonTimers || null,
+            marathonGames: updatedParams?.marathonGames || null,
+            isSentences: updatedParams?.isSentences || false,
+            sentenceWordCount: updatedParams?.sentenceWordCount || 5,
+            customSentence: updatedParams?.customSentence || "",
+            difficulty: updatedParams?.difficulty || 'normal',
+            notifyCreator: updatedParams?.notifyCreator !== undefined ? updatedParams.notifyCreator : (updatedParams?.notify_creator !== undefined ? updatedParams.notify_creator : false),
+        };
+
         try {
-            await updateMutation.mutateAsync({ challengeId, params: updatedParams });
+            await updateMutation.mutateAsync({ challengeId, params });
             triggerToast('Challenge updated successfully!', 3000);
             queryClient.invalidateQueries({ queryKey: ['my-challenges'] });
             
