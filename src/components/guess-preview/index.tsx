@@ -21,7 +21,7 @@ import { ScoreBreakdown } from "./ScoreBreakdown";
 import { GuessGrid } from "./GuessGrid";
 import { MarathonGameList } from "./MarathonGameList";
 import { ChallengeContext } from "../../context/ChallengeContext";
-import { safeLocalStorage } from "@/utils/storage";
+import { safeLocalStorage } from "../../utils/storage";
 
 interface GuessPreviewModalProps {
   entry: any; // More flexible for challenge participants
@@ -450,10 +450,11 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
   const username = entry.username || entry.profiles?.username || "Player";
   const canSeeDetails = viewerHasFinished || isCreator || isOwnEntry;
+  const revealTargetWord = viewerHasFinished || isCreator;
 
   useEffect(() => {
     let active = true;
-    if (canSeeDetails) {
+    if (revealTargetWord) {
       setTimeout(() => {
         if (active) {
           setShowTargetWord(true);
@@ -463,7 +464,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     return () => {
       active = false;
     };
-  }, [canSeeDetails]);
+  }, [revealTargetWord]);
 
   return (
     <div
@@ -555,7 +556,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <TargetWordSection
-              canSeeDetails={canSeeDetails}
+              canSeeDetails={revealTargetWord}
               showTargetWord={showTargetWord}
               setShowTargetWord={setShowTargetWord}
               isShapeshifter={!!isShapeshifter}

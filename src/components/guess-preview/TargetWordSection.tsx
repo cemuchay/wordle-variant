@@ -5,7 +5,7 @@ import { getTileSizeClass } from './types';
 import { parseMarathonGames } from '../../utils/marathon';
 
 interface TargetWordSectionProps {
-    canSeeDetails: boolean;
+    canSeeDetails: boolean | undefined;
     showTargetWord: boolean;
     setShowTargetWord: (show: boolean) => void;
     isShapeshifter: boolean;
