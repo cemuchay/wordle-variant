@@ -10,6 +10,7 @@ import { getEasyWords } from "../../data/easy-words";
 import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
 import { safeLocalStorage } from "../../utils/storage";
+import { calculateSkillIndexJuly2026 } from "./scoringJuly2026";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -852,14 +853,26 @@ export const calculateSkillIndex = ({
    hint: number;
    decisions: {
       rowNumber: string;
-      totalRowPoints: number;
+   totalRowPoints: number;
       decisions: { letter: string; status: string; pointDeduction: number }[];
    }[];
    finalScore: number;
 } => {
    const targetDate = new Date("2026-05-18");
+   const julyTargetDate = new Date("2026-07-06");
    const currentDate = gameDate ? new Date(gameDate) : new Date();
    const isNewSystem = currentDate >= targetDate;
+   const isJuly2026System = currentDate >= julyTargetDate;
+
+   if (isJuly2026System) {
+      return calculateSkillIndexJuly2026({
+         attempts,
+         maxAttempts,
+         usedHint,
+         guesses,
+         hintRecord,
+      });
+   }
 
    if (!isNewSystem) {
       // Legacy scoring logic for backwards compatibility
