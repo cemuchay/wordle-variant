@@ -48,6 +48,7 @@ export const calculateSkillIndexJuly2026 = ({
    let totalBonus = 0;
 
    const wordsAwardedPoints: Array<{
+      id: string;
       letter: string;
       index: number | undefined;
       status: string;
@@ -76,6 +77,8 @@ export const calculateSkillIndexJuly2026 = ({
             pointDeduction: number;
          }> = [];
 
+         let i = 0;
+
          row.forEach(
             (cell: { letter: string; index?: number; status: string }) => {
                if (cell.status === "present") {
@@ -87,6 +90,7 @@ export const calculateSkillIndexJuly2026 = ({
                      pointDeduction: yScore,
                   });
                   wordsAwardedPoints.push({
+                     id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
                      index: cell.index,
                      status: cell.status,
@@ -101,6 +105,7 @@ export const calculateSkillIndexJuly2026 = ({
                      pointDeduction: -SCORING.ABSENT_PENALTY,
                   });
                   wordsAwardedPoints.push({
+                     id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
                      index: cell.index,
                      status: cell.status,
@@ -116,6 +121,7 @@ export const calculateSkillIndexJuly2026 = ({
                      pointDeduction: gScore,
                   });
                   wordsAwardedPoints.push({
+                     id: Math.random().toString(36).substring(2, 11),
                      letter: cell.letter,
                      index: cell.index,
                      status: cell.status,
@@ -139,6 +145,10 @@ export const calculateSkillIndexJuly2026 = ({
             (item) => item.awardRow < rowIndex,
          );
 
+         if (rowIndex === 1) {
+            console.log(relevantAwardedWords);
+         }
+
          let points = 0;
          const localDecisions: Array<{
             letter: string;
@@ -147,6 +157,7 @@ export const calculateSkillIndexJuly2026 = ({
          }> = [];
 
          const localAwardedPoints: Array<{
+            id: string;
             letter: string;
             index: number | undefined;
             status: string;
@@ -177,6 +188,12 @@ export const calculateSkillIndexJuly2026 = ({
                if (oldGreen && freshYellow) {
                   freshYellow = false;
                }
+
+               const matchedPrevId = awardedOldYellow
+                  ? awardedOldYellow.id
+                  : oldGreen
+                    ? oldGreen.id
+                    : Math.random().toString(36).substring(2, 11);
 
                if (awardedOldYellow) {
                   awardedOldYellow.isChecked = true;
@@ -215,7 +232,10 @@ export const calculateSkillIndexJuly2026 = ({
                            prevCell.status === "correct",
                      ),
                   );
-               if (wasPrevGreenLetter) {
+               const isAlsoGreenInCurrentRow = row.some(
+                  (c) => c.letter === cell.letter && c.status === "correct",
+               );
+               if (wasPrevGreenLetter && !isAlsoGreenInCurrentRow) {
                   points -= 5;
                   localDecisions.push({
                      letter: cell.letter,
@@ -242,6 +262,7 @@ export const calculateSkillIndexJuly2026 = ({
                }
 
                localAwardedPoints.push({
+                  id: matchedPrevId,
                   letter: cell.letter,
                   index: cell.index,
                   status: cell.status,
@@ -286,26 +307,8 @@ export const calculateSkillIndexJuly2026 = ({
                   });
                }
 
-               // Regression check: Yellow to Black
-               const wasPrevYellow = guesses
-                  .slice(0, rowIndex)
-                  .some((prevRow) =>
-                     prevRow.some(
-                        (prevCell) =>
-                           prevCell.letter === cell.letter &&
-                           prevCell.status === "present",
-                     ),
-                  );
-               if (wasPrevYellow) {
-                  points -= 10;
-                  localDecisions.push({
-                     letter: cell.letter,
-                     status: `regression: yellow to black -10`,
-                     pointDeduction: -10,
-                  });
-               }
-
                localAwardedPoints.push({
+                  id: Math.random().toString(36).substring(2, 11),
                   letter: cell.letter,
                   index: cell.index,
                   status: cell.status,
@@ -348,6 +351,9 @@ export const calculateSkillIndexJuly2026 = ({
                }
 
                localAwardedPoints.push({
+                  id: oldPresent
+                     ? oldPresent.id
+                     : Math.random().toString(36).substring(2, 11),
                   letter: cell.letter,
                   index: cell.index,
                   status: cell.status,
@@ -356,6 +362,38 @@ export const calculateSkillIndexJuly2026 = ({
                });
             }
          }
+
+         // Check for Yellow to Black regression using unique IDs:
+         // Find all unique IDs that were Yellow in any prevRow
+         const prevYellowIds = new Set<string>();
+         const yellowIdToLetter: Record<string, string> = {};
+         for (let r = 0; r < rowIndex; r++) {
+            const prevRowAwards = wordsAwardedPoints.filter(
+               (item) => item.awardRow === r,
+            );
+            prevRowAwards.forEach((award) => {
+               if (award.status === "present") {
+                  prevYellowIds.add(award.id);
+                  yellowIdToLetter[award.id] = award.letter;
+               }
+            });
+         }
+
+         // Current row localAwardedPoints IDs
+         const currentRowIds = new Set(
+            localAwardedPoints.map((item) => item.id),
+         );
+
+         prevYellowIds.forEach((id) => {
+            if (!currentRowIds.has(id)) {
+               points -= 10;
+               localDecisions.push({
+                  letter: yellowIdToLetter[id],
+                  status: `regression: yellow to black -10`,
+                  pointDeduction: -10,
+               });
+            }
+         });
 
          rowPointDecisions.push({
             rowNumber: `Row ${rowIndex}`,

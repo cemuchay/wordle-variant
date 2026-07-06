@@ -12,10 +12,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type Challenge } from "../hooks/useChallenge";
-import {
-  ChallengeProvider,
-  useChallengeContext,
-} from "../context/ChallengeContext";
+import { ChallengeProvider } from "../context/ChallengeProvider";
+import { useChallengeContext } from "../context/ChallengeContext";
 import { useChallengeFilters } from "../context/ChallengeFiltersContext";
 import { usePlayedChallenges, PLAYED_PAGE_SIZE } from "../hooks/queries/useChallengeQueries";
 import GuessPreviewModal from "./guess-preview";
