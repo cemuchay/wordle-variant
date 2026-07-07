@@ -2,14 +2,18 @@
 import { memo } from 'react';
 import { Eye } from 'lucide-react';
 import { getTileSizeClass } from './types';
+import { parseMarathonGames } from '../../utils/marathon';
 
 interface TargetWordSectionProps {
-    canSeeDetails: boolean;
+    canSeeDetails: boolean | undefined;
     showTargetWord: boolean;
     setShowTargetWord: (show: boolean) => void;
     isShapeshifter: boolean;
     gameData: any;
     targetWordToUse: string;
+    challenge?: any;
+    marathonGameIndex?: number;
+    entry?: any;
 }
 
 export const TargetWordSection = memo(({
@@ -19,6 +23,9 @@ export const TargetWordSection = memo(({
     isShapeshifter,
     gameData,
     targetWordToUse,
+    challenge,
+    marathonGameIndex,
+    entry,
 }: TargetWordSectionProps) => {
     if (!canSeeDetails) {
         return (
@@ -54,6 +61,9 @@ export const TargetWordSection = memo(({
         );
     }
 
+    const isSentence = challenge?.salt?.endsWith('_sentence');
+    const marathonGames = isSentence ? parseMarathonGames(challenge.target_word, challenge.salt) : [];
+
     return (
         <div className="mb-6 mt-3 flex flex-col items-center">
             {isShapeshifter && gameData?.target_words && gameData.target_words.length > 0 ? (
@@ -70,6 +80,34 @@ export const TargetWordSection = memo(({
                                 </span>
                             </div>
                         ))}
+                    </div>
+                </div>
+            ) : isSentence ? (
+                <div className="flex flex-col items-center animate-in zoom-in duration-300 w-full">
+                    <span className="text-[8px] uppercase font-black text-gray-500 mb-2">
+                        Target Sentence
+                    </span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-3 justify-center items-center">
+                        {marathonGames.map((game, wIdx) => {
+                            const isCurrent = wIdx === marathonGameIndex;
+                            const prog = entry?.marathon_progress?.find((p: any) => p.game_index === wIdx);
+                            const isWordFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
+                            const isEntryFullyPlayed = entry?.status === 'completed' || entry?.status === 'timed_out';
+                            const shouldRevealWord = isEntryFullyPlayed || isWordFinished;
+
+                            return (
+                                <div key={wIdx} className={`flex gap-0.5 pb-1 relative ${isCurrent ? 'border-b-2 border-correct' : ''}`}>
+                                    {game.word.split("").map((letter, lIdx) => (
+                                        <div
+                                            key={lIdx}
+                                            className={`flex items-center justify-center font-black ${isCurrent ? 'bg-correct text-black border border-correct font-extrabold shadow-lg shadow-correct/20' : 'bg-white/5 border border-white/10 text-white/50'} w-6 h-6 sm:w-8 sm:h-8 text-xs sm:text-sm rounded`}
+                                        >
+                                            {shouldRevealWord ? letter : '•'}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             ) : (
