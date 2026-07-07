@@ -1,10 +1,10 @@
-import { Gamepad2, Trophy, BarChart2, Swords, MessageSquare } from 'lucide-react';
+import { Gamepad2, Trophy, BarChart2, MessageSquare } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/AppContext';
 
 interface AppNavigationProps {
-    activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup';
-    onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup') => void;
+    activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more';
+    onNavigate: (item: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more') => void;
     challengeUnreadCount: number;
     chatUnreadCount: number;
     wordupUnreadCount?: number;
@@ -22,6 +22,8 @@ export const AppNavigation = ({
     const { preferences } = useApp();
     const queryClient = useQueryClient();
 
+    const showLeaderboard = activeItem === 'play' || activeItem === 'leaderboard';
+
     const allItems = [
         {
             id: 'play' as const,
@@ -34,29 +36,20 @@ export const AppNavigation = ({
             icon: MessageSquare,
             badge: chatUnreadCount,
         },
-        {
+        ...(showLeaderboard ? [{
             id: 'leaderboard' as const,
             label: 'Leaderboard',
             icon: BarChart2,
-        },
+        }] : []),
         {
-            id: 'challenges' as const,
-            label: 'Challenges',
+            id: 'more' as const,
+            label: 'More Games',
             icon: Trophy,
-            badge: challengeUnreadCount,
-        },
-        {
-            id: 'wordup' as const,
-            label: 'WordUp',
-            icon: Swords,
-            badge: wordupUnreadCount,
+            badge: challengeUnreadCount + (wordupUnreadCount || 0),
         }
     ];
 
-    // Reorder items based on preferences
-    const navItems = preferences.navOrder
-        ? [...preferences.navOrder].map(id => allItems.find(item => item.id === id)).filter(Boolean) as typeof allItems
-        : allItems;
+    const navItems = allItems;
 
     return (
         <nav className="w-full z-140 bg-dark border-t border-white/10 px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0)+6px)] sm:self-center sm:mb-2 sm:rounded-2xl sm:border sm:border-white/10 sm:max-w-lg sm:px-6 sm:py-2 sm:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-300">
@@ -69,7 +62,7 @@ export const AppNavigation = ({
                         <button
                             key={item.id}
                             onClick={() => onNavigate(item.id)}
-                            onPointerEnter={item.id === 'challenges' && userId ? () => { queryClient.prefetchQuery({ queryKey: ['my-challenges', userId] }); } : undefined}
+                            onPointerEnter={item.id === 'more' && userId ? () => { queryClient.prefetchQuery({ queryKey: ['my-challenges', userId] }); } : undefined}
                             className="flex flex-col items-center justify-center gap-0.5 py-0.5 px-1 sm:px-3 rounded-xl transition-all duration-300 relative group cursor-pointer focus:outline-none min-w-[60px] sm:min-w-[72px]"
                         >
                             {/* Icon Wrapper with bounce-on-hover / active scale */}

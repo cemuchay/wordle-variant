@@ -15,6 +15,10 @@
   ],
   "rewrites": [
     { "source": "/admin", "destination": "/index.html" },
-    { "source": "/unsubscribe", "destination": "/index.html" }
+    { "source": "/unsubscribe", "destination": "/index.html" },
+    { "source": "/wordup", "destination": "/index.html" },
+    { "source": "/challenges", "destination": "/index.html" },
+    { "source": "/chat", "destination": "/index.html" },
+    { "source": "/leaderboard", "destination": "/index.html" }
   ]
 }

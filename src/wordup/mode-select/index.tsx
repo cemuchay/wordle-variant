@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
-import { Swords, Zap, GraduationCap } from "lucide-react";
+import { Swords, Zap, GraduationCap, ChevronLeft } from "lucide-react";
 
 interface ModeSelectProps {
    onSelect: (mode: "live" | "async") => void;
    onTutorial?: () => void;
+   onBack?: () => void;
 }
 
-export const ModeSelect = ({ onSelect, onTutorial }: ModeSelectProps) => {
+export const ModeSelect = ({ onSelect, onTutorial, onBack }: ModeSelectProps) => {
    return (
       <motion.div
          initial={{ opacity: 0, y: 15 }}
@@ -14,6 +15,16 @@ export const ModeSelect = ({ onSelect, onTutorial }: ModeSelectProps) => {
          exit={{ opacity: 0, y: -15 }}
          className="flex flex-col items-center justify-center flex-1 gap-8 px-6 py-12 relative"
       >
+         {onBack && (
+            <button
+               onClick={onBack}
+               className="absolute top-4 left-4 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+               title="Back to More Games"
+            >
+               <ChevronLeft size={16} />
+            </button>
+         )}
+
          {onTutorial && (
             <button
                onClick={onTutorial}

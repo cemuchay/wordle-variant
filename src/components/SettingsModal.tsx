@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, ChevronUp, ChevronDown, Layout, Search, Shield, Pencil, Check } from 'lucide-react';
+import { X, ShieldCheck, MessageSquareQuote, LogOut, Terminal, Mail, FileText, Bell, Download, Search, Shield, Pencil, Check } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -25,7 +25,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const [allowRoasts, setAllowRoasts] = useState(preferences.allowRoasts);
     const [compactMode, setCompactMode] = useState(preferences.compactMode);
     const [rememberLastView, setRememberLastView] = useState(preferences.rememberLastView || false);
-    const [navOrder, setNavOrder] = useState<string[]>(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     const [prevPreferences, setPrevPreferences] = useState(preferences);
 
     if (preferences !== prevPreferences) {
@@ -33,7 +32,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
         setRememberLastView(preferences.rememberLastView || false);
-        setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
     }
 
     const [receiveEmails, setReceiveEmails] = useState(true);
@@ -80,7 +78,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setAllowRoasts(preferences.allowRoasts);
         setCompactMode(preferences.compactMode);
         setRememberLastView(preferences.rememberLastView || false);
-        setNavOrder(preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"]);
         setEditUsername(profile?.username || '');
         setIsUsernameEditable(false);
         setReceiveEmails(initialReceiveEmails);
@@ -214,15 +211,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         }
     };
 
-    const moveNavItem = (index: number, direction: 'up' | 'down') => {
-        const newOrder = [...navOrder];
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= newOrder.length) return;
 
-        const [moved] = newOrder.splice(index, 1);
-        newOrder.splice(targetIndex, 0, moved);
-        setNavOrder(newOrder);
-    };
 
     const getChanges = () => {
         const changes: { name: string; from: string; to: string }[] = [];
@@ -271,15 +260,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             });
         }
 
-        const originalOrder = preferences.navOrder || ["play", "chat", "leaderboard", "challenges", "wordup"];
-        if (JSON.stringify(navOrder) !== JSON.stringify(originalOrder)) {
-            const formatOrder = (order: string[]) => order.map(item => navItemLabels[item] || item).join(' → ');
-            changes.push({
-                name: 'Navigation Tabs Order',
-                from: formatOrder(originalOrder),
-                to: formatOrder(navOrder)
-            });
-        }
+
 
         return changes;
     };
@@ -292,7 +273,6 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             allowRoasts,
             compactMode,
             rememberLastView,
-            navOrder,
         };
 
         // Update store directly for immediate effect and anonymous support
@@ -370,13 +350,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setLoading(false);
     };
 
-    const navItemLabels: Record<string, string> = {
-        play: 'Play',
-        chat: 'Chat',
-        leaderboard: 'Leaderboard',
-        challenges: 'Challenges',
-        wordup: 'WordUp'
-    };
+
 
     const matchesSearch = (text: string, description?: string) => {
         if (!searchQuery) return true;
@@ -392,11 +366,10 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const showEmail = matchesSearch('Email Notifications') || matchesSearch('Updates & Reminders');
     const showPush = matchesSearch('Push Notifications') || matchesSearch('Live Push Updates');
     const showApp = !isStandalone && (matchesSearch('Application') || matchesSearch('Install Variant'));
-    const showNav = matchesSearch('Navigation Layout') || navOrder.some(id => matchesSearch(navItemLabels[id]));
     const showDiagnostics = matchesSearch('Diagnostics') || matchesSearch('Session Logs') || matchesSearch('Purge Cache');
     const showLegal = matchesSearch('Legal & Policies') || matchesSearch('Privacy') || matchesSearch('Terms') || matchesSearch('Data Deletion');
 
-    const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showNav || showDiagnostics || showLegal;
+    const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showDiagnostics || showLegal;
 
     return (
         <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
@@ -780,49 +753,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 </section>
                             )}
 
-                            {/* Navigation Layout */}
-                            {showNav && (
-                                <section className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Layout size={14} className="text-indigo-400" />
-                                        <label className="text-[10px] uppercase font-black text-gray-500 tracking-widest">
-                                            Navigation Layout
-                                        </label>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                        {navOrder.map((id, index) => {
-                                            if (!matchesSearch(navItemLabels[id])) return null;
-                                            return (
-                                                <div key={id} className="flex items-center justify-between p-3 bg-gray-900/40 border border-gray-800 rounded-xl">
-                                                    <span className="text-sm font-bold text-gray-200">
-                                                        {navItemLabels[id]}
-                                                    </span>
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            onClick={() => moveNavItem(index, 'up')}
-                                                            disabled={index === 0}
-                                                            className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
-                                                        >
-                                                            <ChevronUp size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moveNavItem(index, 'down')}
-                                                            disabled={index === navOrder.length - 1}
-                                                            className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-colors disabled:opacity-20"
-                                                        >
-                                                            <ChevronDown size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <p className="text-[10px] text-gray-600 px-1 italic">
-                                        Customize the order of your bottom navigation tabs.
-                                    </p>
-                                </section>
-                            )}
 
                             {/* Admin Portal (Only for Admins) */}
                             {isAdmin && (matchesSearch('Admin') || matchesSearch('Portal') || matchesSearch('Shield')) && (

@@ -38,6 +38,7 @@ import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
+import { MoreGamesHub } from "./components/layout/MoreGamesHub";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -234,6 +235,7 @@ export default function App() {
   const showNotifications = useAppStore(s => s.showNotifications);
   const setShowNotifications = useAppStore(s => s.setShowNotifications);
 
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
 
@@ -256,13 +258,15 @@ export default function App() {
 
   const activeNavigationItem = isChatOpen
     ? "chat"
-    : isChallengeOpen
-      ? "challenges"
-      : isStatsOpen
-        ? "leaderboard"
+    : isStatsOpen
+      ? "leaderboard"
+      : isMoreOpen
+        ? "more"
         : isWordUpOpen
           ? "wordup"
-          : "play";
+          : isChallengeOpen
+            ? "challenges"
+            : "play";
 
   const showAlreadyPlayedScreen = !!(activeNavigationItem === "play" && user && state.isGameOver && isAlreadyPlayedTodayOnLoad && !dismissedAlreadyPlayed);
 
@@ -280,6 +284,8 @@ export default function App() {
           setIsChallengeOpen(tab === "challenges");
           setIsStatsOpen(tab === "leaderboard");
           setIsWordUpOpen(tab === "wordup");
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setIsMoreOpen(tab === "more");
           if (tab !== "wordup") {
             setWordupMode(null);
           }
@@ -423,6 +429,8 @@ export default function App() {
       appState.setShowNotifications(false);
       appState.setPendingDMUserId(null);
       appState.setPendingChatGroupId(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsMoreOpen(false);
     }
   }, []);
 
@@ -523,7 +531,11 @@ export default function App() {
       const hasChallenge = params.has("challenge");
       const hasOpen = params.has("open") || params.has("group_id") || params.has("dm_user_id");
 
-      if (hasChallenge || hasOpen) {
+      const isWordUpHost = window.location.hostname.startsWith("wordup.");
+      const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
+      const isPathEntry = isWordUpHost || path === "/wordup" || path === "/challenges" || path === "/chat" || path === "/leaderboard";
+
+      if (hasChallenge || hasOpen || isPathEntry) {
         // Clear all other view states to let the notification click override persistence
         const appState = useAppStore.getState();
         appState.setChallengeOpen(false);
@@ -536,6 +548,22 @@ export default function App() {
         appState.setWordUpOpen(false);
         appState.setWeeklyWrappedOpen(false);
         appState.setShowNotifications(false);
+        setIsMoreOpen(false);
+      }
+
+      if (isWordUpHost || path === "/wordup") {
+        setIsWordUpOpen(true);
+      } else if (path === "/challenges") {
+        setIsChallengeOpen(true);
+      } else if (path === "/chat") {
+        setIsChatOpen(true);
+      } else if (path === "/leaderboard") {
+        setStatsActiveTab("leaderboard");
+        setIsStatsOpen(true);
+      }
+
+      if (isPathEntry) {
+        window.history.replaceState({}, document.title, `/${window.location.search}`);
       }
 
       const challengeId = params.get("challenge");
@@ -556,7 +584,7 @@ export default function App() {
         if (dmUserId) {
           useAppStore.getState().setPendingDMUserId(dmUserId);
         }
-      } else if (open === "leaderboard") {
+      } else if (open === "leaderboard" && !isPathEntry) {
         setStatsActiveTab("leaderboard");
         setIsStatsOpen(true);
       } else if (open === "notifications") {
@@ -572,6 +600,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", parseUrlParams);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setIsChallengeOpen, setIsChatOpen, setIsNotificationsOpen, setIsStatsOpen, setStatsActiveTab]);
 
   // Re-open challenge modal after successful login/signup if initiated from the challenge screen
@@ -802,7 +831,7 @@ export default function App() {
   }
 
   const handleNavigation = (
-    item: "play" | "chat" | "leaderboard" | "challenges" | "wordup",
+    item: "play" | "chat" | "leaderboard" | "challenges" | "wordup" | "more",
   ) => {
     if (item === activeNavigationItem) return;
 
@@ -820,6 +849,7 @@ export default function App() {
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
     setIsWordUpOpen(item === "wordup");
+    setIsMoreOpen(item === "more");
     if (item !== "wordup") {
       setWordupMode(null);
     }
@@ -1077,13 +1107,24 @@ export default function App() {
               </div>
             )}
 
+            {activeNavigationItem === "more" && (
+              <MoreGamesHub
+                onSelectGame={(game) => handleNavigation(game)}
+                challengeUnreadCount={challengeUnreadCount}
+                wordupUnreadCount={wordupUnreadCount}
+              />
+            )}
+
             {activeNavigationItem === "challenges" && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <ChallengeModal
                     isOpen={true}
                     inline={true}
-                    onClose={() => setIsChallengeOpen(false)}
+                    onClose={() => {
+                      setIsChallengeOpen(false);
+                      setIsMoreOpen(true);
+                    }}
                     user={user as AppUser}
                     onChallengeCreated={handleChallengeCreated}
                     initialChallengeId={selectedChallengeId || new URLSearchParams(window.location.search).get('challenge')}
@@ -1099,6 +1140,10 @@ export default function App() {
                     wordupMode={wordupMode}
                     setWordupMode={setWordupMode}
                     onTutorial={() => setIsWordupTutorialOpen(true)}
+                    onBack={() => {
+                      setIsWordUpOpen(false);
+                      setIsMoreOpen(true);
+                    }}
                   />
                 </Suspense>
 
@@ -1165,7 +1210,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && activeNavigationItem !== "wordup" && activeNavigationItem !== "challenges" && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}
