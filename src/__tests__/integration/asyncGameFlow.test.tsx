@@ -8,7 +8,7 @@ import { waitForStore } from '../helpers/waitForStore';
 import { makeAsyncMatch } from '../fixtures/matchData';
 import { makeQuestionSet } from '../fixtures/questions';
 import { makeProfile } from '../fixtures/profiles';
-import { ConfirmationProvider } from '../../context/ConfirmationContext';
+import { ConfirmationProvider } from '../../context/ConfirmationProvider';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'test-user', user_metadata: { full_name: 'TestPlayer' } } }),

@@ -5,7 +5,7 @@ import { useWordUpStore } from '../../store/useWordUpStore';
 import { seedStore } from '../helpers/seedStore';
 import { makeQuestionSet } from '../fixtures/questions';
 import { makeMatch } from '../fixtures/matchData';
-import { ConfirmationProvider } from '../../context/ConfirmationContext';
+import { ConfirmationProvider } from '../../context/ConfirmationProvider';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'test-user', user_metadata: { full_name: 'TestPlayer' } } }),

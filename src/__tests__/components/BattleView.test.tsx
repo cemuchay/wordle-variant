@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BattleView } from '../../components/wordup/WordUpView/components/BattleView';
-import { ConfirmationProvider } from '../../context/ConfirmationContext';
+import { ConfirmationProvider } from '../../context/ConfirmationProvider';
 import { makeQuestion } from '../fixtures/questions';
 import { useWordUpStore } from '../../store/useWordUpStore';
 
