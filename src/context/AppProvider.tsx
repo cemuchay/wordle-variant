@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useState, type ReactNode, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useGlobalPresence } from '../hooks/useGlobalPresence';
@@ -32,7 +33,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const lastSyncRef = useRef<number>(0);
 
     useEffect(() => {
-        // Monitor socket connection status via a shared real-time channel
         const channel = supabase
             .channel('connection_health_monitor')
             .subscribe((status) => {
@@ -111,7 +111,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const count = globalMessages.filter((m) => {
                 if (m.user_id === user.id) return false;
                 if (!joinedSet.has(m.group_id)) return false;
-                // Game Analysis is locked if user hasn't played today
                 if (!hasPlayed && m.group_id === "00000000-0000-0000-0000-000000000002") return false;
                 const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
                 return new Date(m.created_at).getTime() > new Date(lastSeen).getTime();
@@ -307,7 +306,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     status: 'connected'
                 });
 
-                // Group call alert handling
                 if (currentCall.type === 'group') {
                     const activeInRoom = onlineUsers.filter(u => u.activeVoiceRoomId === currentCall.channelId);
                     if (activeInRoom.length <= 1) {
@@ -342,7 +340,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
                 const currentCall = useAppStore.getState().activeCall;
                 if (currentCall && currentCall.status !== 'idle') {
-                    // Send call_busy to caller
                     const busyChannel = supabase.channel(`user_signals_${payload.callerId}`);
                     trackOneShotChannel(busyChannel);
                     busyChannel.subscribe((status) => {
@@ -396,7 +393,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
             })
             .on('broadcast', { event: 'wordup_invite' }, ({ payload }) => {
-                // If invitee is already in a match or call, send busy back
                 const currentCall = useAppStore.getState().activeCall;
                 const activeMatchId = useLiveStore.getState().matchId || useAsyncStore.getState().matchId;
                 if ((currentCall && currentCall.status !== 'idle') || activeMatchId) {
@@ -426,7 +422,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             })
             .on('broadcast', { event: 'wordup_invite_accepted' }, ({ payload }) => {
                 window.dispatchEvent(new CustomEvent('wordup-invite-accepted', { detail: payload }));
-                // Direct store update so the transition survives tab switches
                 const store = useLiveStore.getState();
                 if (payload?.matchId && !store.matchId) {
                     store.setMatchId(payload.matchId);
@@ -500,7 +495,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
             useAppStore.getState().setReadReceipts(receipts);
 
-            // Fetch the user's joined groups
             const { data: memberData } = await supabase
                 .from('chat_group_members')
                 .select('group_id')
@@ -532,14 +526,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const syncMessages = async () => {
             if (!user?.id) return;
 
-            // Throttle syncs to once every 10 seconds to avoid spamming
             const now = Date.now();
             if (now - lastSyncRef.current < 10000) return;
             lastSyncRef.current = now;
 
-            // 1. Force refresh notification query
             queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
-            
+
             const currentMessages = useAppStore.getState().globalMessages;
             if (currentMessages.length === 0) {
                 fetchMessagesAndReceipts();
@@ -551,7 +543,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             if (!lastCreatedAt) return;
 
-            // Fetch only messages created after our last known message
             const { data, error } = await supabase
                 .from('messages')
                 .select('*, profiles(username, avatar_url)')
@@ -567,16 +558,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         fetchMessagesAndReceipts();
 
-        // Re-sync messages when app comes back to foreground or connection is restored
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 syncMessages();
-                
+
                 const timeHidden = Date.now() - lastHiddenTimeRef.current;
                 const shouldRefresh = wasDisconnectedRef.current || timeHidden > 30 * 60 * 1000;
 
                 if (shouldRefresh) {
-                    // Refresh authoritative date silently and trigger a global event for game engines to re-hydrate
                     queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });
                     window.dispatchEvent(new CustomEvent('app-visibility-visible'));
                     wasDisconnectedRef.current = false;
@@ -630,7 +619,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                     useAppStore.getState().updateGlobalMessage({ id: targetId, reactions: updatedReactions });
                                 }
                             } else if (targetId && emoji === 'None') {
-                                // Remove reaction
                                 const allMsgs = useAppStore.getState().globalMessages;
                                 const target = allMsgs.find((m: any) => m.id === targetId);
                                 if (target && target.reactions) {
@@ -639,7 +627,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                                     useAppStore.getState().updateGlobalMessage({ id: targetId, reactions: updatedReactions });
                                 }
                             }
-                            return; // Don't add reaction messages to the UI
+                            return;
                         }
 
                         const allMsgs = useAppStore.getState().globalMessages;
@@ -659,10 +647,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
                     } else if (payload.eventType === 'UPDATE') {
-                        // Merge the updated columns in global store
                         useAppStore.getState().updateGlobalMessage(payload.new);
                     } else if (payload.eventType === 'DELETE') {
-                        // Remove deleted records (e.g. from 24h cron purges)
                         useAppStore.setState((state) => ({
                             globalMessages: state.globalMessages.filter((m) => m.id !== payload.old.id)
                         }));
@@ -727,7 +713,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
         window.addEventListener('online', handleOnline);
 
-        // Also retry pending syncs on visibility change (app coming to foreground)
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && user?.id) {
                 syncPendingGames(user.id);
