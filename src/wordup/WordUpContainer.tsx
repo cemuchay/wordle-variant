@@ -7,6 +7,7 @@ interface WordUpContainerProps {
    setWordupMode: (mode: "live" | "async" | null) => void;
    onTutorial: () => void;
    onBack?: () => void;
+   onBackToClassic?: () => void;
 }
 
 export const WordUpContainer = ({
@@ -14,6 +15,7 @@ export const WordUpContainer = ({
    setWordupMode,
    onTutorial,
    onBack,
+   onBackToClassic,
 }: WordUpContainerProps) => {
    if (wordupMode === null) {
       return (
@@ -31,6 +33,7 @@ export const WordUpContainer = ({
             onBack={() => setWordupMode(null)}
             onSwitchMode={setWordupMode}
             onTutorial={onTutorial}
+            onBackToClassic={onBackToClassic}
          />
       );
    }
@@ -40,6 +43,7 @@ export const WordUpContainer = ({
          onBack={() => setWordupMode(null)}
          onSwitchMode={setWordupMode}
          onTutorial={onTutorial}
+         onBackToClassic={onBackToClassic}
       />
    );
 };

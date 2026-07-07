@@ -1,6 +1,6 @@
 import { Gamepad2, Trophy, BarChart2, MessageSquare } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useApp } from '../../context/AppContext';
+// import { useApp } from '../../context/AppContext';
 
 interface AppNavigationProps {
     activeItem: 'play' | 'chat' | 'leaderboard' | 'challenges' | 'wordup' | 'more';
@@ -19,7 +19,7 @@ export const AppNavigation = ({
     wordupUnreadCount,
     userId
 }: AppNavigationProps) => {
-    const { preferences } = useApp();
+    // const { preferences } = useApp();
     const queryClient = useQueryClient();
 
     const showLeaderboard = activeItem === 'play' || activeItem === 'leaderboard';
@@ -42,10 +42,16 @@ export const AppNavigation = ({
             icon: BarChart2,
         }] : []),
         {
+            id: 'challenges' as const,
+            label: 'Challenges',
+            icon: Trophy,
+            badge: challengeUnreadCount,
+        },
+        {
             id: 'more' as const,
             label: 'More Games',
-            icon: Trophy,
-            badge: challengeUnreadCount + (wordupUnreadCount || 0),
+            icon: Gamepad2,
+            badge: wordupUnreadCount,
         }
     ];
 

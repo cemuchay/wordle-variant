@@ -38,7 +38,6 @@ import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
-import { MoreGamesHub } from "./components/layout/MoreGamesHub";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -274,26 +273,38 @@ export default function App() {
 
   useEffect(() => {
     if (!isHydrated || !date || tabRestoredRef.current) return;
-    const stored = safeLocalStorage.getItem("wordle_last_viewed_tab");
+    
+    let stored = safeSessionStorage.getItem("wordle_last_viewed_tab");
+    let isFromSession = true;
+
+    if (!stored) {
+      stored = safeLocalStorage.getItem("wordle_last_viewed_tab");
+      isFromSession = false;
+    }
+
     if (stored) {
       try {
         const { tab, date: savedDate } = JSON.parse(stored);
         if (savedDate === date) {
-          tabRestoredRef.current = true;
-          setIsChatOpen(tab === "chat");
-          setIsChallengeOpen(tab === "challenges");
-          setIsStatsOpen(tab === "leaderboard");
-          setIsWordUpOpen(tab === "wordup");
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setIsMoreOpen(tab === "more");
-          if (tab !== "wordup") {
-            setWordupMode(null);
-          }
-          if (tab === "leaderboard") {
-            setStatsActiveTab("leaderboard");
+          // Cross-session recovery only restores WordUp
+          if (isFromSession || tab === "wordup") {
+            tabRestoredRef.current = true;
+            setIsChatOpen(tab === "chat");
+            setIsChallengeOpen(tab === "challenges");
+            setIsStatsOpen(tab === "leaderboard");
+            setIsWordUpOpen(tab === "wordup");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setIsMoreOpen(tab === "more" || tab === "wordup");
+            if (tab !== "wordup" && tab !== "more") {
+              setWordupMode(null);
+            }
+            if (tab === "leaderboard") {
+              setStatsActiveTab("leaderboard");
+            }
           }
         } else {
           safeLocalStorage.removeItem("wordle_last_viewed_tab");
+          safeSessionStorage.removeItem("wordle_last_viewed_tab");
         }
       } catch (e) {
         console.error("Failed to restore last active tab", e);
@@ -848,9 +859,9 @@ export default function App() {
     setIsChatOpen(item === "chat");
     setIsChallengeOpen(item === "challenges");
     setIsStatsOpen(item === "leaderboard");
-    setIsWordUpOpen(item === "wordup");
+    setIsWordUpOpen(item === "wordup" || item === "more");
     setIsMoreOpen(item === "more");
-    if (item !== "wordup") {
+    if (item !== "wordup" && item !== "more") {
       setWordupMode(null);
     }
     setIsInfoOpen(false);
@@ -859,10 +870,21 @@ export default function App() {
     }
 
     if (date) {
-      safeLocalStorage.setItem(
+      // Always save to session storage for same-session recovery
+      safeSessionStorage.setItem(
         "wordle_last_viewed_tab",
         JSON.stringify({ tab: item, date })
       );
+
+      // Only save to local storage (cross-session recovery) if it is wordup or more
+      if (item === "wordup" || item === "more") {
+        safeLocalStorage.setItem(
+          "wordle_last_viewed_tab",
+          JSON.stringify({ tab: item, date })
+        );
+      } else {
+        safeLocalStorage.removeItem("wordle_last_viewed_tab");
+      }
     }
   };
 
@@ -1107,14 +1129,6 @@ export default function App() {
               </div>
             )}
 
-            {activeNavigationItem === "more" && (
-              <MoreGamesHub
-                onSelectGame={(game) => handleNavigation(game)}
-                challengeUnreadCount={challengeUnreadCount}
-                wordupUnreadCount={wordupUnreadCount}
-              />
-            )}
-
             {activeNavigationItem === "challenges" && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
@@ -1123,7 +1137,6 @@ export default function App() {
                     inline={true}
                     onClose={() => {
                       setIsChallengeOpen(false);
-                      setIsMoreOpen(true);
                     }}
                     user={user as AppUser}
                     onChallengeCreated={handleChallengeCreated}
@@ -1133,7 +1146,7 @@ export default function App() {
               </div>
             )}
 
-            {activeNavigationItem === "wordup" && (
+            {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
                 <Suspense fallback={null}>
                   <WordUpContainer
@@ -1142,8 +1155,9 @@ export default function App() {
                     onTutorial={() => setIsWordupTutorialOpen(true)}
                     onBack={() => {
                       setIsWordUpOpen(false);
-                      setIsMoreOpen(true);
+                      setIsMoreOpen(false);
                     }}
+                    onBackToClassic={() => handleNavigation('play')}
                   />
                 </Suspense>
 
@@ -1210,7 +1224,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && activeNavigationItem !== "wordup" && activeNavigationItem !== "challenges" && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && activeNavigationItem !== "wordup" && activeNavigationItem !== "more" && (
         <AppNavigation
           activeItem={activeNavigationItem}
           onNavigate={handleNavigation}

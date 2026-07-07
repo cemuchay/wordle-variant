@@ -30,9 +30,10 @@ interface LiveViewProps {
    onBack?: () => void;
    onSwitchMode?: (mode: "live" | "async") => void;
    onTutorial?: () => void;
+   onBackToClassic?: () => void;
 }
 
-export const LiveView = ({ onBack, onSwitchMode, onTutorial }: LiveViewProps) => {
+export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: LiveViewProps) => {
    const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, realtimeStatus, profile, onlineUsers } = useApp();
 
@@ -299,8 +300,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial }: LiveViewProps) =>
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
                    onSwitchMode={() => onSwitchMode?.("async")}
-                   onBack={() => onBack?.()}
-                   onTutorial={onTutorial}
+                    onBack={() => onBack?.()}
+                    onTutorial={onTutorial}
+                    onBackToClassic={onBackToClassic}
                />
             )}
             {view === "matchmaking" && (

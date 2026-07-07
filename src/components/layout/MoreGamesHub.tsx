@@ -88,7 +88,7 @@ export const MoreGamesHub = ({
                                     Launch Game
                                 </span>
                                 <div className={`p-1.5 rounded-xl transition-all duration-300 ${game.iconBg} group-hover:translate-x-1`}>
-                                    <ChevronRight size={14} className="stroke-[3]" />
+                                    <ChevronRight size={14} className="stroke-3" />
                                 </div>
                             </div>
                         </motion.div>

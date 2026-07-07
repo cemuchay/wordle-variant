@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RotateCcw, Swords, Shuffle, Radio, GraduationCap } from "lucide-react";
+import { HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RotateCcw, Swords, Shuffle, Radio, GraduationCap, LayoutGrid, ChevronRight } from "lucide-react";
 import { CATEGORIES } from "../../shared/constants";
 import { type ProfileStats } from "../../shared/types";
 import { supabase } from "../../../lib/supabaseClient";
@@ -21,9 +21,10 @@ interface LobbyViewProps {
    soundEnabled: boolean;
    onToggleSound: () => void;
    onPurgeAndReset: () => void;
-   onSwitchMode?: () => void;
-   onBack?: () => void;
-   onTutorial?: () => void;
+    onSwitchMode?: () => void;
+    onBack?: () => void;
+    onTutorial?: () => void;
+    onBackToClassic?: () => void;
 }
 
 export const LobbyView = ({
@@ -37,8 +38,9 @@ export const LobbyView = ({
    soundEnabled,
    onToggleSound,
    onPurgeAndReset,
-   onSwitchMode,
-   onTutorial,
+    onSwitchMode,
+    onTutorial,
+    onBackToClassic,
 }: LobbyViewProps) => {
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -383,8 +385,32 @@ export const LobbyView = ({
                       )}
                    </motion.div>
                )}
-            </AnimatePresence>
-         </div>
-      </motion.div>
-   );
+             </AnimatePresence>
+          </div>
+
+          {/* More Games section */}
+          <div className="mt-4 pt-4 border-t border-white/5">
+             <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2.5 px-0.5">
+                More Games
+             </p>
+             <button
+                onClick={onBackToClassic}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer group"
+             >
+                <div className="p-2 rounded-lg bg-white/10 border border-white/20 text-gray-300 group-hover:text-white transition-colors">
+                   <LayoutGrid size={16} />
+                </div>
+                <div className="flex-1 text-left">
+                   <p className="text-xs font-black text-white group-hover:text-correct transition-colors">
+                      Classic Variant
+                   </p>
+                   <p className="text-[10px] text-gray-500 font-bold">
+                      Play the daily word puzzle
+                   </p>
+                </div>
+                <ChevronRight size={14} className="text-gray-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+             </button>
+          </div>
+       </motion.div>
+    );
 };

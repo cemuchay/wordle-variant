@@ -28,9 +28,10 @@ interface AsyncViewProps {
    onBack?: () => void;
    onSwitchMode?: (mode: "live" | "async") => void;
    onTutorial?: () => void;
+   onBackToClassic?: () => void;
 }
 
-export const AsyncView = ({ onBack, onSwitchMode, onTutorial }: AsyncViewProps) => {
+export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: AsyncViewProps) => {
    const { user: authUser, loading: authLoading } = useAuth();
    const { triggerToast, onlineUsers, profile, allProfiles } = useApp();
 
@@ -441,9 +442,10 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial }: AsyncViewProps) 
                   onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
-                   onSwitchMode={() => onSwitchMode?.("live")}
-                   onBack={() => onBack?.()}
-                   onTutorial={onTutorial}
+                    onSwitchMode={() => onSwitchMode?.("live")}
+                    onBack={() => onBack?.()}
+                    onTutorial={onTutorial}
+                    onBackToClassic={onBackToClassic}
                />
             )}
             {view === "loading" && <LoadingView message={connectingMsg} onCancel={handleCancelChallenge} />}
