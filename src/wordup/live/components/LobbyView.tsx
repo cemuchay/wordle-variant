@@ -7,7 +7,8 @@ import { type ProfileStats } from "../../shared/types";
 import { supabase } from "../../../lib/supabaseClient";
 import { useLiveStore } from "../store/useLiveStore";
 import { safeLocalStorage } from "../../../utils/storage";
-import { CategorySelectModal, CATEGORY_STYLE_MAP } from "../../shared/CategorySelectModal";
+import { CategorySelectModal } from "../../shared/CategorySelectModal";
+import { CATEGORY_STYLE_MAP } from "../../shared/categorySelectConstants";
 import { RankingView } from "../../shared/RankingView";
 
 interface LobbyViewProps {
