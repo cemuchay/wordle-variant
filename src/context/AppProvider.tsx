@@ -12,6 +12,7 @@ import { useAppInit } from '../hooks/useAppInit';
 import { useQueryClient } from '@tanstack/react-query';
 import { syncWithRetry } from '../lib/game-logic';
 import { safeLocalStorage } from '../utils/storage';
+import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
 import { logger } from '../lib/logger';
 import { AppContext, type AppContextType } from './AppContext';
 
@@ -511,16 +512,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const joinedArray = Array.from(joinedSet);
             useAppStore.getState().setJoinedGroupIds(joinedArray);
 
-            const { data } = await supabase
-                .from('messages')
-                .select('*, profiles(username, avatar_url)')
-                .order('created_at', { ascending: false })
-                .limit(300);
-
-            if (data) {
-                const chronData = data.reverse();
-                useAppStore.getState().setGlobalMessages(chronData);
+            // 1. Read cached messages from IndexedDB for instant render
+            let cachedMessages: any[] = [];
+            try {
+                cachedMessages = await getAllMessages();
+                if (cachedMessages.length > 0) {
+                    cachedMessages.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                    useAppStore.getState().setGlobalMessages(cachedMessages);
+                }
+            } catch (e) {
+                console.warn('Failed to read cached messages from IndexedDB:', e);
             }
+
+            // 2. Fetch delta from Supabase
+            const latestTimestamp = cachedMessages.length > 0
+                ? cachedMessages[cachedMessages.length - 1].created_at
+                : null;
+
+            if (latestTimestamp) {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('*, profiles(username, avatar_url)')
+                    .gt('created_at', latestTimestamp)
+                    .order('created_at', { ascending: true });
+
+                if (!error && data && data.length > 0) {
+                    data.forEach(msg => {
+                        useAppStore.getState().addGlobalMessage(msg);
+                    });
+                    saveMessages(data).catch(e => console.warn('Failed to cache delta messages:', e));
+                }
+            } else {
+                // No cache — fetch full 300
+                const { data } = await supabase
+                    .from('messages')
+                    .select('*, profiles(username, avatar_url)')
+                    .order('created_at', { ascending: false })
+                    .limit(300);
+
+                if (data) {
+                    const chronData = data.reverse();
+                    useAppStore.getState().setGlobalMessages(chronData);
+                    saveMessages(chronData).catch(e => console.warn('Failed to cache messages:', e));
+                }
+            }
+
+            // 3. Purge messages older than 7 days
+            purgeMessagesOlderThan(7).catch(e => console.warn('Failed to purge old messages:', e));
         };
 
         const syncMessages = async () => {
@@ -553,6 +591,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 data.forEach(msg => {
                     useAppStore.getState().addGlobalMessage(msg);
                 });
+                saveMessages(data).catch(e => console.warn('Failed to cache sync messages:', e));
             }
         };
 
@@ -646,12 +685,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
                         const messageWithProfile = { ...newMessage, profiles: profile };
                         useAppStore.getState().addGlobalMessage(messageWithProfile);
+                        addMessage(messageWithProfile).catch(e => console.warn('IndexedDB add failed:', e));
                     } else if (payload.eventType === 'UPDATE') {
                         useAppStore.getState().updateGlobalMessage(payload.new);
+                        updateMessage(payload.new.id, payload.new).catch(e => console.warn('IndexedDB update failed:', e));
                     } else if (payload.eventType === 'DELETE') {
                         useAppStore.setState((state) => ({
                             globalMessages: state.globalMessages.filter((m) => m.id !== payload.old.id)
                         }));
+                        removeMessage(payload.old.id).catch(e => console.warn('IndexedDB remove failed:', e));
                     }
                 }
             )
