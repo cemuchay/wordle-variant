@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
+﻿import { motion } from "framer-motion";
 import { Swords } from "lucide-react";
-import { CATEGORIES } from "../constants";
+import { CATEGORIES } from "./constants";
 // import { WordUpMascot } from "./WordUpMascot";
 
 interface MatchmakingViewProps {

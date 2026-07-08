@@ -3,7 +3,7 @@ import { useRef, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../utils/fetchWithRetry";
 import { useLiveStore } from "../store/useLiveStore";
-import { wordupNetworkGate } from "../../../components/wordup/WordUpView/services/wordupNetworkGate";
+import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { WORDUP_TIMEOUT } from "../../../constants/wordup";
 

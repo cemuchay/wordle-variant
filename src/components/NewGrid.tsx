@@ -224,11 +224,11 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     }
   }
 
-  const [mascotData, setMascotData] = useState<{ expression: import('./wordup/WordUpView/components/WordUpMascot').MascotExpression; label: string } | null>(null);
+  const [mascotData, setMascotData] = useState<{ expression: import('../wordup/shared/WordUpMascot').MascotExpression; label: string } | null>(null);
 
   useEffect(() => {
     const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
-    let expression: import('./wordup/WordUpView/components/WordUpMascot').MascotExpression = 'idle';
+    let expression: import('../wordup/shared/WordUpMascot').MascotExpression = 'idle';
     let label = 'Looking good!';
 
     if (isWon) {

@@ -1,9 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
-import { CATEGORIES } from "../constants";
-import { safeLocalStorage } from "../../../../utils/storage";
-import { useWordUpStore } from "../../../../store/useWordUpStore";
+import { CATEGORIES } from "./constants";
+import { safeLocalStorage } from "../../utils/storage";
+import { useWordUpStore } from "../../store/useWordUpStore";
 
 const RECENTS_KEY = "wordup_recent_categories";
 const MAX_RECENTS = 5;
@@ -406,3 +406,4 @@ export const CategorySelectModal = ({
       </div>
    );
 };
+

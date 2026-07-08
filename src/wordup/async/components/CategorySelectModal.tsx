@@ -4,7 +4,7 @@ import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "../../shared/constants";
 import { safeLocalStorage } from "../../../utils/storage";
 import { useAsyncStore } from "../store/useAsyncStore";
-import { CATEGORY_STYLE_MAP } from "../../../components/wordup/WordUpView/components/CategorySelectModal";
+import { CATEGORY_STYLE_MAP } from "../../shared/CategorySelectModal";
 
 const RECENTS_KEY = "wordup_async_recent_categories";
 const MAX_RECENTS = 5;

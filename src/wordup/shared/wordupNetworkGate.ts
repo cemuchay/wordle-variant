@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/wordup/WordUpView/services/wordupNetworkGate.ts
-import { supabase } from "../../../../lib/supabaseClient";
-import { safeLocalStorage } from "../../../../utils/storage";
+import { supabase } from "../../lib/supabaseClient";
+import { safeLocalStorage } from "../../utils/storage";
 
 export type RequestType = "get" | "post" | "put" | "delete" | "rpc";
 

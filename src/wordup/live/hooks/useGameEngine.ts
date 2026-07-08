@@ -16,7 +16,7 @@ import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { useLiveStore } from "../store/useLiveStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../utils/storage";
-import { wordupNetworkGate } from "../../../components/wordup/WordUpView/services/wordupNetworkGate";
+import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
 import { QUESTION_DURATION, WORDUP_TIMEOUT } from "../../../constants/wordup";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import {

@@ -1,6 +1,6 @@
 import { supabase } from "../../lib/supabaseClient";
 import { isProceduralCategory } from "./generatorRegistry";
-import { wordupNetworkGate } from "../../components/wordup/WordUpView/services/wordupNetworkGate";
+import { wordupNetworkGate } from "../../wordup/shared/wordupNetworkGate";
 
 /**
  * Generates questions for a match.

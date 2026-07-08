@@ -9,8 +9,8 @@ import formatLastSeen from '../utils/formatLastSeen';
 import { ReigningBadge } from './common/ReigningBadge';
 
 import { useAppStore } from '../store/useAppStore';
-import { WordUpMascot } from './wordup/WordUpView/components/WordUpMascot';
-import type { MascotExpression } from './wordup/WordUpView/components/WordUpMascot';
+import { WordUpMascot } from '../wordup/shared/WordUpMascot';
+import type { MascotExpression } from '../wordup/shared/WordUpMascot';
 import formatUsername from '../utils/formatUsername';
 
 export const DynamicIslandStatus = () => {

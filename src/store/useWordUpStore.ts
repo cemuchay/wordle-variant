@@ -1,7 +1,7 @@
 // src/store/useWordUpStore.ts
 import { create } from "zustand";
 import { type WordUpQuestion } from "../utils/wordupQuestionGenerator";
-import { type ProfileStats } from "../components/wordup/WordUpView/types";
+import { type ProfileStats } from "../wordup/shared/types";
 import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 import { postProcessQuestions } from "../utils/wordupQuestionPostProcessor";
 

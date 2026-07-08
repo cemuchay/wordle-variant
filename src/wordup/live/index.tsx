@@ -14,12 +14,12 @@ import { Swords, Volume2, VolumeX } from "lucide-react";
 import { decryptMatchQuestions } from "../../utils/wordupQuestionGenerator";
 
 import { LobbyView } from "./components/LobbyView";
-import { MatchmakingView } from "../../components/wordup/WordUpView/components/MatchmakingView";
+import { MatchmakingView } from "../shared/MatchmakingView";
 import { CountdownView } from "./components/CountdownView";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../../components/wordup/WordUpView/components/LoadingView";
-import { ConnectionOverlay } from "../../components/wordup/WordUpView/components/ConnectionOverlay";
+import { LoadingView } from "../shared/LoadingView";
+import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
 

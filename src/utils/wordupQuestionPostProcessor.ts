@@ -1,5 +1,5 @@
 import { type WordUpQuestion } from "./wordupQuestionGenerator";
-import { FLAG_MAP } from "../components/wordup/WordUpView/constants";
+import { FLAG_MAP } from "../wordup/shared/constants";
 
 // Cache to hold preloaded flag image URLs so we don't have to resolve/re-verify them mid-game
 const flagUrlCache: Record<string, string> = {};

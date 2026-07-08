@@ -5,16 +5,16 @@ import { AlertTriangle } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
-import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
-import { PreloadedImage } from "../../../components/wordup/PreloadedImage";
+import { FormulaRenderer } from "../../shared/FormulaRenderer";
+import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
 import { getQuestionDuration } from "../hooks/useGameEngine";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
-import { CircularTimer } from "../../../components/wordup/CircularTimer";
-import { ScoreBar } from "../../../components/wordup/ScoreBar";
+import { CircularTimer } from "../../shared/CircularTimer";
+import { ScoreBar } from "../../shared/ScoreBar";
 
 interface MatchData {
    p1_score?: number;

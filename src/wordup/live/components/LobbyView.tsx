@@ -7,8 +7,8 @@ import { type ProfileStats } from "../../shared/types";
 import { supabase } from "../../../lib/supabaseClient";
 import { useLiveStore } from "../store/useLiveStore";
 import { safeLocalStorage } from "../../../utils/storage";
-import { CategorySelectModal, CATEGORY_STYLE_MAP } from "../../../components/wordup/WordUpView/components/CategorySelectModal";
-import { RankingView } from "../../../components/wordup/WordUpView/components/RankingView";
+import { CategorySelectModal, CATEGORY_STYLE_MAP } from "../../shared/CategorySelectModal";
+import { RankingView } from "../../shared/RankingView";
 
 interface LobbyViewProps {
    userStats: ProfileStats | null;

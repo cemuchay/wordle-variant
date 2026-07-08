@@ -7,7 +7,7 @@ import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { useAsyncStore } from "../store/useAsyncStore";
 import { safeLocalStorage, safeSessionStorage } from "../../../utils/storage";
-import { wordupNetworkGate } from "../../../components/wordup/WordUpView/services/wordupNetworkGate";
+import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
 import { WORDUP_TIMEOUT, WORDUP_GAME, QUESTION_DURATION } from "../../../constants/wordup";
 import { gameEngineReducer, initialState } from "./useGameEngine.types";
 
