@@ -14,6 +14,7 @@ interface TargetWordSectionProps {
     challenge?: any;
     marathonGameIndex?: number;
     myParticipation?: any;
+    isCreator?: boolean;
 }
 
 export const TargetWordSection = memo(({
@@ -26,6 +27,7 @@ export const TargetWordSection = memo(({
     challenge,
     marathonGameIndex,
     myParticipation,
+    isCreator,
 }: TargetWordSectionProps) => {
     if (!canSeeDetails) {
         return (
@@ -92,7 +94,7 @@ export const TargetWordSection = memo(({
                             const isCurrent = wIdx === marathonGameIndex;
                             const viewerProg = myParticipation?.marathon_progress?.find((p: any) => p.game_index === wIdx);
                             const viewerFinishedWord = viewerProg?.status === 'completed' || viewerProg?.status === 'timed_out';
-                            const shouldRevealWord = viewerFinishedWord;
+                            const shouldRevealWord = viewerFinishedWord || isCreator;
 
                             return (
                                 <div key={wIdx} className={`flex gap-0.5 pb-1 relative ${isCurrent ? 'border-b-2 border-correct' : ''}`}>

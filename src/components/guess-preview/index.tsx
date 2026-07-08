@@ -571,6 +571,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               challenge={challenge}
               marathonGameIndex={marathonGameIndex}
               myParticipation={myParticipation}
+              isCreator={!!isCreator}
             />
 
             {/* Roast Message */}
