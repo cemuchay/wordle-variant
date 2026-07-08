@@ -45,6 +45,7 @@ export type EngineAction =
    | { type: "SET_LAST_ROUND_POPUP"; show: boolean }
    | { type: "SET_CONNECTION"; connected: boolean }
    | { type: "SET_OPPONENT_SIGNAL"; level: number }
+   | { type: "RESTORE_MATCH"; payload: any }
    | { type: "RESET" };
 
 export const initialState: EngineState = {
@@ -104,6 +105,19 @@ export function gameEngineReducer(state: EngineState, action: EngineAction): Eng
          return { ...state, currentRound: action.round, selectedAnswer: null, revealAnswers: false };
       case "SET_LAST_ROUND_POPUP":
          return { ...state, lastRoundPopup: action.show };
+      case "RESTORE_MATCH":
+         return {
+            ...state,
+            phase: "playing",
+            currentRound: action.payload.currentRound,
+            matchData: action.payload.matchData,
+            questions: action.payload.questions,
+            opponentStats: action.payload.opponentStats,
+            revealAnswers: action.payload.revealAnswers,
+            selectedAnswer: action.payload.selectedAnswer,
+            timeLeft: action.payload.timeLeft,
+            maxTime: action.payload.maxTime,
+         };
       case "RESET":
          return { ...initialState };
       default:

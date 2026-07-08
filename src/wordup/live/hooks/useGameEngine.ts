@@ -502,6 +502,7 @@ export function useGameEngine(props: EngineProps) {
          if (G.current.isEnding) return;
          G.current.isEnding = true;
          clearT("opponentInactivityTimeout");
+         safeLocalStorage.removeItem("wordup_active_game");
          const completedAt = new Date().toISOString();
          const finalMatch = {
             ...match,
@@ -681,7 +682,9 @@ export function useGameEngine(props: EngineProps) {
          const startTime =
             _match?.question_started_at && _match?.status === "active"
                ? new Date(_match.question_started_at).getTime()
-               : getSyncedNow();
+               : state.timeLeft < duration
+                  ? getSyncedNow() - (duration - state.timeLeft) * 1000
+                  : getSyncedNow();
          let lastTickRemaining = duration;
          T.current.roundInterval = window.setInterval(() => {
             const remainingTime = Math.max(
@@ -943,6 +946,7 @@ export function useGameEngine(props: EngineProps) {
          timeLeft: state.timeLeft,
          maxTime: state.maxTime,
          gameType,
+         savedAt: Date.now(),
       };
       safeLocalStorage.setItem("wordup_active_game", JSON.stringify(as));
    }, [
@@ -1074,7 +1078,32 @@ export function useGameEngine(props: EngineProps) {
                return;
             }
 
-            // ── Live match ──
+            // ── Try localStorage recovery first (instant, no network) ──
+            const savedRaw = safeLocalStorage.getItem("wordup_active_game");
+            if (savedRaw) {
+               try {
+                  const saved = JSON.parse(savedRaw);
+                  if (saved.matchId === mId && saved.role === activeRole) {
+                     const elapsedSec = (Date.now() - saved.savedAt) / 1000;
+                     const adjustedTimeLeft = saved.selectedAnswer !== null
+                        ? saved.timeLeft
+                        : Math.max(0, saved.timeLeft - elapsedSec);
+
+                     const restored = { ...saved, timeLeft: adjustedTimeLeft };
+                     dispatch({ type: "RESTORE_MATCH", payload: restored });
+
+                     useLiveStore.getState().setMatchData(saved.matchData);
+                     useLiveStore.getState().setCurrentIdx(saved.currentRound);
+                     if (saved.questions?.length > 0) useLiveStore.getState().setQuestions(saved.questions);
+                     if (saved.opponentStats) useLiveStore.getState().setOpponentStats(saved.opponentStats);
+
+                     cb.current.startQuestionRound?.(saved.matchData, saved.currentRound);
+                     return;
+                  }
+               } catch { /* ignore corrupt cache */ }
+            }
+
+            // ── Live match (Supabase fetch) ──
             let match: any;
             try {
                match = await wordupNetworkGate.enqueue(
@@ -1645,6 +1674,7 @@ export function useGameEngine(props: EngineProps) {
    useEffect(() => {
       return () => {
          cleanup();
+         safeLocalStorage.removeItem("wordup_active_game");
          const store = useLiveStore.getState();
          if (
             !(
