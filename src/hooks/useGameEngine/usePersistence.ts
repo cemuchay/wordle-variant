@@ -16,7 +16,7 @@ interface UsePersistenceProps {
 
 export const usePersistence = ({ user, date, dispatch, config, triggerToast }: UsePersistenceProps) => {
    const performSync = useCallback(
-      async (gamePayload: { status: string; guesses?: any[] }) => {
+      async (gamePayload: { status: string; guesses?: any[]; usedHint?: boolean; hintRecord?: any }) => {
          if (!user || !date) return false;
          dispatch({ type: "SET_SYNC_STATUS", status: "syncing" });
 
@@ -24,18 +24,29 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
          try {
             const { data: cloudData } = await supabase
                .from("scores")
-               .select("guesses")
+               .select("guesses, hints_used, hint_record")
                .eq("user_id", user.id)
                .eq("game_date", date)
                .maybeSingle();
 
-            if (cloudData?.guesses && gamePayload.guesses && cloudData.guesses.length >= gamePayload.guesses.length) {
-               dispatch({ type: "SET_SYNC_STATUS", status: "synced" });
-               setTimeout(
-                  () => dispatch({ type: "SET_SYNC_STATUS", status: "idle" }),
-                  TOAST_DURATION.DEFAULT,
+            if (cloudData?.guesses && gamePayload.guesses) {
+               const cloudCount = cloudData.guesses.length;
+               const localCount = gamePayload.guesses.length;
+
+               const cloudAhead = cloudCount > localCount || (
+                  cloudCount === localCount &&
+                  cloudData.hints_used === gamePayload.usedHint &&
+                  JSON.stringify(cloudData.hint_record) === JSON.stringify(gamePayload.hintRecord)
                );
-               return true;
+
+               if (cloudAhead) {
+                  dispatch({ type: "SET_SYNC_STATUS", status: "synced" });
+                  setTimeout(
+                     () => dispatch({ type: "SET_SYNC_STATUS", status: "idle" }),
+                     TOAST_DURATION.DEFAULT,
+                  );
+                  return true;
+               }
             }
          } catch (e) {
             console.warn("Pre-sync check failed, proceeding with sync:", e);

@@ -1254,6 +1254,32 @@ export const syncGameState = async (
    payload: any,
 ) => {
    if (!date) return;
+
+   // DB-side guard: don't overwrite if server already has equal or better data
+   const { data: existing } = await supabase
+      .from("scores")
+      .select("guesses, hints_used, hint_record")
+      .eq("user_id", userId)
+      .eq("game_date", date)
+      .maybeSingle();
+
+   if (existing) {
+      const existingCount = existing.guesses?.length ?? 0;
+      const incomingCount = payload.guesses?.length ?? 0;
+
+      // Server has MORE guesses — client is stale, abort
+      if (existingCount > incomingCount) return;
+
+      if (existingCount === incomingCount) {
+         // Server has hint but client doesn't — don't roll back
+         if (existing.hints_used && !payload.usedHint) return;
+
+         // Both have same hint state — already synced, skip
+         if (existing.hints_used === payload.usedHint &&
+             JSON.stringify(existing.hint_record) === JSON.stringify(payload.hintRecord)) return;
+      }
+   }
+
    const isGameOver = payload.status !== "playing";
 
    const skillScore = isGameOver
