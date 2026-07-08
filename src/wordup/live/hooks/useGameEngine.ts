@@ -13,6 +13,7 @@ import {
    getRandomBotProfile,
 } from "../../../utils/wordupQuestionGenerator";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
+import { dispatchGameStatus } from "../../shared/GameStatusToast";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { useLiveStore } from "../store/useLiveStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../utils/storage";
@@ -72,6 +73,7 @@ export function useGameEngine(props: EngineProps) {
       isAdvancing: false,
       isRevealing: false,
       isEnding: false,
+      wasConnected: false,
    });
 
    const S = useRef({
@@ -335,16 +337,17 @@ export function useGameEngine(props: EngineProps) {
                   payload: { nextIdx },
                })
                .catch(console.error);
-         if (nextIdx < 6) {
-            dispatch({
-               type: "SET_ROUND",
-               round: nextIdx,
-               timeLeft: nextDur,
-               maxTime: nextDur,
-            });
-         }
-         cb.current.handleMatchUpdate?.(upd);
-         G.current.isAdvancing = false;
+          if (nextIdx < 6) {
+             dispatch({
+                type: "SET_ROUND",
+                round: nextIdx,
+                timeLeft: nextDur,
+                maxTime: nextDur,
+             });
+             dispatchGameStatus('Proceeding to next round', 'info');
+          }
+          cb.current.handleMatchUpdate?.(upd);
+          G.current.isAdvancing = false;
       },
       [gameType, getSyncedNow],
    );
@@ -913,8 +916,9 @@ export function useGameEngine(props: EngineProps) {
             S.current.matchData?.status !== "active"
          )
             return;
-         triggerToast("Opponent disconnected. Match completed.", 5000);
-         const final = {
+          triggerToast("Opponent disconnected. Match completed.", 5000);
+          dispatchGameStatus("Opponent did not respond in time, moving to next round", "warning");
+          const final = {
             ...cur,
             status: "completed",
             p1_answered: true,
@@ -1352,30 +1356,39 @@ export function useGameEngine(props: EngineProps) {
                          dispatch({ type: "SET_OPPONENT_SIGNAL", level: payload.level });
                       }
                    })
-                   .subscribe((status) => {
-                     if (status === "SUBSCRIBED") {
-                        dispatch({ type: "SET_CONNECTION", connected: true });
-                        supabase
-                           .from("wordup_matches")
-                           .select("*")
-                           .eq("id", mId)
-                           .single()
-                           .then(
-                              ({ data }) => {
-                                 if (data) cb.current.handleMatchUpdate?.(data);
-                              },
-                              () => {},
-                           );
-                        resetInactivityWatchdog();
-                     }
-                     if (status === "CHANNEL_ERROR" || status === "CLOSED") {
-                        dispatch({ type: "SET_CONNECTION", connected: false });
-                        triggerToast(
-                           "Connection lost. Attempting to reconnect...",
-                           3000,
-                        );
-                     }
-                  });
+                    .subscribe((status) => {
+                      if (status === "SUBSCRIBED") {
+                         const wasConnected = G.current.wasConnected;
+                         G.current.wasConnected = true;
+                         dispatch({ type: "SET_CONNECTION", connected: true });
+                         if (wasConnected) {
+                            dispatchGameStatus("Opponent rejoined match channel", "info");
+                         } else {
+                            dispatchGameStatus("Handshake established with opponent", "info");
+                         }
+                         supabase
+                            .from("wordup_matches")
+                            .select("*")
+                            .eq("id", mId)
+                            .single()
+                            .then(
+                               ({ data }) => {
+                                  if (data) cb.current.handleMatchUpdate?.(data);
+                               },
+                               () => {},
+                            );
+                         resetInactivityWatchdog();
+                      }
+                      if (status === "CHANNEL_ERROR" || status === "CLOSED") {
+                         G.current.wasConnected = false;
+                         dispatch({ type: "SET_CONNECTION", connected: false });
+                         dispatchGameStatus("Communication lost with opponent", "warning");
+                         triggerToast(
+                            "Connection lost. Attempting to reconnect...",
+                            3000,
+                         );
+                      }
+                   });
                channel.current = ch;
             }
 

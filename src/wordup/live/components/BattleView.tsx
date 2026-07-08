@@ -16,6 +16,7 @@ import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../..
 import { CircularTimer } from "../../shared/CircularTimer";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { SignalBar } from "../../shared/SignalBar";
+import { GameStatusToast } from "../../shared/GameStatusToast";
 
 interface MatchData {
    p1_score?: number;
@@ -191,6 +192,7 @@ export const BattleView = ({
          animate={{ opacity: 1 }}
           className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
       >
+         <GameStatusToast />
          {lastRoundPopup && (
             <motion.div
                initial={{ opacity: 0 }}
