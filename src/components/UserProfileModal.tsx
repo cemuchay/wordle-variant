@@ -10,6 +10,7 @@ import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
 import { isCurrentPeriod, formatAwardPeriod } from '../utils/isoWeek';
+import { calculateStreak } from '../utils/streak';
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
@@ -184,48 +185,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         const winPct = played > 0 ? Math.round((won / played) * 100) : 0;
 
         // Streaks
-        const wonDates = dailyScores
-            .filter(s => s.status === 'won')
-            .map(s => s.game_date)
-            .filter((v, i, a) => a.indexOf(v) === i)
-            .sort();
-
-        let maxStreak = 0;
-        let currentStreak = 0;
-        let prevDate: Date | null = null;
-
-        for (const dStr of wonDates) {
-            const currentDate = new Date(dStr);
-            if (!prevDate) {
-                currentStreak = 1;
-            } else {
-                const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                if (diffDays === 1) {
-                    currentStreak += 1;
-                } else if (diffDays > 1) {
-                    if (currentStreak > maxStreak) maxStreak = currentStreak;
-                    currentStreak = 1;
-                }
-            }
-            prevDate = currentDate;
-        }
-        if (currentStreak > maxStreak) maxStreak = currentStreak;
-
-        // Check if current streak is active
-        if (prevDate) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-
-            const lastWon = new Date(prevDate);
-            lastWon.setHours(0, 0, 0, 0);
-
-            if (lastWon.getTime() !== today.getTime() && lastWon.getTime() !== yesterday.getTime()) {
-                currentStreak = 0;
-            }
-        }
+        const { currentStreak, maxStreak } = calculateStreak(dailyScores);
 
         // Guess Distribution
         const guessDist = [0, 0, 0, 0, 0, 0];

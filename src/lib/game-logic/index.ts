@@ -11,6 +11,7 @@ import { supabase } from "../supabaseClient";
 import { SCORING, MAX_ATTEMPTS } from "../../constants/game";
 import { safeLocalStorage } from "../../utils/storage";
 import { calculateSkillIndexJuly2026 } from "./scoringJuly2026";
+import { calculateStreak } from "../../utils/streak";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -772,35 +773,30 @@ export const fetchAndSyncCloudStats = async (userId: string): Promise<void> => {
    try {
       const { data: scores, error } = await supabase
          .from("scores")
-         .select("status, attempts")
+         .select("status, attempts, game_date")
          .eq("user_id", userId)
          .order("game_date", { ascending: true });
 
       if (error) throw error;
 
+      const { currentStreak, maxStreak } = calculateStreak(scores || []);
+
       const cloudStats: GameStats = {
          gamesPlayed: scores.length,
          gamesWon: 0,
-         currentStreak: 0,
-         maxStreak: 0,
+         currentStreak,
+         maxStreak,
          guesses: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 },
       };
 
       scores.forEach((game) => {
          if (game.status === "won") {
             cloudStats.gamesWon += 1;
-            cloudStats.currentStreak += 1;
-            cloudStats.maxStreak = Math.max(
-               cloudStats.maxStreak,
-               cloudStats.currentStreak,
-            );
 
             const attemptKey = String(game.attempts);
             if (cloudStats.guesses[attemptKey] !== undefined) {
                cloudStats.guesses[attemptKey] += 1;
             }
-         } else {
-            cloudStats.currentStreak = 0;
          }
       });
 
