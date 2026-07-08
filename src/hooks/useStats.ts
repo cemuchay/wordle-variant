@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import type { AppUser, GameStats } from "../types/game";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
-import { calculateStreak } from "../utils/streak";
+import { calculateStreak } from "@/utils/streak";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
