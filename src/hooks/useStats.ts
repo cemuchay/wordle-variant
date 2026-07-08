@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import type { AppUser, GameStats } from "../types/game";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
+import { calculateStreak } from "../utils/streak";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
@@ -69,30 +70,27 @@ export const useWordleStats = (
             JSON.stringify(INITIAL_STATS)
          );
 
-         // Calculate streaks and distribution from cloud history
-         let current = 0;
-         let max = 0;
+         // Calculate streaks using shared date-aware function
+         const { currentStreak, maxStreak } = calculateStreak(data);
 
+         // Build guess distribution
          data.forEach((score) => {
             if (score.status === "won") {
-               current++;
                const attKey = score.attempts?.toString();
                if (attKey && constructed.guesses[attKey] !== undefined) {
                   constructed.guesses[attKey]++;
                }
             } else if (score.status === "lost") {
-               current = 0;
                constructed.guesses["X"]++;
             }
-            if (current > max) max = current;
          });
 
          constructed.gamesPlayed = data.filter(
             (s) => s.status !== "playing"
          ).length;
          constructed.gamesWon = data.filter((s) => s.status === "won").length;
-         constructed.currentStreak = current;
-         constructed.maxStreak = max;
+         constructed.currentStreak = currentStreak;
+         constructed.maxStreak = maxStreak;
 
          setStats(constructed);
       }
