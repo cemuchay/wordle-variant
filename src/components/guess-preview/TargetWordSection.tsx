@@ -13,7 +13,7 @@ interface TargetWordSectionProps {
     targetWordToUse: string;
     challenge?: any;
     marathonGameIndex?: number;
-    entry?: any;
+    myParticipation?: any;
 }
 
 export const TargetWordSection = memo(({
@@ -25,7 +25,7 @@ export const TargetWordSection = memo(({
     targetWordToUse,
     challenge,
     marathonGameIndex,
-    entry,
+    myParticipation,
 }: TargetWordSectionProps) => {
     if (!canSeeDetails) {
         return (
@@ -90,10 +90,9 @@ export const TargetWordSection = memo(({
                     <div className="flex flex-wrap gap-x-4 gap-y-3 justify-center items-center">
                         {marathonGames.map((game, wIdx) => {
                             const isCurrent = wIdx === marathonGameIndex;
-                            const prog = entry?.marathon_progress?.find((p: any) => p.game_index === wIdx);
-                            const isWordFinished = prog?.status === 'completed' || prog?.status === 'timed_out';
-                            const isEntryFullyPlayed = entry?.status === 'completed' || entry?.status === 'timed_out';
-                            const shouldRevealWord = isEntryFullyPlayed || isWordFinished;
+                            const viewerProg = myParticipation?.marathon_progress?.find((p: any) => p.game_index === wIdx);
+                            const viewerFinishedWord = viewerProg?.status === 'completed' || viewerProg?.status === 'timed_out';
+                            const shouldRevealWord = viewerFinishedWord;
 
                             return (
                                 <div key={wIdx} className={`flex gap-0.5 pb-1 relative ${isCurrent ? 'border-b-2 border-correct' : ''}`}>
