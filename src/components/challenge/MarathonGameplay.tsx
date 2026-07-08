@@ -433,7 +433,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
         return { featuredGame, remainingUnplayed, playedGames };
     }, [filteredGames, gamesWithMetadata]);
 
-    const isSentence = challenge.salt?.endsWith('_sentence');
+    const isSentence = challenge.is_sentence;
     const activeSentenceGameIndex = useMemo(() => {
         if (!isSentence) return null;
         const nextUnfinished = gamesWithMetadata.find(g => !g.isFinished);

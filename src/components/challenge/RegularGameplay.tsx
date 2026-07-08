@@ -219,9 +219,9 @@ export const RegularGameplay = memo(function RegularGameplay({
     const showHint = stableGuessesCount >= ANIMATION.HINT_MIN_GUESSES && (!isGameOver || state.isRevealing) && !challenge.disable_hints;
 
     const sentenceGames = useMemo(() => {
-        if (!challenge.salt?.endsWith('_sentence')) return null;
+        if (!challenge.is_sentence) return null;
         return parseMarathonGames(challenge.target_word, challenge.salt);
-    }, [challenge.target_word, challenge.salt]);
+    }, [challenge.target_word, challenge.salt, challenge.is_sentence]);
 
     const lastGuess = guesses[guesses.length - 1];
 

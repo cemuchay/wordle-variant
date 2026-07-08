@@ -484,7 +484,7 @@ export const useChallengeMutations = () => {
          notifyCreator = false,
          notify_creator = false,
        }: any) => {
-          const salt = Math.random().toString(36).substring(2, 15) + (isSentences ? '_sentence' : '');
+           const salt = Math.random().toString(36).substring(2, 15);
           const resolveDiff = (idx?: number) => Array.isArray(difficulty) ? difficulty[idx ?? 0] ?? 'normal' : difficulty;
           let actualLength = length;
          let targetWord: string;
@@ -655,8 +655,9 @@ export const useChallengeMutations = () => {
                   disable_hints: disableHints,
                   marathon_timers: marathonTimers,
                   marathon_force_order: effectiveForceOrder,
-                  is_bot_marathon: resolvedIsBotMarathon,
-                  is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
+                   is_bot_marathon: resolvedIsBotMarathon,
+                   is_sentence: isSentences,
+                   is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
                   notify_creator: !!(notifyCreator || notify_creator),
                },
             ])
@@ -964,7 +965,7 @@ export const useChallengeMutations = () => {
             (isCustomWord && (length === 1 ? !!customWords : !!customWord));
 
          if (shouldRegenerateTarget) {
-            salt = Math.random().toString(36).substring(2, 15) + (isSentences ? '_sentence' : '');
+            salt = Math.random().toString(36).substring(2, 15);
             if (resolvedMarathonGames) {
                const targetArray: { length: number; word: string }[] = [];
                const chosenWords = new Set<string>();
@@ -1121,6 +1122,7 @@ export const useChallengeMutations = () => {
                   : existing.disable_hints,
             marathon_timers: marathonTimers,
             marathon_force_order: effectiveForceOrder,
+            is_sentence: isSentences,
             is_shapeshifter: !!(isShapeshifter || is_shapeshifter),
          };
 

@@ -61,7 +61,7 @@ export const TargetWordSection = memo(({
         );
     }
 
-    const isSentence = challenge?.salt?.endsWith('_sentence');
+    const isSentence = challenge?.is_sentence;
     const marathonGames = isSentence ? parseMarathonGames(challenge.target_word, challenge.salt) : [];
 
     return (
