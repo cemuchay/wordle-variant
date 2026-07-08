@@ -691,7 +691,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     // Handle lifespan options alignment based on challenge type
     useEffect(() => {
         if (isBotMarathon) {
-            if (![24, 48, 72, 168].includes(lifespanHours)) {
+            if (![24, 48, 72, 96, 120, 144, 168].includes(lifespanHours)) {
                 setLifespanHours(24);
             }
         } else {
@@ -1391,15 +1391,15 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                             setActiveTooltip={setActiveTooltip} 
                             tooltipId="lifespan" 
                         />
-                        <div className="grid grid-cols-4 gap-2">
-                            {(isBotMarathon ? [24, 48, 72, 168] : [1, 6, 12, 24]).map(h => (
+                        <div className={`grid gap-2 ${isBotMarathon ? 'grid-cols-7' : 'grid-cols-4'}`}>
+                            {(isBotMarathon ? [24, 48, 72, 96, 120, 144, 168] : [1, 6, 12, 24]).map(h => (
                                 <button
                                     key={h}
                                     type="button"
                                     onClick={() => setLifespanHours(h)}
                                     className={`py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all ${lifespanHours === h ? 'border-correct bg-correct/10 text-correct' : 'border-white/10 bg-black/20 hover:border-white/20'}`}
                                 >
-                                    {h}h
+                                    {isBotMarathon ? `${h / 24}d` : `${h}h`}
                                 </button>
                             ))}
                         </div>
