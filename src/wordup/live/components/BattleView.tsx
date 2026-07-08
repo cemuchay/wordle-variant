@@ -269,7 +269,7 @@ export const BattleView = ({
                  ))}
               </div>
 
-              <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} selectedAnswer={selectedAnswer} revealAnswers={revealAnswers} />
+              <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} />
 
               <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
                  <div className="truncate max-w-[100px]">

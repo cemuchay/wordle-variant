@@ -362,10 +362,9 @@ export function useGameEngine(props: EngineProps) {
             !matchId
          )
             return;
-         G.current.isSubmitting = true;
-         dispatch({ type: "ANSWER_SELECTED", answer: choice });
-         clearT("roundInterval");
-         const q = S.current.questions[S.current.currentRound];
+          G.current.isSubmitting = true;
+          dispatch({ type: "ANSWER_SELECTED", answer: choice });
+          const q = S.current.questions[S.current.currentRound];
          const duration = q ? getQuestionDuration(q.type) : 10.0;
          const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
          const correct = choice === q?.answer;
