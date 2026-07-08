@@ -81,6 +81,11 @@ const MODE_DEFINITIONS = {
     title: "Sentence Mode",
     description: "Guess the words in order to form a coherent sentence.",
     color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+  },
+  CUSTOM_WORD: {
+    title: "Custom Word Challenge",
+    description: "The challenge words were hand-picked by the challenge creator.",
+    color: "bg-amber-500/20 text-amber-400 border-amber-500/30"
   }
 };
 
@@ -445,6 +450,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               </ClickableModeLabel>
             )}
 
+            {selectedChallenge.is_custom_word && (
+              <ClickableModeLabel type="CUSTOM_WORD">
+                <span className="hidden sm:inline">Custom Word</span>
+                <span className="sm:hidden">CW</span>
+              </ClickableModeLabel>
+            )}
+
             {selectedChallenge.disable_hints && (
               <ClickableModeLabel type="DISABLE_HINTS">
                 <span className="hidden sm:inline">No Hints</span>
@@ -552,7 +564,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                 Challenge Config.
               </h4>
               <span className="text-[7px] sm:text-[8px] font-bold text-white/70 uppercase">
-                Hosted by{" "}
+                {selectedChallenge.is_custom_word ? "Curated by" : "Hosted by"}{" "}
                 {selectedChallenge.is_bot_marathon
                   ? "Variant Bot"
                   : selectedChallenge.profiles?.username ||
