@@ -23,6 +23,7 @@ export interface EngineState {
    countdownText: string;
    lastRoundPopup: boolean;
    isConnected: boolean;
+   opponentSignalLevel: number;
 }
 
 export type EngineAction =
@@ -43,6 +44,7 @@ export type EngineAction =
    | { type: "ADVANCE_ROUND"; round: number }
    | { type: "SET_LAST_ROUND_POPUP"; show: boolean }
    | { type: "SET_CONNECTION"; connected: boolean }
+   | { type: "SET_OPPONENT_SIGNAL"; level: number }
    | { type: "RESET" };
 
 export const initialState: EngineState = {
@@ -61,6 +63,7 @@ export const initialState: EngineState = {
    countdownText: "3",
    lastRoundPopup: false,
    isConnected: true,
+   opponentSignalLevel: 0,
 };
 
 export function gameEngineReducer(state: EngineState, action: EngineAction): EngineState {
@@ -93,6 +96,8 @@ export function gameEngineReducer(state: EngineState, action: EngineAction): Eng
          return { ...state, showRematchButton: action.show };
       case "SET_CONNECTION":
          return { ...state, isConnected: action.connected };
+      case "SET_OPPONENT_SIGNAL":
+         return { ...state, opponentSignalLevel: action.level };
       case "SET_COUNTDOWN_TEXT":
          return { ...state, countdownText: action.text };
       case "ADVANCE_ROUND":

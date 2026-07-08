@@ -1337,17 +1337,22 @@ export function useGameEngine(props: EngineProps) {
                         onRematchAccepted(payload.newMatchId, activeRole);
                      },
                   )
-                  .on(
-                     "broadcast",
-                     { event: "quick_chat" },
-                     ({ payload }: any) =>
-                        window.dispatchEvent(
-                           new CustomEvent("wordup-quick-chat", {
-                              detail: payload,
-                           }),
-                        ),
-                  )
-                  .subscribe((status) => {
+                   .on(
+                      "broadcast",
+                      { event: "quick_chat" },
+                      ({ payload }: any) =>
+                         window.dispatchEvent(
+                            new CustomEvent("wordup-quick-chat", {
+                               detail: payload,
+                            }),
+                         ),
+                   )
+                   .on("broadcast", { event: "signal_update" }, ({ payload }: any) => {
+                      if (typeof payload?.level === "number") {
+                         dispatch({ type: "SET_OPPONENT_SIGNAL", level: payload.level });
+                      }
+                   })
+                   .subscribe((status) => {
                      if (status === "SUBSCRIBED") {
                         dispatch({ type: "SET_CONNECTION", connected: true });
                         supabase
@@ -1642,14 +1647,23 @@ export function useGameEngine(props: EngineProps) {
    }, [cleanup]);
 
    // ── Return ───────────────────────────────────────────────────────────
+   const sendSignalUpdate = useCallback((level: number) => {
+      const ch = channel.current;
+      if (ch) {
+         ch.send({ type: "broadcast", event: "signal_update", payload: { level } });
+      }
+   }, []);
+
    return {
       state,
       isConnected: state.isConnected,
+      opponentSignalLevel: state.opponentSignalLevel,
       startMatch,
       handleAnswerSelect,
       sendRematch,
       acceptRematch,
       sendQuickChat,
+      sendSignalUpdate,
       cleanup,
       abortMatch,
       purgeAndReset,

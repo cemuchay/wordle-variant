@@ -7,6 +7,7 @@ import { useServerTime } from "../shared/useServerTime";
 import { useWordUpProfile } from "../shared/useWordUpProfile";
 import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useGameEngine } from "./hooks/useGameEngine";
+import { useSignalStrength } from "./hooks/useSignalStrength";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { Swords, Volume2, VolumeX } from "lucide-react";
@@ -194,6 +195,21 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
    const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing" && currentIdx === 6;
 
+   const playerSignalLevel = useSignalStrength();
+   const prevSignalRef = useRef(0);
+   useEffect(() => {
+      if (view !== "battle") return;
+      const level = playerSignalLevel;
+      if (level !== prevSignalRef.current) {
+         prevSignalRef.current = level;
+         engine.sendSignalUpdate(level);
+      }
+      const interval = setInterval(() => {
+         engine.sendSignalUpdate(playerSignalLevel);
+      }, 15000);
+      return () => clearInterval(interval);
+   }, [view, playerSignalLevel, engine.sendSignalUpdate]);
+
    const handlePurgeAndReset = useCallback(async () => {
       await enginePurgeAndReset();
       cancelMatchmaking();
@@ -321,8 +337,10 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                    role={role} playerProfile={profile}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                    waitingForOpponent={waitingForOpponent}
-                />
-             )}
+                   playerSignalLevel={playerSignalLevel}
+                   opponentSignalLevel={engine.opponentSignalLevel}
+                 />
+              )}
              {view === "gameover" && (
                <GameOverView
                   matchData={matchData}

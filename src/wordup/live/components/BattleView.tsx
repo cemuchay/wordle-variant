@@ -15,6 +15,7 @@ import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
 import { CircularTimer } from "../../shared/CircularTimer";
 import { ScoreBar } from "../../shared/ScoreBar";
+import { SignalBar } from "../../shared/SignalBar";
 
 interface MatchData {
    p1_score?: number;
@@ -50,6 +51,8 @@ interface BattleViewProps {
    onAbort: () => void;
    lastRoundPopup: boolean;
    waitingForOpponent: boolean;
+   playerSignalLevel?: number;
+   opponentSignalLevel?: number;
 }
 
 interface Particle {
@@ -77,6 +80,8 @@ export const BattleView = ({
    onAbort,
    lastRoundPopup,
    waitingForOpponent,
+   playerSignalLevel,
+   opponentSignalLevel,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const { ask } = useConfirmation();
@@ -248,6 +253,7 @@ export const BattleView = ({
                     <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                     <p className="text-base font-black text-white">{myScore} pts</p>
                  </div>
+                 {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as any} className="ml-1" />}
                  {scorePopups.filter((p) => p.side === "my").map((p) => (
                     <motion.span
                        key={p.id}
@@ -268,7 +274,8 @@ export const BattleView = ({
                     <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
                     <p className="text-base font-black text-white">{oppScore} pts</p>
                  </div>
-                {scorePopups.filter((p) => p.side === "opp").map((p) => (
+                 {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as any} className="ml-1" />}
+                 {scorePopups.filter((p) => p.side === "opp").map((p) => (
                    <motion.span
                       key={p.id}
                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
