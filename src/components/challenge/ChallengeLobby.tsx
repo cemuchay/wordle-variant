@@ -76,6 +76,11 @@ const MODE_DEFINITIONS = {
     title: "Handicap Starter",
     description: "Players are given a specific starting word to use. This can be a strategic hint or a mandatory first guess.",
     color: "bg-correct/20 text-correct border-correct/30"
+  },
+  SENTENCE: {
+    title: "Sentence Mode",
+    description: "Guess the words in order to form a coherent sentence.",
+    color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
   }
 };
 
@@ -430,6 +435,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
               <ClickableModeLabel type="SHAPESHIFTER" className="animate-pulse">
                 <span className="hidden sm:inline">Shape Shifter</span>
                 <span className="sm:hidden">🌀 Shift</span>
+              </ClickableModeLabel>
+            )}
+
+            {selectedChallenge.is_sentence && (
+              <ClickableModeLabel type="SENTENCE">
+                <span className="hidden sm:inline">Sentence</span>
+                <span className="sm:hidden">S</span>
               </ClickableModeLabel>
             )}
 

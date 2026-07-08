@@ -259,7 +259,13 @@ export const ChallengeItem = memo(function ChallengeItem({
           <span className="text-white/40">·</span>
           <span>{mode === "LIVE" ? "LIVE" : "ASYNC"}</span>
           <span className="text-white/40">·</span>
-          <span>{isMarathon ? "MARATHON" : `${word_length} LETTERS`}</span>
+          {challenge?.is_sentence ? (
+            <span className="text-indigo-400 font-black text-[10px] tracking-wide">S</span>
+          ) : isMarathon ? (
+            <span>MARATHON</span>
+          ) : (
+            <span>{word_length} LETTERS</span>
+          )}
           {challenge.creator && (
             <>
               <span className="text-white/40">·</span>

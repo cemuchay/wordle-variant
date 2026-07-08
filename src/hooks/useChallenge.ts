@@ -33,6 +33,7 @@ export interface Challenge {
     marathon_timers?: Record<number, number> | null;
     marathon_force_order?: boolean;
     is_shapeshifter?: boolean;
+    is_sentence?: boolean;
     max_attempts?: number;
 }
 
