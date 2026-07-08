@@ -310,14 +310,15 @@ interface AppState {
          name: "variant-app-storage",
           storage: createJSONStorage(() => asyncStorage),
           // Only persist specific keys to keep it lightweight
-          partialize: (state) => ({
-             preferences: state.preferences,
-             stats: state.stats,
-             myParticipations: state.myParticipations,
-             readReceipts: state.readReceipts,
-             joinedGroupIds: state.joinedGroupIds,
-             challengePresets: state.challengePresets,
-          }),
+           partialize: (state) => ({
+              preferences: state.preferences,
+              stats: state.stats,
+              myParticipations: state.myParticipations,
+              readReceipts: state.readReceipts,
+              joinedGroupIds: state.joinedGroupIds,
+              challengePresets: state.challengePresets,
+              failedMessageIds: state.failedMessageIds,
+           }),
       },
    ),
 );
