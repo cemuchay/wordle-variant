@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Eye, Swords, HelpCircle, X, Sparkles } from "lucide-react";
+import { Trophy, Eye, Swords, HelpCircle, X, } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
 
 interface AlreadyPlayedScreenProps {
@@ -54,7 +54,7 @@ export const AlreadyPlayedScreen = ({
   ];
 
   return (
-    <div className="h-full w-full overflow-y-auto px-4 py-8 sm:px-6 flex flex-col justify-start md:justify-center items-center select-none text-white scrollbar-thin">
+    <div className="h-full w-full overflow-y-auto px-4 py-12 sm:px-6 flex flex-col justify-center items-center select-none text-white scrollbar-thin">
       <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6">
         {/* Title block */}
         <motion.div
@@ -63,9 +63,7 @@ export const AlreadyPlayedScreen = ({
           transition={{ duration: 0.4 }}
           className="text-center space-y-2"
         >
-          <div className="inline-flex p-3 bg-indigo-500/10 rounded-full border border-indigo-500/20 text-indigo-400 mb-2">
-            <Sparkles className="animate-pulse" size={28} />
-          </div>
+
           <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-gray-200 to-gray-400">
             Already Played
           </h2>
