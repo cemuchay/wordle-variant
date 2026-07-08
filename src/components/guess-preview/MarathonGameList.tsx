@@ -15,6 +15,7 @@ interface MarathonGameListProps {
     isCreator: boolean;
     marathonGamesRef: React.RefObject<HTMLDivElement | null>;
     isBotMarathon?: boolean;
+    numDays?: number;
 }
 
 const getLengthColor = (length: number) => {
@@ -44,6 +45,7 @@ export const MarathonGameList = memo(({
     isCreator,
     marathonGamesRef,
     isBotMarathon: isBotMarathonProp,
+    numDays: numDaysProp,
 }: MarathonGameListProps) => {
     const isBotMarathon = isBotMarathonProp || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon;
 
@@ -69,8 +71,8 @@ export const MarathonGameList = memo(({
 
     const gamesByDay = useMemo(() => {
         if (!isBotMarathon) return {};
-        const numDays = 7;
-        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / numDays));
+        const nd = numDaysProp || 7;
+        const baseSequenceLength = Math.max(1, Math.floor(marathonGames.length / nd));
 
         return marathonGames.reduce((acc, game, idx) => {
             const dayNum = Math.floor(idx / baseSequenceLength) + 1;
@@ -78,7 +80,7 @@ export const MarathonGameList = memo(({
             acc[dayNum].push({ ...game, originalIndex: idx });
             return acc;
         }, {} as Record<number, any[]>);
-    }, [marathonGames, isBotMarathon]);
+    }, [marathonGames, isBotMarathon, numDaysProp]);
 
     const renderGameButton = (idx: number, label: string, wordLength: number) => {
         const prog = entry.marathon_progress?.find(

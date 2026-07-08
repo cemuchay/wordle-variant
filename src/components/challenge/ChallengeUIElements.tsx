@@ -266,6 +266,12 @@ export const ChallengeItem = memo(function ChallengeItem({
           ) : (
             <span>{word_length} LETTERS</span>
           )}
+          {challenge?.is_custom_word && (
+            <>
+              <span className="text-white/40">·</span>
+              <span className="text-amber-400 font-black text-[10px] tracking-wide">CW</span>
+            </>
+          )}
           {challenge.creator && (
             <>
               <span className="text-white/40">·</span>

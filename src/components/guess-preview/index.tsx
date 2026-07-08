@@ -76,6 +76,12 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     return parseMarathonGames(targetWord, salt);
   }, [isMarathon, targetWord, salt]);
 
+  const numDays = useMemo(() => {
+    if (!challenge?.created_at || !challenge?.expires_at) return 7;
+    const diffMs = new Date(challenge.expires_at).getTime() - new Date(challenge.created_at).getTime();
+    return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+  }, [challenge?.created_at, challenge?.expires_at]);
+
   const [sortMode, setSortMode] = useState<"number" | "length" | "day">(() => {
     const isBotMarathon = challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon;
     if (isBotMarathon) return "day";
@@ -615,6 +621,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                 isCreator={!!isCreator}
                 marathonGamesRef={marathonGamesRef}
                 isBotMarathon={challenge?.is_bot_marathon || entry?.challenge?.is_bot_marathon || entry?.is_bot_marathon}
+                numDays={numDays}
               />
             )}
 
