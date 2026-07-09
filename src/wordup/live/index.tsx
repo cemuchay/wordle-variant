@@ -6,7 +6,7 @@ import { useApp } from "../../context/AppContext";
 import { useServerTime } from "../shared/useServerTime";
 import { useWordUpProfile } from "../shared/useWordUpProfile";
 import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
-import { useGameEngine } from "./hooks/useGameEngine";
+import { useGameEngine } from "./hooks/useGameEngine.new";
 import { useSignalStrength } from "./hooks/useSignalStrength";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";

@@ -27,26 +27,28 @@ async function seedEngineForLiveMatch(page: any, role: "player1" | "player2", ma
       const d = (window as any).__gameDispatch;
       const store = (window as any).__liveStore;
 
-      // Engine state
-      d({ type: "SET_MATCH_DATA", data: {
-         id: mid, category: "mixed", status: "active",
-         game_type: "live", current_question_index: 0,
-         p1_answers: [], p2_answers: [],
-         p1_answered: false, p2_answered: false,
-         p1_score: 0, p2_score: 0,
-         player1_id: "p1-e2e", player2_id: "p2-e2e",
-      }});
-      d({ type: "SET_QUESTIONS", questions: qs });
-      d({ type: "SET_PHASE", phase: "playing" });
-      d({ type: "SET_ROUND", round: 0, timeLeft: 10, maxTime: 10 });
-      d({ type: "CLEAR_ANSWER" });
-      d({ type: "HIDE_REVEAL" });
+      // New engine: SET_INITIAL populates everything
+      d({
+         type: "SET_INITIAL",
+         payload: {
+            matchId: mid, gameType: "live", role: r, questions: qs,
+            matchData: {
+               id: mid, category: "mixed", status: "active",
+               game_type: "live", current_question_index: 0,
+               p1_answers: [], p2_answers: [],
+               p1_answered: false, p2_answered: false,
+               p1_score: 0, p2_score: 0,
+               player1_id: "p1-e2e", player2_id: "p2-e2e",
+            },
+            opponentStats: { username: r === "player1" ? "Player2" : "Player1", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" },
+         },
+      });
+      d({ type: "COUNTDOWN_DONE" });
+      d({ type: "START_ROUND", round: 0, startedAt: Date.now() });
 
-      // Zustand sync
       if (store) {
          store.setState({
             view: "battle", matchId: mid, role: r, questions: qs, currentIdx: 0,
-            opponentStats: { username: r === "player1" ? "Player2" : "Player1", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" },
          });
       }
    }, { r: role, mid: matchId, qs: QUESTIONS });
@@ -100,17 +102,17 @@ test.describe("Live PvP (engine)", () => {
       await page1.waitForTimeout(500);
       await page2.waitForTimeout(500);
 
-      // Verify each engine tracked their own answer
+      // Verify each engine tracked their own answer (via selectedAnswer / myChoice)
       const p1Ans = await page1.evaluate(() => {
          const s = (window as any).__liveStore?.getState();
-         return s?.matchData?.p1_answers?.length;
+         return s?.selectedAnswer;
       });
       const p2Ans = await page2.evaluate(() => {
          const s = (window as any).__liveStore?.getState();
-         return s?.matchData?.p2_answers?.length;
+         return s?.selectedAnswer;
       });
-      expect(p1Ans).toBe(1);
-      expect(p2Ans).toBe(1);
+      expect(p1Ans).toBe("Paris");
+      expect(p2Ans).toBe("London");
 
       await ctx1.close();
       await ctx2.close();

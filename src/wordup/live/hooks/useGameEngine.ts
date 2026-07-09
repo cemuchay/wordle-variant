@@ -236,12 +236,12 @@ export function useGameEngine(props: EngineProps) {
          const merged = mergeMatchData(cur, newMatch);
          dispatch({ type: "SET_MATCH_DATA", data: merged });
 
-         // Reveal condition
-         const both = merged.p1_answered && merged.p2_answered;
-         const shouldReveal =
-            both && !S.current.revealAnswers && !G.current.isRevealing;
+          // Reveal condition
+          const both = merged.p1_answered && merged.p2_answered;
+          const shouldReveal =
+             both && !S.current.revealAnswers && !G.current.isRevealing;
 
-         if (shouldReveal) {
+          if (shouldReveal) {
             G.current.isRevealing = true;
             clearT("roundInterval");
             clearT("botTimeout");
@@ -336,8 +336,11 @@ export function useGameEngine(props: EngineProps) {
                 maxTime: nextDur,
              });
           }
-         cb.current.handleMatchUpdate?.(upd);
-         G.current.isAdvancing = false;
+          cb.current.handleMatchUpdate?.(upd);
+          if (nextIdx < 7) {
+             cb.current.startQuestionRound?.(upd, nextIdx);
+          }
+          G.current.isAdvancing = false;
       },
       [gameType, getSyncedNow],
    );
@@ -555,7 +558,7 @@ export function useGameEngine(props: EngineProps) {
    // ── Start question round ──────────────────────────────────────────────
    const startQuestionRound = useCallback(
       (_match: any, index: number) => {
-         if (S.current.currentRound > index) return;
+         if (S.current.currentRound >= index) return;
          S.current.currentRound = index;
          clearT("roundInterval");
          clearT("botTimeout");
@@ -581,7 +584,7 @@ export function useGameEngine(props: EngineProps) {
           G.current.isSubmitting = false;
           dispatch({
              type: "SET_MATCH_DATA",
-             data: { ...(S.current.matchData || {}), p1_answered: false, p2_answered: false },
+             data: { ...(_match || S.current.matchData || {}), p1_answered: false, p2_answered: false },
           });
 
          if (index === 6) {
