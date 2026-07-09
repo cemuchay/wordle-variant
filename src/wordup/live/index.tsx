@@ -119,6 +119,35 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       try { await updateStats(eloGain, xpReward, won, tied); }
       catch { triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION); }
+
+      // Fire-and-forget: record handcrafted question answers for difficulty tracking
+      try {
+         const questions = useLiveStore.getState().questions;
+         const userAnswers = isP1 ? match.p1_answers : match.p2_answers;
+         if (questions?.length > 0 && userAnswers?.length > 0) {
+            const hcIds: string[] = [];
+            const corrects: boolean[] = [];
+            const timesTaken: number[] = [];
+            for (const a of userAnswers) {
+               const q = questions[a.question_idx];
+               const hcId = q && (q as any).id;
+               if (hcId) {
+                  hcIds.push(hcId);
+                  corrects.push(!!a.correct);
+                  timesTaken.push(a.time_taken ?? 0);
+               }
+            }
+            if (hcIds.length > 0) {
+               await supabase.rpc("record_match_answers", {
+                  p_user_id: effectiveUser.id,
+                  p_topic_slug: match.category || "general_knowledge",
+                  p_question_ids: hcIds,
+                  p_corrects: corrects,
+                  p_times_taken: timesTaken,
+               });
+            }
+         }
+      } catch { /* best-effort difficulty tracking */ }
    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
    const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
@@ -338,7 +367,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                    waitingForOpponent={waitingForOpponent}
                    playerSignalLevel={playerSignalLevel}
-                   opponentSignalLevel={engine.opponentSignalLevel}
+                    opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
                  />
               )}
              {view === "gameover" && (

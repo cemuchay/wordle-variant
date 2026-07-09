@@ -1,6 +1,7 @@
 export type SuperCategory = "biography" | "creative_work" | "science_facts" | "calculations" | "language_arts";
 
 export interface Question {
+   id?: string;      // handcrafted question DB id (for difficulty tracking)
    type: string;
    prompt: string;
    choices: string[];
