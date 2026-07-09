@@ -76,15 +76,16 @@ export function useGameEngine(props: EngineProps) {
       wasConnected: false,
    });
 
-   const S = useRef({
-      matchData: null as any,
-      questions: [] as any[],
-      currentRound: 0,
-      revealAnswers: false,
-      timeLeft: 0,
-      role: null as "player1" | "player2" | null,
-      maxTime: 0,
-   });
+    const S = useRef({
+       matchData: null as any,
+       questions: [] as any[],
+       currentRound: 0,
+       revealAnswers: false,
+       timeLeft: 0,
+       role: null as "player1" | "player2" | null,
+       maxTime: 0,
+       selectedAnswer: null as string | null,
+    });
 
    const channel = useRef<any>(null);
    const launchedId = useRef<string | null>(null);
@@ -97,7 +98,8 @@ export function useGameEngine(props: EngineProps) {
    S.current.revealAnswers = state.revealAnswers;
    S.current.timeLeft = state.timeLeft;
    S.current.role = role;
-   S.current.maxTime = state.maxTime;
+    S.current.maxTime = state.maxTime;
+    S.current.selectedAnswer = state.selectedAnswer;
 
    // ── Timer helpers ─────────────────────────────────────────────────────
    function clearT(name: keyof typeof T.current) {
@@ -148,18 +150,18 @@ export function useGameEngine(props: EngineProps) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [state.phase]);
 
-   useEffect(() => {
-      useLiveStore.getState().setCurrentIdx(state.currentRound);
-   }, [state.currentRound]);
-   useEffect(() => {
-      useLiveStore.getState().setTimeLeft(state.timeLeft);
-   }, [state.timeLeft]);
-   useEffect(() => {
-      useLiveStore.getState().setMaxTime(state.maxTime);
-   }, [state.maxTime]);
-   useEffect(() => {
-      useLiveStore.getState().setSelectedAnswer(state.selectedAnswer);
-   }, [state.selectedAnswer]);
+    useEffect(() => {
+       useLiveStore.getState().setSelectedAnswer(state.selectedAnswer);
+    }, [state.selectedAnswer]);
+    useEffect(() => {
+       useLiveStore.getState().setTimeLeft(state.timeLeft);
+    }, [state.timeLeft]);
+    useEffect(() => {
+       useLiveStore.getState().setMaxTime(state.maxTime);
+    }, [state.maxTime]);
+    useEffect(() => {
+       useLiveStore.getState().setCurrentIdx(state.currentRound);
+    }, [state.currentRound]);
    useEffect(() => {
       useLiveStore.getState().setRevealAnswers(state.revealAnswers);
    }, [state.revealAnswers]);
@@ -344,6 +346,7 @@ export function useGameEngine(props: EngineProps) {
                 timeLeft: nextDur,
                 maxTime: nextDur,
              });
+             dispatch({ type: "CLEAR_ANSWER" });
              dispatchGameStatus('Proceeding to next round', 'info');
           }
           cb.current.handleMatchUpdate?.(upd);
@@ -682,8 +685,8 @@ export function useGameEngine(props: EngineProps) {
          const startTime =
             _match?.question_started_at && _match?.status === "active"
                ? new Date(_match.question_started_at).getTime()
-               : state.timeLeft < duration
-                  ? getSyncedNow() - (duration - state.timeLeft) * 1000
+                : S.current.timeLeft < duration
+                   ? getSyncedNow() - (duration - S.current.timeLeft) * 1000
                   : getSyncedNow();
          let lastTickRemaining = duration;
          T.current.roundInterval = window.setInterval(() => {
@@ -704,7 +707,7 @@ export function useGameEngine(props: EngineProps) {
             }
             if (remainingTime <= 0) {
                clearT("roundInterval");
-               if (useLiveStore.getState().selectedAnswer === null) {
+                if (S.current.selectedAnswer === null) {
                   wordupAudio.playTimeUp();
                   cb.current.handleAnswerSelect?.("");
                }
