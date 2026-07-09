@@ -110,3 +110,8 @@ export const useLiveStore = create<LiveState>((set) => ({
       });
    },
 }));
+
+// Expose for E2E tests (dev only)
+if (import.meta.env.DEV) {
+   (window as any).__liveStore = useLiveStore;
+}
