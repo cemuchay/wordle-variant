@@ -367,7 +367,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                    waitingForOpponent={waitingForOpponent}
                    playerSignalLevel={playerSignalLevel}
-                   opponentSignalLevel={engine.opponentSignalLevel}
+                    opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
                  />
               )}
              {view === "gameover" && (

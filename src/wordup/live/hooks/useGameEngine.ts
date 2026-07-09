@@ -339,15 +339,14 @@ export function useGameEngine(props: EngineProps) {
                   payload: { nextIdx },
                })
                .catch(console.error);
-         if (nextIdx < 6) {
-            dispatch({
-               type: "SET_ROUND",
-               round: nextIdx,
-               timeLeft: nextDur,
-               maxTime: nextDur,
-            });
-            dispatch({ type: "CLEAR_ANSWER" });
-         }
+          if (nextIdx < 6) {
+             dispatch({
+                type: "SET_ROUND",
+                round: nextIdx,
+                timeLeft: nextDur,
+                maxTime: nextDur,
+             });
+          }
          cb.current.handleMatchUpdate?.(upd);
          G.current.isAdvancing = false;
       },
@@ -671,9 +670,13 @@ export function useGameEngine(props: EngineProps) {
             timeLeft: remaining,
             maxTime: duration,
          });
-         dispatch({ type: "CLEAR_ANSWER" });
-         dispatch({ type: "HIDE_REVEAL" });
-         G.current.isSubmitting = false;
+          dispatch({ type: "CLEAR_ANSWER" });
+          dispatch({ type: "HIDE_REVEAL" });
+          G.current.isSubmitting = false;
+          dispatch({
+             type: "SET_MATCH_DATA",
+             data: { ...(S.current.matchData || {}), p1_answered: false, p2_answered: false },
+          });
 
          if (index === 6) {
             wordupAudio.playFinalRound();
