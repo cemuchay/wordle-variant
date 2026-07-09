@@ -61,6 +61,10 @@ export function useGameEngine(props: EngineProps) {
    } = props;
    const [state, dispatch] = useReducer(gameEngineReducer, initialState);
 
+   if (import.meta.env.DEV) {
+      (window as any).__gameDispatch = dispatch;
+   }
+
    // ── Refs grouped by purpose ───────────────────────────────────────────
    const T = useRef({
       roundInterval: null as number | null,

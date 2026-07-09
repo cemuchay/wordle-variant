@@ -1,7 +1,8 @@
-// ── E2E: Bot game full lifecycle ───────────────────────────────────
-// Seeds the Zustand store directly via window.__liveStore (exposed in
-// dev mode).  Tests the actual BattleView render cycle, answer
-// selection, reveal, and round transitions.
+// ── E2E: Bot game via real engine dispatch ─────────────────────────
+// Seeds the engine's reducer state and Zustand store, then verifies
+// the first click goes through the real handleAnswerSelect (proven by
+// score appearing in the store).  Subsequent rounds are advanced by
+// dispatching engine events directly.
 
 import { test, expect } from "@playwright/test";
 
@@ -15,169 +16,147 @@ const QUESTIONS = [
    { type: "definition", prompt: "What is the speed of light? (km/s)", choices: ["300,000", "150,000", "500,000", "100,000"], answer: "300,000" },
 ];
 
-async function seedBotMatch(page: any) {
-   // Wait until window.__liveStore is available
-   await page.waitForFunction(() => !!(window as any).__liveStore, null, { timeout: 10000 });
-
-   await page.evaluate((questions) => {
-      const store = (window as any).__liveStore;
-      const matchId = crypto.randomUUID();
-
-      store.setState({
-         view: "battle",
-         matchId,
-         role: "player1",
-         questions,
-         currentIdx: 0,
-         matchData: {
-            id: matchId,
-            category: "mixed",
-            status: "active",
-            is_bot_match: true,
-            bot_profile: "average",
-            game_type: "live-bot",
-            current_question_index: 0,
-            p1_answers: [],
-            p2_answers: [],
-            p1_answered: false,
-            p2_answered: false,
-            p1_score: 0,
-            p2_score: 0,
-            player1_id: "test-player-1",
-            player2_id: "test-player-2",
-         },
-         opponentStats: { username: "Bot", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" },
-         selectedAnswer: null,
-         revealAnswers: false,
-         timeLeft: 10,
-         maxTime: 10,
-      });
-   }, QUESTIONS);
-}
-
-async function answerAndAdvance(page: any, choice: string, correct: boolean, round: number) {
-   const q = QUESTIONS[round];
-   const points = correct ? 15 + Math.floor(Math.random() * 5) : 0;
-   const botCorrect = Math.random() > 0.4;
-   const botPts = botCorrect ? 12 + Math.floor(Math.random() * 8) : 0;
-   const botWrongChoice = q.choices.find((c: string) => c !== q.answer) || q.choices[0];
-
-   await page.evaluate(({ r, ch, corr, pts, bCorr, bPts, bChoice }: any) => {
-      const store = (window as any).__liveStore;
-      const s = store.getState();
-      const prevP1 = s.matchData?.p1_score || 0;
-      const prevP2 = s.matchData?.p2_score || 0;
-
-      store.setState({
-         selectedAnswer: ch,
-         revealAnswers: true,
-         matchData: {
-            ...s.matchData,
-            p1_answers: [...(s.matchData?.p1_answers || []), { question_idx: r, correct: corr, time_taken: 2, points: pts, choice: ch }],
-            p1_answered: true,
-            p1_score: prevP1 + pts,
-            p2_answers: [...(s.matchData?.p2_answers || []), { question_idx: r, correct: bCorr, time_taken: 3, points: bPts, choice: bChoice }],
-            p2_answered: true,
-            p2_score: prevP2 + bPts,
-         },
-      });
-   }, { r: round, ch: choice, corr: correct, pts: points, bCorr: botCorrect, bPts: botPts, bChoice: botWrongChoice });
-}
-
-async function advanceRound(page: any, round: number) {
-   await page.evaluate((r) => {
-      const store = (window as any).__liveStore;
-      store.setState({
-         currentIdx: r,
-         timeLeft: 10,
-         maxTime: 10,
-         selectedAnswer: null,
-         revealAnswers: false,
-         matchData: {
-            ...store.getState().matchData,
-            current_question_index: r,
-            p1_answered: false,
-            p2_answered: false,
-         },
-      });
-   }, round);
-}
-
-test.describe("Bot game", () => {
-   test("full 7-round flow", async ({ page }) => {
-      // Set up guest user before page loads — mock localStorage.getItem so LiveView
-      // always sees our guest user regardless of when it mounts.
+test.describe("Bot game (engine)", () => {
+   test("click goes through real handleAnswerSelect and scores points", async ({ page }) => {
       await page.addInitScript(() => {
-         const uid = "e2e-test-user-" + crypto.randomUUID().slice(0, 8);
-         const store = new Map();
-         store.set("wordle_anon_id", uid);
-         store.set("wordle_anon_username", "E2ETestBot");
-         store.set("wordle_guest_opted_in", "true");
-         store.set("wordle_guest_banner_last_dismissed", "2025-01-01");
-         store.set("wordup_tutorial_completed", "true");
-         store.set("wordle_tutorial_completed", "true");
-
-         const origGetItem = localStorage.getItem.bind(localStorage);
-         localStorage.getItem = (key: string) => store.get(key) ?? origGetItem(key);
+         const s = new Map();
+         s.set("wordle_anon_id", "e2e-bot-" + crypto.randomUUID().slice(0, 8));
+         s.set("wordle_anon_username", "E2ETestBot");
+         s.set("wordle_guest_opted_in", "true");
+         s.set("wordle_guest_banner_last_dismissed", "2025-01-01");
+         s.set("wordup_tutorial_completed", "true");
+         s.set("wordle_tutorial_completed", "true");
+         s.set("wordle_last_hydrated_timestamp", Date.now().toString());
+         const orig = localStorage.getItem.bind(localStorage);
+         localStorage.getItem = (k: string) => s.get(k) ?? orig(k);
       });
 
       await page.goto("/");
-      await page.waitForTimeout(3000);
-
-      // Seed stores: navigate to WordUp and set up bot match
-      await page.evaluate(() => {
-         const appStore = (window as any).__appStore;
-         if (appStore) {
-            appStore.setState?.({ wordupMode: "live", isWordUpOpen: true });
-            if (appStore.setWordupMode) appStore.setWordupMode("live");
-            if (appStore.setWordUpOpen) appStore.setWordUpOpen(true);
-         }
-      });
-      await seedBotMatch(page);
       await page.waitForTimeout(2000);
 
+      // Check what stores are available
+      const storesAvail = await page.evaluate(() => ({
+         live: !!(window as any).__liveStore,
+         app: !!(window as any).__appStore,
+      }));
+      console.log("Stores available:", JSON.stringify(storesAvail));
 
-      // Verify BattleView rendered — look for first question text
-      await expect(page.getByText("capital of France").first()).toBeVisible({ timeout: 10000 });
-      await page.screenshot({ path: "e2e/screenshots/bot-round0.png", fullPage: true });
+      // Navigate to WordUp by seeding app store state directly
+      await page.waitForFunction(() => !!(window as any).__appStore && !!(window as any).__liveStore, null, { timeout: 10000 });
 
-      // Round 0: answer correctly
-      await page.locator("button").filter({ hasText: "Paris" }).click();
-      await page.waitForTimeout(500);
+      await page.evaluate(() => {
+         // Set ALL state flags that control WordUp visibility
+         const app = (window as any).__appStore;
+         if (!app) return;
+         app.setState({
+            isWordUpOpen: true,
+            isMoreOpen: true,
+            wordupMode: "live",
+         });
+         if (app.setWordupMode) app.setWordupMode("live");
+         if (app.setWordUpOpen) app.setWordUpOpen(true);
+      });
 
-      // Check answer was registered
-      await page.screenshot({ path: "e2e/screenshots/bot-round0-answer.png", fullPage: true });
+      await page.waitForTimeout(5000);
 
-      // Advance to round 1
-      await advanceRound(page, 1);
-      await page.waitForTimeout(500);
-      await expect(page.getByText("2 + 2").first()).toBeVisible({ timeout: 5000 });
-      await page.locator("button").filter({ hasText: "4" }).click();
-      await page.waitForTimeout(500);
+      // Check what's available after navigation
+      const debug = await page.evaluate(() => ({
+         gameDispatch: !!(window as any).__gameDispatch,
+         liveStore: !!(window as any).__liveStore,
+         appStore: !!(window as any).__appStore,
+         body: (document.body?.textContent || "").substring(0, 200),
+      }));
+      console.log("After navigation:", JSON.stringify(debug));
 
-      // Advance to round 2
-      await advanceRound(page, 2);
-      await page.waitForTimeout(500);
-      await expect(page.getByText("Red Planet").first()).toBeVisible({ timeout: 5000 });
-      await page.locator("button").filter({ hasText: "Mars" }).click();
-      await page.waitForTimeout(500);
-
-      // Quick advance through rounds 3-6
-      for (let r = 3; r < 7; r++) {
-         await advanceRound(page, r);
-         await page.waitForTimeout(500);
-         const q = QUESTIONS[r];
-         if (q) {
-            await answerAndAdvance(page, q.answer, true, r);
-            await page.waitForTimeout(500);
-         }
+      if (!debug.gameDispatch) {
+         // Engine dispatch not available — set it up ourselves by patching the hook
+         console.log("WARNING: __gameDispatch not found. Falling back to store-only mode.");
       }
 
-      await page.waitForTimeout(1000);
-      await page.screenshot({ path: "e2e/screenshots/bot-gameover.png", fullPage: true });
+      const matchId = "e2e-bot-" + crypto.randomUUID().slice(0, 8);
 
-      // Verify game is still showing (round completed)
-      const hasScore = await page.getByText(/pts/i).first().isVisible().catch(() => false);
-      expect(hasScore).toBeTruthy();
+      await page.evaluate(({ mid, questions }) => {
+         const d = (window as any).__gameDispatch;
+         const store = (window as any).__liveStore;
+
+         d({ type: "SET_MATCH_DATA", data: {
+            id: mid, category: "mixed", status: "active",
+            is_bot_match: true, bot_profile: "average",
+            game_type: "live-bot", current_question_index: 0,
+            p1_answers: [], p2_answers: [], p1_answered: false, p2_answered: false,
+            p1_score: 0, p2_score: 0,
+            player1_id: "test-player-1", player2_id: "test-player-2",
+         }});
+         d({ type: "SET_QUESTIONS", questions });
+         d({ type: "SET_PHASE", phase: "playing" });
+         d({ type: "SET_ROUND", round: 0, timeLeft: 10, maxTime: 10 });
+         d({ type: "CLEAR_ANSWER" });
+         d({ type: "HIDE_REVEAL" });
+
+         if (store) {
+            store.setState({
+               view: "battle", matchId: mid, role: "player1", questions, currentIdx: 0,
+               opponentStats: { username: "Bot", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" },
+            });
+         }
+      }, { mid: matchId, questions: QUESTIONS });
+
+      await page.waitForTimeout(2000);
+
+      // Verify question renders
+      await expect(page.getByText("capital of France").first()).toBeVisible({ timeout: 5000 });
+
+      // Click correct answer → goes through real handleAnswerSelect
+      await page.locator("button").filter({ hasText: "Paris" }).click();
+      await page.waitForTimeout(1000);
+
+      // Verify the engine processed it via S.current or state
+      const engineState = await page.evaluate(() => {
+         // Check matchData from the engine's reducer (via Zustand sync)
+         const store = (window as any).__liveStore;
+         const s = store?.getState();
+         return {
+            p1_answers: s?.matchData?.p1_answers?.length ?? 0,
+            p1_score: s?.matchData?.p1_score ?? -1,
+            p1_answered: s?.matchData?.p1_answered ?? false,
+         };
+      });
+      console.log("Engine state after click:", JSON.stringify(engineState));
+
+      expect(engineState.p1_score).toBeGreaterThan(0);
+      expect(engineState.p1_answered).toBe(true);
+
+      // Manually advance rounds via dispatch
+      for (let round = 1; round < 7; round++) {
+         await page.evaluate(({ r, questions }) => {
+            const d = (window as any).__gameDispatch;
+            const store = (window as any).__liveStore;
+            const q = questions[r];
+
+            d({ type: "SET_ROUND", round: r, timeLeft: 10, maxTime: 10 });
+            d({ type: "CLEAR_ANSWER" });
+            d({ type: "HIDE_REVEAL" });
+
+            if (store) {
+               store.setState({
+                  currentIdx: r,
+                  selectedAnswer: null,
+                  revealAnswers: false,
+                  timeLeft: 10,
+                  maxTime: 10,
+               });
+            }
+         }, { r: round, questions: QUESTIONS });
+
+         await page.waitForTimeout(500);
+
+         // Click the correct answer for this round
+         const q = QUESTIONS[round];
+         await expect(page.getByText(q.prompt).first()).toBeVisible({ timeout: 5000 });
+         await page.locator("button").filter({ hasText: q.answer }).click();
+         await page.waitForTimeout(500);
+      }
+
+      await page.screenshot({ path: "e2e/screenshots/engine-bot-final.png", fullPage: true });
    });
 });
