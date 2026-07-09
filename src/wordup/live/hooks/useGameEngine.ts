@@ -76,16 +76,17 @@ export function useGameEngine(props: EngineProps) {
       wasConnected: false,
    });
 
-   const S = useRef({
-      matchData: null as any,
-      questions: [] as any[],
-      currentRound: 0,
-      revealAnswers: false,
-      timeLeft: 0,
-      role: null as "player1" | "player2" | null,
-      maxTime: 0,
-      selectedAnswer: null as string | null,
-   });
+    const S = useRef({
+       matchData: null as any,
+       questions: [] as any[],
+       currentRound: 0,
+       revealAnswers: false,
+       timeLeft: 0,
+       role: null as "player1" | "player2" | null,
+       maxTime: 0,
+       selectedAnswer: null as string | null,
+       opponentStats: null as any,
+    });
 
    const channel = useRef<any>(null);
    const launchedId = useRef<string | null>(null);
@@ -99,7 +100,8 @@ export function useGameEngine(props: EngineProps) {
    S.current.timeLeft = state.timeLeft;
    S.current.role = role;
    S.current.maxTime = state.maxTime;
-   S.current.selectedAnswer = state.selectedAnswer;
+    S.current.selectedAnswer = state.selectedAnswer;
+    S.current.opponentStats = state.opponentStats;
 
    // ── Timer helpers ─────────────────────────────────────────────────────
    function clearT(name: keyof typeof T.current) {
@@ -502,9 +504,8 @@ export function useGameEngine(props: EngineProps) {
       async (match: any) => {
          if (G.current.isEnding) return;
          G.current.isEnding = true;
-         clearT("opponentInactivityTimeout");
-         safeLocalStorage.removeItem("wordup_active_game");
-         const completedAt = new Date().toISOString();
+          clearT("opponentInactivityTimeout");
+          const completedAt = new Date().toISOString();
          const finalMatch = {
             ...match,
             status: "completed",
@@ -604,28 +605,44 @@ export function useGameEngine(props: EngineProps) {
             }
             safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
             safeLocalStorage.removeItem("wordup_active_game");
-         } catch (e) {
-            console.error(`[WordUp] ${gameType} endGame DB failed:`, e);
-            triggerToast(
-               "Failed to save final results. Check connection.",
-               5000,
-            );
-            if (gameType !== "live" && !match.id.startsWith("bot-match-")) {
-               try {
-                  await supabase
-                     .from("wordup_matches")
-                     .update({
-                        status: "completed",
-                        p1_score: match.p1_score,
-                        p2_score: match.p2_score,
-                        completed_at: completedAt,
-                     })
-                     .eq("id", match.id);
-               } catch {
-                  /* best-effort fallback */
-               }
-            }
-         }
+          } catch (e) {
+             console.error(`[WordUp] ${gameType} endGame DB failed:`, e);
+             triggerToast(
+                "Failed to save final results. Check connection.",
+                5000,
+             );
+             if (gameType !== "live" && !match.id.startsWith("bot-match-")) {
+                try {
+                   await supabase
+                      .from("wordup_matches")
+                      .update({
+                         status: "completed",
+                         p1_score: match.p1_score,
+                         p2_score: match.p2_score,
+                         completed_at: completedAt,
+                      })
+                      .eq("id", match.id);
+                } catch {
+                   /* best-effort fallback */
+                }
+             }
+             // Preserve game state for recovery retry
+             safeLocalStorage.setItem("wordup_active_game", JSON.stringify({
+                _retryCompletion: true,
+                matchId,
+                role: S.current.role,
+                matchData: finalMatch,
+                questions: S.current.questions,
+                currentRound: S.current.currentRound,
+                opponentStats: S.current.opponentStats,
+                revealAnswers: true,
+                selectedAnswer: true,
+                timeLeft: S.current.timeLeft,
+                maxTime: S.current.maxTime,
+                gameType,
+                savedAt: Date.now(),
+             }));
+          }
          if (gameType !== "live") {
             const myScore =
                S.current.role === "player1"
@@ -1110,18 +1127,23 @@ export function useGameEngine(props: EngineProps) {
                            .getState()
                            .setOpponentStats(saved.opponentStats);
 
-                     cb.current.startQuestionRound?.(
-                        saved.matchData,
-                        saved.currentRound,
-                     );
-                     return;
-                  }
-               } catch {
-                  /* ignore corrupt cache */
-               }
-            }
+                      if (saved._retryCompletion) {
+                         cb.current.endGame?.(saved.matchData);
+                         return;
+                      }
 
-            // ── Live match (Supabase fetch) ──
+                      cb.current.startQuestionRound?.(
+                         saved.matchData,
+                         saved.currentRound,
+                      );
+                      return;
+                   }
+                } catch {
+                   /* ignore corrupt cache */
+                }
+             }
+
+             // ── Live match (Supabase fetch) ──
             let match: any;
             try {
                match = await wordupNetworkGate.enqueue(
