@@ -875,9 +875,28 @@ serve(async (req) => {
          );
       }
 
-      // Fetch active handcrafted questions
+      // Fetch active handcrafted questions with stats
       let handcraftedList: any[] = [];
+      let userTopicSkill = 1500;
       try {
+         // Fetch user skill for this topic (use minimum skill across players)
+         try {
+            const skillResults = await Promise.all(
+               playerIds.map((uid: string) =>
+                  supabaseClient.rpc("get_user_skill", {
+                     p_user_id: uid,
+                     p_topic_slug: category,
+                  })
+               )
+            );
+            const skills = skillResults
+               .filter((r) => !r.error)
+               .map((r) => Number(r.data ?? 1500));
+            userTopicSkill = skills.length > 0 ? Math.min(...skills) : 1500;
+         } catch {
+            userTopicSkill = 1500;
+         }
+
          const { data: hcData, error: hcError } = await supabaseClient
             .from("wordup_handcrafted_questions")
             .select(`
@@ -887,7 +906,8 @@ serve(async (req) => {
                answer,
                explanation,
                variations,
-               history:wordup_user_handcrafted_history(user_id, seen_at)
+               history:wordup_user_handcrafted_history(user_id, seen_at),
+               stats:wordup_question_stats(difficulty_elo, topic_elo)
             `)
             .eq("category", category)
             .or("expires_at.is.null,expires_at.gt.now()");
@@ -898,11 +918,12 @@ serve(async (req) => {
                hcError,
             );
          } else {
-            const filteredHc = (hcData || []).map((hq: any) => {
+            const enriched = (hcData || []).map((hq: any) => {
                const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
-               const lastSeen = playerHistory.length > 0 
-                  ? Math.max(...playerHistory.map((h: any) => new Date(h.seen_at).getTime()))
-                  : 0;
+               const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
+               const seenCount = seenUsers.size;
+               const topicElo = hq.stats?.topic_elo ?? 1500;
+               const diffScore = Math.abs(topicElo - userTopicSkill);
                return {
                   id: hq.id,
                   prompt: hq.prompt,
@@ -910,18 +931,34 @@ serve(async (req) => {
                   answer: hq.answer,
                   explanation: hq.explanation,
                   variations: hq.variations,
-                  lastSeen
+                  seenCount,
+                  diffScore,
+                  topicElo,
                };
             });
 
-            filteredHc.sort((a: any, b: any) => a.lastSeen - b.lastSeen);
-            handcraftedList = filteredHc;
+            // Tiered bucket: neither → one → both, sorted by difficulty proximity within each
+            const buckets = { neither: [] as any[], one: [] as any[], both: [] as any[] };
+            for (const hq of enriched) {
+               if (hq.seenCount === 0) buckets.neither.push(hq);
+               else if (hq.seenCount < playerIds.length) buckets.one.push(hq);
+               else buckets.both.push(hq);
+            }
+            for (const key of ["neither", "one", "both"] as const) {
+               buckets[key].sort((a, b) => a.diffScore - b.diffScore);
+            }
+
+            handcraftedList = [
+               ...buckets.neither,
+               ...buckets.one,
+               ...buckets.both,
+            ];
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
       }
       console.log(
-         `${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions`,
+         `${logPrefix} Fetched ${handcraftedList.length} active handcrafted questions (user skill=${userTopicSkill})`,
       );
 
       // Fetch custom templates for this topic from DB

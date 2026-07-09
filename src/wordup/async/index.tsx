@@ -113,9 +113,38 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          let eloGain = baseEloChange + accuracyBonus;
          if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
          if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
-         try { await updateStats(eloGain, xpReward, won, tied); }
-         catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
-      }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]),
+          try { await updateStats(eloGain, xpReward, won, tied); }
+          catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
+
+          // Fire-and-forget: record handcrafted question answers for difficulty tracking
+          try {
+             const questions = useAsyncStore.getState().questions;
+             const userAnswers = isP1 ? match.p1_answers : match.p2_answers;
+             if (questions?.length > 0 && userAnswers?.length > 0) {
+                const hcIds: string[] = [];
+                const corrects: boolean[] = [];
+                const timesTaken: number[] = [];
+                for (const a of userAnswers) {
+                   const q = questions[a.question_idx];
+                   const hcId = q && (q as any).id;
+                   if (hcId) {
+                      hcIds.push(hcId);
+                      corrects.push(!!a.correct);
+                      timesTaken.push(a.time_taken ?? 0);
+                   }
+                }
+                if (hcIds.length > 0) {
+                   await supabase.rpc("record_match_answers", {
+                      p_user_id: effectiveUser.id,
+                      p_topic_slug: match.category || "general_knowledge",
+                      p_question_ids: hcIds,
+                      p_corrects: corrects,
+                      p_times_taken: timesTaken,
+                   });
+                }
+             }
+          } catch { /* best-effort difficulty tracking */ }
+       }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]),
    });
 
    const { handleAnswerSelect, startMatch } = engine;
