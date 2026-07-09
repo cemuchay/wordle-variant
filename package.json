@@ -11,7 +11,10 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test",
+    "sim:bot": "npx tsx scripts/gameSimulator.ts --mode bot",
+    "sim:pvp": "npx tsx scripts/gameSimulator.ts --mode pvp --mock",
+    "sim:stress": "npx tsx scripts/gameSimulator.ts --mode bot --runs 100 --report"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
@@ -41,6 +44,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dotenv": "^17.4.2",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
@@ -48,6 +52,7 @@
     "happy-dom": "^20.10.6",
     "sharp": "^0.35.2",
     "supabase": "^2.108.0",
+    "tsx": "^4.23.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",

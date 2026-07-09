@@ -10,7 +10,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 390, height: 844 }, // portrait — avoids LandscapeBlocker overlay
   },
   webServer: {
     command: 'npm run dev',

@@ -37,3 +37,8 @@ scratch
 .opencode
 
 deno.lock
+e2e/screenshots/  
+e2e/test-results/ 
+ 
+e2e/e2e/screenshots/  
+e2e/e2e/test-results/ 

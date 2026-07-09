@@ -5,12 +5,12 @@ import { supabase } from "../../../lib/supabaseClient";
 import { fetchWithRetry } from "../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import {
-   decryptMatchQuestions,
-   generateWordUpQuestions,
-   generateSecretKey,
-   encryptQuestions,
-   simulateBotResponse,
-   getRandomBotProfile,
+    decryptMatchQuestions,
+    generateWordUpQuestions,
+    generateSecretKey,
+    encryptQuestions,
+    simulateBotResponse,
+    getRandomBotProfile,
 } from "../../../utils/wordupQuestionGenerator";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { dispatchGameStatus } from "../../shared/GameStatusToast";
@@ -18,17 +18,26 @@ import { generateMatchQuestions } from "../../../services/wordup/questionService
 import { useLiveStore } from "../store/useLiveStore";
 import { safeSessionStorage, safeLocalStorage } from "../../../utils/storage";
 import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
-import { QUESTION_DURATION, WORDUP_TIMEOUT } from "../../../constants/wordup";
+import { WORDUP_TIMEOUT } from "../../../constants/wordup";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import {
-   gameEngineReducer,
-   initialState,
-   type GameType,
+    gameEngineReducer,
+    initialState,
+    type GameType,
 } from "./useGameEngine.types";
+import {
+    getQuestionDuration,
+    calcPoints,
+    buildPlayerAnswer,
+    buildBotAnswer,
+    mergeMatchData,
+    buildAdvanceMatchData,
+    buildEndMatchData,
+    fabricateBotUpdate,
+} from "./useGameEngine.core";
 
-export function getQuestionDuration(type: string): number {
-   return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
-}
+export type { AnswerPayload } from "./useGameEngine.core";
+export { getQuestionDuration } from "./useGameEngine.core";
 
 interface EngineProps {
    gameType: GameType;
@@ -51,6 +60,10 @@ export function useGameEngine(props: EngineProps) {
       onRematchAccepted,
    } = props;
    const [state, dispatch] = useReducer(gameEngineReducer, initialState);
+
+   if (import.meta.env.DEV) {
+      (window as any).__gameDispatch = dispatch;
+   }
 
    // ── Refs grouped by purpose ───────────────────────────────────────────
    const T = useRef({
@@ -212,7 +225,7 @@ export function useGameEngine(props: EngineProps) {
    // CORE GAME FLOW
    // ══════════════════════════════════════════════════════════════════════
 
-   const handleMatchUpdate = useCallback(
+    const handleMatchUpdate = useCallback(
       (newMatch: any) => {
          const cur = S.current.matchData;
          if (!cur) {
@@ -220,27 +233,7 @@ export function useGameEngine(props: EngineProps) {
             return;
          }
 
-         const merged = { ...cur, ...newMatch };
-         if (
-            (cur.p1_answers?.length || 0) > (newMatch.p1_answers?.length || 0)
-         ) {
-            merged.p1_answers = cur.p1_answers;
-            merged.p1_score = cur.p1_score;
-            merged.p1_answered = cur.p1_answered;
-         }
-         if (
-            (cur.p2_answers?.length || 0) > (newMatch.p2_answers?.length || 0)
-         ) {
-            merged.p2_answers = cur.p2_answers;
-            merged.p2_score = cur.p2_score;
-            merged.p2_answered = cur.p2_answered;
-         }
-         merged.current_question_index = Math.max(
-            cur.current_question_index || 0,
-            newMatch.current_question_index || 0,
-         );
-         if (cur.status === "active" && newMatch.status === "countdown")
-            merged.status = "active";
+         const merged = mergeMatchData(cur, newMatch);
          dispatch({ type: "SET_MATCH_DATA", data: merged });
 
          // Reveal condition
@@ -320,19 +313,13 @@ export function useGameEngine(props: EngineProps) {
    );
    cb.current.handleMatchUpdate = handleMatchUpdate;
 
-   const advanceRound = useCallback(
+    const advanceRound = useCallback(
       (_mId: string, nextIdx: number) => {
          if (G.current.isAdvancing) return;
          G.current.isAdvancing = true;
          const nextQ = S.current.questions[nextIdx];
          const nextDur = nextQ ? getQuestionDuration(nextQ.type) : 10.0;
-         const upd: any = {
-            ...S.current.matchData,
-            current_question_index: nextIdx,
-            question_started_at: new Date(getSyncedNow()).toISOString(),
-         };
-         upd.p1_answered = false;
-         upd.p2_answered = false;
+         const upd = buildAdvanceMatchData(S.current.matchData, nextIdx, getSyncedNow());
          if (gameType === "live")
             channel.current
                ?.send({
@@ -367,31 +354,16 @@ export function useGameEngine(props: EngineProps) {
             return;
          G.current.isSubmitting = true;
          dispatch({ type: "ANSWER_SELECTED", answer: choice });
-         const q = S.current.questions[S.current.currentRound];
-         const duration = q ? getQuestionDuration(q.type) : 10.0;
-         const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
-         const correct = choice === q?.answer;
-         let points = 0;
-         if (correct) {
-            const eff = Math.max(0, elapsed - 1.5);
-            const denom = duration - 1.5;
-            points = Math.max(
-               11,
-               Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
-            );
-         }
-         if (S.current.currentRound === 6) points *= 2;
-         if (choice !== "") {
-            if (correct) wordupAudio.playCorrect();
-            else wordupAudio.playIncorrect();
-         }
-         const sub = {
-            question_idx: S.current.currentRound,
-            correct,
-            time_taken: elapsed,
-            points,
-            choice,
-         };
+          const q = S.current.questions[S.current.currentRound];
+          const duration = q ? getQuestionDuration(q.type) : 10.0;
+          const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
+          const correct = choice === q?.answer;
+          const points = calcPoints(correct, elapsed, duration, S.current.currentRound === 6);
+          if (choice !== "") {
+             if (correct) wordupAudio.playCorrect();
+             else wordupAudio.playIncorrect();
+          }
+          const sub = buildPlayerAnswer(S.current.currentRound, choice, correct, elapsed, points);
 
          try {
             const lm = S.current.matchData;
@@ -399,6 +371,7 @@ export function useGameEngine(props: EngineProps) {
             let upd: any;
 
             if (gameType === "live-bot") {
+               // ── Bot path: fabricate bot answer alongside player answer ──
                clearT("botTimeout");
                const botAlreadyAnswered = lm.p2_answers?.some(
                   (a: any) => a.question_idx === S.current.currentRound,
@@ -415,43 +388,20 @@ export function useGameEngine(props: EngineProps) {
                      correct: Math.random() > 0.5,
                      time_taken: 2.0,
                   };
-                  let bp = 0;
-                  if (ba.correct) {
-                     const eff = Math.max(0, ba.time_taken - 1.5);
-                     const denom = duration - 1.5;
-                     bp = Math.max(
-                        11,
-                        Math.round(
-                           20 * (1 - eff / (denom > 0 ? denom : duration)),
-                        ),
-                     );
-                  }
-                  if (S.current.currentRound === 6) bp *= 2;
-                  let bc = q?.answer;
-                  if (!ba.correct && q?.choices) {
-                     const w = q.choices.filter((c: any) => c !== q.answer);
-                     bc = w[Math.floor(Math.random() * w.length)] || "WRONG";
-                  }
+                  const botAnswer = buildBotAnswer(q, S.current.currentRound, ba, duration, S.current.currentRound === 6);
                   upd = {
                      ...lm,
                      p1_answers: [...(lm.p1_answers || []), sub],
                      p1_answered: true,
                      p1_score: (lm.p1_score || 0) + points,
-                     p2_answers: [
-                        ...(lm.p2_answers || []),
-                        {
-                           question_idx: S.current.currentRound,
-                           correct: ba.correct,
-                           time_taken: ba.time_taken,
-                           points: bp,
-                           choice: bc,
-                        },
-                     ],
+                     p2_answers: [...(lm.p2_answers || []), botAnswer],
                      p2_answered: true,
-                     p2_score: (lm.p2_score || 0) + bp,
+                     p2_score: (lm.p2_score || 0) + botAnswer.points,
                   };
                }
+               cb.current.handleMatchUpdate?.(upd);
             } else {
+               // ── Live path: submit only player answer, broadcast to opponent ──
                const isP1 = S.current.role === "player1";
                const answers = [
                   ...((isP1 ? lm.p1_answers : lm.p2_answers) || []),
@@ -464,12 +414,8 @@ export function useGameEngine(props: EngineProps) {
                   [isP1 ? "p1_answered" : "p2_answered"]: true,
                   [isP1 ? "p1_score" : "p2_score"]: ns,
                };
-            }
+               cb.current.handleMatchUpdate?.(upd);
 
-            cb.current.handleMatchUpdate?.(upd);
-
-            if (gameType === "live") {
-               const isP1 = S.current.role === "player1";
                const activeAnswers = isP1 ? upd.p1_answers : upd.p2_answers;
                const myScore = isP1 ? upd.p1_score : upd.p2_score;
                const oppScore = isP1 ? upd.p2_score : upd.p1_score;
@@ -504,30 +450,13 @@ export function useGameEngine(props: EngineProps) {
       async (match: any) => {
          if (G.current.isEnding) return;
          G.current.isEnding = true;
-          clearT("opponentInactivityTimeout");
-          const completedAt = new Date().toISOString();
-         const finalMatch = {
-            ...match,
-            status: "completed",
-            p1_answered: true,
-            p2_answered: true,
-            completed_at: completedAt,
-         };
+         clearT("opponentInactivityTimeout");
+         const completedAt = new Date().toISOString();
+          const finalMatch = buildEndMatchData(match, completedAt);
 
-         if (gameType === "live") {
-            const myScore =
-               S.current.role === "player1" ? match.p1_score : match.p2_score;
-            const oppScore =
-               S.current.role === "player1" ? match.p2_score : match.p1_score;
-            if (myScore > oppScore) wordupAudio.playVictory();
-            else if (myScore < oppScore) wordupAudio.playDefeat();
-            dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
-            dispatch({ type: "SET_PHASE", phase: "gameover" });
-            onGameOver(finalMatch);
-         }
-
-         try {
-            if (gameType === "live-bot") {
+         if (gameType === "live-bot") {
+            // ── Bot path: persist first, then gameover UI ──
+            try {
                const isLocal = match.id.startsWith("bot-match-");
                if (isLocal) {
                   await supabase.from("wordup_matches").insert({
@@ -535,128 +464,88 @@ export function useGameEngine(props: EngineProps) {
                      category: match.category,
                      player1_id: match.player1_id,
                      player2_id: "00000000-0000-0000-0000-000000000b0b",
-                     is_bot_match: true,
-                     game_type: "live-bot",
+                     is_bot_match: true, game_type: "live-bot",
                      bot_profile: match.bot_profile || "average",
                      status: "completed",
                      p1_answers: match.p1_answers,
                      p2_answers: match.p2_answers,
-                     p1_score: match.p1_score,
-                     p2_score: match.p2_score,
-                     p1_answered: true,
-                     p2_answered: true,
+                     p1_score: match.p1_score, p2_score: match.p2_score,
+                     p1_answered: true, p2_answered: true,
                      completed_at: completedAt,
                   });
                } else {
-                  await wordupNetworkGate.enqueue(
-                     "put",
-                     "finalize bot match",
-                     () =>
-                        fetchWithRetry(
-                           async () => {
-                              const { error } = await supabase
-                                 .from("wordup_matches")
-                                 .update({
-                                    status: "completed",
-                                    p1_answers: match.p1_answers,
-                                    p2_answers: match.p2_answers,
-                                    p1_score: match.p1_score,
-                                    p2_score: match.p2_score,
-                                    p1_answered: true,
-                                    p2_answered: true,
-                                    completed_at: completedAt,
-                                 })
-                                 .eq("id", match.id);
-                              if (error) throw error;
-                           },
-                           3,
-                           1000,
-                        ),
-                     true,
-                  );
+                  await wordupNetworkGate.enqueue("put", "finalize bot match", () =>
+                     fetchWithRetry(async () => {
+                        const { error } = await supabase.from("wordup_matches").update({
+                           status: "completed",
+                           p1_answers: match.p1_answers, p2_answers: match.p2_answers,
+                           p1_score: match.p1_score, p2_score: match.p2_score,
+                           p1_answered: true, p2_answered: true,
+                           completed_at: completedAt,
+                        }).eq("id", match.id);
+                        if (error) throw error;
+                     }, 3, 1000), true);
                }
-            } else {
-               await wordupNetworkGate.enqueue(
-                  "put",
-                  "finalize match",
-                  () =>
-                     fetchWithRetry(
-                        async () => {
-                           const { error } = await supabase
-                              .from("wordup_matches")
-                              .update({
-                                 status: "completed",
-                                 p1_answers: match.p1_answers,
-                                 p2_answers: match.p2_answers,
-                                 p1_score: match.p1_score,
-                                 p2_score: match.p2_score,
-                                 p1_answered: true,
-                                 p2_answered: true,
-                                 completed_at: completedAt,
-                              })
-                              .eq("id", match.id);
-                           if (error) throw error;
-                        },
-                        3,
-                        1000,
-                     ),
-                  true,
-               );
+               safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
+               safeLocalStorage.removeItem("wordup_active_game");
+            } catch (e) {
+               console.error("[WordUp] live-bot endGame DB failed:", e);
+               triggerToast("Failed to save final results. Check connection.", 5000);
+               safeLocalStorage.setItem("wordup_active_game", JSON.stringify({
+                  _retryCompletion: true, matchId, role: S.current.role,
+                  matchData: finalMatch, questions: S.current.questions,
+                  currentRound: S.current.currentRound,
+                  opponentStats: S.current.opponentStats,
+                  revealAnswers: true, selectedAnswer: true,
+                  timeLeft: S.current.timeLeft, maxTime: S.current.maxTime,
+                  gameType, savedAt: Date.now(),
+               }));
             }
-            safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
-            safeLocalStorage.removeItem("wordup_active_game");
-          } catch (e) {
-             console.error(`[WordUp] ${gameType} endGame DB failed:`, e);
-             triggerToast(
-                "Failed to save final results. Check connection.",
-                5000,
-             );
-             if (gameType !== "live" && !match.id.startsWith("bot-match-")) {
-                try {
-                   await supabase
-                      .from("wordup_matches")
-                      .update({
-                         status: "completed",
-                         p1_score: match.p1_score,
-                         p2_score: match.p2_score,
-                         completed_at: completedAt,
-                      })
-                      .eq("id", match.id);
-                } catch {
-                   /* best-effort fallback */
-                }
-             }
-             // Preserve game state for recovery retry
-             safeLocalStorage.setItem("wordup_active_game", JSON.stringify({
-                _retryCompletion: true,
-                matchId,
-                role: S.current.role,
-                matchData: finalMatch,
-                questions: S.current.questions,
-                currentRound: S.current.currentRound,
-                opponentStats: S.current.opponentStats,
-                revealAnswers: true,
-                selectedAnswer: true,
-                timeLeft: S.current.timeLeft,
-                maxTime: S.current.maxTime,
-                gameType,
-                savedAt: Date.now(),
-             }));
-          }
-         if (gameType !== "live") {
-            const myScore =
-               S.current.role === "player1"
-                  ? finalMatch.p1_score
-                  : finalMatch.p2_score;
-            const oppScore =
-               S.current.role === "player1"
-                  ? finalMatch.p2_score
-                  : finalMatch.p1_score;
+
+            const myScore = S.current.role === "player1" ? finalMatch.p1_score : finalMatch.p2_score;
+            const oppScore = S.current.role === "player1" ? finalMatch.p2_score : finalMatch.p1_score;
             if (myScore > oppScore) wordupAudio.playVictory();
             else if (myScore < oppScore) wordupAudio.playDefeat();
             dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
             dispatch({ type: "SET_PHASE", phase: "gameover" });
             onGameOver(finalMatch);
+         } else {
+            // ── Live path: gameover UI first, then persist (fire-and-forget) ──
+            const myScore = S.current.role === "player1" ? match.p1_score : match.p2_score;
+            const oppScore = S.current.role === "player1" ? match.p2_score : match.p1_score;
+            if (myScore > oppScore) wordupAudio.playVictory();
+            else if (myScore < oppScore) wordupAudio.playDefeat();
+            dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
+            dispatch({ type: "SET_PHASE", phase: "gameover" });
+            onGameOver(finalMatch);
+
+            try {
+               await wordupNetworkGate.enqueue("put", "finalize match", () =>
+                  fetchWithRetry(async () => {
+                     const { error } = await supabase.from("wordup_matches").update({
+                        status: "completed",
+                        p1_answers: match.p1_answers, p2_answers: match.p2_answers,
+                        p1_score: match.p1_score, p2_score: match.p2_score,
+                        p1_answered: true, p2_answered: true,
+                        completed_at: completedAt,
+                     }).eq("id", match.id);
+                     if (error) throw error;
+                  }, 3, 1000), true);
+               safeSessionStorage.setItem("wordup_completed_" + match.id, "true");
+               safeLocalStorage.removeItem("wordup_active_game");
+            } catch (e) {
+               console.error("[WordUp] live endGame DB failed:", e);
+               triggerToast("Failed to save final results. Check connection.", 5000);
+               safeLocalStorage.setItem("wordup_active_game", JSON.stringify({
+                  _retryCompletion: true, matchId, role: S.current.role,
+                  matchData: finalMatch, questions: S.current.questions,
+                  currentRound: S.current.currentRound,
+                  opponentStats: S.current.opponentStats,
+                  revealAnswers: true, selectedAnswer: true,
+                  timeLeft: S.current.timeLeft, maxTime: S.current.maxTime,
+                  gameType, savedAt: Date.now(),
+               }));
+            }
          }
       },
       [gameType, triggerToast, onGameOver],
@@ -707,110 +596,77 @@ export function useGameEngine(props: EngineProps) {
                : S.current.timeLeft < duration
                  ? getSyncedNow() - (duration - S.current.timeLeft) * 1000
                  : getSyncedNow();
-         let lastTickRemaining = duration;
-         T.current.roundInterval = window.setInterval(() => {
-            const remainingTime = Math.max(
-               0,
-               duration - (getSyncedNow() - startTime) / 1000,
-            );
-            dispatch({
-               type: "TICK",
-               timeLeft: parseFloat(remainingTime.toFixed(2)),
-            });
-            if (remainingTime <= 5.0) {
-               const desiredInterval = Math.max(0.08, remainingTime * 0.2);
-               if (lastTickRemaining - remainingTime >= desiredInterval) {
-                  lastTickRemaining = remainingTime;
-                  wordupAudio.playTicking();
-               }
-            }
-            if (remainingTime <= 0) {
-               clearT("roundInterval");
-               if (S.current.selectedAnswer === null) {
-                  wordupAudio.playTimeUp();
-                  cb.current.handleAnswerSelect?.("");
-               }
-               const cur = S.current.matchData;
-               if (cur && gameType === "live") {
-                  const isP1 = S.current.role === "player1";
-                  const oppAnswered = isP1 ? cur.p2_answered : cur.p1_answered;
-                  if (!oppAnswered) {
-                     const synced = {
-                        ...cur,
-                        [isP1 ? "p2_answers" : "p1_answers"]: [
-                           ...((isP1 ? cur.p2_answers : cur.p1_answers) || []),
-                           {
-                              question_idx: S.current.currentRound,
-                              correct: false,
-                              time_taken: 0,
-                              points: 0,
-                              choice: "",
-                           },
-                        ],
-                        [isP1 ? "p2_answered" : "p1_answered"]: true,
-                        [isP1 ? "p2_score" : "p1_score"]: isP1
-                           ? cur.p2_score || 0
-                           : cur.p1_score || 0,
-                     };
-                     cb.current.handleMatchUpdate?.(synced);
-                  }
-               }
-            }
-         }, 50);
+          let lastTickRemaining = duration;
+          T.current.roundInterval = window.setInterval(() => {
+             const remainingTime = Math.max(
+                0,
+                duration - (getSyncedNow() - startTime) / 1000,
+             );
+             dispatch({
+                type: "TICK",
+                timeLeft: parseFloat(remainingTime.toFixed(2)),
+             });
+             if (remainingTime <= 5.0) {
+                const desiredInterval = Math.max(0.08, remainingTime * 0.2);
+                if (lastTickRemaining - remainingTime >= desiredInterval) {
+                   lastTickRemaining = remainingTime;
+                   wordupAudio.playTicking();
+                }
+             }
+             if (remainingTime <= 0) {
+                clearT("roundInterval");
+                if (S.current.selectedAnswer === null) {
+                   wordupAudio.playTimeUp();
+                   cb.current.handleAnswerSelect?.("");
+                }
+                 // Live only: fill opponent dummy answer if they timed out
+                 // Deferred to next tick so any handleAnswerSelect("") above has
+                 // flushed through React's render cycle and S.current.matchData
+                 // reflects the user's just-submitted timeout answer.
+                 if (gameType === "live") {
+                    setTimeout(() => {
+                       const cur = S.current.matchData;
+                       if (cur) {
+                          const isP1 = S.current.role === "player1";
+                          const oppAnswered = isP1 ? cur.p2_answered : cur.p1_answered;
+                          if (!oppAnswered) {
+                             const synced = {
+                                ...cur,
+                                [isP1 ? "p2_answers" : "p1_answers"]: [
+                                   ...((isP1 ? cur.p2_answers : cur.p1_answers) || []),
+                                   { question_idx: S.current.currentRound, correct: false, time_taken: 0, points: 0, choice: "" },
+                                ],
+                                [isP1 ? "p2_answered" : "p1_answered"]: true,
+                                [isP1 ? "p2_score" : "p1_score"]: isP1 ? cur.p2_score || 0 : cur.p1_score || 0,
+                             };
+                             cb.current.handleMatchUpdate?.(synced);
+                          }
+                       }
+                    }, 0);
+                 }
+             }
+          }, 50);
 
-         if (gameType === "live-bot" && q) {
-            const bp = _match.bot_profile || "average";
-            const br = simulateBotResponse(q, bp, duration);
-            const bt = Math.min(br.time_taken, duration - 0.5);
-            botAction.current = { ...br, time_taken: bt };
-            const botAlreadyAnswered = _match.p2_answers?.some(
-               (a: any) => a.question_idx === index,
-            );
-            if (!botAlreadyAnswered) {
-               const botRemainingTime = Math.max(0, bt - elapsed);
-               T.current.botTimeout = window.setTimeout(() => {
-                  const lm = S.current.matchData;
-                  if (!lm) return;
-                  const ba = botAction.current || {
-                     correct: Math.random() > 0.5,
-                     time_taken: 2.0,
-                  };
-                  let bpPoints = 0;
-                  if (ba.correct) {
-                     const eff = Math.max(0, ba.time_taken - 1.5);
-                     const denom = duration - 1.5;
-                     bpPoints = Math.max(
-                        11,
-                        Math.round(
-                           20 * (1 - eff / (denom > 0 ? denom : duration)),
-                        ),
-                     );
-                  }
-                  if (index === 6) bpPoints *= 2;
-                  let bc = q?.answer;
-                  if (!ba.correct && q?.choices) {
-                     const w = q.choices.filter((c: any) => c !== q.answer);
-                     bc = w[Math.floor(Math.random() * w.length)] || "WRONG";
-                  }
-                  const updatedMatch = {
-                     ...lm,
-                     p2_answers: [
-                        ...(lm.p2_answers || []),
-                        {
-                           question_idx: index,
-                           correct: ba.correct,
-                           time_taken: ba.time_taken,
-                           points: bpPoints,
-                           choice: bc,
-                        },
-                     ],
-                     p2_answered: true,
-                     p2_score: (lm.p2_score || 0) + bpPoints,
-                  };
-                  cb.current.handleMatchUpdate?.(updatedMatch);
-               }, botRemainingTime * 1000);
-            }
-         }
+          // Bot only: schedule simulated bot answer timeout
+          if (gameType === "live-bot" && q) {
+             const bp = _match.bot_profile || "average";
+             const br = simulateBotResponse(q, bp, duration);
+             const bt = Math.min(br.time_taken, duration - 0.5);
+             botAction.current = { ...br, time_taken: bt };
+             const botAlreadyAnswered = _match.p2_answers?.some(
+                (a: any) => a.question_idx === index,
+             );
+             if (!botAlreadyAnswered) {
+                const botRemainingTime = Math.max(0, bt - elapsed);
+                 T.current.botTimeout = window.setTimeout(() => {
+                    const lm = S.current.matchData;
+                    if (!lm) return;
+                    const ba = botAction.current || { correct: Math.random() > 0.5, time_taken: 2.0 };
+                    const updatedMatch = fabricateBotUpdate(lm, index, ba, duration, index === 6, q);
+                    cb.current.handleMatchUpdate?.(updatedMatch);
+                 }, botRemainingTime * 1000);
+             }
+          }
       },
       [gameType, getSyncedNow],
    );

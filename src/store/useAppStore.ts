@@ -322,3 +322,8 @@ interface AppState {
       },
    ),
 );
+
+if (import.meta.env.DEV) {
+   (window as any).__appStore = useAppStore;
+}
+
