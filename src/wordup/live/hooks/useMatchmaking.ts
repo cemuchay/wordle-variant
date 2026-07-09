@@ -222,14 +222,9 @@ export const useWordUpMatchmaking = (
                useLiveStore.getState().category || "mixed",
             );
             await supabase
-               .from("wordup_matches")
-               .update({
-                  status: "countdown",
-                  question_started_at: new Date(
-                     Date.now() + 4500,
-                  ).toISOString(),
-               })
-               .eq("id", newMatchId);
+                .from("wordup_matches")
+                .update({ status: "countdown" })
+                .eq("id", newMatchId);
             setRole("player2");
             setMatchId(newMatchId);
             onMatchFound(newMatchId, "player2");
