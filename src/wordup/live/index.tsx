@@ -310,7 +310,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             {view === "menu" && (
                <LobbyView
                   userStats={userStats} category={category} setCategory={setCategory}
-                  startMatchmaking={() => { setView("connecting"); startMatchmaking(); }}
+                  startMatchmaking={() => { resetGame(); setView("connecting"); startMatchmaking(); }}
                   getRankColor={getRankColor}
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}

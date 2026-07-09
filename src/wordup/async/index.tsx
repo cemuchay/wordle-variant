@@ -141,6 +141,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
    const handleChallengePlayer = useCallback(async (targetUser: any) => {
       if (!effectiveUser) return;
+      resetGame();
       clearChallengeResources();
       challengeResolvedRef.current = false;
 
@@ -321,6 +322,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
 
    const handlePlayTurn = useCallback((match: any) => {
+      resetGame();
       const mRole = match.player1_id === effectiveUser?.id ? "player1" : "player2";
       setMatchId(match.id);
       setRole(mRole);
@@ -483,6 +485,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                opponentName={formatUsername(pendingChallenge.targetUser?.username || pendingChallenge.targetUser?.user_metadata?.full_name) || "Opponent"}
                category={category}
                onPlayNow={() => {
+                  resetGame();
                   const pc = pendingChallenge;
                   setPendingChallenge(null);
                   setView("loading");
