@@ -29,7 +29,7 @@ import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
-import { wordupNetworkGate } from "./components/wordup/WordUpView/services/wordupNetworkGate";
+import { wordupNetworkGate } from "./wordup/shared/wordupNetworkGate";
 import { type AppUser, type Challenge } from "./types/game";
 import { useChallengeStore } from "./store/useChallengeStore";
 import { useAppStore } from "./store/useAppStore";
@@ -479,7 +479,7 @@ export default function App() {
     const now = new Date();
     const hour = now.getHours();
     let greeting = "Hello!";
-    let expression: import('./components/wordup/WordUpView/components/WordUpMascot').MascotExpression = 'idle';
+    let expression: import('./wordup/shared/WordUpMascot').MascotExpression = 'idle';
 
     if (hour >= 5 && hour < 12) {
       greeting = "Good morning! ☀️";

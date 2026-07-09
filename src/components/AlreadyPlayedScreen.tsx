@@ -54,8 +54,8 @@ export const AlreadyPlayedScreen = ({
   ];
 
   return (
-    <div className="h-full w-full overflow-y-auto px-4 py-12 sm:px-6 flex flex-col justify-center items-center select-none text-white scrollbar-thin">
-      <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6">
+    <div className="h-full w-full overflow-y-auto px-4 pt-12 sm:px-6 flex flex-col justify-center items-center select-none text-white overflow-hidden">
+      <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6 overflow-hidden">
         {/* Title block */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

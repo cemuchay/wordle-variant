@@ -1,40 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
-import { CATEGORIES } from "../../shared/constants";
-import { safeLocalStorage } from "../../../utils/storage";
-import { useAsyncStore } from "../store/useAsyncStore";
-import { CATEGORY_STYLE_MAP } from "../../../components/wordup/WordUpView/components/CategorySelectModal";
-
-const RECENTS_KEY = "wordup_async_recent_categories";
-const MAX_RECENTS = 5;
-
-function loadRecents(): string[] {
-   try {
-      const raw = safeLocalStorage.getItem(RECENTS_KEY);
-      return raw ? JSON.parse(raw) : [];
-   } catch {
-      return [];
-   }
-}
-
-function saveRecents(ids: string[]) {
-   try {
-      safeLocalStorage.setItem(RECENTS_KEY, JSON.stringify(ids));
-   } catch { /* ignore */ }
-}
-
-function pushRecent(ids: string[], id: string): string[] {
-   const filtered = ids.filter((i) => i !== id);
-   return [id, ...filtered].slice(0, MAX_RECENTS);
-}
-
-const DEFAULT_STYLE = {
-   emoji: "💡",
-   gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40",
-   glow: "shadow-[0_0_15px_rgba(255,255,255,0.05)]",
-   border: "border-white/20 text-gray-300"
-};
+import { CATEGORIES } from "./constants";
+import { useWordUpStore } from "../../store/useWordUpStore";
+import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents, saveRecents, pushRecent } from "./categorySelectConstants";
 
 interface CategorySelectModalProps {
    isOpen: boolean;
@@ -94,18 +63,18 @@ export const CategorySelectModal = ({
       });
    };
 
-   const handleCategoryClick = (id: string) => {
-      setCategory(id);
-      recordRecent(id);
-      onClose();
-   };
+    const handleCategoryClick = (id: string) => {
+       setCategory(id);
+       recordRecent(id);
+       onClose();
+    };
 
-   const handleSelectAndPlay = () => {
-      const currentCategory = useAsyncStore.getState().category;
-      recordRecent(currentCategory);
-      startMatchmaking();
-      onClose();
-   };
+    const handleSelectAndPlay = () => {
+        const currentCategory = useWordUpStore.getState().category;
+        recordRecent(currentCategory);
+        startMatchmaking();
+        onClose();
+     };
 
    return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
@@ -119,7 +88,7 @@ export const CategorySelectModal = ({
             <div className="flex items-center justify-between p-5 border-b border-white/5">
                <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-white">Select Arena Category</h3>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Choose an arena mode to start a challenge</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Choose an arena mode to matchmake or play bots</p>
                </div>
                <button
                   onClick={onClose}
@@ -129,7 +98,7 @@ export const CategorySelectModal = ({
                </button>
             </div>
 
-            {/* Search Box */}
+            {/* Search Box — always visible */}
             <div className="p-4 border-b border-white/5 bg-slate-950/45 flex items-center gap-2 shrink-0">
                <Search size={16} className="text-gray-500 shrink-0 ml-1" />
                <input
@@ -148,6 +117,7 @@ export const CategorySelectModal = ({
 
             {/* Scrollable List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0 scrollbar-hide">
+               {/* Recents (only when not searching) */}
                {!searchQuery && recentCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1 flex items-center gap-1.5">
@@ -175,6 +145,7 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
+               {/* Editor's Picks — vertical list */}
                {featuredCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1">Editor's Picks</p>
@@ -203,6 +174,7 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
+               {/* All Categories (alphabetical) — single column */}
                {regularCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">All Categories</p>
@@ -238,7 +210,7 @@ export const CategorySelectModal = ({
                )}
             </div>
 
-            {/* Footer */}
+            {/* Footer Select & Play button */}
             <div className="p-4 border-t border-white/5 bg-slate-950/30 flex gap-3">
                <button
                   onClick={onClose}
@@ -257,3 +229,4 @@ export const CategorySelectModal = ({
       </div>
    );
 };
+

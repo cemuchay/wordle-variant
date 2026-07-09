@@ -3,8 +3,6 @@ import { useState, useEffect, useRef } from "react";
 interface CircularTimerProps {
    maxTime: number;
    currentIdx: number;
-   selectedAnswer: string | null;
-   revealAnswers: boolean;
    colorClass?: string;
 }
 
@@ -14,8 +12,6 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export const CircularTimer = ({
    maxTime,
    currentIdx,
-   selectedAnswer,
-   revealAnswers,
    colorClass = "text-correct",
 }: CircularTimerProps) => {
    const circleRef = useRef<SVGCircleElement | null>(null);
@@ -53,19 +49,6 @@ export const CircularTimer = ({
          if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
       };
    }, [currentIdx, maxTime]);
-
-   useEffect(() => {
-      if (selectedAnswer !== null || revealAnswers) {
-         if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
-
-         const circle = circleRef.current;
-         if (!circle) return;
-
-         const computed = window.getComputedStyle(circle);
-         circle.style.transition = "none";
-         circle.style.strokeDashoffset = computed.strokeDashoffset;
-      }
-   }, [selectedAnswer, revealAnswers]);
 
    const seconds = Math.ceil(displayTime);
 

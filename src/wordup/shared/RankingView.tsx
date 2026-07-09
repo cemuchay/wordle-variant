@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Loader2, Trophy, Medal } from "lucide-react";
-import { supabase } from "../../../../lib/supabaseClient";
-import { ProtectedAvatar } from "../../../../components/chat/ProtectedAvatar";
+import { supabase } from "../../lib/supabaseClient";
+import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 
-import { type ProfileStats } from "../types";
-import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../../../constants/wordup";
-import formatUsername from '../../../../utils/formatUsername';
+import { type ProfileStats } from "./types";
+import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../constants/wordup";
+import formatUsername from '../../utils/formatUsername';
 
 interface LeaderboardEntry extends ProfileStats {
    id: string;

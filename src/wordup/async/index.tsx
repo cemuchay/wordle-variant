@@ -17,7 +17,7 @@ import { LobbyView } from "./components/LobbyView";
 import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../../components/wordup/WordUpView/components/LoadingView";
+import { LoadingView } from "../shared/LoadingView";
 import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";

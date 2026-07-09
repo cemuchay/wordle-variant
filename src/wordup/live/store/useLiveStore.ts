@@ -52,7 +52,7 @@ export const useLiveStore = create<LiveState>((set) => ({
    isBattlePlaying: false,
    activeTab: (safeSessionStorage.getItem("wordup_live_tab") as LiveTab) || "play",
    view: "menu",
-   category: safeSessionStorage.getItem("wordup_selected_category") || "mixed",
+   category: safeLocalStorage.getItem("wordup_selected_category") || "mixed",
    matchId: null,
    role: null,
    questions: [],
@@ -68,7 +68,7 @@ export const useLiveStore = create<LiveState>((set) => ({
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
    setCategory: (category) => {
-      safeSessionStorage.setItem("wordup_selected_category", category);
+      safeLocalStorage.setItem("wordup_selected_category", category);
       set({ category });
    },
    setMatchId: (matchId) => set({ matchId }),

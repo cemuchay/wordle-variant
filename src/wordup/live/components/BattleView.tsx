@@ -5,16 +5,18 @@ import { AlertTriangle } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
-import { FormulaRenderer } from "../../../components/wordup/FormulaRenderer";
-import { PreloadedImage } from "../../../components/wordup/PreloadedImage";
+import { FormulaRenderer } from "../../shared/FormulaRenderer";
+import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
 import { getQuestionDuration } from "../hooks/useGameEngine";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
-import { CircularTimer } from "../../../components/wordup/CircularTimer";
-import { ScoreBar } from "../../../components/wordup/ScoreBar";
+import { CircularTimer } from "../../shared/CircularTimer";
+import { ScoreBar } from "../../shared/ScoreBar";
+import { SignalBar } from "../../shared/SignalBar";
+import { GameStatusToast } from "../../shared/GameStatusToast";
 
 interface MatchData {
    p1_score?: number;
@@ -50,6 +52,8 @@ interface BattleViewProps {
    onAbort: () => void;
    lastRoundPopup: boolean;
    waitingForOpponent: boolean;
+   playerSignalLevel?: number;
+   opponentSignalLevel?: number;
 }
 
 interface Particle {
@@ -77,6 +81,8 @@ export const BattleView = ({
    onAbort,
    lastRoundPopup,
    waitingForOpponent,
+   playerSignalLevel,
+   opponentSignalLevel,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const { ask } = useConfirmation();
@@ -186,6 +192,7 @@ export const BattleView = ({
          animate={{ opacity: 1 }}
           className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
       >
+         <GameStatusToast />
          {lastRoundPopup && (
             <motion.div
                initial={{ opacity: 0 }}
@@ -244,31 +251,33 @@ export const BattleView = ({
                    username={playerProfile?.username || "You"}
                    className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
                 />
-                <div className="truncate">
-                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                   <p className="text-base font-black text-white">{myScore} pts</p>
-                </div>
-                {scorePopups.filter((p) => p.side === "my").map((p) => (
-                   <motion.span
-                      key={p.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                   >
-                      +{p.points}
-                   </motion.span>
-                ))}
-             </div>
+                 <div className="truncate max-w-[100px]">
+                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                    <p className="text-base font-black text-white">{myScore} pts</p>
+                 </div>
+                 {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as any} className="ml-1" />}
+                 {scorePopups.filter((p) => p.side === "my").map((p) => (
+                    <motion.span
+                       key={p.id}
+                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                       animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                       transition={{ duration: 2.5, ease: "easeOut" }}
+                       className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
+                    >
+                       +{p.points}
+                    </motion.span>
+                 ))}
+              </div>
 
-             <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} selectedAnswer={selectedAnswer} revealAnswers={revealAnswers} />
+              <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} />
 
-             <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
-                <div className="truncate">
-                   <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
-                   <p className="text-base font-black text-white">{oppScore} pts</p>
-                </div>
-                {scorePopups.filter((p) => p.side === "opp").map((p) => (
+              <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
+                 <div className="truncate max-w-[100px]">
+                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
+                    <p className="text-base font-black text-white">{oppScore} pts</p>
+                 </div>
+                 {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as any} className="ml-1" />}
+                 {scorePopups.filter((p) => p.side === "opp").map((p) => (
                    <motion.span
                       key={p.id}
                       initial={{ opacity: 0, y: 0, scale: 0.5 }}

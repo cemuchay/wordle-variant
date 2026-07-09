@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { WordUpView } from '../../components/wordup/WordUpView';
+import { WordUpView } from '../../wordup/WordUpContainer';
 import { useWordUpStore } from '../../store/useWordUpStore';
 import { seedStore } from '../helpers/seedStore';
 import { makeQuestionSet } from '../fixtures/questions';
@@ -21,11 +21,11 @@ vi.mock('../../context/AppContext', () => ({
   }),
 }));
 
-vi.mock('../../components/wordup/WordUpView/hooks/useServerTime', () => ({
+vi.mock('../../wordup/shared/useServerTime', () => ({
   useServerTime: () => ({ getSyncedNow: () => Date.now() }),
 }));
 
-vi.mock('../../components/wordup/WordUpView/hooks/useWordUpProfile', () => ({
+vi.mock('../../wordup/shared/useWordUpProfile', () => ({
   useWordUpProfile: () => ({
     userStats: { rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: 'Bronze' },
     getRankColor: () => 'text-gray-400',
@@ -34,7 +34,7 @@ vi.mock('../../components/wordup/WordUpView/hooks/useWordUpProfile', () => ({
   }),
 }));
 
-vi.mock('../../components/wordup/WordUpView/hooks/useMatchmaking', () => ({
+vi.mock('../../wordup/live/hooks/useMatchmaking', () => ({
   useWordUpMatchmaking: () => ({
     startMatchmaking: () => {},
     cancelMatchmaking: () => {},
@@ -42,7 +42,7 @@ vi.mock('../../components/wordup/WordUpView/hooks/useMatchmaking', () => ({
   }),
 }));
 
-vi.mock('../../components/wordup/WordUpView/hooks/useWordUpGameLoop', () => ({
+vi.mock('../../wordup/live/hooks/useGameEngine', () => ({
   useWordUpGameLoop: () => {
     const s = useWordUpStore.getState();
     return {

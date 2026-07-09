@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { WordUpView } from '../../components/wordup/WordUpView';
+import { WordUpView } from '../../wordup/WordUpContainer';
 import { useWordUpStore } from '../../store/useWordUpStore';
 import { seedStore } from '../helpers/seedStore';
 import { waitForStore } from '../helpers/waitForStore';

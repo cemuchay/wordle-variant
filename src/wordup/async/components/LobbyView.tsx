@@ -5,7 +5,8 @@ import { Swords, HelpCircle, ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, 
 import { CATEGORIES } from "../../shared/constants";
 import { type ProfileStats } from "../../shared/types";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
-import { CategorySelectModal, CATEGORY_STYLE_MAP } from "../../../components/wordup/WordUpView/components/CategorySelectModal";
+import { CategorySelectModal } from "../../shared/CategorySelectModal";
+import { CATEGORY_STYLE_MAP } from "../../shared/categorySelectConstants";
 import { useAsyncStore } from "../store/useAsyncStore";
 
 interface AsyncLobbyViewProps {

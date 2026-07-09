@@ -7,6 +7,7 @@ import { useServerTime } from "../shared/useServerTime";
 import { useWordUpProfile } from "../shared/useWordUpProfile";
 import { useWordUpMatchmaking } from "./hooks/useMatchmaking";
 import { useGameEngine } from "./hooks/useGameEngine";
+import { useSignalStrength } from "./hooks/useSignalStrength";
 import { wordupAudio } from "../../utils/wordupAudio";
 import { supabase } from "../../lib/supabaseClient";
 import { Swords, Volume2, VolumeX } from "lucide-react";
@@ -14,12 +15,12 @@ import { Swords, Volume2, VolumeX } from "lucide-react";
 import { decryptMatchQuestions } from "../../utils/wordupQuestionGenerator";
 
 import { LobbyView } from "./components/LobbyView";
-import { MatchmakingView } from "../../components/wordup/WordUpView/components/MatchmakingView";
+import { MatchmakingView } from "../shared/MatchmakingView";
 import { CountdownView } from "./components/CountdownView";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../../components/wordup/WordUpView/components/LoadingView";
-import { ConnectionOverlay } from "../../components/wordup/WordUpView/components/ConnectionOverlay";
+import { LoadingView } from "../shared/LoadingView";
+import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
 
@@ -194,6 +195,21 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
    const waitingForOpponent = view === "battle" && gameType === "live" && selectedAnswer !== null && !revealAnswers && phase === "playing" && currentIdx === 6;
 
+   const playerSignalLevel = useSignalStrength();
+   const prevSignalRef = useRef(0);
+   useEffect(() => {
+      if (view !== "battle") return;
+      const level = playerSignalLevel;
+      if (level !== prevSignalRef.current) {
+         prevSignalRef.current = level;
+         engine.sendSignalUpdate(level);
+      }
+      const interval = setInterval(() => {
+         engine.sendSignalUpdate(playerSignalLevel);
+      }, 15000);
+      return () => clearInterval(interval);
+   }, [view, playerSignalLevel, engine.sendSignalUpdate]);
+
    const handlePurgeAndReset = useCallback(async () => {
       await enginePurgeAndReset();
       cancelMatchmaking();
@@ -321,8 +337,10 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                    role={role} playerProfile={profile}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
                    waitingForOpponent={waitingForOpponent}
-                />
-             )}
+                   playerSignalLevel={playerSignalLevel}
+                   opponentSignalLevel={engine.opponentSignalLevel}
+                 />
+              )}
              {view === "gameover" && (
                <GameOverView
                   matchData={matchData}
