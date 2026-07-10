@@ -428,7 +428,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                             ? joinMutation.mutateAsync({ challengeId: challenge.id, userId: currentUser.id, isGuest: !userRef.current })
                             : Promise.resolve(localMatch || null);
 
-                        let participation = localMatch;
+                        // Synthetic "host" or "viewed" entries have no real
+                        // participation data (no marathon_progress, guesses, etc.).
+                        // Skip them so we fetch the real record instead.
+                        const isSynthetic = localMatch?.id?.startsWith?.("host-") || localMatch?.id?.startsWith?.("viewed-");
+                        let participation = isSynthetic ? null : localMatch;
                         if (!participation && !isExpired) {
                             participation = await participationPromise;
                         } else if (isExpired) {

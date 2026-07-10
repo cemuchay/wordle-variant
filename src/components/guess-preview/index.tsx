@@ -144,6 +144,21 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         );
         const myFinished =
           myProg?.status === "completed" || myProg?.status === "timed_out";
+
+        // If viewer completed ALL marathon games, they can see any game
+        if (!myFinished) {
+          const totalGames = marathonGames.length;
+          const marathonProgressAll = myParticipation?.marathon_progress || [];
+          const completedCount = marathonProgressAll.filter(
+            (p: any) => p.status === "completed" || p.status === "timed_out",
+          ).length;
+
+          if (totalGames > 0 && completedCount >= totalGames) {
+            setViewerHasFinished(true);
+            return;
+          }
+        }
+
         setViewerHasFinished(myFinished);
         return;
       }
@@ -192,6 +207,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     yesterday,
     isMarathon,
     marathonGameIndex,
+    marathonGames,
     myParticipation,
     profile?.id,
     targetDate,
