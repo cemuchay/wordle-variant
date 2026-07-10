@@ -62,6 +62,7 @@ export type Action =
    | { type: "START_REVEAL" }
    | { type: "ADVANCE" }
    | { type: "GAMEOVER" }
+   | { type: "SET_LAST_ROUND_POPUP"; show: boolean }
    | { type: "RESET" };
 
 export const initialGameState: GameState = {
@@ -113,7 +114,12 @@ export function gameReducer(state: GameState, action: Action): GameState {
          const correct = action.choice === q?.answer;
          const pts = correct ? Math.max(11, Math.round(20 * (1 - Math.max(0, action.timeTaken - 1.5) / (dur - 1.5 > 0 ? dur - 1.5 : dur)))) : 0;
          const finalPts = state.currentRound === 6 ? pts * 2 : pts;
-         return { ...state, myChoice: action.choice, myCurrentPoints: finalPts };
+         const newState = { ...state, myChoice: action.choice, myCurrentPoints: finalPts };
+         if (state.opponentChoice !== null) {
+            newState.status = "reveal";
+            newState.revealAnswers = true;
+         }
+         return newState;
       }
 
       case "OPPONENT_ANSWER": {
@@ -135,6 +141,8 @@ export function gameReducer(state: GameState, action: Action): GameState {
          if (nextRound > 6) return state;
          return {
             ...state,
+            myScore: state.myScore + state.myCurrentPoints,
+            opponentScore: state.opponentScore + state.opponentCurrentPoints,
             currentRound: nextRound,
             status: "playing",
             roundStartedAt: Date.now(),
@@ -142,10 +150,9 @@ export function gameReducer(state: GameState, action: Action): GameState {
             opponentChoice: null,
             myCurrentPoints: 0,
             opponentCurrentPoints: 0,
-            myScore: state.myScore + state.myCurrentPoints,
-            opponentScore: state.opponentScore + state.opponentCurrentPoints,
             timeRemaining: state.maxTime,
             revealAnswers: false,
+            lastRoundPopup: false,
          };
       }
 
@@ -154,6 +161,9 @@ export function gameReducer(state: GameState, action: Action): GameState {
          const totalOpp = state.opponentScore + state.opponentCurrentPoints;
          return { ...state, status: "gameover", revealAnswers: false, myScore: totalMy, opponentScore: totalOpp };
       }
+
+      case "SET_LAST_ROUND_POPUP":
+         return { ...state, lastRoundPopup: action.show };
 
       case "RESET":
          return { ...initialGameState };

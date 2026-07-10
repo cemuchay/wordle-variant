@@ -44,7 +44,7 @@ function pickBotChoice(q: WordUpQuestion, correct: boolean): string {
 // ── Hook ──────────────────────────────────────────────────────────
 
 export function useGameEngine(props: EngineProps) {
-   const { gameType, matchId: _matchId, role: _role, getSyncedNow: _getSyncedNow, triggerToast: _triggerToast, onGameOver } = props;
+   const { gameType, matchId: _matchId, role: _role, getSyncedNow: _getSyncedNow, triggerToast, onGameOver } = props;
    const [state, dispatch] = useReducer(gameReducer, initialGameState);
 
    if (import.meta.env.DEV) {
@@ -68,10 +68,13 @@ export function useGameEngine(props: EngineProps) {
       s.setCurrentIdx(state.currentRound);
       s.setRevealAnswers(state.status === "reveal");
       if (state.matchData) {
+         const showRunning = status === "playing" || status === "reveal";
+         const runningMy = state.myScore + (showRunning ? state.myCurrentPoints : 0);
+         const runningOpp = state.opponentScore + (showRunning ? state.opponentCurrentPoints : 0);
          s.setMatchData({
             ...state.matchData,
-            p1_score: state.role === "player1" ? state.myScore : state.opponentScore,
-            p2_score: state.role === "player1" ? state.opponentScore : state.myScore,
+            p1_score: state.role === "player1" ? runningMy : runningOpp,
+            p2_score: state.role === "player1" ? runningOpp : runningMy,
          });
       }
       s.setQuestions(state.questions);
@@ -137,25 +140,31 @@ export function useGameEngine(props: EngineProps) {
    // ── Reveal → Advance / GameOver ────────────────────────────────
    useEffect(() => {
       if (state.status !== "reveal") return;
-      const delay = state.currentRound >= 5 ? 3200 : 1800;
+      if (state.lastRoundPopup) return; // raw setTimeout below owns the advance
+
+      const isLast = state.currentRound >= 6;
+      const delay = isLast ? 3200 : 1800;
 
       const id = setTimeout(() => {
-         if (state.currentRound >= 6) {
+         if (isLast) {
             dispatch({ type: "GAMEOVER" });
-            // Read scores from store (reducer GAMEOVER accumulated them)
-            const s = useLiveStore.getState();
             onGameOver(buildFinalMatch({
-               matchData: s.matchData,
-               role: s.matchData?.is_bot_match ? "player1" : (s.matchData as any)?.role || "player1",
+               matchData: state.matchData,
+               role: state.role,
                myScore: state.myScore + state.myCurrentPoints,
                opponentScore: state.opponentScore + state.opponentCurrentPoints,
             }));
+         } else if (state.currentRound === 5) {
+            // Round 5 → 6: show overlay, delay advance with a raw setTimeout
+            triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+            dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
+            setTimeout(() => dispatch({ type: "ADVANCE" }), 1500);
          } else {
             dispatch({ type: "ADVANCE" });
          }
       }, delay);
       return () => clearTimeout(id);
-   }, [state.status, state.currentRound, state.myScore, state.opponentScore, state.myCurrentPoints, state.opponentCurrentPoints, onGameOver]);
+   }, [state.status, state.currentRound, state.lastRoundPopup, state.myScore, state.opponentScore, state.myCurrentPoints, state.opponentCurrentPoints, state.matchData, state.role, triggerToast, onGameOver]);
 
    // ── Handle my answer ───────────────────────────────────────────
    const handleAnswerSelect = useCallback((choice: string) => {
@@ -200,7 +209,7 @@ export function useGameEngine(props: EngineProps) {
             p1_answers: [], p2_answers: [], p1_answered: false, p2_answered: false,
             p1_score: 0, p2_score: 0,
          };
-         questions = await generateWordUpQuestions("mixed");
+         questions = await generateWordUpQuestions(matchData.category || "mixed");
          const bp = getRandomBotProfile();
          const prof = BOT_PROFILES[bp];
          oppStats = { username: prof?.name || "Bot", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" };
@@ -249,7 +258,7 @@ export function useGameEngine(props: EngineProps) {
          isConnected: true,
          opponentSignalLevel: 0,
          countdownText: state.countdownText,
-         lastRoundPopup: false,
+          lastRoundPopup: state.lastRoundPopup,
       },
       isConnected: true,
       opponentSignalLevel: 0,
