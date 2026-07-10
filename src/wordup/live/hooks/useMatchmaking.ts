@@ -171,12 +171,13 @@ export const useWordUpMatchmaking = (
             () =>
                fetchWithRetry(
                   async () => {
+                     const cat = useLiveStore.getState().category || "mixed";
+                     console.log(`[matchmaking] RPC category: "${cat}"`);
                      const { data, error } = await supabase.rpc(
                         "join_wordup_queue",
                         {
-                           p_user_id: user.id,
-                           p_category:
-                              useLiveStore.getState().category || "mixed",
+                            p_user_id: user.id,
+                            p_category: cat,
                         },
                      );
                      if (error) throw error;
@@ -217,9 +218,11 @@ export const useWordUpMatchmaking = (
          } else {
             // Player2: matched immediately — generate questions via edge function
             const newMatchId = result.match_id;
+            const matchCategory = useLiveStore.getState().category || "mixed";
+            console.log(`[matchmaking] PvP generateMatchQuestions category: "${matchCategory}"`);
             await generateMatchQuestions(
                newMatchId,
-               useLiveStore.getState().category || "mixed",
+               matchCategory,
             );
             await supabase
                 .from("wordup_matches")

@@ -16,6 +16,7 @@ export const useAsyncMatchmaking = (
 
    const createMatch = useCallback(async (targetUser: any, overrideCategory?: string) => {
       const cat = overrideCategory || effectiveCategory;
+      console.log(`[async] createMatch category: "${cat}", isProcedural=${isProceduralCategory(cat)}, effectiveCategory="${effectiveCategory}", override="${overrideCategory ?? "none"}"`);
       if (!user?.id || !targetUser?.id) return null;
       try {
          const { data, error } = await supabase

@@ -32,6 +32,7 @@ import {
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
+import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import type { WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import type { ProfileStats } from "../../shared/types";
 
@@ -132,6 +133,7 @@ export function useGameEngine(props: EngineProps) {
     const roundTickRef = useRef<number | null>(null);
     const revealRef = useRef<number | null>(null);
     const overallRef = useRef<number | null>(null);
+    const botTimerRef = useRef<number | null>(null);
 
     // Guard: prevents the "both answered" effect from firing twice
     const transitioningRef = useRef(false);
@@ -185,12 +187,20 @@ export function useGameEngine(props: EngineProps) {
         }
     }, []);
 
+    const stopBotTimer = useCallback(() => {
+        if (botTimerRef.current !== null) {
+            clearTimeout(botTimerRef.current);
+            botTimerRef.current = null;
+        }
+    }, []);
+
     const stopAllTimers = useCallback(() => {
         stopCountdown();
         stopRoundTick();
         stopReveal();
         stopOverall();
-    }, [stopCountdown, stopRoundTick, stopReveal, stopOverall]);
+        stopBotTimer();
+    }, [stopCountdown, stopRoundTick, stopReveal, stopOverall, stopBotTimer]);
 
     // ══════════════════════════════════════════════════════════════════
     // Internal actions (read refs, safe inside timeouts)
@@ -242,6 +252,7 @@ export function useGameEngine(props: EngineProps) {
         console.log(`[engine] beginReveal: round=${currentRoundRef.current}, isLast=${currentRoundRef.current >= 6}`);
         transitioningRef.current = true;
         stopRoundTick();
+        stopBotTimer();
 
         const isLast = currentRoundRef.current >= 6;
         const delay = isLast ? 3200 : 1800;
@@ -265,7 +276,7 @@ export function useGameEngine(props: EngineProps) {
                 advanceRound();
             }
         }, delay);
-    }, [triggerToast, advanceRound, endGame, stopRoundTick]);
+    }, [triggerToast, advanceRound, endGame, stopRoundTick, stopBotTimer]);
 
     // ══════════════════════════════════════════════════════════════════
     // EFFECT 1 — Countdown (3 → 2 → 1 → playing)
@@ -335,6 +346,7 @@ export function useGameEngine(props: EngineProps) {
             if (remaining <= 0) {
                 console.log(`[engine] timer expired: t=${Date.now()} round=${currentRoundRef.current}`);
                 stopRoundTick();
+                stopBotTimer();
 
                 // Auto-submit empty answer for the player if they haven't answered
                 if (myChoiceRef.current === null) {
@@ -366,9 +378,28 @@ export function useGameEngine(props: EngineProps) {
             }
         }, 50);
 
+        // ── Independent bot answer timer ──
+        if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
+            const bq = questionsRef.current[currentRound];
+            if (bq) {
+                const bDur = getQuestionDuration(bq.type);
+                const br = simulateBotResponse(bq, botProfileRef.current, bDur);
+                const botMs = Math.max(200, br.time_taken * 1000);
+                botTimerRef.current = window.setTimeout(() => {
+                    botTimerRef.current = null;
+                    if (opponentChoiceRef.current !== null) return;
+                    const botChoice = pickBotChoice(bq, br.correct);
+                    const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                    console.log(`[engine] bot answer (independent): t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${pts}, timeTaken=${br.time_taken}s`);
+                    setOpponentChoice(botChoice);
+                    setOpponentCurrentPoints(pts);
+                }, botMs);
+            }
+        }
+
         return () => {
             stopRoundTick();
-            // Do NOT stop the overall timer — it runs across all rounds
+            stopBotTimer();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, currentRound]);
@@ -468,9 +499,6 @@ export function useGameEngine(props: EngineProps) {
         setMyChoice(choice);
         setMyCurrentPoints(pts);
 
-        // Stop the tick timer since the player answered
-        stopRoundTick();
-
         // Play sound
         void (async () => {
             const { wordupAudio } = await import("../../../utils/wordupAudio");
@@ -478,25 +506,22 @@ export function useGameEngine(props: EngineProps) {
             else wordupAudio.playIncorrect();
         })();
 
-        // Live-bot: schedule a simulated bot answer
+        // Live-bot: answer immediately for fast UX
         if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
+            stopBotTimer();
             const br = simulateBotResponse(q, botProfileRef.current, duration);
-            const delay = Math.max(500, br.time_taken * 1000);
-
-            setTimeout(() => {
-                const botChoice = pickBotChoice(q, br.correct);
-                const botPts = calcPoints(
-                    br.correct,
-                    br.time_taken,
-                    duration,
-                    currentRoundRef.current === 6,
-                );
-                console.log(`[engine] bot answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${botPts}, timeTaken=${br.time_taken}s`);
-                setOpponentChoice(botChoice);
-                setOpponentCurrentPoints(botPts);
-            }, delay);
+            const botChoice = pickBotChoice(q, br.correct);
+            const botPts = calcPoints(
+                br.correct,
+                br.time_taken,
+                duration,
+                currentRoundRef.current === 6,
+            );
+            console.log(`[engine] bot answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${botPts}, timeTaken=${br.time_taken}s`);
+            setOpponentChoice(botChoice);
+            setOpponentCurrentPoints(botPts);
         }
-    }, [stopRoundTick]);
+    }, [stopRoundTick, stopBotTimer]);
 
     /**
      * Handle opponent answer from a live PvP broadcast.
@@ -548,6 +573,7 @@ export function useGameEngine(props: EngineProps) {
             if (mId.startsWith("bot-match-")) {
                 // ── Local bot match — generate questions on the fly ──
                 const category = useLiveStore.getState().category || "mixed";
+                console.log(`[engine] bot startMatch category: "${category}" (store raw: "${useLiveStore.getState().category}")`);
                 matchData = {
                     id: mId,
                     category,
@@ -562,7 +588,26 @@ export function useGameEngine(props: EngineProps) {
                     p1_score: 0,
                     p2_score: 0,
                 };
-                questions = await generateWordUpQuestions(category);
+                if (isProceduralCategory(category)) {
+                    console.log(`[engine] bot using edge function for procedural category "${category}"`);
+                    const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                    const seed = `${cleanId}-${category}`;
+                    const { data: edgeData } = await supabase.functions.invoke(
+                        "generate-match-questions",
+                        { body: { matchId: cleanId, category, seed } },
+                    );
+                    if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
+                        questions = await decryptMatchQuestions({
+                            questions: edgeData.encryptedQuestions,
+                            encryption_key: edgeData.encryptionKey,
+                        } as any);
+                    } else {
+                        console.log(`[engine] edge function failed, fallback to local generator`);
+                        questions = await generateWordUpQuestions(category);
+                    }
+                } else {
+                    questions = await generateWordUpQuestions(category);
+                }
                 const bp = getRandomBotProfile();
                 botProfileRef.current = bp;
                 const prof = BOT_PROFILES[bp];
@@ -586,6 +631,7 @@ export function useGameEngine(props: EngineProps) {
                     .single();
                 if (!match) return;
                 matchData = match;
+                console.log(`[engine] live startMatch: matchId="${mId}", match.category="${match?.category ?? "undefined"}"`);
                 questions = await decryptMatchQuestions(match);
                 await preloadMatchImages(questions);
 
@@ -622,6 +668,15 @@ export function useGameEngine(props: EngineProps) {
             matchDataRef.current = matchData;
             opponentStatsRef.current = oppStats;
             roleRef.current = activeRole;
+
+            // Reset scores and choices for new game
+            setMyScore(0);
+            setOpponentScore(0);
+            setMyCurrentPoints(0);
+            setOpponentCurrentPoints(0);
+            setMyChoice(null);
+            setOpponentChoice(null);
+            setLastRoundPopup(false);
 
             // Start the countdown
             setPhase("countdown");

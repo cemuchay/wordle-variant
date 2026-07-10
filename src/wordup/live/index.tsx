@@ -157,15 +157,15 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       startMatchRef.current?.(newMId, newRole);
    }, [setMatchId, setRole]);
 
-   const engine = useGameEngine({
-      gameType: gameType as any || "live-bot",
-      matchId,
-      role,
-      getSyncedNow,
-      triggerToast,
-      onGameOver,
-      onRematchAccepted,
-   });
+    const engine = useGameEngine({
+       gameType: gameType as any || "live-bot",
+       matchId,
+       role,
+       getSyncedNow,
+       triggerToast,
+       onGameOver,
+       onRematchAccepted,
+    });
 
    const launchedMatchRef = useRef<string | null>(null);
    const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
