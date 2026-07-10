@@ -272,6 +272,28 @@ export function useGameEngine(props: EngineProps) {
         const finalMy = myScoreRef.current + myCurrentPointsRef.current;
         const finalOpp = opponentScoreRef.current + opponentCurrentPointsRef.current;
 
+        // Push last round answers into matchData
+        const p1Arr = matchDataRef.current?.p1_answers;
+        const p2Arr = matchDataRef.current?.p2_answers;
+        if (Array.isArray(p1Arr)) {
+            p1Arr.push({
+                question_idx: currentRoundRef.current,
+                choice: myChoiceRef.current,
+                correct: myChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
+                points: myCurrentPointsRef.current,
+                time_taken: 0,
+            });
+        }
+        if (Array.isArray(p2Arr)) {
+            p2Arr.push({
+                question_idx: currentRoundRef.current,
+                choice: opponentChoiceRef.current,
+                correct: opponentChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
+                points: opponentCurrentPointsRef.current,
+                time_taken: 0,
+            });
+        }
+
         setMyScore(finalMy);
         setOpponentScore(finalOpp);
         setPhase("gameover");
@@ -589,6 +611,8 @@ export function useGameEngine(props: EngineProps) {
     const abortMatch = useCallback(async () => {
         stopAllTimers();
         setPhase("idle");
+        useLiveStore.getState().setView("menu");
+        useLiveStore.getState().resetGame();
     }, [stopAllTimers]);
     const purgeAndReset = useCallback(async () => {
         stopAllTimers();

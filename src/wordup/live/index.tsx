@@ -84,6 +84,8 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    const onGameOver = useCallback(async (match: any) => {
       if (useLiveStore.getState().view === "gameover") return;
       setView("gameover");
+      setMatchId(null);
+      setRole(null);
 
       if (!effectiveUser) return;
       const isP1 = role === "player1";
@@ -181,7 +183,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
          }
       }
-   }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
+   }, [effectiveUser, updateStats, triggerToast, role, userStats, setView, setMatchId, setRole]);
 
    const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
       launchedMatchRef.current = newMId;
