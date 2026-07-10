@@ -148,6 +148,39 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             }
          }
       } catch { /* best-effort difficulty tracking */ }
+
+      // Save bot match record to DB with retry queue
+      if (match.is_bot_match) {
+         const record = {
+            id: match.id,
+            category: match.category,
+            player1_id: effectiveUser.id,
+            player2_id: "00000000-0000-0000-0000-000000000b0b",
+            is_bot_match: true,
+            bot_profile: match.bot_profile,
+            status: "completed",
+            game_type: "live-bot",
+            p1_score: match.p1_score,
+            p2_score: match.p2_score,
+            p1_answers: match.p1_answers || [],
+            p2_answers: match.p2_answers || [],
+            p1_answered: true,
+            p2_answered: true,
+            completed_at: match.completed_at || new Date().toISOString(),
+         };
+         const PENDING_KEY = "wordup_pending_bot_matches";
+         const getPending = () => { try { return JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]"); } catch { return []; } };
+         const setPending = (list: any[]) => safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(list));
+         const pending = getPending();
+         pending.push(record);
+         setPending(pending);
+         try {
+            await supabase.from("wordup_matches").insert(record);
+            setPending(getPending().filter((m: any) => m.id !== record.id));
+         } catch (e) {
+            console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
+         }
+      }
    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
    const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
@@ -259,6 +292,26 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
       };
    }, [resetGame]);
+
+   // Retry pending bot match saves on mount
+   useEffect(() => {
+      const PENDING_KEY = "wordup_pending_bot_matches";
+      let cancelled = false;
+      (async () => {
+         const pending = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
+         for (const record of pending) {
+            if (cancelled) break;
+            try {
+               await supabase.from("wordup_matches").insert(record);
+               if (!cancelled) {
+                  const remaining = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
+                  safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(remaining.filter((m: any) => m.id !== record.id)));
+               }
+            } catch {}
+         }
+      })();
+      return () => { cancelled = true; };
+   }, []);
 
    const handleSelectHistoryMatch = useCallback(async (match: any) => {
       if (!effectiveUser) return;

@@ -66,15 +66,23 @@ function buildFinalMatch(
     role: "player1" | "player2" | null,
     myScore: number,
     opponentScore: number,
+    cleanId?: string,
+    botProfileKey?: string,
+    encryptedQuestions?: string,
+    encryptionKey?: string,
 ) {
     return {
         ...matchData,
+        id: cleanId || matchData.id,
         p1_score: role === "player1" ? myScore : opponentScore,
         p2_score: role === "player1" ? opponentScore : myScore,
         p1_answered: true,
         p2_answered: true,
         status: "completed",
         completed_at: new Date().toISOString(),
+        questions: encryptedQuestions || matchData.questions || null,
+        encryption_key: encryptionKey || (matchData.encryption_key as string) || null,
+        ...(botProfileKey ? { bot_profile: botProfileKey } : {}),
     };
 }
 
@@ -137,6 +145,11 @@ export function useGameEngine(props: EngineProps) {
 
     // Guard: prevents the "both answered" effect from firing twice
     const transitioningRef = useRef(false);
+
+    // Clean UUID for DB save (set once in edge function path)
+    const cleanIdRef = useRef<string>("");
+    const encryptedQuestionsRef = useRef<string>("");
+    const encryptionKeyRef = useRef<string>("");
 
     // Phase ref for use in callbacks (avoids stale closures)
     const phaseRef = useRef<Status>("idle");
@@ -214,6 +227,28 @@ export function useGameEngine(props: EngineProps) {
 
         transitioningRef.current = false;
 
+        // Push current round answers into matchData before resetting
+        const p1Arr = matchDataRef.current?.p1_answers;
+        const p2Arr = matchDataRef.current?.p2_answers;
+        if (Array.isArray(p1Arr)) {
+            p1Arr.push({
+                question_idx: currentRoundRef.current,
+                choice: myChoiceRef.current,
+                correct: myChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
+                points: myCurrentPointsRef.current,
+                time_taken: 0,
+            });
+        }
+        if (Array.isArray(p2Arr)) {
+            p2Arr.push({
+                question_idx: currentRoundRef.current,
+                choice: opponentChoiceRef.current,
+                correct: opponentChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
+                points: opponentCurrentPointsRef.current,
+                time_taken: 0,
+            });
+        }
+
         setMyScore((s) => s + myCurrentPointsRef.current);
         setOpponentScore((s) => s + opponentCurrentPointsRef.current);
 
@@ -244,7 +279,7 @@ export function useGameEngine(props: EngineProps) {
         stopAllTimers();
         safeLocalStorage.removeItem("wordup_active_game");
         const md = matchDataRef.current;
-        onGameOver(buildFinalMatch(md || {}, roleRef.current, finalMy, finalOpp));
+        onGameOver(buildFinalMatch(md || {}, roleRef.current, finalMy, finalOpp, cleanIdRef.current, botProfileRef.current, encryptedQuestionsRef.current, encryptionKeyRef.current));
     }, [onGameOver, stopAllTimers]);
 
     /** Start the reveal phase, then advance or game-over after a delay. */
@@ -591,12 +626,15 @@ export function useGameEngine(props: EngineProps) {
                 if (isProceduralCategory(category)) {
                     console.log(`[engine] bot using edge function for procedural category "${category}"`);
                     const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                    cleanIdRef.current = cleanId;
                     const seed = `${cleanId}-${category}`;
                     const { data: edgeData } = await supabase.functions.invoke(
                         "generate-match-questions",
                         { body: { matchId: cleanId, category, seed } },
                     );
                     if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
+                        encryptedQuestionsRef.current = edgeData.encryptedQuestions;
+                        encryptionKeyRef.current = edgeData.encryptionKey;
                         questions = await decryptMatchQuestions({
                             questions: edgeData.encryptedQuestions,
                             encryption_key: edgeData.encryptionKey,
