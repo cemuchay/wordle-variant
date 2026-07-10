@@ -26,6 +26,8 @@ import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
     decryptMatchQuestions,
     generateWordUpQuestions,
+    generateSecretKey,
+    encryptQuestions,
     simulateBotResponse,
     getRandomBotProfile,
 } from "../../../utils/wordupQuestionGenerator";
@@ -222,7 +224,6 @@ export function useGameEngine(props: EngineProps) {
     /** Advance to the next round — accumulates points, resets choices. */
     const advanceRound = useCallback(() => {
         const next = currentRoundRef.current + 1;
-        console.log(`[engine] advanceRound: next=${next}, max=6, willAdvance=${next <= 6}`);
         if (next > 6) return;
 
         transitioningRef.current = false;
@@ -306,7 +307,6 @@ export function useGameEngine(props: EngineProps) {
 
     /** Start the reveal phase, then advance or game-over after a delay. */
     const beginReveal = useCallback(() => {
-        console.log(`[engine] beginReveal: round=${currentRoundRef.current}, isLast=${currentRoundRef.current >= 6}`);
         transitioningRef.current = true;
         stopRoundTick();
         stopBotTimer();
@@ -323,7 +323,6 @@ export function useGameEngine(props: EngineProps) {
 
         revealRef.current = window.setTimeout(() => {
             revealRef.current = null;
-            console.log(`[engine] reveal timeout fired: isLast=${isLast}, currentRound=${currentRoundRef.current}`);
             if (isLast) {
                 endGame();
             } else if (currentRoundRef.current === 5) {
@@ -348,7 +347,6 @@ export function useGameEngine(props: EngineProps) {
             if (count <= 0) {
                 stopCountdown();
 
-                console.log(`[engine] countdown done → starting round 0, total questions: ${questionsRef.current.length}`);
                 // Start the first round
                 setCurrentRound(0);
                 setMyChoice(null);
@@ -401,7 +399,6 @@ export function useGameEngine(props: EngineProps) {
 
             // ── Timer expired ───────────────────────────────────────
             if (remaining <= 0) {
-                console.log(`[engine] timer expired: t=${Date.now()} round=${currentRoundRef.current}`);
                 stopRoundTick();
                 stopBotTimer();
 
@@ -447,7 +444,6 @@ export function useGameEngine(props: EngineProps) {
                     if (opponentChoiceRef.current !== null) return;
                     const botChoice = pickBotChoice(bq, br.correct);
                     const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
-                    console.log(`[engine] bot answer (independent): t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${pts}, timeTaken=${br.time_taken}s`);
                     setOpponentChoice(botChoice);
                     setOpponentCurrentPoints(pts);
                 }, botMs);
@@ -472,7 +468,6 @@ export function useGameEngine(props: EngineProps) {
         if (myChoice === null || opponentChoice === null) return;
         if (transitioningRef.current) return;
 
-        console.log(`[engine] EFFECT 3 both answered: t=${Date.now()} round=${currentRound}, myChoice="${myChoice}", opponentChoice="${opponentChoice}" → beginReveal`);
         beginReveal();
     }, [phase, myChoice, opponentChoice, currentRound, beginReveal]);
 
@@ -537,10 +532,7 @@ export function useGameEngine(props: EngineProps) {
      * For live-bot: immediately schedules a simulated bot answer.
      */
     const handleAnswerSelect = useCallback((choice: string) => {
-        if (myChoiceRef.current !== null || phaseRef.current !== "playing") {
-            console.log(`[engine] handleAnswerSelect BLOCKED: choice=${choice}, myChoiceRef=${myChoiceRef.current}, phase=${phaseRef.current}`);
-            return;
-        }
+        if (myChoiceRef.current !== null || phaseRef.current !== "playing") return;
 
         const q = questionsRef.current[currentRoundRef.current];
         if (!q) return;
@@ -550,8 +542,6 @@ export function useGameEngine(props: EngineProps) {
         const timeTaken = parseFloat(elapsed.toFixed(2));
         const correct = choice !== "" && choice === q.answer;
         const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
-
-        console.log(`[engine] player answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${choice}", correct=${correct}, pts=${pts}, timeTaken=${timeTaken}s`);
 
         setMyChoice(choice);
         setMyCurrentPoints(pts);
@@ -574,7 +564,6 @@ export function useGameEngine(props: EngineProps) {
                 duration,
                 currentRoundRef.current === 6,
             );
-            console.log(`[engine] bot answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${botPts}, timeTaken=${br.time_taken}s`);
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
@@ -585,17 +574,13 @@ export function useGameEngine(props: EngineProps) {
      * Called externally when a `player_answered` message arrives.
      */
     const handleOpponentAnswer = useCallback((choice: string, timeTaken: number) => {
-        if (opponentChoiceRef.current !== null || phaseRef.current !== "playing") {
-            console.log(`[engine] handleOpponentAnswer BLOCKED: choice=${choice}, opponentChoiceRef=${opponentChoiceRef.current}, phase=${phaseRef.current}`);
-            return;
-        }
+        if (opponentChoiceRef.current !== null || phaseRef.current !== "playing") return;
 
         const q = questionsRef.current[currentRoundRef.current];
         const duration = q ? getQuestionDuration(q.type) : 10;
         const correct = choice === q?.answer;
         const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
 
-        console.log(`[engine] opponent answer: round=${currentRoundRef.current}, choice="${choice}", correct=${correct}, pts=${pts}, timeTaken=${timeTaken}s`);
         setOpponentChoice(choice);
         setOpponentCurrentPoints(pts);
     }, []);
@@ -632,7 +617,6 @@ export function useGameEngine(props: EngineProps) {
             if (mId.startsWith("bot-match-")) {
                 // ── Local bot match — generate questions on the fly ──
                 const category = useLiveStore.getState().category || "mixed";
-                console.log(`[engine] bot startMatch category: "${category}" (store raw: "${useLiveStore.getState().category}")`);
                 matchData = {
                     id: mId,
                     category,
@@ -648,7 +632,6 @@ export function useGameEngine(props: EngineProps) {
                     p2_score: 0,
                 };
                 if (isProceduralCategory(category)) {
-                    console.log(`[engine] bot using edge function for procedural category "${category}"`);
                     const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
                     cleanIdRef.current = cleanId;
                     const seed = `${cleanId}-${category}`;
@@ -664,11 +647,16 @@ export function useGameEngine(props: EngineProps) {
                             encryption_key: edgeData.encryptionKey,
                         } as any);
                     } else {
-                        console.log(`[engine] edge function failed, fallback to local generator`);
                         questions = await generateWordUpQuestions(category);
+                        const fKey = generateSecretKey();
+                        encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
+                        encryptionKeyRef.current = fKey;
                     }
                 } else {
                     questions = await generateWordUpQuestions(category);
+                    const fKey = generateSecretKey();
+                    encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
+                    encryptionKeyRef.current = fKey;
                 }
                 const bp = getRandomBotProfile();
                 botProfileRef.current = bp;
@@ -693,7 +681,6 @@ export function useGameEngine(props: EngineProps) {
                     .single();
                 if (!match) return;
                 matchData = match;
-                console.log(`[engine] live startMatch: matchId="${mId}", match.category="${match?.category ?? "undefined"}"`);
                 questions = await decryptMatchQuestions(match);
                 await preloadMatchImages(questions);
 

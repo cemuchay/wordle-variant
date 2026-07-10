@@ -153,30 +153,32 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       // Save bot match record to DB with retry queue
       if (match.is_bot_match) {
-         const record = {
-            id: match.id,
-            category: match.category,
-            player1_id: effectiveUser.id,
-            player2_id: "00000000-0000-0000-0000-000000000b0b",
-            is_bot_match: true,
-            bot_profile: match.bot_profile,
-            status: "completed",
-            game_type: "live-bot",
-            p1_score: match.p1_score,
-            p2_score: match.p2_score,
-            p1_answers: match.p1_answers || [],
-            p2_answers: match.p2_answers || [],
-            p1_answered: true,
-            p2_answered: true,
+          const record = {
+             id: match.id,
+             category: match.category,
+             player1_id: effectiveUser.id,
+             player2_id: "00000000-0000-0000-0000-000000000b0b",
+             is_bot_match: true,
+             bot_profile: match.bot_profile,
+             status: "completed",
+             game_type: "live-bot",
+             p1_score: match.p1_score,
+             p2_score: match.p2_score,
+             p1_answers: match.p1_answers || [],
+             p2_answers: match.p2_answers || [],
+             questions: match.questions || null,
+             encryption_key: match.encryption_key || null,
+             p1_answered: true,
+             p2_answered: true,
             completed_at: match.completed_at || new Date().toISOString(),
          };
          const PENDING_KEY = "wordup_pending_bot_matches";
          const getPending = () => { try { return JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]"); } catch { return []; } };
          const setPending = (list: any[]) => safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(list));
-         const pending = getPending();
-         pending.push(record);
-         setPending(pending);
-         try {
+          const pending = getPending();
+          pending.push(record);
+          setPending(pending);
+          try {
             await supabase.from("wordup_matches").insert(record);
             setPending(getPending().filter((m: any) => m.id !== record.id));
          } catch (e) {
