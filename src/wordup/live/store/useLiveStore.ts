@@ -27,10 +27,11 @@ interface LiveState {
    countdownSecs: number;
    timeLeft: number;
    maxTime: number;
-   selectedAnswer: string | null;
-   revealAnswers: boolean;
+    selectedAnswer: string | null;
+    opponentChoice: string | null;
+    revealAnswers: boolean;
 
-   setIsBattlePlaying: (playing: boolean) => void;
+    setIsBattlePlaying: (playing: boolean) => void;
    setView: (view: "menu" | "connecting" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading") => void;
    setCategory: (category: string) => void;
    setMatchId: (matchId: string | null) => void;
@@ -42,8 +43,9 @@ interface LiveState {
    setCountdownSecs: (secs: number) => void;
    setTimeLeft: (time: number) => void;
    setMaxTime: (time: number) => void;
-   setSelectedAnswer: (ans: string | null) => void;
-   setRevealAnswers: (reveal: boolean) => void;
+    setSelectedAnswer: (ans: string | null) => void;
+    setOpponentChoice: (choice: string | null) => void;
+    setRevealAnswers: (reveal: boolean) => void;
    setActiveTab: (tab: LiveTab) => void;
    resetGame: () => void;
 }
@@ -62,8 +64,9 @@ export const useLiveStore = create<LiveState>((set) => ({
    countdownSecs: 6,
    timeLeft: 10.0,
    maxTime: 10.0,
-   selectedAnswer: null,
-   revealAnswers: false,
+    selectedAnswer: null,
+    opponentChoice: null,
+    revealAnswers: false,
 
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
@@ -84,8 +87,9 @@ export const useLiveStore = create<LiveState>((set) => ({
    setCountdownSecs: (countdownSecs) => set({ countdownSecs }),
    setTimeLeft: (timeLeft) => set({ timeLeft }),
    setMaxTime: (maxTime) => set({ maxTime }),
-   setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
-   setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
+    setSelectedAnswer: (selectedAnswer) => set({ selectedAnswer }),
+    setOpponentChoice: (opponentChoice) => set({ opponentChoice }),
+    setRevealAnswers: (revealAnswers) => set({ revealAnswers }),
    setActiveTab: (activeTab) => {
       safeSessionStorage.setItem("wordup_live_tab", activeTab);
       set({ activeTab });
@@ -105,8 +109,9 @@ export const useLiveStore = create<LiveState>((set) => ({
          countdownSecs: 6,
          timeLeft: 10.0,
          maxTime: 10.0,
-         selectedAnswer: null,
-         revealAnswers: false,
+          selectedAnswer: null,
+          opponentChoice: null,
+          revealAnswers: false,
       });
    },
 }));

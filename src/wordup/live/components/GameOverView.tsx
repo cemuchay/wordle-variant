@@ -25,9 +25,9 @@ export const GameOverView = ({
    sendRematch,
    acceptRematch
 }: GameOverViewProps) => {
-   if (!matchData) return null;
-
    const questions = useLiveStore((s) => s.questions);
+
+   if (!matchData) return null;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;

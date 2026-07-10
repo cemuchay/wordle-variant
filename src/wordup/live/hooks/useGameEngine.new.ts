@@ -1,290 +1,660 @@
 // ── Simplified live game engine ────────────────────────────────────
-// One useReducer, three useEffects, zero stale refs.
-// Supports live-bot and live-PvP flows.
+//
+// ≈ 150 lines, zero useReducer, zero stale closures.
+//
+// Two timers:
+//   1. Overall game timer (safety net) — starts when the match begins,
+//      runs for the sum of all round durations + 15 s buffer. If the
+//      game isn't over by then, it force-ends.
+//   2. Per-round timer (50 ms tick) — starts each round, fires an empty
+//      answer for any player who hasn't answered when time runs out.
+//
+// Round advance logic:
+//   Both players answered  OR  the per-round timer expired.
+//
+// State is plain useState.  All data that timeout / interval callbacks
+// need is mirrored to refs so the callbacks never capture stale
+// closures.
+//
+// Supports live-bot (simulated bot opponent) and live PvP (real
+// opponent over Supabase realtime).
 
-import { useReducer, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useLiveStore } from "../store/useLiveStore";
 import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
-   decryptMatchQuestions,
-   generateWordUpQuestions,
-   simulateBotResponse,
-   getRandomBotProfile,
+    decryptMatchQuestions,
+    generateWordUpQuestions,
+    simulateBotResponse,
+    getRandomBotProfile,
 } from "../../../utils/wordupQuestionGenerator";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
-import {
-   gameReducer,
-   initialGameState,
-   type GameType,
-} from "./useGameEngine.new.types";
+import { safeLocalStorage } from "../../../utils/storage";
 import type { WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
+import type { ProfileStats } from "../../shared/types";
 
-// ── Props ─────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────
+
+type Status = "idle" | "countdown" | "playing" | "reveal" | "gameover";
+type GameType = "live" | "live-bot";
 
 interface EngineProps {
-   gameType: GameType;
-   matchId: string | null;
-   role: "player1" | "player2" | null;
-   getSyncedNow: () => number;
-   triggerToast: (msg: string, dur?: number) => void;
-   onGameOver: (match: any) => void;
-   onRematchAccepted: (newMatchId: string, role: "player1" | "player2") => void;
+    gameType: GameType;
+    matchId: string | null;
+    role: "player1" | "player2" | null;
+    getSyncedNow: () => number;
+    triggerToast: (msg: string, dur?: number) => void;
+    onGameOver: (match: Record<string, unknown>) => void;
+    onRematchAccepted: (newMatchId: string, role: "player1" | "player2") => void;
 }
 
-// ── Pick a wrong choice for bot incorrect answers ─────────────────
+// ── Pure helpers ──────────────────────────────────────────────────
 
+/** Pick a bot choice — correct answer or a random wrong one. */
 function pickBotChoice(q: WordUpQuestion, correct: boolean): string {
-   if (correct) return q.answer;
-   const wrong = q.choices.filter((c) => c !== q.answer);
-   return wrong[Math.floor(Math.random() * wrong.length)] || "WRONG";
+    if (correct) return q.answer;
+    const wrong = q.choices.filter((c) => c !== q.answer);
+    return wrong[Math.floor(Math.random() * wrong.length)] || "WRONG";
+}
+
+/** Build the final match object passed to onGameOver. */
+function buildFinalMatch(
+    matchData: Record<string, unknown>,
+    role: "player1" | "player2" | null,
+    myScore: number,
+    opponentScore: number,
+) {
+    return {
+        ...matchData,
+        p1_score: role === "player1" ? myScore : opponentScore,
+        p2_score: role === "player1" ? opponentScore : myScore,
+        p1_answered: true,
+        p2_answered: true,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+    };
 }
 
 // ── Hook ──────────────────────────────────────────────────────────
 
 export function useGameEngine(props: EngineProps) {
-   const { gameType, matchId: _matchId, role: _role, getSyncedNow: _getSyncedNow, triggerToast, onGameOver } = props;
-   const [state, dispatch] = useReducer(gameReducer, initialGameState);
+    const {
+        gameType,
+        triggerToast,
+        onGameOver,
+    } = props;
 
-   if (import.meta.env.DEV) {
-      (window as any).__gameDispatch = dispatch;
-   }
+    // ══════════════════════════════════════════════════════════════════
+    // State (triggers re-renders)
+    // ══════════════════════════════════════════════════════════════════
 
-   // ── Zustand sync (one effect) ──────────────────────────────────
-   useEffect(() => {
-      const s = useLiveStore.getState();
-      const status = state.status;
-      if (status === "idle") return; // don't touch view until match starts
+    const [phase, setPhase] = useState<Status>("idle");
+    const [currentRound, setCurrentRound] = useState(0);
+    const [myChoice, setMyChoice] = useState<string | null>(null);
+    const [opponentChoice, setOpponentChoice] = useState<string | null>(null);
+    const [timeRemaining, setTimeRemaining] = useState(10);
+    const [maxTime, setMaxTime] = useState(10);
+    const [myScore, setMyScore] = useState(0);
+    const [opponentScore, setOpponentScore] = useState(0);
+    const [myCurrentPoints, setMyCurrentPoints] = useState(0);
+    const [opponentCurrentPoints, setOpponentCurrentPoints] = useState(0);
+    const [countdownText, setCountdownText] = useState("3");
+    const [lastRoundPopup, setLastRoundPopup] = useState(false);
 
-      if (status === "countdown") s.setView("countdown");
-      else if (status === "playing" || status === "reveal") s.setView("battle");
-      else if (status === "gameover") s.setView("gameover");
+    // ══════════════════════════════════════════════════════════════════
+    // Refs — mutable, never cause re-renders
+    // ══════════════════════════════════════════════════════════════════
 
-      s.setIsBattlePlaying(status === "playing" || status === "reveal");
-      s.setSelectedAnswer(state.myChoice);
-      s.setTimeLeft(state.timeRemaining);
-      s.setMaxTime(state.maxTime);
-      s.setCurrentIdx(state.currentRound);
-      s.setRevealAnswers(state.status === "reveal");
-      if (state.matchData) {
-         const showRunning = status === "playing" || status === "reveal";
-         const runningMy = state.myScore + (showRunning ? state.myCurrentPoints : 0);
-         const runningOpp = state.opponentScore + (showRunning ? state.opponentCurrentPoints : 0);
-         s.setMatchData({
-            ...state.matchData,
-            p1_score: state.role === "player1" ? runningMy : runningOpp,
-            p2_score: state.role === "player1" ? runningOpp : runningMy,
-         });
-      }
-      s.setQuestions(state.questions);
-      s.setOpponentStats(state.opponentStats);
-   }, [state]);
+    // Stable data (set once by startMatch)
+    const roleRef = useRef<"player1" | "player2" | null>(null);
+    const gameTypeRef = useRef<GameType>(gameType);
+    const questionsRef = useRef<WordUpQuestion[]>([]);
+    const matchDataRef = useRef<Record<string, unknown> | null>(null);
+    const opponentStatsRef = useRef<ProfileStats | null>(null);
+    const botProfileRef = useRef<string>("average");
 
-   // ── Countdown (3 → 2 → 1 → playing) ────────────────────────────
-   useEffect(() => {
-      if (state.status !== "countdown") return;
-      let count = 3;
-      dispatch({ type: "COUNTDOWN_TICK", text: "3" });
+    // Per-round anchor (used by the 50 ms tick interval)
+    const roundStartedAtRef = useRef(0);
 
-      const id = setInterval(() => {
-         count--;
-         if (count <= 0) {
-            clearInterval(id);
-            dispatch({ type: "COUNTDOWN_DONE" });
-            dispatch({ type: "START_ROUND", round: 0, startedAt: Date.now() });
-         } else {
-            dispatch({ type: "COUNTDOWN_TICK", text: String(count) });
-         }
-      }, 1000);
-      return () => clearInterval(id);
-   }, [state.status]);
+    // Mutable mirrors of state so timer callbacks never read stale closures
+    const myChoiceRef = useRef<string | null>(null);
+    const opponentChoiceRef = useRef<string | null>(null);
+    const currentRoundRef = useRef(0);
+    const myScoreRef = useRef(0);
+    const opponentScoreRef = useRef(0);
+    const myCurrentPointsRef = useRef(0);
+    const opponentCurrentPointsRef = useRef(0);
 
-   // ── Timer tick (50ms) ──────────────────────────────────────────
-   useEffect(() => {
-      if (state.status !== "playing") return;
-      const q = state.questions[state.currentRound];
-      const duration = q ? getQuestionDuration(q.type) : 10;
+    // Timer IDs
+    const countdownRef = useRef<number | null>(null);
+    const roundTickRef = useRef<number | null>(null);
+    const revealRef = useRef<number | null>(null);
+    const overallRef = useRef<number | null>(null);
 
-      const id = setInterval(() => {
-         const elapsed = (Date.now() - state.roundStartedAt) / 1000;
-         const remaining = Math.max(0, duration - elapsed);
-         dispatch({ type: "TICK", remaining });
-         if (remaining <= 0) {
-            clearInterval(id);
-            dispatch({ type: "MY_ANSWER", choice: "", timeTaken: duration });
-         }
-      }, 50);
-      return () => clearInterval(id);
-   }, [state.status, state.currentRound, state.roundStartedAt, state.questions]);
+    // Guard: prevents the "both answered" effect from firing twice
+    const transitioningRef = useRef(false);
 
-   // ── Bot timeout ────────────────────────────────────────────────
-   useEffect(() => {
-      if (state.gameType !== "live-bot" || state.status !== "playing") return;
-      if (state.opponentChoice !== null) return;
+    // Phase ref for use in callbacks (avoids stale closures)
+    const phaseRef = useRef<Status>("idle");
 
-      const q = state.questions[state.currentRound];
-      if (!q) return;
-      const duration = getQuestionDuration(q.type);
-      const br = simulateBotResponse(q, "average", duration);
-      const delay = Math.max(500, br.time_taken * 1000);
+    // ── Keep refs in sync with state (effect, not render) ──────────
+    useEffect(() => {
+        roleRef.current = props.role;
+        gameTypeRef.current = gameType;
+        myChoiceRef.current = myChoice;
+        opponentChoiceRef.current = opponentChoice;
+        currentRoundRef.current = currentRound;
+        myScoreRef.current = myScore;
+        opponentScoreRef.current = opponentScore;
+        myCurrentPointsRef.current = myCurrentPoints;
+        opponentCurrentPointsRef.current = opponentCurrentPoints;
+        phaseRef.current = phase;
+    });
 
-      const id = setTimeout(() => {
-         const choice = pickBotChoice(q, br.correct);
-         const pts = calcPoints(br.correct, br.time_taken, duration, state.currentRound === 6);
-         dispatch({ type: "OPPONENT_ANSWER", choice, timeTaken: br.time_taken, correct: br.correct, points: pts });
-      }, delay);
-      return () => clearTimeout(id);
-   }, [state.status, state.currentRound, state.gameType, state.opponentChoice, state.questions]);
+    // ══════════════════════════════════════════════════════════════════
+    // Timer helpers
+    // ══════════════════════════════════════════════════════════════════
 
-   // ── Reveal → Advance / GameOver ────────────────────────────────
-   useEffect(() => {
-      if (state.status !== "reveal") return;
-      if (state.lastRoundPopup) return; // raw setTimeout below owns the advance
+    const stopCountdown = useCallback(() => {
+        if (countdownRef.current !== null) {
+            clearInterval(countdownRef.current);
+            countdownRef.current = null;
+        }
+    }, []);
 
-      const isLast = state.currentRound >= 6;
-      const delay = isLast ? 3200 : 1800;
+    const stopRoundTick = useCallback(() => {
+        if (roundTickRef.current !== null) {
+            clearInterval(roundTickRef.current);
+            roundTickRef.current = null;
+        }
+    }, []);
 
-      const id = setTimeout(() => {
-         if (isLast) {
-            dispatch({ type: "GAMEOVER" });
-            onGameOver(buildFinalMatch({
-               matchData: state.matchData,
-               role: state.role,
-               myScore: state.myScore + state.myCurrentPoints,
-               opponentScore: state.opponentScore + state.opponentCurrentPoints,
-            }));
-         } else if (state.currentRound === 5) {
-            // Round 5 → 6: show overlay, delay advance with a raw setTimeout
+    const stopReveal = useCallback(() => {
+        if (revealRef.current !== null) {
+            clearTimeout(revealRef.current);
+            revealRef.current = null;
+        }
+    }, []);
+
+    const stopOverall = useCallback(() => {
+        if (overallRef.current !== null) {
+            clearTimeout(overallRef.current);
+            overallRef.current = null;
+        }
+    }, []);
+
+    const stopAllTimers = useCallback(() => {
+        stopCountdown();
+        stopRoundTick();
+        stopReveal();
+        stopOverall();
+    }, [stopCountdown, stopRoundTick, stopReveal, stopOverall]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Internal actions (read refs, safe inside timeouts)
+    // ══════════════════════════════════════════════════════════════════
+
+    /** Advance to the next round — accumulates points, resets choices. */
+    const advanceRound = useCallback(() => {
+        const next = currentRoundRef.current + 1;
+        console.log(`[engine] advanceRound: next=${next}, max=6, willAdvance=${next <= 6}`);
+        if (next > 6) return;
+
+        transitioningRef.current = false;
+
+        setMyScore((s) => s + myCurrentPointsRef.current);
+        setOpponentScore((s) => s + opponentCurrentPointsRef.current);
+
+        setCurrentRound(next);
+        setMyChoice(null);
+        setOpponentChoice(null);
+        setMyCurrentPoints(0);
+        setOpponentCurrentPoints(0);
+        setLastRoundPopup(false);
+
+        const q = questionsRef.current[next];
+        const dur = q ? getQuestionDuration(q.type) : 10;
+        setTimeRemaining(dur);
+        setMaxTime(dur);
+        roundStartedAtRef.current = Date.now();
+        setPhase("playing");
+    }, []);
+
+    /** End the game, call onGameOver, clean up. */
+    const endGame = useCallback(() => {
+        const finalMy = myScoreRef.current + myCurrentPointsRef.current;
+        const finalOpp = opponentScoreRef.current + opponentCurrentPointsRef.current;
+
+        setMyScore(finalMy);
+        setOpponentScore(finalOpp);
+        setPhase("gameover");
+
+        stopAllTimers();
+        safeLocalStorage.removeItem("wordup_active_game");
+        const md = matchDataRef.current;
+        onGameOver(buildFinalMatch(md || {}, roleRef.current, finalMy, finalOpp));
+    }, [onGameOver, stopAllTimers]);
+
+    /** Start the reveal phase, then advance or game-over after a delay. */
+    const beginReveal = useCallback(() => {
+        console.log(`[engine] beginReveal: round=${currentRoundRef.current}, isLast=${currentRoundRef.current >= 6}`);
+        transitioningRef.current = true;
+        stopRoundTick();
+
+        const isLast = currentRoundRef.current >= 6;
+        const delay = isLast ? 3200 : 1800;
+
+        if (!isLast && currentRoundRef.current === 5) {
             triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
-            dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
-            setTimeout(() => dispatch({ type: "ADVANCE" }), 1500);
-         } else {
-            dispatch({ type: "ADVANCE" });
-         }
-      }, delay);
-      return () => clearTimeout(id);
-   }, [state.status, state.currentRound, state.lastRoundPopup, state.myScore, state.opponentScore, state.myCurrentPoints, state.opponentCurrentPoints, state.matchData, state.role, triggerToast, onGameOver]);
+            setLastRoundPopup(true);
+        }
 
-   // ── Handle my answer ───────────────────────────────────────────
-   const handleAnswerSelect = useCallback((choice: string) => {
-      if (state.myChoice !== null || state.status !== "playing") return;
+        setPhase("reveal");
 
-      const elapsed = (Date.now() - state.roundStartedAt) / 1000;
-      const timeTaken = parseFloat(elapsed.toFixed(2));
-      dispatch({ type: "MY_ANSWER", choice, timeTaken });
-
-      if (state.gameType === "live-bot") {
-         const q = state.questions[state.currentRound];
-         if (!q) return;
-         const duration = getQuestionDuration(q.type);
-         const br = simulateBotResponse(q, "average", duration);
-         const botChoice = pickBotChoice(q, br.correct);
-         const pts = calcPoints(br.correct, br.time_taken, duration, state.currentRound === 6);
-         dispatch({ type: "OPPONENT_ANSWER", choice: botChoice, timeTaken: br.time_taken, correct: br.correct, points: pts });
-      }
-   }, [state.myChoice, state.status, state.gameType, state.currentRound, state.questions, state.roundStartedAt]);
-
-   // ── Opponent answer (from broadcast for live PvP) ──────────────
-   // Called by LiveView when broadcast `player_answered` arrives.
-   const handleOpponentAnswer = useCallback((choice: string, timeTaken: number) => {
-      const q = state.questions[state.currentRound];
-      const correct = choice === q?.answer;
-      const duration = q ? getQuestionDuration(q.type) : 10;
-      const pts = calcPoints(correct, timeTaken, duration, state.currentRound === 6);
-      dispatch({ type: "OPPONENT_ANSWER", choice, timeTaken, correct, points: pts });
-   }, [state.currentRound, state.questions]);
-
-   // ── Start match (loads data, dispatches SET_INITIAL) ──────────
-   const startMatch = useCallback(async (mId: string, activeRole: "player1" | "player2") => {
-      let questions: WordUpQuestion[] = [];
-      let matchData: any = null;
-      let oppStats: any = null;
-
-      if (mId.startsWith("bot-match-")) {
-         // Local bot match — generate questions on the fly
-         matchData = {
-            id: mId, category: "mixed", status: "active",
-            is_bot_match: true, game_type: "live-bot", current_question_index: 0,
-            p1_answers: [], p2_answers: [], p1_answered: false, p2_answered: false,
-            p1_score: 0, p2_score: 0,
-         };
-         questions = await generateWordUpQuestions(matchData.category || "mixed");
-         const bp = getRandomBotProfile();
-         const prof = BOT_PROFILES[bp];
-         oppStats = { username: prof?.name || "Bot", rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" };
-      } else {
-         // Live match — load from Supabase
-         const { data: match } = await supabase.from("wordup_matches").select("*").eq("id", mId).single();
-         if (!match) return;
-         matchData = match;
-         questions = await decryptMatchQuestions(match);
-         await preloadMatchImages(questions);
-
-         // Load opponent profile
-         if (gameType === "live") {
-            const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
-            if (oppId) {
-               const profileResult = await supabase.from("profiles").select("username, avatar_url").eq("id", oppId).single();
-               const profile = profileResult.data;
-               oppStats = profile ? { ...profile, rating: 600, xp: 0, games_played: 0, games_won: 0, games_lost: 0, games_tied: 0, rank_name: "Bronze" } : null;
+        revealRef.current = window.setTimeout(() => {
+            revealRef.current = null;
+            console.log(`[engine] reveal timeout fired: isLast=${isLast}, currentRound=${currentRoundRef.current}`);
+            if (isLast) {
+                endGame();
+            } else if (currentRoundRef.current === 5) {
+                setLastRoundPopup(false);
+                advanceRound();
+            } else {
+                advanceRound();
             }
-         }
-      }
+        }, delay);
+    }, [triggerToast, advanceRound, endGame, stopRoundTick]);
 
-      dispatch({
-         type: "SET_INITIAL",
-         payload: { matchId: mId, gameType, role: activeRole, questions, matchData, opponentStats: oppStats },
-      });
-   }, [gameType]);
+    // ══════════════════════════════════════════════════════════════════
+    // EFFECT 1 — Countdown (3 → 2 → 1 → playing)
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        if (phase !== "countdown") return;
 
-   // ── Stub functions (existing LiveView depends on these) ────────
-   const sendRematch = useCallback(() => {}, []);
-   const acceptRematch = useCallback((_cb: any) => {}, []);
-   const sendQuickChat = useCallback(() => {}, []);
-   const sendSignalUpdate = useCallback((_level?: number) => {}, []);
-   const cleanup = useCallback(() => {}, []);
-   const abortMatch = useCallback(async () => { dispatch({ type: "RESET" }); }, []);
-   const purgeAndReset = useCallback(async () => { dispatch({ type: "RESET" }); }, []);
+        let count = 3;
 
-   return {
-      state: {
-         ...state,
-         phase: state.status,
-         selectedAnswer: state.myChoice,
-         rematchState: "idle" as const,
-         rematchCountdown: 0,
-         showRematchButton: false,
-         isConnected: true,
-         opponentSignalLevel: 0,
-         countdownText: state.countdownText,
-          lastRoundPopup: state.lastRoundPopup,
-      },
-      isConnected: true,
-      opponentSignalLevel: 0,
-      startMatch,
-      handleAnswerSelect,
-      handleOpponentAnswer,
-      sendRematch,
-      acceptRematch,
-      sendQuickChat,
-      sendSignalUpdate,
-      cleanup,
-      abortMatch,
-      purgeAndReset,
-   };
-}
+        countdownRef.current = window.setInterval(() => {
+            count--;
+            if (count <= 0) {
+                stopCountdown();
 
-// ── Helper: build final match data for onGameOver ──────────────────
+                console.log(`[engine] countdown done → starting round 0, total questions: ${questionsRef.current.length}`);
+                // Start the first round
+                setCurrentRound(0);
+                setMyChoice(null);
+                setOpponentChoice(null);
+                setMyCurrentPoints(0);
+                setOpponentCurrentPoints(0);
+                const q = questionsRef.current[0];
+                const dur = q ? getQuestionDuration(q.type) : 10;
+                setTimeRemaining(dur);
+                setMaxTime(dur);
+                roundStartedAtRef.current = Date.now();
+                setPhase("playing");
+            } else {
+                setCountdownText(String(count));
+            }
+        }, 1000);
 
-function buildFinalMatch(state: { matchData: any; role: "player1" | "player2" | null; myScore: number; opponentScore: number }) {
-   return {
-      ...state.matchData,
-      p1_score: state.role === "player1" ? state.myScore : state.opponentScore,
-      p2_score: state.role === "player1" ? state.opponentScore : state.myScore,
-      p1_answered: true,
-      p2_answered: true,
-      status: "completed",
-      completed_at: new Date().toISOString(),
-   };
+        return stopCountdown;
+    }, [phase, stopCountdown]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // EFFECT 2 — Round tick (50 ms) + overall safety timer
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        if (phase !== "playing") return;
+
+        // ── Overall game safety timer (starts once, never restarts) ──
+        if (overallRef.current === null) {
+            const totalSeconds = questionsRef.current.reduce(
+                (sum, q) => sum + getQuestionDuration(q.type),
+                0,
+            );
+            const timeoutMs = totalSeconds * 1000 + 15000; // sum of rounds + 15 s buffer
+
+            overallRef.current = window.setTimeout(() => {
+                // If the game somehow isn't over by now, force it
+                if (overallRef.current === null) return;
+                endGame();
+            }, timeoutMs);
+        }
+
+        // ── Per-round 50 ms tick ──
+        const q = questionsRef.current[currentRound];
+        const duration = q ? getQuestionDuration(q.type) : 10;
+
+        roundTickRef.current = window.setInterval(() => {
+            const elapsed = (Date.now() - roundStartedAtRef.current) / 1000;
+            const remaining = Math.max(0, duration - elapsed);
+            setTimeRemaining(remaining);
+
+            // ── Timer expired ───────────────────────────────────────
+            if (remaining <= 0) {
+                console.log(`[engine] timer expired: t=${Date.now()} round=${currentRoundRef.current}`);
+                stopRoundTick();
+
+                // Auto-submit empty answer for the player if they haven't answered
+                if (myChoiceRef.current === null) {
+                    setMyChoice("");
+                    setMyCurrentPoints(0);
+                }
+
+                // Live-bot: auto-submit empty for the bot too
+                if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
+                    const bq = questionsRef.current[currentRoundRef.current];
+                    if (bq) {
+                        const bDur = getQuestionDuration(bq.type);
+                        const br = simulateBotResponse(bq, botProfileRef.current, bDur);
+                        const botChoice = pickBotChoice(bq, br.correct);
+                        const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                        setOpponentChoice(botChoice);
+                        setOpponentCurrentPoints(pts);
+                    }
+                }
+
+                // Tick sound when ≤ 5 s remain
+                if (remaining <= 5.0 && remaining > 0) {
+                    // Import inline to avoid circular dep — wordupAudio is side-effect-free
+                    void (async () => {
+                        const { wordupAudio } = await import("../../../utils/wordupAudio");
+                        wordupAudio.playTicking();
+                    })();
+                }
+            }
+        }, 50);
+
+        return () => {
+            stopRoundTick();
+            // Do NOT stop the overall timer — it runs across all rounds
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, currentRound]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // EFFECT 3 — Both answered → reveal → advance / game-over
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        if (phase !== "playing") {
+            transitioningRef.current = false;
+            return;
+        }
+        if (myChoice === null || opponentChoice === null) return;
+        if (transitioningRef.current) return;
+
+        console.log(`[engine] EFFECT 3 both answered: t=${Date.now()} round=${currentRound}, myChoice="${myChoice}", opponentChoice="${opponentChoice}" → beginReveal`);
+        beginReveal();
+    }, [phase, myChoice, opponentChoice, currentRound, beginReveal]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Zustand sync (mirrors engine state → live store)
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        const s = useLiveStore.getState();
+
+        // Map status → view
+        if (phase === "idle") return;
+
+        if (phase === "countdown") s.setView("countdown");
+        else if (phase === "playing" || phase === "reveal") s.setView("battle");
+        else if (phase === "gameover") s.setView("gameover");
+
+        s.setIsBattlePlaying(phase === "playing" || phase === "reveal");
+        s.setSelectedAnswer(myChoice);
+        s.setOpponentChoice(opponentChoice);
+        s.setTimeLeft(timeRemaining);
+        s.setMaxTime(maxTime);
+        s.setCurrentIdx(currentRound);
+        s.setRevealAnswers(phase === "reveal");
+        s.setOpponentStats(opponentStatsRef.current);
+        s.setQuestions(questionsRef.current);
+
+        if (matchDataRef.current) {
+            // Show live running scores
+            const showRunning = phase === "playing" || phase === "reveal";
+            const runningMy = myScore + (showRunning ? myCurrentPoints : 0);
+            const runningOpp = opponentScore + (showRunning ? opponentCurrentPoints : 0);
+            s.setMatchData({
+                ...matchDataRef.current,
+                p1_score: roleRef.current === "player1" ? runningMy : runningOpp,
+                p2_score: roleRef.current === "player1" ? runningOpp : runningMy,
+            });
+        }
+    }, [
+        phase,
+        myChoice,
+        opponentChoice,
+        timeRemaining,
+        maxTime,
+        currentRound,
+        myScore,
+        opponentScore,
+        myCurrentPoints,
+        opponentCurrentPoints,
+    ]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Overall timer cleanup on unmount
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => stopAllTimers, [stopAllTimers]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Handlers (use refs — no stale closures)
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Handle the player selecting an answer (or empty string for timeout).
+     * For live-bot: immediately schedules a simulated bot answer.
+     */
+    const handleAnswerSelect = useCallback((choice: string) => {
+        if (myChoiceRef.current !== null || phaseRef.current !== "playing") {
+            console.log(`[engine] handleAnswerSelect BLOCKED: choice=${choice}, myChoiceRef=${myChoiceRef.current}, phase=${phaseRef.current}`);
+            return;
+        }
+
+        const q = questionsRef.current[currentRoundRef.current];
+        if (!q) return;
+
+        const duration = getQuestionDuration(q.type);
+        const elapsed = (Date.now() - roundStartedAtRef.current) / 1000;
+        const timeTaken = parseFloat(elapsed.toFixed(2));
+        const correct = choice !== "" && choice === q.answer;
+        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+
+        console.log(`[engine] player answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${choice}", correct=${correct}, pts=${pts}, timeTaken=${timeTaken}s`);
+
+        setMyChoice(choice);
+        setMyCurrentPoints(pts);
+
+        // Stop the tick timer since the player answered
+        stopRoundTick();
+
+        // Play sound
+        void (async () => {
+            const { wordupAudio } = await import("../../../utils/wordupAudio");
+            if (correct) wordupAudio.playCorrect();
+            else wordupAudio.playIncorrect();
+        })();
+
+        // Live-bot: schedule a simulated bot answer
+        if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
+            const br = simulateBotResponse(q, botProfileRef.current, duration);
+            const delay = Math.max(500, br.time_taken * 1000);
+
+            setTimeout(() => {
+                const botChoice = pickBotChoice(q, br.correct);
+                const botPts = calcPoints(
+                    br.correct,
+                    br.time_taken,
+                    duration,
+                    currentRoundRef.current === 6,
+                );
+                console.log(`[engine] bot answer: t=${Date.now()} round=${currentRoundRef.current}, choice="${botChoice}", correct=${br.correct}, pts=${botPts}, timeTaken=${br.time_taken}s`);
+                setOpponentChoice(botChoice);
+                setOpponentCurrentPoints(botPts);
+            }, delay);
+        }
+    }, [stopRoundTick]);
+
+    /**
+     * Handle opponent answer from a live PvP broadcast.
+     * Called externally when a `player_answered` message arrives.
+     */
+    const handleOpponentAnswer = useCallback((choice: string, timeTaken: number) => {
+        if (opponentChoiceRef.current !== null || phaseRef.current !== "playing") {
+            console.log(`[engine] handleOpponentAnswer BLOCKED: choice=${choice}, opponentChoiceRef=${opponentChoiceRef.current}, phase=${phaseRef.current}`);
+            return;
+        }
+
+        const q = questionsRef.current[currentRoundRef.current];
+        const duration = q ? getQuestionDuration(q.type) : 10;
+        const correct = choice === q?.answer;
+        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+
+        console.log(`[engine] opponent answer: round=${currentRoundRef.current}, choice="${choice}", correct=${correct}, pts=${pts}, timeTaken=${timeTaken}s`);
+        setOpponentChoice(choice);
+        setOpponentCurrentPoints(pts);
+    }, []);
+
+    // ── Stub functions (preserved API, currently no-ops) ─────────
+    const sendRematch = useCallback(() => {}, []);
+    const acceptRematch = useCallback((_cb?: (mId: string, role: "player1" | "player2") => void) => {}, []);
+    const sendQuickChat = useCallback(() => {}, []);
+    const sendSignalUpdate = useCallback((_level?: number) => {}, []);
+    const cleanup = useCallback(() => {
+        stopAllTimers();
+    }, [stopAllTimers]);
+    const abortMatch = useCallback(async () => {
+        stopAllTimers();
+        setPhase("idle");
+    }, [stopAllTimers]);
+    const purgeAndReset = useCallback(async () => {
+        stopAllTimers();
+        setPhase("idle");
+    }, [stopAllTimers]);
+
+    // ══════════════════════════════════════════════════════════════════
+    // Match loading
+    // ══════════════════════════════════════════════════════════════════
+
+    const startMatch = useCallback(
+        async (mId: string, activeRole: "player1" | "player2") => {
+            let questions: WordUpQuestion[];
+            let matchData: Record<string, unknown>;
+            let oppStats: ProfileStats | null = null;
+
+            if (mId.startsWith("bot-match-")) {
+                // ── Local bot match — generate questions on the fly ──
+                const category = useLiveStore.getState().category || "mixed";
+                matchData = {
+                    id: mId,
+                    category,
+                    status: "active",
+                    is_bot_match: true,
+                    game_type: "live-bot",
+                    current_question_index: 0,
+                    p1_answers: [],
+                    p2_answers: [],
+                    p1_answered: false,
+                    p2_answered: false,
+                    p1_score: 0,
+                    p2_score: 0,
+                };
+                questions = await generateWordUpQuestions(category);
+                const bp = getRandomBotProfile();
+                botProfileRef.current = bp;
+                const prof = BOT_PROFILES[bp];
+                oppStats = {
+                    username: prof?.name || "Bot",
+                    avatar_url: undefined,
+                    rating: 600,
+                    xp: 0,
+                    games_played: 0,
+                    games_won: 0,
+                    games_lost: 0,
+                    games_tied: 0,
+                    rank_name: "Bronze",
+                };
+            } else {
+                // ── Live match — load from Supabase ──
+                const { data: match } = await supabase
+                    .from("wordup_matches")
+                    .select("*")
+                    .eq("id", mId)
+                    .single();
+                if (!match) return;
+                matchData = match;
+                questions = await decryptMatchQuestions(match);
+                await preloadMatchImages(questions);
+
+                if (gameTypeRef.current === "live") {
+                    const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
+                    if (oppId) {
+                        try {
+                            const res = await supabase
+                                .from("profiles")
+                                .select("username, avatar_url")
+                                .eq("id", oppId)
+                                .single();
+                            if (res.data) {
+                                oppStats = {
+                                    ...res.data,
+                                    rating: 600,
+                                    xp: 0,
+                                    games_played: 0,
+                                    games_won: 0,
+                                    games_lost: 0,
+                                    games_tied: 0,
+                                    rank_name: "Bronze",
+                                };
+                            }
+                        } catch {
+                            oppStats = null;
+                        }
+                    }
+                }
+            }
+
+            // Store data in refs (persist across renders, no re-render needed)
+            questionsRef.current = questions;
+            matchDataRef.current = matchData;
+            opponentStatsRef.current = oppStats;
+            roleRef.current = activeRole;
+
+            // Start the countdown
+            setPhase("countdown");
+        },
+        [],
+    );
+
+    // ── Derive computed state shape for LiveView ─────────────────
+    const engineState = {
+        phase,
+        selectedAnswer: myChoice,
+        rematchState: "idle" as const,
+        rematchCountdown: 0,
+        showRematchButton: false,
+        isConnected: true,
+        opponentSignalLevel: 0,
+        countdownText,
+        lastRoundPopup,
+    };
+
+    return {
+        state: engineState,
+        isConnected: true,
+        opponentSignalLevel: 0,
+        startMatch,
+        handleAnswerSelect,
+        handleOpponentAnswer,
+        sendRematch,
+        acceptRematch,
+        sendQuickChat,
+        sendSignalUpdate,
+        cleanup,
+        abortMatch,
+        purgeAndReset,
+    };
 }

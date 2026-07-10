@@ -2,7 +2,6 @@
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "./constants";
-import { useWordUpStore } from "../../store/useWordUpStore";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents, saveRecents, pushRecent } from "./categorySelectConstants";
 
 interface CategorySelectModalProps {
@@ -70,8 +69,7 @@ export const CategorySelectModal = ({
     };
 
     const handleSelectAndPlay = () => {
-        const currentCategory = useWordUpStore.getState().category;
-        recordRecent(currentCategory);
+        recordRecent(category);
         startMatchmaking();
         onClose();
      };
