@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     RefreshCw,
     ChevronLeft,
@@ -18,7 +18,10 @@ import {
     X,
     FileCode,
     Bell,
-    Trophy
+    Trophy,
+    Image,
+    Sparkles,
+    EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
@@ -38,6 +41,849 @@ interface FlaggedWordData {
     };
 }
 
+interface HandcraftedQuestion {
+    id: string;
+    category: string;
+    prompt: string;
+    choices: string[];
+    answer: string;
+    explanation: string;
+    image_url?: string | null;
+    image_urls?: string[] | null;
+    no_image_needed?: boolean;
+    created_at?: string;
+}
+
+const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
+    const [questions, setQuestions] = useState<HandcraftedQuestion[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    // Filters
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<'missing' | 'has' | 'excluded' | 'all'>('missing');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Selection & Asset editing states
+    const [selectedQuestion, setSelectedQuestion] = useState<HandcraftedQuestion | null>(null);
+    const [imageUrlVal, setImageUrlVal] = useState('');
+    const [imageUrlsList, setImageUrlsList] = useState<string[]>([]);
+    const [noImageNeededVal, setNoImageNeededVal] = useState(false);
+
+    // Wiki Search States
+    const [wikiSearchTerm, setWikiSearchTerm] = useState('');
+    const [wikiLoading, setWikiLoading] = useState(false);
+    const [wikiResults, setWikiResults] = useState<{ title: string; url: string }[]>([]);
+    const [searchMode, setSearchMode] = useState<'svg' | 'photo'>('svg');
+
+    const fetchQuestions = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('wordup_handcrafted_questions')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setQuestions(data || []);
+        } catch (err: any) {
+            triggerToast(err.message || 'Error loading handcrafted questions', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [triggerToast]);
+
+    useEffect(() => {
+        Promise.resolve().then(() => {
+            fetchQuestions();
+        });
+    }, [fetchQuestions]);
+
+    // Maintain a ref to the current search query to prevent constant event listener re-registration
+    const wikiSearchTermRef = useRef(wikiSearchTerm);
+    useEffect(() => {
+        wikiSearchTermRef.current = wikiSearchTerm;
+    }, [wikiSearchTerm]);
+
+    // Micro-interaction: Auto-replace search query with selected prompt/answer text after 2 seconds
+    useEffect(() => {
+        let selectionTimer: any = null;
+
+        const handleSelectionChange = () => {
+            const selection = window.getSelection();
+            if (!selection) return;
+            const selectedText = selection.toString().trim();
+
+            if (selectionTimer) {
+                clearTimeout(selectionTimer);
+                selectionTimer = null;
+            }
+
+            if (selectedText.length > 0) {
+                selectionTimer = setTimeout(() => {
+                    try {
+                        const range = selection.getRangeAt(0);
+                        const container = document.getElementById('curator-question-details');
+                        if (container && range && container.contains(range.commonAncestorContainer)) {
+                            const currentSearchTerm = wikiSearchTermRef.current.trim();
+                            if (currentSearchTerm.toLowerCase() !== selectedText.toLowerCase()) {
+                                setWikiSearchTerm(selectedText);
+                                triggerToast(`Updated search query to "${selectedText}"!`);
+                            }
+                        }
+                    } catch (e) {
+                        // ignore range errors
+                    }
+                }, 2000);
+            }
+        };
+
+        document.addEventListener('selectionchange', handleSelectionChange);
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            if (selectionTimer) clearTimeout(selectionTimer);
+        };
+    }, [triggerToast]);
+
+    // Auto-extract all unique categories
+    const categories = useMemo(() => {
+        const set = new Set(questions.map(q => q.category));
+        return ['all', ...Array.from(set)];
+    }, [questions]);
+
+    // Filter logic
+    const filteredQuestions = useMemo(() => {
+        return questions.filter(q => {
+            // Category filter
+            if (selectedCategory !== 'all' && q.category !== selectedCategory) return false;
+
+            // Status filter
+            const hasImage = !!q.image_url || (q.image_urls && q.image_urls.length > 0);
+            if (statusFilter === 'missing') {
+                if (hasImage || q.no_image_needed) return false;
+            } else if (statusFilter === 'has') {
+                if (!hasImage) return false;
+            } else if (statusFilter === 'excluded') {
+                if (!q.no_image_needed) return false;
+            }
+
+            // Text query filter
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const promptMatch = q.prompt.toLowerCase().includes(query);
+                const answerMatch = q.answer.toLowerCase().includes(query);
+                const choicesMatch = q.choices.some(c => c.toLowerCase().includes(query));
+                if (!promptMatch && !answerMatch && !choicesMatch) return false;
+            }
+
+            return true;
+        });
+    }, [questions, selectedCategory, statusFilter, searchQuery]);
+
+    // Pre-populate input states on question selection
+    useEffect(() => {
+        Promise.resolve().then(() => {
+            if (selectedQuestion) {
+                setImageUrlVal(selectedQuestion.image_url || '');
+                setImageUrlsList(selectedQuestion.image_urls || []);
+                setNoImageNeededVal(selectedQuestion.no_image_needed || false);
+                setWikiSearchTerm(selectedQuestion.answer);
+                setWikiResults([]);
+            } else {
+                setImageUrlVal('');
+                setImageUrlsList([]);
+                setNoImageNeededVal(false);
+                setWikiSearchTerm('');
+                setWikiResults([]);
+            }
+        });
+    }, [selectedQuestion]);
+
+    // Batch resolve SVG URLs in 2 query requests or search Wikipedia page images
+    const handleSearchWiki = async (term: string) => {
+        if (!term.trim()) return;
+        setWikiLoading(true);
+        setWikiResults([]);
+        try {
+            if (searchMode === 'svg') {
+                const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}%20filetype:svg&srnamespace=6&format=json&origin=*&srlimit=12`;
+                const res = await fetch(searchUrl);
+                const searchData = await res.json();
+                const searchResults = searchData.query?.search || [];
+
+                if (searchResults.length === 0) {
+                    triggerToast("No SVG assets found for that query.", "error");
+                    return;
+                }
+
+                // Batch resolve detailed URLs
+                const titles = searchResults.map((r: any) => r.title).join('|');
+                const detailsUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&format=json&origin=*`;
+                const detailsRes = await fetch(detailsUrl);
+                const detailsData = await detailsRes.json();
+                const pages = detailsData.query?.pages || {};
+
+                const mappedResults = searchResults.map((r: any) => {
+                    const page = Object.values(pages).find((p: any) => p.title === r.title) as any;
+                    const directUrl = page?.imageinfo?.[0]?.url || "";
+                    return {
+                        title: r.title,
+                        url: directUrl
+                    };
+                }).filter((item: any) => item.url);
+
+                setWikiResults(mappedResults);
+            } else {
+                const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrnamespace=0&gsrlimit=12&prop=pageimages&pithumbsize=400&pilimit=12&format=json&origin=*`;
+                const res = await fetch(searchUrl);
+                const searchData = await res.json();
+                const pages = searchData.query?.pages || {};
+
+                const mappedResults = Object.values(pages).map((p: any) => {
+                    return {
+                        title: p.title,
+                        url: p.thumbnail?.source || ""
+                    };
+                }).filter((item: any) => item.url)
+                    .sort((a, b) => a.title.localeCompare(b.title));
+
+                if (mappedResults.length === 0) {
+                    triggerToast("No photographic assets found on Wikipedia for that query.", "error");
+                    return;
+                }
+
+                setWikiResults(mappedResults);
+            }
+        } catch (err: any) {
+            triggerToast(err.message || 'Failed to query Wiki API', 'error');
+        } finally {
+            setWikiLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!selectedQuestion) return;
+        setSaving(true);
+        try {
+            const updates = {
+                image_url: imageUrlVal.trim() || null,
+                image_urls: imageUrlsList.length > 0 ? imageUrlsList : null,
+                no_image_needed: noImageNeededVal
+            };
+
+            const { error } = await supabase
+                .from('wordup_handcrafted_questions')
+                .update(updates)
+                .eq('id', selectedQuestion.id);
+
+            if (error) throw error;
+
+            triggerToast('Asset mapped successfully!');
+
+            // Pre-calculate the next question to edit in the current list before we trigger setQuestions state update
+            const currentIndex = filteredQuestions.findIndex(q => q.id === selectedQuestion.id);
+            const nextQuestion = (currentIndex !== -1 && currentIndex + 1 < filteredQuestions.length)
+                ? filteredQuestions[currentIndex + 1]
+                : null;
+
+            // Update local lists
+            setQuestions(prev => prev.map(q => q.id === selectedQuestion.id ? { ...q, ...updates } : q));
+            setSelectedQuestion(nextQuestion);
+        } catch (err: any) {
+            triggerToast(err.message || 'Error updating question assets', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const formatCategory = (cat: string) => {
+        if (cat === 'all') return 'All Categories';
+        return cat.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Panel: Question list & filters */}
+            <div className="lg:col-span-4 bg-gray-900 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 max-h-[750px]">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black uppercase tracking-tight text-white flex items-center gap-2">
+                        <Image className="text-correct" size={16} /> Handcrafted List ({filteredQuestions.length})
+                    </h3>
+                    <button
+                        onClick={fetchQuestions}
+                        className="text-gray-400 hover:text-white transition-colors"
+                        title="Refresh list"
+                        disabled={loading}
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
+
+                {/* Search & Topic Filters */}
+                <div className="space-y-3">
+                    <div className="relative">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                        <input
+                            type="text"
+                            placeholder="Search prompt or choices..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-correct/50 transition-all text-white placeholder-gray-600"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <select
+                            value={selectedCategory}
+                            onChange={e => setSelectedCategory(e.target.value)}
+                            className="bg-black/40 border border-white/10 rounded-xl p-2 text-xs focus:outline-none focus:border-correct/50 text-white"
+                        >
+                            {categories.map(cat => (
+                                <option key={cat} value={cat} className="bg-gray-900 text-white">
+                                    {formatCategory(cat)}
+                                </option>
+                            ))}
+                        </select>
+
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value as any)}
+                            className="bg-black/40 border border-white/10 rounded-xl p-2 text-xs focus:outline-none focus:border-correct/50 text-white"
+                        >
+                            <option value="missing" className="bg-gray-900 text-white">Missing Image</option>
+                            <option value="has" className="bg-gray-900 text-white">Has Image</option>
+                            <option value="excluded" className="bg-gray-900 text-white">Excluded (Skip)</option>
+                            <option value="all" className="bg-gray-900 text-white">All Questions</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Scrollable Questions list */}
+                <div className="overflow-y-auto pr-1 space-y-2 flex-1 scrollbar-thin scrollbar-thumb-white/10">
+                    {loading ? (
+                        <div className="py-8 text-center text-xs font-bold text-gray-600 uppercase tracking-widest flex items-center justify-center gap-2">
+                            <RefreshCw size={14} className="animate-spin text-correct" />
+                            Loading database...
+                        </div>
+                    ) : filteredQuestions.length === 0 ? (
+                        <div className="py-12 border border-dashed border-white/5 rounded-xl text-center text-xs font-bold text-gray-600 uppercase tracking-widest">
+                            No matching questions
+                        </div>
+                    ) : (
+                        filteredQuestions.map(q => {
+                            const hasImage = !!q.image_url || (q.image_urls && q.image_urls.length > 0);
+                            const isSelected = selectedQuestion?.id === q.id;
+
+                            return (
+                                <button
+                                    key={q.id}
+                                    onClick={() => setSelectedQuestion(q)}
+                                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${isSelected
+                                            ? 'bg-correct border-correct text-black shadow-lg shadow-correct/10'
+                                            : 'bg-black/40 border-white/5 text-gray-300 hover:border-white/20 hover:bg-white/5'
+                                        }`}
+                                >
+                                    <div className="mt-1">
+                                        {q.no_image_needed ? (
+                                            <span title="Excluded"><EyeOff size={14} className={isSelected ? 'text-black' : 'text-gray-600'} /></span>
+                                        ) : hasImage ? (
+                                            <div className={`w-3.5 h-3.5 rounded-full border ${isSelected ? 'bg-black border-black' : 'bg-correct/20 border-correct text-correct'}`} />
+                                        ) : (
+                                            <div className="w-3.5 h-3.5 rounded-full border border-white/25 bg-black/20" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 justify-between">
+                                            <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${isSelected ? 'bg-black/10 text-black' : 'bg-white/5 text-gray-400'
+                                                }`}>
+                                                {q.category}
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs font-bold mt-1.5 leading-snug line-clamp-2 ${isSelected ? 'text-black' : 'text-white'
+                                            }`}>
+                                            {q.prompt}
+                                        </p>
+                                    </div>
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+
+            {/* Right Panel: curator & Wiki search workspace */}
+            <div className="lg:col-span-8 space-y-6">
+                {!selectedQuestion ? (
+                    <div className="bg-gray-900/60 border border-white/15 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[450px]">
+                        <div className="p-4 rounded-full bg-white/5 text-gray-500 mb-4 border border-white/10">
+                            <Image size={36} />
+                        </div>
+                        <h4 className="text-base font-black uppercase tracking-tighter text-gray-400">Curator Workspace</h4>
+                        <p className="text-xs text-gray-500 max-w-xs mt-2 font-bold uppercase tracking-wider">
+                            Select a question from the left sidebar panel to start mapping SVG assets.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-6">
+                        {/* Selected Question Header Info */}
+                        <div id="curator-question-details" className="border-b border-white/5 pb-5">
+                            <div className="flex items-center gap-2 justify-between flex-wrap">
+                                <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                    Category: {selectedQuestion.category}
+                                </span>
+
+                                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400 hover:text-white cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={noImageNeededVal}
+                                        onChange={e => setNoImageNeededVal(e.target.checked)}
+                                        className="accent-correct"
+                                    />
+                                    <EyeOff size={14} /> Exclude (No Image Needed)
+                                </label>
+                            </div>
+
+                            <h4 className="text-lg font-black tracking-tight mt-4 text-white">
+                                {selectedQuestion.prompt}
+                            </h4>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                                {selectedQuestion.choices.map((choice, i) => {
+                                    const isCorrect = choice === selectedQuestion.answer;
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`p-3 rounded-xl border text-xs font-bold ${isCorrect
+                                                    ? 'bg-correct/10 border-correct text-correct'
+                                                    : 'bg-black/30 border-white/5 text-gray-400'
+                                                }`}
+                                        >
+                                            <span className="text-[10px] opacity-40 uppercase block mb-1">Choice {i + 1}</span>
+                                            {choice}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <p className="text-xs text-gray-500 mt-4 font-bold uppercase leading-relaxed">
+                                <span className="text-white">Explanation:</span> {selectedQuestion.explanation}
+                            </p>
+                        </div>
+
+                        {/* Direct URL Form Details */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                                        Primary SVG Image URL (`image_url`)
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="wikimedia:File:... or direct https URL"
+                                            value={imageUrlVal}
+                                            onChange={e => setImageUrlVal(e.target.value)}
+                                            className="flex-1 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs focus:outline-none focus:border-correct/50 text-white"
+                                        />
+                                        {imageUrlVal && (
+                                            <button
+                                                onClick={() => setImageUrlVal('')}
+                                                className="px-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs font-black uppercase hover:bg-red-500/20 transition-all cursor-pointer"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                                        Additional URLs List (`image_urls`)
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Add list element url..."
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                                    const val = e.currentTarget.value.trim();
+                                                    if (!imageUrlsList.includes(val)) {
+                                                        setImageUrlsList(prev => [...prev, val]);
+                                                    }
+                                                    e.currentTarget.value = '';
+                                                }
+                                            }}
+                                            className="flex-1 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs focus:outline-none focus:border-correct/50 text-white"
+                                        />
+                                        {imageUrlsList.length > 0 && (
+                                            <button
+                                                onClick={() => setImageUrlsList([])}
+                                                className="px-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs font-black uppercase hover:bg-red-500/20 transition-all cursor-pointer"
+                                            >
+                                                Clear All
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {imageUrlsList.map((url, index) => (
+                                            <span key={index} className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg pl-2.5 pr-1.5 py-1 text-[10px] font-bold text-gray-300">
+                                                <span className="truncate max-w-[150px]">{url}</span>
+                                                <button
+                                                    onClick={() => setImageUrlsList(prev => prev.filter((_, idx) => idx !== index))}
+                                                    className="text-gray-500 hover:text-white rounded-full p-0.5"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Active Preview if Image set */}
+                            {imageUrlVal && (
+                                <div className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center gap-2">
+                                    <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Live SVG Preview</span>
+                                    <div className="w-32 h-32 flex items-center justify-center border border-white/10 rounded-xl bg-white/5 p-2 overflow-hidden">
+                                        <img
+                                            src={imageUrlVal.startsWith('wikimedia:') ? `https://commons.wikimedia.org/wiki/Special:FilePath/${imageUrlVal.replace(/^wikimedia:File:/, '')}` : imageUrlVal}
+                                            alt="SVG Preview"
+                                            className="max-w-full max-h-full object-contain"
+                                            onError={(e) => {
+                                                // fallback check
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
+                                    <span className="text-[9px] text-gray-400 font-mono break-all">{imageUrlVal}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Wikimedia Commons SVG Search Engine panel */}
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-5 space-y-4">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div>
+                                    <h5 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                                        <Sparkles size={14} className="text-yellow-400" /> Search Wiki Assets
+                                    </h5>
+                                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Find vector artwork or photographic portraits</p>
+                                </div>
+
+                                {/* Hybrid Search Toggle Pills */}
+                                <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 self-start">
+                                    <button
+                                        onClick={() => {
+                                            setSearchMode('svg');
+                                            setWikiResults([]);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${searchMode === 'svg'
+                                            ? 'bg-correct text-black'
+                                            : 'text-gray-400 hover:text-white'
+                                            }`}
+                                    >
+                                        Vector / SVG
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSearchMode('photo');
+                                            setWikiResults([]);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${searchMode === 'photo'
+                                            ? 'bg-correct text-black'
+                                            : 'text-gray-400 hover:text-white'
+                                            }`}
+                                    >
+                                        Photo / Portrait
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => handleSearchWiki(selectedQuestion.answer)}
+                                        className="text-[9px] font-black uppercase tracking-wider text-correct bg-correct/10 hover:bg-correct/20 border border-correct/20 px-2 py-1 rounded"
+                                    >
+                                        Use Answer
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const words = selectedQuestion.prompt.split(' ').filter(w => w.length > 4 && /^[a-zA-Z]+$/.test(w));
+                                            if (words.length > 0) {
+                                                handleSearchWiki(words[Math.floor(Math.random() * words.length)]);
+                                            }
+                                        }}
+                                        className="text-[9px] font-black uppercase tracking-wider text-gray-400 bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1 rounded"
+                                    >
+                                        Random Word
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Enter entity query e.g. Lionel Messi, Oxygen, France flag..."
+                                    value={wikiSearchTerm}
+                                    onChange={e => setWikiSearchTerm(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleSearchWiki(wikiSearchTerm)}
+                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl py-2.5 px-4 text-xs focus:outline-none focus:border-correct/50 text-white"
+                                />
+                                <button
+                                    onClick={() => handleSearchWiki(wikiSearchTerm)}
+                                    disabled={wikiLoading}
+                                    className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-2.5 rounded-xl transition-all shadow-lg cursor-pointer flex items-center gap-1.5"
+                                >
+                                    {wikiLoading ? <RefreshCw size={12} className="animate-spin" /> : <Search size={12} />}
+                                    Search
+                                </button>
+                            </div>
+
+                            {/* Results Grid */}
+                            {wikiLoading ? (
+                                <div className="py-8 text-center text-[10px] font-black text-gray-500 uppercase tracking-widest animate-pulse">
+                                    Searching Wikimedia databases...
+                                </div>
+                            ) : wikiResults.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                                    {wikiResults.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="group relative bg-black/40 border border-white/5 hover:border-correct/40 rounded-xl p-3.5 flex flex-col items-center gap-2.5 transition-all text-center"
+                                        >
+                                            {/* Candidate Preview */}
+                                            <div className="w-16 h-16 flex items-center justify-center bg-white/5 p-1 rounded-lg overflow-hidden border border-white/5">
+                                                <img
+                                                    src={item.url}
+                                                    alt="Candidate SVG"
+                                                    className="max-w-full max-h-full object-contain"
+                                                    loading="lazy"
+                                                />
+                                            </div>
+
+                                            <p className="text-[9px] font-bold text-gray-400 truncate w-full" title={item.title}>
+                                                {item.title.replace(/^File:/, '')}
+                                            </p>
+
+                                            {/* Mapping Controls Hover Overlay */}
+                                            <div className="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center gap-2 p-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const val = searchMode === 'svg' ? `wikimedia:${item.title}` : item.url;
+                                                        setImageUrlVal(val);
+                                                        triggerToast("Set as primary image!");
+                                                    }}
+                                                    className="w-full bg-correct text-black font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform"
+                                                >
+                                                    Use Primary
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const val = searchMode === 'svg' ? `wikimedia:${item.title}` : item.url;
+                                                        if (!imageUrlsList.includes(val)) {
+                                                            setImageUrlsList(prev => [...prev, val]);
+                                                            triggerToast("Added to list!");
+                                                        }
+                                                    }}
+                                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform border border-white/10"
+                                                >
+                                                    Add to List
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-8 border border-dashed border-white/5 rounded-xl text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">
+                                    Search results will display here
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Curator save operations bar */}
+                        <div className="flex justify-between items-center border-t border-white/5 pt-5 gap-4">
+                            <button
+                                onClick={() => setSelectedQuestion(null)}
+                                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3.5 rounded-xl transition-all cursor-pointer"
+                            >
+                                Close Editor
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="bg-correct hover:brightness-110 disabled:opacity-50 text-black font-black uppercase text-[10px] tracking-widest px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-correct/20 cursor-pointer flex items-center gap-1.5"
+                            >
+                                {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                                Save Question Assets
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const BotMarathonManagement = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
+    const [loading, setLoading] = useState(false);
+    const [marathons, setMarathons] = useState<any[]>([]);
+
+    const fetchMarathons = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('challenges')
+                .select('*, profiles!creator_id(username)')
+                .eq('is_bot_marathon', true)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setMarathons(data || []);
+        } catch (err: any) {
+            triggerToast(err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [triggerToast]);
+
+    useEffect(() => {
+        Promise.resolve().then(() => {
+            fetchMarathons();
+        });
+    }, [fetchMarathons]);
+
+    const createNextWeekMarathon = async () => {
+        const confirmed = window.confirm("This will create a new Bot Marathon challenge for Variant Bot. Continue?");
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
+            // Determine next Monday
+            const now = new Date();
+            const lagosOffset = 1 * 60 * 60 * 1000; // Lagos is UTC+1
+            const lagosNow = new Date(now.getTime() + lagosOffset);
+
+            const daysUntilMonday = (8 - lagosNow.getUTCDay()) % 7 || 7;
+            const nextMonday = new Date(lagosNow.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
+            nextMonday.setUTCHours(0, 0, 0, 0);
+
+            const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000);
+            nextSunday.setUTCHours(23, 59, 59, 999);
+
+            // Create the challenge
+            const { error: challengeError } = await supabase
+                .from('challenges')
+                .insert({
+                    creator_id: '00000000-0000-0000-0000-000000000b0b',
+                    mode: 'ANYTIME', // Marathon uses ANYTIME mode logic for sequences
+                    word_length: 5, // Default/dummy as marathon uses dynamic
+                    target_word: 'MARATHON', // Dummy
+                    expires_at: nextSunday.toISOString(),
+                    is_bot_marathon: true
+                });
+
+            if (challengeError) throw challengeError;
+
+            // Pre-generate words for the entire week (Monday to Sunday)
+            const allGeneratedWords = [];
+
+            for (let d = 0; d < 7; d++) {
+                const currentDay = new Date(nextMonday.getTime() + d * 24 * 60 * 60 * 1000);
+                const playDateStr = currentDay.toISOString().split('T')[0];
+
+                for (let len = 3; len <= 7; len++) {
+                    const pool = await OFFICIAL_WORDS[len]();
+                    const word = pool[Math.floor(Math.random() * pool.length)];
+                    const salt = Math.random().toString(36).substring(2, 15);
+
+                    allGeneratedWords.push({
+                        play_date: playDateStr,
+                        word_length: len,
+                        target_word: word,
+                        salt: salt
+                    });
+                }
+            }
+
+            const { error: wordsError } = await supabase
+                .from('bot_marathon_daily_words')
+                .upsert(allGeneratedWords);
+
+            if (wordsError) throw wordsError;
+
+            triggerToast("Next week's Bot Marathon and all daily words created successfully!");
+            fetchMarathons();
+        } catch (err: any) {
+            triggerToast(err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                            <Trophy className="text-indigo-400" /> Bot Marathon Management
+                        </h3>
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">
+                            Control and monitor system-managed weekly events
+                        </p>
+                    </div>
+                    <button
+                        onClick={createNextWeekMarathon}
+                        disabled={loading}
+                        className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
+                    >
+                        {loading ? <RefreshCw size={14} className="animate-spin" /> : <Trophy size={14} />}
+                        Create Next Week's Event
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Event History</h4>
+                    {marathons.length === 0 ? (
+                        <div className="bg-black/40 border border-white/5 rounded-xl p-8 text-center">
+                            <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">No bot marathons found</span>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-white/5">
+                                        <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Created</th>
+                                        <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Expires</th>
+                                        <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {marathons.map((m) => (
+                                        <tr key={m.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                            <td className="py-4 px-4 text-xs font-mono text-gray-300">
+                                                {new Date(m.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="py-4 px-4 text-xs font-mono text-gray-300">
+                                                {new Date(m.expires_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                {new Date(m.expires_at) > new Date() ? (
+                                                    <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest">Active</span>
+                                                ) : (
+                                                    <span className="bg-gray-500/10 text-gray-500 border border-gray-500/20 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest">Expired</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const AdminPage: React.FC = () => {
     const [WORDS_3, setWORDS_3] = useState<string[]>([]);
     const [WORDS_4, setWORDS_4] = useState<string[]>([]);
@@ -49,7 +895,7 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup'>('words');
 
     // Authentication States
     const [loginEmail, setLoginEmail] = useState('');
@@ -114,7 +960,9 @@ export const AdminPage: React.FC = () => {
 
     useEffect(() => {
         if (isAdmin) {
-            fetchFlaggedWords();
+            Promise.resolve().then(() => {
+                fetchFlaggedWords();
+            });
         }
     }, [isAdmin, fetchFlaggedWords]);
 
@@ -173,7 +1021,9 @@ export const AdminPage: React.FC = () => {
 
     // Reset pagination when filter/search/length changes
     useEffect(() => {
-        setCurrentPage(1);
+        Promise.resolve().then(() => {
+            setCurrentPage(1);
+        });
     }, [activeLength, filterType, searchQuery, startLetter, sortBy]);
 
     const totalPages = Math.ceil(processedWords.length / itemsPerPage);
@@ -288,169 +1138,6 @@ SELECT create_admin_user(
 
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-    /**
-     * Component for Managing Bot Marathon
-     */
-    const BotMarathonManagement = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
-        const [loading, setLoading] = useState(false);
-        const [marathons, setMarathons] = useState<any[]>([]);
-
-        const fetchMarathons = useCallback(async () => {
-            setLoading(true);
-            try {
-                const { data, error } = await supabase
-                    .from('challenges')
-                    .select('*, profiles!creator_id(username)')
-                    .eq('is_bot_marathon', true)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                setMarathons(data || []);
-            } catch (err: any) {
-                triggerToast(err.message, 'error');
-            } finally {
-                setLoading(false);
-            }
-        }, [triggerToast]);
-
-        useEffect(() => {
-            fetchMarathons();
-        }, [fetchMarathons]);
-
-        const createNextWeekMarathon = async () => {
-            const confirmed = window.confirm("This will create a new Bot Marathon challenge for Variant Bot. Continue?");
-            if (!confirmed) return;
-
-            setLoading(true);
-            try {
-                // Determine next Monday
-                const now = new Date();
-                const lagosOffset = 1 * 60 * 60 * 1000; // Lagos is UTC+1
-                const lagosNow = new Date(now.getTime() + lagosOffset);
-
-                const daysUntilMonday = (8 - lagosNow.getUTCDay()) % 7 || 7;
-                const nextMonday = new Date(lagosNow.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
-                nextMonday.setUTCHours(0, 0, 0, 0);
-
-                const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000);
-                nextSunday.setUTCHours(23, 59, 59, 999);
-
-                // Create the challenge
-                const { error: challengeError } = await supabase
-                    .from('challenges')
-                    .insert({
-                        creator_id: '00000000-0000-0000-0000-000000000b0b',
-                        mode: 'ANYTIME', // Marathon uses ANYTIME mode logic for sequences
-                        word_length: 5, // Default/dummy as marathon uses dynamic
-                        target_word: 'MARATHON', // Dummy
-                        expires_at: nextSunday.toISOString(),
-                        is_bot_marathon: true
-                    });
-
-                if (challengeError) throw challengeError;
-
-                // Pre-generate words for the entire week (Monday to Sunday)
-                const allGeneratedWords = [];
-
-                for (let d = 0; d < 7; d++) {
-                    const currentDay = new Date(nextMonday.getTime() + d * 24 * 60 * 60 * 1000);
-                    const playDateStr = currentDay.toISOString().split('T')[0];
-
-                    for (let len = 3; len <= 7; len++) {
-                        const pool = await OFFICIAL_WORDS[len]();
-                        const word = pool[Math.floor(Math.random() * pool.length)];
-                        const salt = Math.random().toString(36).substring(2, 15);
-
-                        allGeneratedWords.push({
-                            play_date: playDateStr,
-                            word_length: len,
-                            target_word: word,
-                            salt: salt
-                        });
-                    }
-                }
-
-                const { error: wordsError } = await supabase
-                    .from('bot_marathon_daily_words')
-                    .upsert(allGeneratedWords);
-
-                if (wordsError) throw wordsError;
-
-                triggerToast("Next week's Bot Marathon and all daily words created successfully!");
-                fetchMarathons();
-            } catch (err: any) {
-                triggerToast(err.message, 'error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        return (
-            <div className="flex flex-col gap-6">
-                <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                                <Trophy className="text-indigo-400" /> Bot Marathon Management
-                            </h3>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">
-                                Control and monitor system-managed weekly events
-                            </p>
-                        </div>
-                        <button
-                            onClick={createNextWeekMarathon}
-                            disabled={loading}
-                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 cursor-pointer"
-                        >
-                            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Trophy size={14} />}
-                            Create Next Week's Event
-                        </button>
-                    </div>
-
-                    <div className="space-y-4">
-                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Event History</h4>
-                        {marathons.length === 0 ? (
-                            <div className="bg-black/40 border border-white/5 rounded-xl p-8 text-center">
-                                <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">No bot marathons found</span>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-white/5">
-                                            <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Created</th>
-                                            <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Expires</th>
-                                            <th className="py-3 px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {marathons.map((m) => (
-                                            <tr key={m.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                                <td className="py-4 px-4 text-xs font-mono text-gray-300">
-                                                    {new Date(m.created_at).toLocaleDateString()}
-                                                </td>
-                                                <td className="py-4 px-4 text-xs font-mono text-gray-300">
-                                                    {new Date(m.expires_at).toLocaleDateString()}
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    {new Date(m.expires_at) > new Date() ? (
-                                                        <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest">Active</span>
-                                                    ) : (
-                                                        <span className="bg-gray-500/10 text-gray-500 border border-gray-500/20 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest">Expired</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     // RENDER LOADING SCREEN (Auth / Admin status verify)
     if (authLoading || (user && adminLoading)) {
         return (
@@ -554,7 +1241,7 @@ SELECT create_admin_user(
 
     // MAIN DASHBOARD RENDER
     return (
-        <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-correct selection:text-black">
+        <div className="h-screen overflow-y-auto bg-black text-white flex flex-col font-sans selection:bg-correct selection:text-black">
             {/* Local Toast Rendering */}
             <AnimatePresence>
                 {toast && (
@@ -562,7 +1249,7 @@ SELECT create_admin_user(
                         initial={{ opacity: 0, y: 50, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl border ${toast.type === 'error' ? 'bg-red-900 border-red-500 text-white' : 'bg-gray-900 border-correct/30 text-correct'} flex items-center gap-3`}
+                        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-100 px-6 py-3 rounded-2xl shadow-2xl border ${toast.type === 'error' ? 'bg-red-900 border-red-500 text-white' : 'bg-gray-900 border-correct/30 text-correct'} flex items-center gap-3`}
                     >
                         {toast.type === 'error' ? <Flag size={18} /> : <Check size={18} />}
                         <span className="text-xs font-black uppercase tracking-wider">{toast.text}</span>
@@ -589,12 +1276,19 @@ SELECT create_admin_user(
                         <button
                             onClick={() => setShowSqlHelper(!showSqlHelper)}
                             className={`p-2 rounded-full border transition-all text-xs font-black flex items-center gap-1.5 cursor-pointer ${showSqlHelper
-                                    ? 'bg-correct border-correct text-black'
-                                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/30'
+                                ? 'bg-correct border-correct text-black'
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/30'
                                 }`}
                             title="SQL Helper"
                         >
                             <FileCode size={16} />
+                        </button>
+                        <button
+                            onClick={() => window.location.href = '/'}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white p-2 rounded-full transition-all cursor-pointer"
+                            title="Return to Home"
+                        >
+                            <Home size={16} />
                         </button>
                         <button
                             onClick={() => signOut()}
@@ -614,8 +1308,8 @@ SELECT create_admin_user(
                     <button
                         onClick={() => setActiveTab('words')}
                         className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'words'
-                                ? 'bg-white text-black shadow-lg shadow-white/5'
-                                : 'text-gray-500 hover:text-white'
+                            ? 'bg-white text-black shadow-lg shadow-white/5'
+                            : 'text-gray-500 hover:text-white'
                             }`}
                     >
                         <FileCode size={14} /> Word Vetting
@@ -623,11 +1317,20 @@ SELECT create_admin_user(
                     <button
                         onClick={() => setActiveTab('marathon')}
                         className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'marathon'
-                                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                                : 'text-gray-500 hover:text-white'
+                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                            : 'text-gray-500 hover:text-white'
                             }`}
                     >
                         <Trophy size={14} /> Bot Marathon
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('wordup')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'wordup'
+                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <Image size={14} /> WordUp Curator
                     </button>
                 </div>
 
@@ -734,8 +1437,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setActiveLength(3)}
                                         className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeLength === 3
-                                                ? 'bg-correct text-black shadow-md'
-                                                : 'text-gray-400 hover:text-white'
+                                            ? 'bg-correct text-black shadow-md'
+                                            : 'text-gray-400 hover:text-white'
                                             }`}
                                     >
                                         3-Letter Words
@@ -743,8 +1446,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setActiveLength(4)}
                                         className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeLength === 4
-                                                ? 'bg-correct text-black shadow-md'
-                                                : 'text-gray-400 hover:text-white'
+                                            ? 'bg-correct text-black shadow-md'
+                                            : 'text-gray-400 hover:text-white'
                                             }`}
                                     >
                                         4-Letter Words
@@ -756,8 +1459,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setFilterType('all')}
                                         className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${filterType === 'all'
-                                                ? 'bg-white border-white text-black'
-                                                : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+                                            ? 'bg-white border-white text-black'
+                                            : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
                                             }`}
                                     >
                                         All Words ({processedWords.length})
@@ -765,8 +1468,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setFilterType('flagged')}
                                         className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${filterType === 'flagged'
-                                                ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20'
-                                                : 'bg-red-500/5 border-red-500/10 text-red-400 hover:bg-red-500/10'
+                                            ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20'
+                                            : 'bg-red-500/5 border-red-500/10 text-red-400 hover:bg-red-500/10'
                                             }`}
                                     >
                                         <Flag size={12} /> Flagged
@@ -774,8 +1477,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setFilterType('unflagged')}
                                         className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 cursor-pointer ${filterType === 'unflagged'
-                                                ? 'bg-correct border-correct text-black shadow-lg shadow-correct/20'
-                                                : 'bg-correct/5 border-correct/10 text-correct hover:bg-correct/10'
+                                            ? 'bg-correct border-correct text-black shadow-lg shadow-correct/20'
+                                            : 'bg-correct/5 border-correct/10 text-correct hover:bg-correct/10'
                                             }`}
                                     >
                                         <Check size={12} /> Safe
@@ -837,8 +1540,8 @@ SELECT create_admin_user(
                                     <button
                                         onClick={() => setStartLetter(null)}
                                         className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${startLetter === null
-                                                ? 'bg-correct border-correct text-black'
-                                                : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+                                            ? 'bg-correct border-correct text-black'
+                                            : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
                                             }`}
                                     >
                                         ALL
@@ -852,8 +1555,8 @@ SELECT create_admin_user(
                                                 key={letter}
                                                 onClick={() => setStartLetter(startLetter === letter ? null : letter)}
                                                 className={`w-7.5 h-7.5 rounded-lg text-[10px] font-black border transition-all flex items-center justify-center cursor-pointer ${startLetter === letter
-                                                        ? 'bg-correct border-correct text-black shadow-md'
-                                                        : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+                                                    ? 'bg-correct border-correct text-black shadow-md'
+                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
                                                     }`}
                                                 title={`${countForLetter} words`}
                                             >
@@ -1015,8 +1718,8 @@ SELECT create_admin_user(
                                                     key={pageNum}
                                                     onClick={() => setCurrentPage(pageNum)}
                                                     className={`w-9.5 h-9.5 text-[10px] font-black rounded-xl border transition-all flex items-center justify-center cursor-pointer ${currentPage === pageNum
-                                                            ? 'bg-correct border-correct text-black shadow-md shadow-correct/10'
-                                                            : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+                                                        ? 'bg-correct border-correct text-black shadow-md shadow-correct/10'
+                                                        : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
                                                         }`}
                                                 >
                                                     {pageNum}
@@ -1036,8 +1739,10 @@ SELECT create_admin_user(
                             )}
                         </div>
                     </>
-                ) : (
+                ) : activeTab === 'marathon' ? (
                     <BotMarathonManagement triggerToast={triggerToast} />
+                ) : (
+                    <WordUpCurator triggerToast={triggerToast} />
                 )}
             </main>
 
