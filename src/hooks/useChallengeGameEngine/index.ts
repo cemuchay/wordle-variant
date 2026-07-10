@@ -91,7 +91,7 @@ export const useChallengeGameEngine = ({
       isGameOver: false,
    });
 
-   const { guesses, isGameOver, usedHint, hintRecord, timeLeft } =
+   const { guesses, isGameOver, usedHint, hintRecord, timeLeft, currentGuess, cursorIndex } =
       state;
 
    const currentKey = isMarathon ? `m-idx-${gameIndex}` : `r-${challenge.id}`;
@@ -302,6 +302,8 @@ export const useChallengeGameEngine = ({
          let needsBackgroundSync = false;
          let recoveredPayload = null;
          let isStarterEnforced = false;
+         let recoveredCurrentGuess = '';
+         let recoveredCursorIndex = 0;
 
          try {
             if (participation) {
@@ -476,6 +478,9 @@ export const useChallengeGameEngine = ({
                      needsBackgroundSync = true;
                      recoveredPayload = parsed;
                   }
+
+                  recoveredCurrentGuess = parsed.currentGuess || '';
+                  recoveredCursorIndex = parsed.cursorIndex || 0;
                }
             } catch (e) {
                logger.error("Local recovery failed", {
@@ -501,22 +506,24 @@ export const useChallengeGameEngine = ({
                }
             }
 
-            dispatch({
-               type: "START_GAME",
-               payload: {
-                  guesses: localGuesses,
-                  letterStatuses: getLetterStatuses(localGuesses),
-                  usedHint: localUsedHint,
-                  hintRecord: localHintRecord,
-                  isGameOver:
-                     isFinishedStatus ||
-                     (initialTimeLeft !== null && initialTimeLeft <= 0) ||
-                     localGuesses.some((g: any) =>
-                        g.every((r: any) => r.status === "correct"),
-                     ) ||
-                     localGuesses.length >= maxAttempts,
-                  status: serverStatus,
-                  timeLeft: initialTimeLeft,
+             dispatch({
+                type: "START_GAME",
+                payload: {
+                   guesses: localGuesses,
+                   letterStatuses: getLetterStatuses(localGuesses),
+                   usedHint: localUsedHint,
+                   hintRecord: localHintRecord,
+                   isGameOver:
+                      isFinishedStatus ||
+                      (initialTimeLeft !== null && initialTimeLeft <= 0) ||
+                      localGuesses.some((g: any) =>
+                         g.every((r: any) => r.status === "correct"),
+                      ) ||
+                      localGuesses.length >= maxAttempts,
+                   status: serverStatus,
+                   timeLeft: initialTimeLeft,
+                   currentGuess: recoveredCurrentGuess,
+                   cursorIndex: recoveredCursorIndex,
                },
             });
          } catch (e) {
@@ -615,6 +622,20 @@ export const useChallengeGameEngine = ({
       window.addEventListener('app-visibility-visible', handleRehydrate);
       return () => window.removeEventListener('app-visibility-visible', handleRehydrate);
    }, []);
+
+   // Persist currentGuess and cursorIndex when app goes to background
+   useEffect(() => {
+      const saveCurrentState = () => {
+         if (document.visibilityState === 'hidden') {
+            saveToLocal({
+               currentGuess,
+               cursorIndex,
+            });
+         }
+      };
+      document.addEventListener('visibilitychange', saveCurrentState);
+      return () => document.removeEventListener('visibilitychange', saveCurrentState);
+   }, [currentGuess, cursorIndex, saveToLocal]);
 
    useEffect(() => {
       if (isSaving ||

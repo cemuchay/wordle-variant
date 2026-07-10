@@ -38,7 +38,7 @@ export const usePersistence = ({
    }, []);
 
    const saveToLocal = useCallback(
-      (payload: any, needsSync = false) => {
+      (payload: any, needsSync = true) => {
          try {
             const existing = safeLocalStorage.getItem(storageKey);
             const existingParsed = existing ? JSON.parse(existing) : {};
@@ -78,36 +78,30 @@ export const usePersistence = ({
             dbPayload.guesses = encryptGuesses(dbPayload.guesses, key);
          }
 
-         const success = await submitChallengeResult(dbPayload, wordLen, gIdx);
+         let success = false;
+         try {
+            success = await submitChallengeResult(dbPayload, wordLen, gIdx);
+         } catch (e) {
+            logger.error("Sync failed with exception", { error: e });
+         }
          const duration = Date.now() - start;
          addLog(`Sync End: ${success ? "Success" : "Failed"}`, duration);
 
          if (!success) {
-            saveToLocal(payload, true);
+            saveToLocal(payload);
          } else {
-            try {
-               const saved = safeLocalStorage.getItem(storageKey);
-               if (saved) {
-                  const parsed = JSON.parse(saved);
-                  if (parsed.needsSync) {
-                     delete parsed.needsSync;
-                     safeLocalStorage.setItem(storageKey, JSON.stringify(parsed));
+            if (payload.status === "completed" || payload.status === "timed_out") {
+               try {
+                  safeLocalStorage.removeItem(storageKey);
+                  if (isMarathon && activeGame) {
+                     const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
+                     safeLocalStorage.removeItem(legacyKey);
                   }
+               } catch (e) {
+                  logger.error("Local cleanup failed", { key: storageKey, error: e });
                }
-            } catch (e) {
-               logger.error("Failed to clear needsSync flag", { error: e });
-            }
-         }
-
-         if (success && (payload.status === "completed" || payload.status === "timed_out")) {
-            try {
-               safeLocalStorage.removeItem(storageKey);
-               if (isMarathon && activeGame) {
-                  const legacyKey = `challenge-prog-${challenge.id}-m-${activeGame.wordLength}`;
-                  safeLocalStorage.removeItem(legacyKey);
-               }
-            } catch (e) {
-               logger.error("Local cleanup failed", { key: storageKey, error: e });
+            } else {
+               saveToLocal(payload, false);
             }
          }
 

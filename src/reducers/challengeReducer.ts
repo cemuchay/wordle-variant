@@ -18,7 +18,7 @@ export interface ChallengeGameState {
 }
 
 export type ChallengeGameAction =
-    | { type: 'START_GAME'; payload: { guesses: any[], letterStatuses: any, usedHint: boolean, hintRecord: any, timeLeft: number | null, isGameOver: boolean, status: any } }
+    | { type: 'START_GAME'; payload: { guesses: any[], letterStatuses: any, usedHint: boolean, hintRecord: any, timeLeft: number | null, isGameOver: boolean, status: any, currentGuess?: string, cursorIndex?: number } }
     | { type: 'TICK_TIMER' }
     | { type: 'TYPE_CHAR'; char: string; wordLength: number }
     | { type: 'DELETE_CHAR' }
@@ -181,6 +181,19 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
             return {
                 ...state,
                 retryCount: action.count
+            };
+
+        case 'SWITCH_LENGTH':
+            return {
+                ...state,
+                guesses: action.payload.guesses,
+                letterStatuses: action.payload.letterStatuses,
+                isGameOver: action.payload.isGameOver,
+                currentGuess: '',
+                cursorIndex: 0,
+                editIndex: null,
+                isRevealing: false,
+                isShake: false,
             };
 
         default:
