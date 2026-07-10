@@ -10,7 +10,7 @@ import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
-import { getQuestionDuration } from "../hooks/useGameEngine";
+import { getQuestionDuration } from "../hooks/useGameEngine.core";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
 import { CircularTimer } from "../../shared/CircularTimer";

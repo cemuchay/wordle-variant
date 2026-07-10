@@ -42,8 +42,8 @@ vi.mock('../../wordup/live/hooks/useMatchmaking', () => ({
   }),
 }));
 
-vi.mock('../../wordup/live/hooks/useGameEngine', () => ({
-  useWordUpGameLoop: () => {
+vi.mock('../../wordup/live/hooks/useGameEngine.new', () => ({
+  useGameEngine: () => {
     const s = useWordUpStore.getState();
     const isGameover = s.view === 'gameover';
     return {
