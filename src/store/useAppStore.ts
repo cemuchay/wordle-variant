@@ -91,8 +91,10 @@ interface AppState {
    isPWAInstalled: boolean;
     wordupMode: "live" | "async" | null;
     pendingAsyncMatchId: string | null;
+    hasHydrated: boolean;
 
    // Actions
+   setHasHydrated: (val: boolean) => void;
    triggerToast: (message: string, duration?: number, isLarge?: boolean) => void;
    setToast: (toast: {
       show: boolean;
@@ -182,12 +184,14 @@ interface AppState {
          pendingChatGroupId: null,
          pendingChallengeUserId: null,
          previewImage: null,
-          challengePresets: [],
-           isPWAInstalled: false,
-            wordupMode: (safeLocalStorage.getItem("wordup_mode") as "live" | "async" | null) || null,
-            pendingAsyncMatchId: null,
+         challengePresets: [],
+         isPWAInstalled: false,
+         wordupMode: (safeLocalStorage.getItem("wordup_mode") as "live" | "async" | null) || null,
+         pendingAsyncMatchId: null,
+         hasHydrated: false,
 
-          // Actions
+         // Actions
+         setHasHydrated: (hasHydrated) => set({ hasHydrated }),
          triggerToast: (message, duration = 3000, isLarge = false) =>
             set({ toast: { show: true, message, duration, isLarge } }),
          setToast: (toast) => set({ toast }),
@@ -298,27 +302,30 @@ interface AppState {
                   (p) => p.id !== id,
                ),
             })),
-          setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
-           setWordupMode: (wordupMode) => {
-              safeLocalStorage.setItem("wordup_mode", wordupMode ?? "");
-              set({ wordupMode });
-           },
-           setPendingAsyncMatchId: (pendingAsyncMatchId) => set({ pendingAsyncMatchId }),
+         setIsPWAInstalled: (isPWAInstalled) => set({ isPWAInstalled }),
+         setWordupMode: (wordupMode) => {
+            safeLocalStorage.setItem("wordup_mode", wordupMode ?? "");
+            set({ wordupMode });
+         },
+         setPendingAsyncMatchId: (pendingAsyncMatchId) => set({ pendingAsyncMatchId }),
 
       }),
       {
          name: "variant-app-storage",
-          storage: createJSONStorage(() => asyncStorage),
-          // Only persist specific keys to keep it lightweight
-           partialize: (state) => ({
-              preferences: state.preferences,
-              stats: state.stats,
-              myParticipations: state.myParticipations,
-              readReceipts: state.readReceipts,
-              joinedGroupIds: state.joinedGroupIds,
-              challengePresets: state.challengePresets,
-              failedMessageIds: state.failedMessageIds,
-           }),
+         storage: createJSONStorage(() => asyncStorage),
+         onRehydrateStorage: () => (state) => {
+            state?.setHasHydrated(true);
+         },
+         // Only persist specific keys to keep it lightweight
+         partialize: (state) => ({
+            preferences: state.preferences,
+            stats: state.stats,
+            myParticipations: state.myParticipations,
+            readReceipts: state.readReceipts,
+            joinedGroupIds: state.joinedGroupIds,
+            challengePresets: state.challengePresets,
+            failedMessageIds: state.failedMessageIds,
+         }),
       },
    ),
 );
@@ -326,4 +333,3 @@ interface AppState {
 if (import.meta.env.DEV) {
    (window as any).__appStore = useAppStore;
 }
-

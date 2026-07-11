@@ -81,10 +81,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const globalMessages = useAppStore(s => s.globalMessages);
     const readReceipts = useAppStore(s => s.readReceipts);
     const joinedGroupIds = useAppStore(s => s.joinedGroupIds);
+    const hasHydrated = useAppStore(s => s.hasHydrated);
 
     // Centralized reactive unread chat messages calculator
     useEffect(() => {
-        if (!user?.id) {
+        if (!user?.id || !hasHydrated) {
             setUnreadCount(0);
             return;
         }
@@ -125,7 +126,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return () => {
             isCancelled = true;
         };
-    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount, queryClient]);
+    }, [globalMessages, readReceipts, joinedGroupIds, user?.id, setUnreadCount, queryClient, hasHydrated]);
 
     // Refs for signaling
     const signalingChannelRef = useRef<any>(null);
