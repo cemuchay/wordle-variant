@@ -288,23 +288,26 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    // eslint-disable-next-line react-hooks/immutability
    useEffect(() => { startMatchRef.current = engine.startMatch; }, [engine.startMatch]);
 
-   useEffect(() => {
-      return () => {
-         cancelMatchmakingRef.current();
-         engineCleanupRef.current?.();
-         const state = useLiveStore.getState();
-         if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
-      };
-   }, [resetGame]);
+    useEffect(() => {
+       return () => {
+          const state = useLiveStore.getState();
+          if (state.view === "connecting" || state.view === "matchmaking") return;
+          cancelMatchmakingRef.current();
+          engineCleanupRef.current?.();
+          if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
+       };
+    }, [resetGame]);
 
     const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
     const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
 
     useEffect(() => {
-       if (autoStartMatchmaking && effectiveUser && view === "menu") {
+       if (autoStartMatchmaking && effectiveUser && (view === "menu" || view === "connecting")) {
           setAutoStartMatchmaking(false);
-          resetGame();
-          setView("connecting");
+          if (view === "menu") {
+             resetGame();
+             setView("connecting");
+          }
           startMatchmaking();
        }
     }, [autoStartMatchmaking, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking]);

@@ -52,36 +52,23 @@ export const WordUpContainer = ({
       refreshPending();
    }, [effectiveUser?.id, refreshPending]);
 
-    // Navigate to Live lobby (classic live mode)
-    const handleNavigateLive = useCallback(() => {
-       useLiveStore.getState().setView("menu");
-       useLiveStore.getState().setAutoStartMatchmaking(false);
+    // Bridge: Play Live Match from Unified Lobby
+    const handlePlayLive = useCallback((catId: string) => {
+       useLiveStore.getState().setCategory(catId);
+       useLiveStore.getState().resetGame();
+       useLiveStore.getState().setView("connecting");
+       useLiveStore.getState().setAutoStartMatchmaking(true);
        setWordupMode("live");
     }, [setWordupMode]);
 
-    // Navigate to Async lobby (classic async mode)
-    const handleNavigateAsync = useCallback(() => {
+    // Bridge: Play Async Challenge from Unified Lobby
+    const handlePlayAsync = useCallback((targetUser: any, catId: string) => {
+       useAsyncStore.getState().setCategory(catId);
+       useAsyncStore.getState().resetGame();
        useAsyncStore.getState().setView("menu");
+       useAsyncStore.getState().setPendingChallengePlayer(targetUser);
        setWordupMode("async");
     }, [setWordupMode]);
-
-    // Bridge: Play Live Match from Unified Lobby
-    const handlePlayLiveCategory = useCallback((catId: string) => {
-      useLiveStore.getState().setCategory(catId);
-      useLiveStore.getState().resetGame();
-      useLiveStore.getState().setView("connecting");
-      useLiveStore.getState().setAutoStartMatchmaking(true);
-      setWordupMode("live");
-   }, [setWordupMode]);
-
-   // Bridge: Play Async Challenge from Unified Lobby
-   const handlePlayAsyncChallenge = useCallback((targetUser: any, catId: string) => {
-      useAsyncStore.getState().setCategory(catId);
-      useAsyncStore.getState().resetGame();
-      useAsyncStore.getState().setView("menu");
-      useAsyncStore.getState().setPendingChallengePlayer(targetUser);
-      setWordupMode("async");
-   }, [setWordupMode]);
 
    // Bridge: Play Async Turn from Unified Lobby
    const handlePlayAsyncTurn = useCallback((match: any) => {
@@ -113,24 +100,22 @@ export const WordUpContainer = ({
 
    if (wordupMode === null) {
       return (
-          <UnifiedLobby
-             userStats={userStats}
-             getRankColor={getRankColor}
-             allProfiles={allProfiles}
-             currentUser={effectiveUser}
-             onSelectHistoryMatch={handleSelectHistoryMatch}
-             soundEnabled={soundEnabled}
-             onToggleSound={() => setSoundEnabled(!soundEnabled)}
-             onPlayLiveCategory={handlePlayLiveCategory}
-             onPlayAsyncChallenge={handlePlayAsyncChallenge}
-             onPlayAsyncTurn={handlePlayAsyncTurn}
-             pendingMatches={pendingMatches}
-             onRefreshPending={refreshPending}
-             onBackToClassic={onBackToClassic}
-             onTutorial={onTutorial}
-             onNavigateLive={handleNavigateLive}
-             onNavigateAsync={handleNavigateAsync}
-          />
+           <UnifiedLobby
+              userStats={userStats}
+              getRankColor={getRankColor}
+              allProfiles={allProfiles}
+              currentUser={effectiveUser}
+              onSelectHistoryMatch={handleSelectHistoryMatch}
+              soundEnabled={soundEnabled}
+              onToggleSound={() => setSoundEnabled(!soundEnabled)}
+              onPlayLive={handlePlayLive}
+              onPlayAsync={handlePlayAsync}
+              onPlayAsyncTurn={handlePlayAsyncTurn}
+              pendingMatches={pendingMatches}
+              onRefreshPending={refreshPending}
+               onBackToClassic={onBackToClassic}
+               onTutorial={onTutorial}
+            />
       );
    }
 
