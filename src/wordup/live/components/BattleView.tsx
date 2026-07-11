@@ -338,7 +338,7 @@ export const BattleView = ({
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
                      animate={{ opacity: 1, scale: 1 }}
-                     className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
+                     className="w-full max-w-[240px] h-[120px] sm:max-w-[200px] sm:h-[100px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
                       <PreloadedImage
                          src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
@@ -367,7 +367,7 @@ export const BattleView = ({
                      const imageUrl = getCachedFlagUrl(flagCode);
                      const optionLetter = String.fromCharCode(65 + index);
 
-                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
+                     let cardClass = "relative w-full aspect-[2.4/1] xs:aspect-[2.2/1] sm:aspect-[1.8/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
                      if (selectedAnswer === null) {
                         cardClass += " cursor-pointer bg-white border-gray-200 hover:border-cyan-400 hover:bg-gray-50";
                      } else {
@@ -449,8 +449,9 @@ export const BattleView = ({
                      const isSelected = selectedAnswer === choice;
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
+                     const hasImage = !!activeQuestion.imageUrl;
 
-                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                     let btnClass = `${hasImage ? "p-3.5 sm:p-5 min-h-[38px] sm:min-h-[50px]" : "p-4 sm:p-6 min-h-[48px] sm:min-h-[64px]"} rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center relative overflow-hidden`;
                      if (selectedAnswer === null) {
                         btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {
