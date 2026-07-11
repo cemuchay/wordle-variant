@@ -7,6 +7,7 @@ export interface MatrixTemplate {
    prompts: string[];
    explanations: string[];
    answerKey?: string;
+   weight?: number;
 }
 
 export const QUESTION_TEMPLATES: MatrixTemplate[] = [
@@ -783,47 +784,119 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
    // FLAG BEARER (3 templates)
    // ═══════════════════════════════════════════════════════════
    {
-      id: "flag_identify",
-      category: "flag_bearer",
-      requiredKeys: ["flag_code"],
-      prompts: [
-         "Which country's flag is shown in the image?",
-         "Identify the country that is represented by this flag:",
-         "Whose national flag is displayed below?",
-         "Identify this flag:",
-      ],
-      explanations: [
-         "The flag shown belongs to {label}.",
-         "This is the official national flag of {label}.",
-      ],
-   },
-   {
-      id: "flag_capital",
-      category: "flag_bearer",
-      requiredKeys: ["capital", "flag_code"],
-      prompts: [
-         "What is the capital city of the country whose flag is shown?",
-         "For the country represented by this flag, what is its capital city?",
-      ],
-      explanations: [
-         "The flag belongs to {label}, whose capital is {capital}.",
-      ],
-      answerKey: "capital",
-   },
-   {
-      id: "flag_continent",
-      category: "flag_bearer",
-      requiredKeys: ["continent", "flag_code"],
-      prompts: [
-         "In which continent is the country located that uses this flag?",
-         "For the national flag shown, which continent does its country belong to?",
-      ],
-      explanations: [
-         "The country represented by this flag ({label}) is located in {continent}.",
-      ],
-      answerKey: "continent",
-   },
-];
+       id: "flag_identify",
+       category: "flag_bearer",
+       requiredKeys: ["flag_code"],
+       prompts: [
+          "Which country's flag is shown in the image?",
+          "Identify the country that is represented by this flag:",
+          "Whose national flag is displayed below?",
+          "Identify this flag:",
+       ],
+       explanations: [
+          "The flag shown belongs to {label}.",
+          "This is the official national flag of {label}.",
+       ],
+       weight: 15,
+    },
+    {
+       id: "flag_capital",
+       category: "flag_bearer",
+       requiredKeys: ["capital", "flag_code"],
+       prompts: [
+          "What is the capital city of the country whose flag is shown?",
+          "For the country represented by this flag, what is its capital city?",
+       ],
+       explanations: [
+          "The flag belongs to {label}, whose capital is {capital}.",
+       ],
+       answerKey: "capital",
+       weight: 5,
+    },
+    {
+       id: "flag_continent",
+       category: "flag_bearer",
+       requiredKeys: ["continent", "flag_code"],
+       prompts: [
+          "In which continent is the country located that uses this flag?",
+          "For the national flag shown, which continent does its country belong to?",
+       ],
+       explanations: [
+          "The country represented by this flag ({label}) is located in {continent}.",
+       ],
+       answerKey: "continent",
+       weight: 3,
+    },
+    {
+       id: "flag_subregion",
+       category: "flag_bearer",
+       requiredKeys: ["subregion", "flag_code"],
+       prompts: [
+          "For the national flag shown, which subregion does its country belong to?",
+          "Identify the subregion of the country represented by this flag:",
+       ],
+       explanations: [
+          "The country represented by this flag ({label}) is located in the {subregion} subregion.",
+       ],
+       answerKey: "subregion",
+       weight: 2,
+    },
+    {
+       id: "flag_language",
+       category: "flag_bearer",
+       requiredKeys: ["primary_language", "flag_code"],
+       prompts: [
+          "What is the primary language spoken in the country whose flag is shown?",
+          "For the country represented by this flag, what is the primary language?",
+       ],
+       explanations: [
+          "The country represented by this flag ({label}) has {primary_language} as its primary language.",
+       ],
+       answerKey: "primary_language",
+       weight: 2,
+    },
+    {
+       id: "flag_currency",
+       category: "flag_bearer",
+       requiredKeys: ["currency", "flag_code"],
+       prompts: [
+          "What is the official currency of the country whose flag is shown?",
+          "Identify the currency used by the country represented by this flag:",
+       ],
+       explanations: [
+          "The country represented by this flag ({label}) uses the {currency} as its official currency.",
+       ],
+       answerKey: "currency",
+       weight: 2,
+    },
+    {
+       id: "flag_independence",
+       category: "flag_bearer",
+       requiredKeys: ["independence_year", "flag_code"],
+       prompts: [
+          "In which year did the country represented by this flag gain independence?",
+          "What is the independence year of the country whose flag is shown?",
+       ],
+       explanations: [
+          "{label} gained independence in the year {independence_year}.",
+       ],
+       answerKey: "independence_year",
+       weight: 1,
+    },
+    {
+       id: "flag_demonym",
+       category: "flag_bearer",
+       requiredKeys: ["demonym", "flag_code"],
+       prompts: [
+          "What are people from the country represented by this flag commonly called (demonym)?",
+          "Identify the demonym for citizens of the country whose flag is shown:",
+       ],
+       explanations: [
+          "A person from the country represented by this flag ({label}) is called a {demonym}.",
+       ],
+       answerKey: "demonym",
+       weight: 1,
+    }];
 
 export function getRandomMatchingTemplate(
    // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -849,6 +922,16 @@ export function getRandomMatchingTemplate(
    });
 
    if (matches.length === 0) return null;
-   const shuffled = seededShuffle(matches, rng);
-   return shuffled[0];
+
+   // Weighted random selection
+   const totalWeight = matches.reduce((acc, t) => acc + (t.weight ?? 1), 0);
+   let roll = rng() * totalWeight;
+   for (const template of matches) {
+      roll -= (template.weight ?? 1);
+      if (roll <= 0) {
+         return template;
+      }
+   }
+
+   return matches[0];
 }
