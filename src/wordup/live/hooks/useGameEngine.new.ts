@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useLiveStore } from "../store/useLiveStore";
 import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
@@ -95,6 +96,7 @@ export function useGameEngine(props: EngineProps) {
         gameType,
         triggerToast,
         onGameOver,
+        onRematchAccepted,
     } = props;
 
     // ══════════════════════════════════════════════════════════════════
@@ -113,6 +115,12 @@ export function useGameEngine(props: EngineProps) {
     const [opponentCurrentPoints, setOpponentCurrentPoints] = useState(0);
     const [countdownText, setCountdownText] = useState("3");
     const [lastRoundPopup, setLastRoundPopup] = useState(false);
+
+    // Live PvP States
+    const [opponentSignalLevel, setOpponentSignalLevel] = useState(0);
+    const [rematchState, setRematchState] = useState<"idle" | "sent" | "received" | "expired">("idle");
+    const [rematchCountdown, setRematchCountdown] = useState(0);
+    const [showRematchButton, setShowRematchButton] = useState(false);
 
     // ══════════════════════════════════════════════════════════════════
     // Refs — mutable, never cause re-renders
@@ -152,6 +160,10 @@ export function useGameEngine(props: EngineProps) {
     const cleanIdRef = useRef<string>("");
     const encryptedQuestionsRef = useRef<string>("");
     const encryptionKeyRef = useRef<string>("");
+
+    // Supabase channel ref for PvP broadcasts
+    const channelRef = useRef<RealtimeChannel | null>(null);
+    const rematchIntervalRef = useRef<number | null>(null);
 
     // Phase ref for use in callbacks (avoids stale closures)
     const phaseRef = useRef<Status>("idle");
@@ -209,13 +221,21 @@ export function useGameEngine(props: EngineProps) {
         }
     }, []);
 
+    const stopRematchInterval = useCallback(() => {
+        if (rematchIntervalRef.current !== null) {
+            clearInterval(rematchIntervalRef.current);
+            rematchIntervalRef.current = null;
+        }
+    }, []);
+
     const stopAllTimers = useCallback(() => {
         stopCountdown();
         stopRoundTick();
         stopReveal();
         stopOverall();
         stopBotTimer();
-    }, [stopCountdown, stopRoundTick, stopReveal, stopOverall, stopBotTimer]);
+        stopRematchInterval();
+    }, [stopCountdown, stopRoundTick, stopReveal, stopOverall, stopBotTimer, stopRematchInterval]);
 
     // ══════════════════════════════════════════════════════════════════
     // Internal actions (read refs, safe inside timeouts)
@@ -303,7 +323,26 @@ export function useGameEngine(props: EngineProps) {
         safeLocalStorage.removeItem("wordup_active_game");
         const md = matchDataRef.current;
         onGameOver(buildFinalMatch(md || {}, roleRef.current, finalMy, finalOpp, cleanIdRef.current, botProfileRef.current, encryptedQuestionsRef.current, encryptionKeyRef.current));
-    }, [onGameOver, stopAllTimers]);
+
+        // Start rematch countdown for live PvP matches
+        if (gameTypeRef.current === "live") {
+            setShowRematchButton(true);
+            setRematchCountdown(15);
+            
+            stopRematchInterval();
+            rematchIntervalRef.current = window.setInterval(() => {
+                setRematchCountdown(prev => {
+                    if (prev <= 1) {
+                        stopRematchInterval();
+                        setShowRematchButton(false);
+                        setRematchState("expired");
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+    }, [onGameOver, stopAllTimers, stopRematchInterval]);
 
     /** Start the reveal phase, then advance or game-over after a delay. */
     const beginReveal = useCallback(() => {
@@ -553,6 +592,20 @@ export function useGameEngine(props: EngineProps) {
             else wordupAudio.playIncorrect();
         })();
 
+        // Live PvP: Broadcast selected answer to the opponent
+        if (gameTypeRef.current === "live" && channelRef.current && roleRef.current) {
+            channelRef.current.send({
+                type: "broadcast",
+                event: "player_answered",
+                payload: {
+                    role: roleRef.current,
+                    round: currentRoundRef.current,
+                    choice: choice,
+                    timeTaken: timeTaken
+                }
+            });
+        }
+
         // Live-bot: answer immediately for fast UX
         if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
             stopBotTimer();
@@ -567,7 +620,7 @@ export function useGameEngine(props: EngineProps) {
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
-    }, [stopRoundTick, stopBotTimer]);
+    }, [stopBotTimer]);
 
     /**
      * Handle opponent answer from a live PvP broadcast.
@@ -586,12 +639,82 @@ export function useGameEngine(props: EngineProps) {
     }, []);
 
     // ── Stub functions (preserved API, currently no-ops) ─────────
-    const sendRematch = useCallback(() => {}, []);
-    const acceptRematch = useCallback((_cb?: (mId: string, role: "player1" | "player2") => void) => {}, []);
-    const sendQuickChat = useCallback(() => {}, []);
-    const sendSignalUpdate = useCallback((_level?: number) => {}, []);
+    const sendRematch = useCallback(() => {
+        if (!channelRef.current || !roleRef.current) return;
+        setRematchState("sent");
+        channelRef.current.send({
+            type: "broadcast",
+            event: "rematch_sent",
+            payload: { role: roleRef.current }
+        });
+    }, []);
+
+    const acceptRematch = useCallback(async (onMatchFoundCb?: (mId: string, role: "player1" | "player2") => void) => {
+        if (!channelRef.current || !roleRef.current || !matchDataRef.current) return;
+
+        const newMatchId = `rematch-${crypto.randomUUID()}`;
+        setRematchState("idle");
+
+        channelRef.current.send({
+            type: "broadcast",
+            event: "rematch_accepted",
+            payload: { role: roleRef.current, newMatchId }
+        });
+
+        const nextRole = roleRef.current === "player1" ? "player2" : "player1";
+
+        try {
+            const category = useLiveStore.getState().category || "mixed";
+            const p1 = roleRef.current === "player1" ? matchDataRef.current.player2_id : matchDataRef.current.player1_id;
+            const p2 = roleRef.current === "player1" ? matchDataRef.current.player1_id : matchDataRef.current.player2_id;
+
+            await supabase.from("wordup_matches").insert({
+                id: newMatchId,
+                category,
+                player1_id: p1,
+                player2_id: p2,
+                status: "waiting",
+                game_type: "live"
+            });
+        } catch (e) {
+            console.error("Failed to register rematch matching:", e);
+        }
+
+        if (onMatchFoundCb) {
+            onMatchFoundCb(newMatchId, nextRole);
+        }
+    }, []);
+
+    const sendQuickChat = useCallback((message: string) => {
+        if (!channelRef.current || !roleRef.current) return;
+
+        window.dispatchEvent(new CustomEvent("wordup-quick-chat", {
+            detail: { sender: "self", message }
+        }));
+
+        channelRef.current.send({
+            type: "broadcast",
+            event: "quick_chat",
+            payload: { role: roleRef.current, message }
+        });
+    }, []);
+
+    const sendSignalUpdate = useCallback((level: number) => {
+        if (!channelRef.current || !roleRef.current) return;
+
+        channelRef.current.send({
+            type: "broadcast",
+            event: "signal_update",
+            payload: { role: roleRef.current, level }
+        });
+    }, []);
+
     const cleanup = useCallback(() => {
         stopAllTimers();
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+        }
     }, [stopAllTimers]);
     const abortMatch = useCallback(async () => {
         stopAllTimers();
@@ -645,7 +768,7 @@ export function useGameEngine(props: EngineProps) {
                         questions = await decryptMatchQuestions({
                             questions: edgeData.encryptedQuestions,
                             encryption_key: edgeData.encryptionKey,
-                        } as any);
+                        } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
                     } else {
                         questions = await generateWordUpQuestions(category);
                         const fKey = generateSecretKey();
@@ -729,19 +852,72 @@ export function useGameEngine(props: EngineProps) {
 
             // Start the countdown
             setPhase("countdown");
+
+            // ── Supabase Realtime Channel Registration for Live PvP ──
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
+
+            if (!mId.startsWith("bot-match-")) {
+                const channelName = `wordup_match_${mId}`;
+                const ch = supabase.channel(channelName);
+
+                ch.on("broadcast", { event: "player_answered" }, ({ payload }) => {
+                    const opponentRole = activeRole === "player1" ? "player2" : "player1";
+                    if (payload.role === opponentRole && payload.round === currentRoundRef.current) {
+                        handleOpponentAnswer(payload.choice, payload.timeTaken);
+                    }
+                })
+                .on("broadcast", { event: "signal_update" }, ({ payload }) => {
+                    const opponentRole = activeRole === "player1" ? "player2" : "player1";
+                    if (payload.role === opponentRole) {
+                        setOpponentSignalLevel(payload.level);
+                    }
+                })
+                .on("broadcast", { event: "quick_chat" }, ({ payload }) => {
+                    const opponentRole = activeRole === "player1" ? "player2" : "player1";
+                    if (payload.role === opponentRole) {
+                        window.dispatchEvent(new CustomEvent("wordup-quick-chat", {
+                            detail: { sender: "opponent", message: payload.message }
+                        }));
+                    }
+                })
+                .on("broadcast", { event: "rematch_sent" }, ({ payload }) => {
+                    const opponentRole = activeRole === "player1" ? "player2" : "player1";
+                    if (payload.role === opponentRole) {
+                        setRematchState("received");
+                    }
+                })
+                .on("broadcast", { event: "rematch_accepted" }, ({ payload }) => {
+                    const opponentRole = activeRole === "player1" ? "player2" : "player1";
+                    if (payload.role === opponentRole && payload.newMatchId) {
+                        setRematchState("idle");
+                        const nextRole = activeRole === "player1" ? "player2" : "player1";
+                        onRematchAccepted(payload.newMatchId, nextRole);
+                    }
+                })
+                .subscribe((status) => {
+                    if (status === "SUBSCRIBED") {
+                        console.log(`Subscribed to match channel: ${channelName}`);
+                    }
+                });
+
+                channelRef.current = ch;
+            }
         },
-        [],
+        [handleOpponentAnswer, onRematchAccepted],
     );
 
     // ── Derive computed state shape for LiveView ─────────────────
     const engineState = {
         phase,
         selectedAnswer: myChoice,
-        rematchState: "idle" as const,
-        rematchCountdown: 0,
-        showRematchButton: false,
+        rematchState,
+        rematchCountdown,
+        showRematchButton,
         isConnected: true,
-        opponentSignalLevel: 0,
+        opponentSignalLevel,
         countdownText,
         lastRoundPopup,
     };

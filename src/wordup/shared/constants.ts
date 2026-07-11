@@ -72,12 +72,12 @@ export const CATEGORIES = [
    //    name: "Currencies",
    //    desc: "Match currencies to their countries",
    // },
-   // {
-   //    id: "flag_bearer",
-   //    name: "Flags",
-   //    desc: "Identify countries by their flag colors",
-   //    featured: true,
-   // },
+   {
+      id: "flag_bearer",
+      name: "Flags",
+      desc: "Identify countries by their flag colors and properties",
+      featured: true,
+   },
     {
        id: "chemistry",
        name: "Chemistry",

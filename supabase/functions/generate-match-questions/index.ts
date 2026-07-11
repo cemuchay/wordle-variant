@@ -183,6 +183,8 @@ function generateQuestion(
       qObj.imageUrl = meta.image.startsWith("http")
          ? meta.image
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+   } else if (meta.flag_code) {
+      qObj.imageUrl = `https://flagcdn.com/h240/${meta.flag_code.toLowerCase()}.png`;
    }
    return qObj;
 }

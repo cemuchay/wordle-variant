@@ -16,7 +16,12 @@ export const getFallbackFlagUrl = (code: string) =>
  * Returns the cached flag URL or falls back to primary.
  */
 export function getCachedFlagUrl(code: string): string {
-   return flagUrlCache[code.toLowerCase()] || getPrimaryFlagUrl(code);
+   if (!code) return "";
+   if (code.startsWith("http://") || code.startsWith("https://")) {
+      return code;
+   }
+   const resolved = getFlagCode(code) || code;
+   return flagUrlCache[resolved.toLowerCase()] || getPrimaryFlagUrl(resolved);
 }
 
 /**
@@ -107,62 +112,62 @@ function preloadGeneralImage(url: string): Promise<void> {
  */
 export async function preloadMatchImages(
    questions: WordUpQuestion[],
-): Promise<void> {
-   const flagCodes = new Set<string>();
-   const generalUrls = new Set<string>();
-
-   for (const q of questions) {
-      if (q.imageUrl) {
-         if (q.imageUrl.length === 2) {
-            flagCodes.add(q.imageUrl);
-         } else {
-            generalUrls.add(q.imageUrl);
-         }
-      }
-      if (q.imageUrls) {
-         for (const entry of q.imageUrls) {
-            if (entry && entry.length === 2) {
-               flagCodes.add(entry);
-            } else if (entry) {
-               generalUrls.add(entry);
-            }
-         }
-      }
-   }
-
-   const tasks: Promise<void>[] = [];
-
-   if (flagCodes.size > 0) {
-      tasks.push(
-         ...Array.from(flagCodes).map((code) =>
-            preloadFlagImage(code).catch((err) => console.warn(err)),
-         ),
-      );
-   }
-   if (generalUrls.size > 0) {
-      tasks.push(
-         ...Array.from(generalUrls).map((url) =>
-            preloadGeneralImage(url).catch((err) => console.warn(err)),
-         ),
-      );
-   }
-
-   if (tasks.length === 0) return;
-
-   await Promise.all(tasks);
-}
-
-/** @deprecated Use `preloadMatchImages` instead */
-export const preloadMatchFlags = preloadMatchImages;
-
-/**
- * Post-processes questions client-side to convert textual flag bearer prompts
- * into image-rich visual question formats.
- */
-export function postProcessQuestions(
-   questions: WordUpQuestion[],
-   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-   _category: string,
-): WordUpQuestion[] {
-   return questions;
-}
+ ): Promise<void> {
+    const flagCodes = new Set<string>();
+    const generalUrls = new Set<string>();
+ 
+    for (const q of questions) {
+       if (q.imageUrl) {
+          const resolved = getFlagCode(q.imageUrl);
+          if (resolved && resolved.length === 2) {
+             flagCodes.add(resolved);
+          } else {
+             generalUrls.add(q.imageUrl);
+          }
+       }
+       if (q.imageUrls) {
+          for (const entry of q.imageUrls) {
+             if (entry) {
+                const resolved = getFlagCode(entry);
+                if (resolved && resolved.length === 2) {
+                   flagCodes.add(resolved);
+                } else {
+                   generalUrls.add(entry);
+                }
+             }
+          }
+       }
+    }
+ 
+    const tasks: Promise<void>[] = [];
+ 
+    if (flagCodes.size > 0) {
+       tasks.push(
+          ...Array.from(flagCodes).map((code) =>
+             preloadFlagImage(code).catch((err) => console.warn(err)),
+          ),
+       );
+    }
+    if (generalUrls.size > 0) {
+       tasks.push(
+          ...Array.from(generalUrls).map((url) =>
+             preloadGeneralImage(url).catch((err) => console.warn(err)),
+          ),
+       );
+    }
+ 
+    if (tasks.length === 0) return;
+ 
+    await Promise.all(tasks);
+ }
+ 
+ /** @deprecated Use `preloadMatchImages` instead */
+ export const preloadMatchFlags = preloadMatchImages;
+ 
+ export function postProcessQuestions(
+    questions: WordUpQuestion[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _category: string,
+ ): WordUpQuestion[] {
+    return questions;
+ }

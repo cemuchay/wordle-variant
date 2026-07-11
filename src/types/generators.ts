@@ -4,6 +4,8 @@ export interface BaseQuestion {
    options: string[];
    answer: string;
    explanation?: string;
+   imageUrl?: string;
+   imageUrls?: string[];
    metadata?: {
       generatorId: string;
       entityId?: string;

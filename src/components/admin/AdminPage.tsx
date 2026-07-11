@@ -75,6 +75,7 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
     const [wikiLoading, setWikiLoading] = useState(false);
     const [wikiResults, setWikiResults] = useState<{ title: string; url: string }[]>([]);
     const [searchMode, setSearchMode] = useState<'svg' | 'photo'>('svg');
+    const [exploreTitle, setExploreTitle] = useState<string | null>(null);
 
     const fetchQuestions = useCallback(async () => {
         setLoading(true);
@@ -82,7 +83,8 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
             const { data, error } = await supabase
                 .from('wordup_handcrafted_questions')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(100);
 
             if (error) throw error;
             setQuestions(data || []);
@@ -183,12 +185,20 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
     // Pre-populate input states on question selection
     useEffect(() => {
         Promise.resolve().then(() => {
+            setExploreTitle(null); // Clear active exploration status on question switch
+            
             if (selectedQuestion) {
                 setImageUrlVal(selectedQuestion.image_url || '');
                 setImageUrlsList(selectedQuestion.image_urls || []);
                 setNoImageNeededVal(selectedQuestion.no_image_needed || false);
                 setWikiSearchTerm(selectedQuestion.answer);
                 setWikiResults([]);
+                
+                // Scroll the curator dashboard back to top
+                const container = document.querySelector('.h-screen.overflow-y-auto');
+                if (container) {
+                    container.scrollTo({ top: 0 });
+                }
             } else {
                 setImageUrlVal('');
                 setImageUrlsList([]);
@@ -204,6 +214,7 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
         if (!term.trim()) return;
         setWikiLoading(true);
         setWikiResults([]);
+        setExploreTitle(null); // Reset exploration status on new query
         try {
             if (searchMode === 'svg') {
                 const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}%20filetype:svg&srnamespace=6&format=json&origin=*&srlimit=12`;
@@ -256,6 +267,48 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
             }
         } catch (err: any) {
             triggerToast(err.message || 'Failed to query Wiki API', 'error');
+        } finally {
+            setWikiLoading(false);
+        }
+    };
+
+    // Retrieve all images embedded within a specific Wikipedia article
+    const handleExploreArticle = async (articleTitle: string) => {
+        if (!articleTitle) return;
+        setWikiLoading(true);
+        setExploreTitle(articleTitle);
+        setWikiResults([]);
+        try {
+            const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(articleTitle)}&generator=images&gimlimit=35&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`;
+            const res = await fetch(searchUrl);
+            const searchData = await res.json();
+            const pages = searchData.query?.pages || {};
+
+            const blacklist = ['icon', 'logo', 'lock', 'padlock', 'edit', 'stub', 'sound', 'speaker', 'increase', 'decrease', 'play', 'arrow', 'magnifying', 'red_penc', 'wiki', 'commons', 'disg', 'signature'];
+            const cleanResults = Object.values(pages).map((p: any) => {
+                const info = p.imageinfo?.[0];
+                return {
+                    title: p.title || "",
+                    url: info?.thumburl || info?.url || ""
+                };
+            }).filter((item: any) => {
+                if (!item.url) return false;
+                const name = item.title.toLowerCase();
+                // Exclude system icons and non-image formats
+                if (blacklist.some(term => name.includes(term))) return false;
+                return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.svg');
+            }).sort((a: any, b: any) => a.title.localeCompare(b.title));
+
+            if (cleanResults.length === 0) {
+                triggerToast("No image assets found inside this article.", "error");
+                setExploreTitle(null);
+                return;
+            }
+
+            setWikiResults(cleanResults);
+        } catch (err: any) {
+            triggerToast(err.message || 'Failed to query Wikipedia article images', 'error');
+            setExploreTitle(null);
         } finally {
             setWikiLoading(false);
         }
@@ -618,7 +671,7 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                 </div>
                             </div>
 
-                            <div className="flex gap-2">
+                             <div className="flex gap-2">
                                 <input
                                     type="text"
                                     placeholder="Enter entity query e.g. Lionel Messi, Oxygen, France flag..."
@@ -636,6 +689,24 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                     Search
                                 </button>
                             </div>
+
+                            {/* Exploring Article Header Banner */}
+                            {exploreTitle && (
+                                <div className="flex items-center justify-between bg-black/40 border border-white/5 rounded-xl px-4 py-2.5 text-xs">
+                                    <span className="font-bold text-gray-300">
+                                        Exploring images in: <strong className="text-correct">{exploreTitle}</strong>
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            setExploreTitle(null);
+                                            handleSearchWiki(wikiSearchTerm);
+                                        }}
+                                        className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 px-2.5 py-1 rounded bg-indigo-500/5 cursor-pointer"
+                                    >
+                                        ← Back to Search
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Results Grid */}
                             {wikiLoading ? (
@@ -664,14 +735,14 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                             </p>
 
                                             {/* Mapping Controls Hover Overlay */}
-                                            <div className="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center gap-2 p-2">
+                                            <div className="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex flex-col items-center justify-center gap-1.5 p-2">
                                                 <button
                                                     onClick={() => {
                                                         const val = searchMode === 'svg' ? `wikimedia:${item.title}` : item.url;
                                                         setImageUrlVal(val);
                                                         triggerToast("Set as primary image!");
                                                     }}
-                                                    className="w-full bg-correct text-black font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform"
+                                                    className="w-full bg-correct text-black font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform cursor-pointer"
                                                 >
                                                     Use Primary
                                                 </button>
@@ -683,10 +754,18 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                                             triggerToast("Added to list!");
                                                         }
                                                     }}
-                                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform border border-white/10"
+                                                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform border border-white/10 cursor-pointer"
                                                 >
                                                     Add to List
                                                 </button>
+                                                {searchMode === 'photo' && !exploreTitle && (
+                                                    <button
+                                                        onClick={() => handleExploreArticle(item.title)}
+                                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase text-[8px] py-1.5 rounded hover:scale-105 transition-transform cursor-pointer"
+                                                    >
+                                                        Explore Images
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

@@ -37,6 +37,8 @@ export function baseQuestionToWordUpQuestion(
     choices: base.options,
     answer: base.answer,
     explanation: base.explanation,
+    imageUrl: base.imageUrl,
+    imageUrls: base.imageUrls,
   };
 }
 

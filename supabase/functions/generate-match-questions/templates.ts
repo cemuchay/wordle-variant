@@ -6,6 +6,7 @@ export interface MatrixTemplate {
    requiredKeys: string[];
    prompts: string[];
    explanations: string[];
+   answerKey?: string;
 }
 
 export const QUESTION_TEMPLATES: MatrixTemplate[] = [
@@ -777,6 +778,50 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
          "{label}'s home kit traditionally features {home_kit_colors}.",
          "The official home colors of {label} are {home_kit_colors}.",
       ],
+   },
+   // ═══════════════════════════════════════════════════════════
+   // FLAG BEARER (3 templates)
+   // ═══════════════════════════════════════════════════════════
+   {
+      id: "flag_identify",
+      category: "flag_bearer",
+      requiredKeys: ["flag_code"],
+      prompts: [
+         "Which country's flag is shown in the image?",
+         "Identify the country that is represented by this flag:",
+         "Whose national flag is displayed below?",
+         "Identify this flag:",
+      ],
+      explanations: [
+         "The flag shown belongs to {label}.",
+         "This is the official national flag of {label}.",
+      ],
+   },
+   {
+      id: "flag_capital",
+      category: "flag_bearer",
+      requiredKeys: ["capital", "flag_code"],
+      prompts: [
+         "What is the capital city of the country whose flag is shown?",
+         "For the country represented by this flag, what is its capital city?",
+      ],
+      explanations: [
+         "The flag belongs to {label}, whose capital is {capital}.",
+      ],
+      answerKey: "capital",
+   },
+   {
+      id: "flag_continent",
+      category: "flag_bearer",
+      requiredKeys: ["continent", "flag_code"],
+      prompts: [
+         "In which continent is the country located that uses this flag?",
+         "For the national flag shown, which continent does its country belong to?",
+      ],
+      explanations: [
+         "The country represented by this flag ({label}) is located in {continent}.",
+      ],
+      answerKey: "continent",
    },
 ];
 

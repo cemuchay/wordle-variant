@@ -104,8 +104,6 @@ export const BattleView = ({
    const activeQuestion = questions[currentIdx];
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
-   if (!activeQuestion) return null;
-
 
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
@@ -131,6 +129,8 @@ export const BattleView = ({
       prevMyScoreRef.current = myScore;
       prevOppScoreRef.current = oppScore;
    }, [myScore, oppScore]);
+
+   if (!activeQuestion) return null;
 
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
 

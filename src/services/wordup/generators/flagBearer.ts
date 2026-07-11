@@ -1,5 +1,6 @@
 import { type QuizGenerator, type BaseQuestion, type EntitySeed } from "../../../types/generators";
 import { createSeededRandom, seededShuffle, hashSeed } from "../seededRandom";
+import { getFlagCode } from "../../../utils/wordupQuestionPostProcessor";
 
 const ENTITIES: EntitySeed[] = [
    { id: "1", type: "flag_bearer", label: "Nigeria", metadata: { colors: "Green, White, Green", stripes: 3, continent: "Africa" }, difficulty: 1, tags: ["africa"] },
@@ -44,13 +45,16 @@ export const flagBearerGenerator: QuizGenerator = {
          .map((e) => e.label);
 
       const options = seededShuffle([correct, ...distractors], rng);
+      const flagCode = getFlagCode(correct);
+      const imageUrl = flagCode ? `https://flagcdn.com/${flagCode.toLowerCase()}.svg` : undefined;
 
       return {
          id: seed,
-         question: `Which country has a flag with the colors: ${colors}?`,
+         question: `Which country does this flag belong to?`,
          options,
          answer: correct,
          explanation: `The flag of ${correct} features ${colors.toLowerCase()}.`,
+         imageUrl,
          metadata: { generatorId: "flag_bearer", entityId: chosen.id },
       };
    },
