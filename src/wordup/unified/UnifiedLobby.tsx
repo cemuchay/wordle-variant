@@ -33,6 +33,7 @@ interface UnifiedLobbyProps {
    onRefreshPending: () => void;
    onBackToClassic?: () => void;
     onTutorial?: () => void;
+    restoreCategory?: string | null;
 }
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -57,9 +58,10 @@ export const UnifiedLobby = ({
    pendingMatches,
    onBackToClassic,
    onTutorial,
+   restoreCategory,
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
-   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
    const [liveCategory, setLiveCategory] = useState("mixed");
    const [asyncCategory, setAsyncCategory] = useState("mixed");
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);

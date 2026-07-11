@@ -243,8 +243,8 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    const handleCancelMatchmaking = useCallback(async () => {
       await cancelMatchmaking();
       resetGame();
-      setView("menu");
-   }, [cancelMatchmaking, resetGame, setView]);
+      onBack?.();
+   }, [cancelMatchmaking, resetGame, onBack]);
 
    const { handleAnswerSelect, sendRematch, acceptRematch, abortMatch, purgeAndReset: enginePurgeAndReset } = engine;
    const lastRoundPopup = engine.state.lastRoundPopup;
@@ -442,12 +442,12 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                     opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
                  />
               )}
-             {view === "gameover" && (
-               <GameOverView
-                  matchData={matchData}
-                  setView={(newView) => {
-                     if (newView === "menu") { resetGame(); }
-                     else if (newView === "matchmaking") {
+              {view === "gameover" && (
+                <GameOverView
+                   matchData={matchData}
+                   setView={(newView) => {
+                      if (newView === "menu") { resetGame(); onBack?.(); }
+                      else if (newView === "matchmaking") {
                         engineCleanupRef.current?.();
                         resetGame();
                         setView("connecting");

@@ -40,6 +40,7 @@ export const WordUpContainer = ({
 
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
    const [soundEnabled, setSoundEnabled] = useState(true);
+   const [lastCategory, setLastCategory] = useState<string | null>(null);
 
    const refreshPending = useCallback(async () => {
       if (effectiveUser) {
@@ -54,6 +55,7 @@ export const WordUpContainer = ({
 
     // Bridge: Play Live Match from Unified Lobby
     const handlePlayLive = useCallback((catId: string) => {
+       setLastCategory(catId);
        useLiveStore.getState().setCategory(catId);
        useLiveStore.getState().resetGame();
        useLiveStore.getState().setView("connecting");
@@ -63,6 +65,7 @@ export const WordUpContainer = ({
 
     // Bridge: Play Async Challenge from Unified Lobby
     const handlePlayAsync = useCallback((targetUser: any, catId: string) => {
+       setLastCategory(catId);
        useAsyncStore.getState().setCategory(catId);
        useAsyncStore.getState().resetGame();
        useAsyncStore.getState().setView("menu");
@@ -115,6 +118,7 @@ export const WordUpContainer = ({
               onRefreshPending={refreshPending}
                onBackToClassic={onBackToClassic}
                onTutorial={onTutorial}
+               restoreCategory={lastCategory}
             />
       );
    }
