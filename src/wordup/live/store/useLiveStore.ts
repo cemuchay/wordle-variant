@@ -30,6 +30,7 @@ interface LiveState {
     selectedAnswer: string | null;
     opponentChoice: string | null;
     revealAnswers: boolean;
+    autoStartMatchmaking: boolean;
 
     setIsBattlePlaying: (playing: boolean) => void;
    setView: (view: "menu" | "connecting" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading") => void;
@@ -47,6 +48,7 @@ interface LiveState {
     setOpponentChoice: (choice: string | null) => void;
     setRevealAnswers: (reveal: boolean) => void;
    setActiveTab: (tab: LiveTab) => void;
+   setAutoStartMatchmaking: (val: boolean) => void;
    resetGame: () => void;
 }
 
@@ -67,6 +69,7 @@ export const useLiveStore = create<LiveState>((set) => ({
     selectedAnswer: null,
     opponentChoice: null,
     revealAnswers: false,
+    autoStartMatchmaking: false,
 
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
@@ -94,6 +97,7 @@ export const useLiveStore = create<LiveState>((set) => ({
       safeSessionStorage.setItem("wordup_live_tab", activeTab);
       set({ activeTab });
    },
+   setAutoStartMatchmaking: (autoStartMatchmaking) => set({ autoStartMatchmaking }),
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
       const state = useLiveStore.getState();
@@ -112,6 +116,7 @@ export const useLiveStore = create<LiveState>((set) => ({
           selectedAnswer: null,
           opponentChoice: null,
           revealAnswers: false,
+          autoStartMatchmaking: false,
       });
    },
 }));

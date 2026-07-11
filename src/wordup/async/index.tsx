@@ -277,6 +277,17 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [view, matchId, role, startMatch]);
 
+   const pendingChallengePlayer = useAsyncStore((s) => s.pendingChallengePlayer);
+   const setPendingChallengePlayer = useAsyncStore((s) => s.setPendingChallengePlayer);
+
+   useEffect(() => {
+      if (pendingChallengePlayer && effectiveUser && view === "menu") {
+         const player = pendingChallengePlayer;
+         setPendingChallengePlayer(null);
+         handleChallengePlayer(player);
+      }
+   }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
+
    // Load pending and history matches
    const refreshPending = useCallback(async () => {
       setIsLoadingData(true);

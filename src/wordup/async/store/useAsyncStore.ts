@@ -22,6 +22,7 @@ interface AsyncState {
    revealAnswers: boolean;
    timeLeft: number;
    maxTime: number;
+   pendingChallengePlayer: any | null;
 
    setIsBattlePlaying: (playing: boolean) => void;
    setView: (view: AsyncView) => void;
@@ -37,6 +38,7 @@ interface AsyncState {
    setTimeLeft: (time: number) => void;
    setMaxTime: (time: number) => void;
    setActiveTab: (tab: AsyncTab) => void;
+   setPendingChallengePlayer: (player: any | null) => void;
    resetGame: () => void;
 }
 
@@ -55,6 +57,7 @@ export const useAsyncStore = create<AsyncState>((set) => ({
    revealAnswers: false,
    timeLeft: 10.0,
    maxTime: 10.0,
+   pendingChallengePlayer: null,
 
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
@@ -80,6 +83,7 @@ export const useAsyncStore = create<AsyncState>((set) => ({
       safeSessionStorage.setItem("wordup_async_tab", activeTab);
       set({ activeTab });
    },
+   setPendingChallengePlayer: (pendingChallengePlayer) => set({ pendingChallengePlayer }),
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_async_active_game");
       set({
@@ -93,6 +97,7 @@ export const useAsyncStore = create<AsyncState>((set) => ({
          opponentStats: null,
          selectedAnswer: null,
          revealAnswers: false,
+         pendingChallengePlayer: null,
       });
    },
 }));

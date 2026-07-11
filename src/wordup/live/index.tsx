@@ -297,6 +297,18 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       };
    }, [resetGame]);
 
+    const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
+    const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
+
+    useEffect(() => {
+       if (autoStartMatchmaking && effectiveUser && view === "menu") {
+          setAutoStartMatchmaking(false);
+          resetGame();
+          setView("connecting");
+          startMatchmaking();
+       }
+    }, [autoStartMatchmaking, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking]);
+
    // Retry pending bot match saves on mount
    useEffect(() => {
       const PENDING_KEY = "wordup_pending_bot_matches";
