@@ -279,7 +279,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
 
   useEffect(() => {
     if (maxAttempts > 6) {
-      if ((isWon || isLost) && scrollContainerRef.current) {
+      if (isLost && scrollContainerRef.current) {
         const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
         const timer = setTimeout(() => {
           if (scrollContainerRef.current) {
@@ -471,7 +471,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
 
           {/* Empty Rows */}
           {Array.from({ length: empties }).map((_, i) => {
-            const index = guesses.length + (revealingRowIndex !== null ? 1 : 0) + i;
+            const index = guesses.length + (revealingRowIndex !== null ? 0 : 1) + i;
             return (
               <div key={`row-empty-${i}`} className="flex items-center gap-2">
                 {maxAttempts > 6 && (
