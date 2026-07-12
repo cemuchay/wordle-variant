@@ -908,6 +908,7 @@ serve(async (req) => {
                answer,
                explanation,
                variations,
+               image_url,
                history:wordup_user_handcrafted_history(user_id, seen_at),
                stats:wordup_question_stats(difficulty_elo, topic_elo)
             `)
@@ -933,6 +934,7 @@ serve(async (req) => {
                   answer: hq.answer,
                   explanation: hq.explanation,
                   variations: hq.variations,
+                  image_url: hq.image_url,
                   seenCount,
                   diffScore,
                   topicElo,
@@ -1061,6 +1063,7 @@ serve(async (req) => {
                let finalAnswer = hq.answer;
                let finalChoices = hq.choices || [];
                let finalExplanation = hq.explanation;
+               let finalImageUrl = hq.image_url;
 
                // If variations exist, resolve a variation
                if (hq.variations && Array.isArray(hq.variations) && hq.variations.length > 0) {
@@ -1075,6 +1078,7 @@ serve(async (req) => {
                      if (variation.answer) finalAnswer = variation.answer;
                      if (variation.choices) finalChoices = variation.choices;
                      if (variation.explanation) finalExplanation = variation.explanation;
+                     if (variation.image_url) finalImageUrl = variation.image_url;
                   }
                }
 
@@ -1092,6 +1096,7 @@ serve(async (req) => {
                   choices: shuffledFinalChoices,
                   answer: finalAnswer,
                   explanation: finalExplanation,
+                  ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
                };
                chosenEntity = null;
                hqChosen = hq;

@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "./constants";
@@ -80,34 +80,34 @@ export const CategorySelectModal = ({
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-slate-900 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl"
+            className="bg-[#121212]/95 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl"
          >
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-white/5">
                <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-white">Select Arena Category</h3>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Choose an arena mode to matchmake or play bots</p>
+                  <p className="text-[10px] text-white/40 mt-0.5">Choose an arena mode to matchmake or play bots</p>
                </div>
                <button
                   onClick={onClose}
-                  className="p-1.5 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-all cursor-pointer"
+                  className="p-1.5 hover:bg-white/5 rounded-full text-white/60 hover:text-white transition-all cursor-pointer"
                >
                   <X size={18} />
                </button>
             </div>
 
             {/* Search Box — always visible */}
-            <div className="p-4 border-b border-white/5 bg-slate-950/45 flex items-center gap-2 shrink-0">
-               <Search size={16} className="text-gray-500 shrink-0 ml-1" />
+            <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-2 shrink-0">
+               <Search size={16} className="text-white/40 shrink-0 ml-1" />
                <input
                   type="text"
                   placeholder="Search categories or modes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-xs text-white outline-none placeholder:text-gray-500 font-bold"
+                  className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30 font-bold"
                />
                {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="text-[10px] font-black uppercase text-gray-500 hover:text-white tracking-widest cursor-pointer mr-1">
+                  <button onClick={() => setSearchQuery("")} className="text-[10px] font-black uppercase text-white/40 hover:text-white tracking-widest cursor-pointer mr-1">
                      Clear
                   </button>
                )}
@@ -118,7 +118,7 @@ export const CategorySelectModal = ({
                {/* Recents (only when not searching) */}
                {!searchQuery && recentCats.length > 0 && (
                   <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1 flex items-center gap-1.5">
+                     <p className="text-[9px] font-extrabold uppercase text-[#E85151] tracking-widest pl-1 flex items-center gap-1.5">
                         <Clock size={11} /> Recents
                      </p>
                      <div className="flex flex-wrap gap-2">
@@ -130,11 +130,11 @@ export const CategorySelectModal = ({
                                  onClick={() => handleCategoryClick(cat.id)}
                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                                     isSel
-                                       ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
-                                       : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white"
+                                       ? "bg-[#E85151]/20 border-[#E85151] text-[#E85151] shadow-[0_0_12px_rgba(232,81,81,0.15)]"
+                                       : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white"
                                  }`}
                               >
-                                 <Clock size={10} className={isSel ? "text-amber-400" : "text-gray-600"} />
+                                 <Clock size={10} className={isSel ? "text-[#E85151]" : "text-white/40"} />
                                  {cat.name}
                               </button>
                            );
@@ -146,7 +146,7 @@ export const CategorySelectModal = ({
                {/* Editor's Picks — vertical list */}
                {featuredCats.length > 0 && (
                   <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-amber-400 tracking-widest pl-1">Editor's Picks</p>
+                     <p className="text-[9px] font-extrabold uppercase text-[#E85151] tracking-widest pl-1">Editor's Picks</p>
                      <div className="flex flex-col gap-2">
                         {featuredCats.map((cat) => {
                            const isSel = category === cat.id;
@@ -163,7 +163,7 @@ export const CategorySelectModal = ({
                                  </div>
                                  <div className="flex-1 min-w-0">
                                     <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">{cat.desc}</p>
+                                    <p className="text-xs text-white/60 mt-0.5 leading-tight">{cat.desc}</p>
                                  </div>
                               </button>
                            );
@@ -175,7 +175,7 @@ export const CategorySelectModal = ({
                {/* All Categories (alphabetical) — single column */}
                {regularCats.length > 0 && (
                   <div className="space-y-2">
-                     <p className="text-[9px] font-extrabold uppercase text-gray-500 tracking-widest pl-1">All Categories</p>
+                     <p className="text-[9px] font-extrabold uppercase text-white/40 tracking-widest pl-1">All Categories</p>
                      <div className="flex flex-col gap-2">
                         {regularCats.map((cat) => {
                            const isSel = category === cat.id;
@@ -192,7 +192,7 @@ export const CategorySelectModal = ({
                                  </div>
                                  <div className="flex-1 min-w-0">
                                     <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5 leading-tight">{cat.desc}</p>
+                                    <p className="text-xs text-white/60 mt-0.5 leading-tight">{cat.desc}</p>
                                  </div>
                               </button>
                            );
@@ -202,14 +202,14 @@ export const CategorySelectModal = ({
                )}
 
                {filteredCategories.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 text-xs font-bold uppercase tracking-wider">
+                  <div className="text-center py-8 text-white/40 text-xs font-bold uppercase tracking-wider">
                      No categories match "{searchQuery}"
                   </div>
                )}
             </div>
 
             {/* Footer Select & Play button */}
-            <div className="p-4 border-t border-white/5 bg-slate-950/30 flex gap-3">
+            <div className="p-4 border-t border-white/5 bg-white/5 flex gap-3">
                <button
                   onClick={onClose}
                   className="flex-1 bg-white/5 hover:bg-white/10 text-white font-black uppercase text-[10px] tracking-widest py-3.5 rounded-2xl transition-all border border-white/5 cursor-pointer"
@@ -218,9 +218,9 @@ export const CategorySelectModal = ({
                </button>
                <button
                   onClick={handleSelectAndPlay}
-                  className="flex-1 bg-correct hover:bg-correct/90 text-black font-black uppercase text-[10px] tracking-widest py-3.5 rounded-2xl transition-all flex items-center justify-center gap-1.5 shadow-[0_4px_15px_rgba(46,204,113,0.2)] cursor-pointer"
+                  className="flex-1 bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase text-[10px] tracking-widest py-3.5 rounded-2xl transition-all flex items-center justify-center gap-1.5 shadow-[0_4px_20px_rgba(232,81,81,0.3)] cursor-pointer"
                >
-                  <Play size={12} fill="black" /> Play Mode
+                  <Play size={12} fill="white" className="text-white" /> Play Mode
                </button>
             </div>
          </motion.div>

@@ -36,7 +36,7 @@ export const useAsyncMatchmaking = (
          let key: string;
 
          if (isProceduralCategory(cat)) {
-            await supabase.from("wordup_matches").insert({
+            await supabase.from("wordup_matches").upsert({
                id: newMatch.id, category: cat,
                player1_id: newMatch.player1_id, player2_id: newMatch.player2_id,
                status: "generating", game_type: "async",

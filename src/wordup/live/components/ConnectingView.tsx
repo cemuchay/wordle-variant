@@ -10,7 +10,7 @@ export const ConnectingView = ({ message }: ConnectingViewProps) => {
             <div className="absolute w-24 h-24 rounded-full bg-correct/10 border border-correct/20 animate-ping opacity-25" />
             <div className="absolute w-16 h-16 rounded-full bg-correct/25 blur-xl animate-pulse" />
 
-            <div className="relative p-6 bg-slate-900/80 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-md">
+            <div className="relative p-6 bg-white/5 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-md">
                <div className="w-9 h-9 border-4 border-correct border-t-transparent rounded-full animate-spin" />
             </div>
          </div>
@@ -23,7 +23,7 @@ export const ConnectingView = ({ message }: ConnectingViewProps) => {
             <p className="text-sm font-bold text-white tracking-wide uppercase">
                {message || "Connecting to Server..."}
             </p>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+            <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">
                {isInvite ? "Starting match" : "Setting up match database"}
             </p>
          </div>

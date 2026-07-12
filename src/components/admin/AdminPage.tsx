@@ -70,8 +70,11 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
     const [fetchLimit, setFetchLimit] = useState(100);
     const noImageOnlyRef = useRef(noImageOnly);
     const fetchLimitRef = useRef(fetchLimit);
-    noImageOnlyRef.current = noImageOnly;
-    fetchLimitRef.current = fetchLimit;
+
+    useEffect(() => {
+        noImageOnlyRef.current = noImageOnly;
+        fetchLimitRef.current = fetchLimit;
+    }, [noImageOnly, fetchLimit]);
 
     // Selection & Asset editing states
     const [selectedQuestion, setSelectedQuestion] = useState<HandcraftedQuestion | null>(null);

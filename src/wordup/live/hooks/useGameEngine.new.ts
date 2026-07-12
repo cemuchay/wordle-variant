@@ -23,6 +23,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useLiveStore } from "../store/useLiveStore";
+import { wordupAudio } from "../../../utils/wordupAudio";
 import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
     decryptMatchQuestions,
@@ -252,21 +253,30 @@ export function useGameEngine(props: EngineProps) {
         // Push current round answers into matchData before resetting
         const p1Arr = matchDataRef.current?.p1_answers;
         const p2Arr = matchDataRef.current?.p2_answers;
+        const isP1 = roleRef.current === "player1";
+        const p1Choice = isP1 ? myChoiceRef.current : opponentChoiceRef.current;
+        const p1Correct = p1Choice === questionsRef.current[currentRoundRef.current]?.answer;
+        const p1Points = isP1 ? myCurrentPointsRef.current : opponentCurrentPointsRef.current;
+
+        const p2Choice = isP1 ? opponentChoiceRef.current : myChoiceRef.current;
+        const p2Correct = p2Choice === questionsRef.current[currentRoundRef.current]?.answer;
+        const p2Points = isP1 ? opponentCurrentPointsRef.current : myCurrentPointsRef.current;
+
         if (Array.isArray(p1Arr)) {
             p1Arr.push({
                 question_idx: currentRoundRef.current,
-                choice: myChoiceRef.current,
-                correct: myChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
-                points: myCurrentPointsRef.current,
+                choice: p1Choice,
+                correct: p1Correct,
+                points: p1Points,
                 time_taken: 0,
             });
         }
         if (Array.isArray(p2Arr)) {
             p2Arr.push({
                 question_idx: currentRoundRef.current,
-                choice: opponentChoiceRef.current,
-                correct: opponentChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
-                points: opponentCurrentPointsRef.current,
+                choice: p2Choice,
+                correct: p2Correct,
+                points: p2Points,
                 time_taken: 0,
             });
         }
@@ -297,21 +307,30 @@ export function useGameEngine(props: EngineProps) {
         // Push last round answers into matchData
         const p1Arr = matchDataRef.current?.p1_answers;
         const p2Arr = matchDataRef.current?.p2_answers;
+        const isP1 = roleRef.current === "player1";
+        const p1Choice = isP1 ? myChoiceRef.current : opponentChoiceRef.current;
+        const p1Correct = p1Choice === questionsRef.current[currentRoundRef.current]?.answer;
+        const p1Points = isP1 ? myCurrentPointsRef.current : opponentCurrentPointsRef.current;
+
+        const p2Choice = isP1 ? opponentChoiceRef.current : myChoiceRef.current;
+        const p2Correct = p2Choice === questionsRef.current[currentRoundRef.current]?.answer;
+        const p2Points = isP1 ? opponentCurrentPointsRef.current : myCurrentPointsRef.current;
+
         if (Array.isArray(p1Arr)) {
             p1Arr.push({
                 question_idx: currentRoundRef.current,
-                choice: myChoiceRef.current,
-                correct: myChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
-                points: myCurrentPointsRef.current,
+                choice: p1Choice,
+                correct: p1Correct,
+                points: p1Points,
                 time_taken: 0,
             });
         }
         if (Array.isArray(p2Arr)) {
             p2Arr.push({
                 question_idx: currentRoundRef.current,
-                choice: opponentChoiceRef.current,
-                correct: opponentChoiceRef.current === questionsRef.current[currentRoundRef.current]?.answer,
-                points: opponentCurrentPointsRef.current,
+                choice: p2Choice,
+                correct: p2Correct,
+                points: p2Points,
                 time_taken: 0,
             });
         }
@@ -380,12 +399,17 @@ export function useGameEngine(props: EngineProps) {
     useEffect(() => {
         if (phase !== "countdown") return;
 
+        Promise.resolve().then(() => {
+            setCountdownText("3");
+        });
+        wordupAudio.playCountdownTick(3);
         let count = 3;
 
         countdownRef.current = window.setInterval(() => {
             count--;
             if (count <= 0) {
                 stopCountdown();
+                wordupAudio.playGameStart();
 
                 // Start the first round
                 setCurrentRound(0);
@@ -401,6 +425,7 @@ export function useGameEngine(props: EngineProps) {
                 setPhase("playing");
             } else {
                 setCountdownText(String(count));
+                wordupAudio.playCountdownTick(count);
             }
         }, 1000);
 
@@ -669,7 +694,7 @@ export function useGameEngine(props: EngineProps) {
             const p1 = roleRef.current === "player1" ? matchDataRef.current.player2_id : matchDataRef.current.player1_id;
             const p2 = roleRef.current === "player1" ? matchDataRef.current.player1_id : matchDataRef.current.player2_id;
 
-            await supabase.from("wordup_matches").insert({
+            await supabase.from("wordup_matches").upsert({
                 id: newMatchId,
                 category,
                 player1_id: p1,

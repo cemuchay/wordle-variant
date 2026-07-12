@@ -101,7 +101,7 @@ export const LobbyView = ({
          <div className="space-y-1 relative text-center">
 
             <div className="flex items-center justify-between gap-4 px-2 shrink-0">
-               <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-2 text-xs font-black uppercase tracking-widest">
+               <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-2 text-xs font-black uppercase tracking-widest text-[#E85151]">
                   <Radio size={18} className="animate-pulse stroke-3" />
                   <span className="text-xl">Live Mode</span>
                </div>
@@ -109,7 +109,7 @@ export const LobbyView = ({
                   {onSwitchMode && (
                      <button
                         onClick={onSwitchMode}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-400 text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E85151]/10 hover:bg-[#E85151]/20 border border-[#E85151]/20 text-white text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
                      >
                         <span>1 v 1 mode</span>
                         <Shuffle size={10} className="stroke-3" />
@@ -118,7 +118,7 @@ export const LobbyView = ({
                   <div className="flex items-center gap-2 w-[84px] justify-end">
                      <button
                         onClick={onToggleSound}
-                        className="p-2 rounded-xl bg-correct/5 hover:bg-correct/10 border border-correct/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
                         title="Toggle Sound"
                      >
                         {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
@@ -129,14 +129,14 @@ export const LobbyView = ({
             </div>
          </div>
 
-         <div className="flex bg-correct/5 p-1 rounded-2xl border border-correct/10 shrink-0 shadow-[0_0_15px_rgba(106,170,100,0.08)]">
+         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0 shadow-inner">
             {(["play", "rankings", "history"] as const).map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 text-[10px] font-black uppercase py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === tab
-                     ? "bg-correct text-black shadow-md shadow-correct/30 font-black"
-                     : "text-gray-400 hover:text-white"
+                     ? "bg-[#E85151] text-white shadow-md shadow-[#E85151]/30 font-black"
+                     : "text-white/40 hover:text-white"
                      }`}
                >
                   {tab === "play" ? "Play" : tab === "rankings" ? "Rankings" : "History"}
@@ -154,44 +154,44 @@ export const LobbyView = ({
                   className="space-y-6"
                >
                   {userStats && (
-                     <div className="grid grid-cols-3 bg-correct/5 border border-correct/10 rounded-2xl p-4 text-center">
+                     <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                         <div>
-                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rating</p>
+                           <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rating</p>
                            <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
                         </div>
                         <div>
-                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Rank</p>
+                           <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rank</p>
                            <p className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
                               {userStats.rank_name}
                            </p>
                         </div>
                         <div>
-                           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Wins/Losses</p>
+                           <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Wins/Losses</p>
                            <p className="text-lg font-black text-correct">
-                              {userStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
+                              {userStats.games_won}<span className="text-white/40 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
                            </p>
                         </div>
                      </div>
                   )}
 
                   <div className="space-y-3">
-                     <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Active Arena Category</p>
+                     <p className="text-[10px] font-black uppercase text-white/40 tracking-wider">Active Arena Category</p>
                      {(() => {
                         const activeCatObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
                         const style = CATEGORY_STYLE_MAP[activeCatObj.id] || { emoji: "💡", gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40", glow: "", border: "border-white/20 text-gray-300" };
                         const borderCol = style.border.split(" ")[0];
                         return (
-                           <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-correct/15`}>
+                           <div className={`bg-linear-to-br ${style.gradient} border ${borderCol} ${style.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-[#E85151]/15`}>
                               <div className="flex items-center gap-3">
                                  <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
                                     {style.emoji}
                                  </div>
                                  <div className="min-w-0">
-                                    <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
+                                    <p className="text-[9px] text-white/60 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
                                     <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{activeCatObj.name}</p>
                                  </div>
                               </div>
-                              <p className="text-xs text-gray-300 leading-relaxed font-bold">{activeCatObj.desc}</p>
+                              <p className="text-xs text-white/80 leading-relaxed font-bold">{activeCatObj.desc}</p>
                               <button
                                  onClick={() => setShowCategoryModal(true)}
                                  className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
@@ -213,7 +213,7 @@ export const LobbyView = ({
 
                   <button
                      onClick={() => { useLiveStore.getState().setCategory(lastCategoryRef.current); startMatchmaking(); }}
-                     className="w-full bg-correct hover:bg-correct/90 text-black font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(46,204,113,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
+                     className="w-full bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2 tracking-widest shadow-[0_4px_20px_rgba(232,81,81,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all"
                   >
                      <Swords size={16} /> Search Opponent
                   </button>
@@ -242,7 +242,7 @@ export const LobbyView = ({
                >
                   {isLoadingData ? (
                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-6 h-6 text-correct animate-spin" />
+                        <Loader2 className="w-6 h-6 text-[#E85151] animate-spin" />
                      </div>
                   ) : historyMatches.length > 0 ? (
                      <div className="space-y-2">
@@ -254,10 +254,10 @@ export const LobbyView = ({
                            const oppName = match.is_bot_match ? "Word Bot" : (oppProfile?.username || "Opponent");
 
                            let outcome = "DRAW";
-                           let outcomeColor = "text-gray-400 bg-gray-500/10 border-gray-500/20";
+                           let outcomeColor = "text-white/60 bg-white/5 border-white/10";
                            if (myScore > oppScore) {
                               outcome = "WIN";
-                              outcomeColor = "text-correct bg-correct/10 border-correct/20";
+                              outcomeColor = "text-[#E85151] bg-[#E85151]/10 border-[#E85151]/20";
                            } else if (oppScore > myScore) {
                               outcome = "LOSS";
                               outcomeColor = "text-red-400 bg-red-500/10 border-red-500/20";
@@ -281,18 +281,18 @@ export const LobbyView = ({
                               <div
                                  key={match.id}
                                  onClick={() => onSelectHistoryMatch?.(match)}
-                                 className={`hover:bg-correct/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all ${isNew ? "bg-correct/10 border border-correct/30 shadow-[0_0_12px_rgba(46,204,113,0.1)] hover:border-correct/50" : "bg-correct/5 border border-correct/10 hover:border-correct/20"}`}
+                                 className={`hover:bg-white/10 rounded-2xl p-3.5 flex items-center justify-between text-xs cursor-pointer active:scale-98 transition-all ${isNew ? "bg-[#E85151]/10 border border-[#E85151]/30 shadow-[0_0_12px_rgba(232,81,81,0.1)] hover:border-[#E85151]/50" : "bg-white/5 border border-white/10 hover:border-white/20"}`}
                               >
                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
                                        <p className="font-black text-white truncate">vs {oppName}</p>
                                        {isNew && (
-                                          <span className="text-[7.5px] font-black uppercase text-correct bg-correct/10 border border-correct/25 px-1.5 py-0.5 rounded-md tracking-wider animate-pulse">
+                                          <span className="text-[7.5px] font-black uppercase text-[#E85151] bg-[#E85151]/10 border border-[#E85151]/25 px-1.5 py-0.5 rounded-md tracking-wider animate-pulse">
                                              NEW
                                           </span>
                                        )}
                                     </div>
-                                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">{match.category.replace('_', ' ')} • {dateStr}</p>
+                                    <p className="text-[9px] text-white/40 font-bold uppercase mt-0.5">{match.category.replace('_', ' ')} • {dateStr}</p>
                                  </div>
                                  <div className="flex items-center gap-3 shrink-0">
                                     <span className="font-bold text-white text-[11px]">{myScore} - {oppScore}</span>
@@ -305,7 +305,7 @@ export const LobbyView = ({
                         })}
                      </div>
                   ) : (
-                     <div className="text-center py-12 text-gray-500">
+                     <div className="text-center py-12 text-white/40">
                         <p className="text-[10px] uppercase font-black tracking-wider">No completed matches</p>
                      </div>
                   )}
@@ -313,13 +313,13 @@ export const LobbyView = ({
             )}
          </AnimatePresence>
 
-         <div className="bg-correct/5 border border-correct/10 rounded-2xl overflow-hidden transition-all duration-300">
+         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
             <button
                onClick={() => setShowHelp(!showHelp)}
-               className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
+               className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-white/80 hover:text-white transition-colors cursor-pointer"
             >
                <div className="flex items-center gap-2">
-                  <HelpCircle size={14} className="text-correct" />
+                  <HelpCircle size={14} className="text-[#E85151]" />
                   <span>How to Play & Scoring</span>
                </div>
                {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -332,7 +332,7 @@ export const LobbyView = ({
                      animate={{ opacity: 1, height: "auto" }}
                      exit={{ opacity: 0, height: 0 }}
                      transition={{ duration: 0.2 }}
-                     className="px-4 pb-5 text-[11px] text-gray-400 space-y-4 border-t border-white/5 pt-4 overflow-hidden"
+                     className="px-4 pb-5 text-[11px] text-white/60 space-y-4 border-t border-white/10 pt-4 overflow-hidden"
                   >
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Game Flow</p>
@@ -341,30 +341,30 @@ export const LobbyView = ({
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
                         <ul className="list-disc pl-4 space-y-1">
-                           <li><strong className="text-correct">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays over time with a 1.5s grace period).</li>
-                           <li><strong className="text-correct">Speed Bonus</strong>: Faster answers earn more — the 20-point max drops to 11 at the time limit.</li>
+                           <li><strong className="text-[#E85151]">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays over time with a 1.5s grace period).</li>
+                           <li><strong className="text-[#E85151]">Speed Bonus</strong>: Faster answers earn more — the 20-point max drops to 11 at the time limit.</li>
                            <li><strong className="text-pink-500">Round 7 (Final Round)</strong>: All points are <strong className="text-pink-500">DOUBLED</strong>! Make it count!</li>
                         </ul>
                      </div>
                      <div>
                         <p className="font-black text-white uppercase tracking-wider mb-1">Question Types</p>
                         <div className="grid grid-cols-2 gap-2 mt-1">
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Anagrams</strong> Scramble letters back into a word.
                            </div>
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Definitions</strong> Match the word to its dictionary definition.
                            </div>
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Reverse Wordle</strong> Guess the word that generated the pattern.
                            </div>
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Real / Fake</strong> Spot authentic words vs fake mutations.
                            </div>
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Missing Letter</strong> Complete the blank to spell a valid word.
                            </div>
-                           <div className="bg-correct/5 p-2 rounded-lg">
+                           <div className="bg-white/5 border border-white/10 p-2 rounded-lg">
                               <strong className="text-white block text-[10px]">Pattern Rules</strong> Answer True/False for letter conditions.
                            </div>
                         </div>
@@ -372,7 +372,7 @@ export const LobbyView = ({
                      {onTutorial && (
                         <button
                            onClick={onTutorial}
-                           className="w-full flex items-center justify-center gap-2 bg-correct/10 hover:bg-correct/20 text-correct font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all border border-correct/20 cursor-pointer"
+                           className="w-full flex items-center justify-center gap-2 bg-[#E85151]/10 hover:bg-[#E85151]/20 text-[#E85151] font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all border border-[#E85151]/20 cursor-pointer"
                         >
                            <GraduationCap size={13} />
                            Play Tutorial
@@ -384,8 +384,8 @@ export const LobbyView = ({
          </div>
 
           {/* More Games section */}
-          <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-             <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2.5 px-0.5">
+          <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+             <p className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2.5 px-0.5">
                 More Games
              </p>
              {onBack && (
@@ -393,36 +393,36 @@ export const LobbyView = ({
                    onClick={onBack}
                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer group"
                 >
-                   <div className="p-2 rounded-lg bg-[#ff4b5c]/10 border border-[#ff4b5c]/20 text-[#ff4b5c]">
+                   <div className="p-2 rounded-lg bg-[#E85151]/10 border border-[#E85151]/20 text-[#E85151]">
                       <Radio size={16} />
                    </div>
                    <div className="flex-1 text-left">
-                      <p className="text-xs font-black text-white group-hover:text-[#ff4b5c] transition-colors">
+                      <p className="text-xs font-black text-white group-hover:text-[#E85151] transition-colors">
                          WordUp Arena
                       </p>
-                      <p className="text-[10px] text-gray-500 font-bold">
+                      <p className="text-[10px] text-white/40 font-bold">
                          Browse all game modes
                       </p>
                    </div>
-                   <ChevronRight size={14} className="text-gray-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                   <ChevronRight size={14} className="text-white/40 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
                 </button>
              )}
              <button
                 onClick={onBackToClassic}
                 className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer group"
              >
-                <div className="p-2 rounded-lg bg-white/10 border border-white/20 text-gray-300 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-lg bg-white/10 border border-white/20 text-white/60 group-hover:text-white transition-colors">
                    <LayoutGrid size={16} />
                 </div>
                 <div className="flex-1 text-left">
                    <p className="text-xs font-black text-white group-hover:text-correct transition-colors">
                       Classic Variant
                    </p>
-                   <p className="text-[10px] text-gray-500 font-bold">
+                   <p className="text-[10px] text-white/40 font-bold">
                       Play the daily word puzzle
                    </p>
                 </div>
-                <ChevronRight size={14} className="text-gray-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={14} className="text-white/40 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
              </button>
           </div>
       </motion.div>

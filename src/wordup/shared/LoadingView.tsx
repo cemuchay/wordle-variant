@@ -16,12 +16,12 @@ export const LoadingView = ({ message = "Preparing Arena...", onCancel }: Loadin
       >
          <div className="relative flex items-center justify-center">
             {/* Pulsing glow background */}
-            <div className="absolute w-24 h-24 rounded-full bg-correct/10 border border-correct/20 animate-ping opacity-25" />
-            <div className="absolute w-16 h-16 rounded-full bg-correct/25 blur-xl" />
+            <div className="absolute w-24 h-24 rounded-full bg-[#E85151]/10 border border-[#E85151]/20 animate-ping opacity-25" />
+            <div className="absolute w-16 h-16 rounded-full bg-[#E85151]/25 blur-xl" />
 
             {/* Spinning Loader */}
-            <div className="relative p-6 bg-slate-900/80 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-md">
-               <Loader2 size={36} className="text-correct animate-spin" />
+            <div className="relative p-6 bg-white/5 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-md">
+               <Loader2 size={36} className="text-[#E85151] animate-spin" />
             </div>
          </div>
 
@@ -30,7 +30,7 @@ export const LoadingView = ({ message = "Preparing Arena...", onCancel }: Loadin
                initial={{ y: 10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ delay: 0.1 }}
-               className="text-xs font-black uppercase tracking-widest text-correct flex items-center justify-center gap-1.5"
+               className="text-xs font-black uppercase tracking-widest text-[#E85151] flex items-center justify-center gap-1.5"
             >
                <Swords size={12} className="animate-pulse" />
                WordUp Battles (beta)
@@ -47,7 +47,7 @@ export const LoadingView = ({ message = "Preparing Arena...", onCancel }: Loadin
                initial={{ y: 10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ delay: 0.3 }}
-               className="text-[10px] text-gray-500 font-bold uppercase tracking-wider"
+               className="text-[10px] text-white/40 font-bold uppercase tracking-wider"
             >
                Please wait a moment
             </motion.p>
@@ -59,7 +59,7 @@ export const LoadingView = ({ message = "Preparing Arena...", onCancel }: Loadin
                animate={{ opacity: 1, y: 0 }}
                transition={{ delay: 0.5 }}
                onClick={onCancel}
-               className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-xs font-bold uppercase tracking-wider transition-all duration-200"
+               className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/80 text-xs font-bold uppercase tracking-wider transition-all duration-200"
             >
                <XCircle size={14} />
                Cancel

@@ -19,7 +19,7 @@ import { MatchmakingView } from "../shared/MatchmakingView";
 import { CountdownView } from "./components/CountdownView";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../shared/LoadingView";
+import { VSPreview } from "../shared/VSPreview";
 import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
@@ -90,8 +90,6 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    const onGameOver = useCallback(async (match: any) => {
       if (useLiveStore.getState().view === "gameover") return;
       setView("gameover");
-      setMatchId(null);
-      setRole(null);
 
       if (!effectiveUser) return;
       const isP1 = role === "player1";
@@ -185,7 +183,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
           pending.push(record);
           setPending(pending);
           try {
-            await supabase.from("wordup_matches").insert(record);
+            await supabase.from("wordup_matches").upsert(record);
             setPending(getPending().filter((m: any) => m.id !== record.id));
          } catch (e) {
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
@@ -228,12 +226,13 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    }, [setMatchId, setRole]);
 
    useEffect(() => {
+      if (matchDataFromStore?.status === "completed") return;
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
          // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
-   }, [matchId, role, view]);
+   }, [matchId, role, view, matchDataFromStore?.status]);
 
    useEffect(() => {
       setIsBattlePlaying(view === "battle");
@@ -337,7 +336,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          for (const record of pending) {
             if (cancelled) break;
             try {
-               await supabase.from("wordup_matches").insert(record);
+               await supabase.from("wordup_matches").upsert(record);
                if (!cancelled) {
                   const remaining = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
                   safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(remaining.filter((m: any) => m.id !== record.id)));
@@ -350,21 +349,22 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       return () => { cancelled = true; };
    }, []);
 
-   const handleSelectHistoryMatch = useCallback(async (match: any) => {
-      if (!effectiveUser) return;
-      try {
-         const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
-         const seen = seenStr ? JSON.parse(seenStr) : [];
-         if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
-      } catch (e) { console.error("Failed to mark history match as seen:", e); }
-
-      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-      setRole(myRole as any);
-      setMatchData(match);
-      try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
-      catch (e) { console.error("Failed to decrypt history match questions:", e); }
-      setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
+    const handleSelectHistoryMatch = useCallback(async (match: any) => {
+       if (!effectiveUser) return;
+       try {
+          const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
+          const seen = seenStr ? JSON.parse(seenStr) : [];
+          if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
+       } catch (e) { console.error("Failed to mark history match as seen:", e); }
+ 
+       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+       setMatchId(match.id);
+       setRole(myRole as any);
+       setMatchData(match);
+       try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
+       catch (e) { console.error("Failed to decrypt history match questions:", e); }
+       setView("gameover");
+    }, [effectiveUser, setMatchId, setRole, setMatchData, setQuestions, setView]);
 
    if (authLoading) {
       return (
@@ -443,11 +443,34 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             {view === "matchmaking" && (
                <MatchmakingView category={category} cancelMatchmaking={handleCancelMatchmaking} countdownSecs={countdownSecs} />
             )}
-            {view === "connecting" && <ConnectingView message={matchId ? "Connecting to opponent..." : undefined} />}
+             {view === "connecting" && (
+                matchId ? (
+                   <VSPreview
+                      currentUser={effectiveUser}
+                      opponentStats={opponentStats}
+                      matchData={matchData}
+                      categoryId={category}
+                      getRankColor={getRankColor}
+                      onCancel={abortMatch}
+                      message="Connecting to opponent..."
+                   />
+                ) : (
+                   <ConnectingView />
+                )
+             )}
             {view === "countdown" && (
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
-            {view === "loading" && <LoadingView onCancel={abortMatch} />}
+            {view === "loading" && (
+               <VSPreview
+                  currentUser={effectiveUser}
+                  opponentStats={opponentStats}
+                  matchData={matchData}
+                  categoryId={category}
+                  getRankColor={getRankColor}
+                  onCancel={abortMatch}
+               />
+            )}
             {view === "battle" && (
                <BattleView
                   questions={questions} currentIdx={currentIdx} matchData={matchData}

@@ -213,7 +213,7 @@ export const BattleView = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.4 }}
-                  className="text-sm sm:text-base font-black text-pink-500 mt-2 animate-pulse tracking-wider"
+                  className="text-sm sm:text-base font-black text-[#E85151] mt-2 animate-pulse tracking-wider"
                >
                   DOUBLE POINTS
                </motion.p>
@@ -233,10 +233,10 @@ export const BattleView = ({
                >
                   <div className="w-12 h-12 border-4 border-correct/30 border-t-correct rounded-full animate-spin mb-4" />
                   <p className="text-lg font-black text-white tracking-wider">Waiting for opponent...</p>
-                  <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-white/60 mt-2 leading-relaxed">
                      Your answer is locked in. The match will auto-finalize shortly if the opponent doesn't respond.
                   </p>
-                  <p className="text-[10px] text-gray-500 mt-3 font-bold">
+                  <p className="text-[10px] text-white/40 mt-3 font-bold">
                      Your score is safe — opponent keeps their last score.
                   </p>
                </motion.div>
@@ -252,7 +252,7 @@ export const BattleView = ({
                    className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
                 />
                  <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                     <p className="text-base font-black text-white">{myScore} pts</p>
                  </div>
                  {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as any} className="ml-1" />}
@@ -273,7 +273,7 @@ export const BattleView = ({
 
               <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
                  <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
+                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
                     <p className="text-base font-black text-white">{oppScore} pts</p>
                  </div>
                  {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as any} className="ml-1" />}
@@ -283,7 +283,7 @@ export const BattleView = ({
                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
                       animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
                       transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
+                      className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
                    >
                       +{p.points}
                    </motion.span>
@@ -292,7 +292,7 @@ export const BattleView = ({
                    userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
                    src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
                    username={opponentName}
-                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
+                   className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
                 />
              </div>
           </div>
@@ -320,14 +320,14 @@ export const BattleView = ({
           <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1 sm:space-y-2">
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
-                  {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
+                  {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                 <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
-                  <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
+                  <p className="text-[10px] sm:text-xs text-white/60 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
                      {activeQuestion.subPrompt}
                   </p>
                )}
@@ -357,7 +357,7 @@ export const BattleView = ({
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
                   <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
@@ -382,7 +382,7 @@ export const BattleView = ({
                      }
 
                      if (isOppSelected) {
-                        cardClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                        cardClass += " ring-2 ring-[#E85151] ring-offset-2 ring-offset-dark animate-pulse";
                      }
 
                      let buttonAnimate: TargetAndTransition | undefined = undefined;
@@ -428,7 +428,7 @@ export const BattleView = ({
                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
-                                 <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
                                     {opponentName.slice(0, 5)}
                                  </span>
                               )}
@@ -443,7 +443,7 @@ export const BattleView = ({
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
                   <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice) => {
                      const isSelected = selectedAnswer === choice;
@@ -461,12 +461,12 @@ export const BattleView = ({
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
                          } else {
-                            btnClass += " bg-gray-100 border-gray-200 text-gray-400 opacity-60";
+                            btnClass += " bg-white/5 border-white/10 text-white/40 opacity-60";
                          }
                      }
 
                      if (isOppSelected) {
-                        btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                        btnClass += " ring-2 ring-[#E85151] ring-offset-2 ring-offset-dark animate-pulse";
                      }
 
                      let buttonAnimate: TargetAndTransition | undefined = undefined;
@@ -518,7 +518,7 @@ export const BattleView = ({
                                  <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
-                                 <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
                                     {opponentName.slice(0, 5)}
                                  </span>
                               )}
