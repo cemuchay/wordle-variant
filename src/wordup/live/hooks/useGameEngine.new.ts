@@ -345,7 +345,6 @@ export function useGameEngine(props: EngineProps) {
         }
     }, [onGameOver, stopAllTimers, stopRematchInterval]);
 
-    /** Start the reveal phase, then advance or game-over after a delay. */
     const beginReveal = useCallback(() => {
         transitioningRef.current = true;
         stopRoundTick();
@@ -354,11 +353,6 @@ export function useGameEngine(props: EngineProps) {
         const isLast = currentRoundRef.current >= 6;
         const delay = isLast ? 3200 : 1800;
 
-        if (!isLast && currentRoundRef.current === 5) {
-            triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
-            setLastRoundPopup(true);
-        }
-
         setPhase("reveal");
 
         revealRef.current = window.setTimeout(() => {
@@ -366,8 +360,14 @@ export function useGameEngine(props: EngineProps) {
             if (isLast) {
                 endGame();
             } else if (currentRoundRef.current === 5) {
-                setLastRoundPopup(false);
-                advanceRound();
+                triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+                setLastRoundPopup(true);
+
+                revealRef.current = window.setTimeout(() => {
+                    revealRef.current = null;
+                    setLastRoundPopup(false);
+                    advanceRound();
+                }, 3000);
             } else {
                 advanceRound();
             }
