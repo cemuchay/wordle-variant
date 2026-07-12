@@ -19,7 +19,7 @@ import { MatchmakingView } from "../shared/MatchmakingView";
 import { CountdownView } from "./components/CountdownView";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../shared/LoadingView";
+import { VSPreview } from "../shared/VSPreview";
 import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
@@ -183,7 +183,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
           pending.push(record);
           setPending(pending);
           try {
-            await supabase.from("wordup_matches").insert(record);
+            await supabase.from("wordup_matches").upsert(record);
             setPending(getPending().filter((m: any) => m.id !== record.id));
          } catch (e) {
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
@@ -336,7 +336,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          for (const record of pending) {
             if (cancelled) break;
             try {
-               await supabase.from("wordup_matches").insert(record);
+               await supabase.from("wordup_matches").upsert(record);
                if (!cancelled) {
                   const remaining = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
                   safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(remaining.filter((m: any) => m.id !== record.id)));
@@ -443,11 +443,34 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             {view === "matchmaking" && (
                <MatchmakingView category={category} cancelMatchmaking={handleCancelMatchmaking} countdownSecs={countdownSecs} />
             )}
-            {view === "connecting" && <ConnectingView message={matchId ? "Connecting to opponent..." : undefined} />}
+             {view === "connecting" && (
+                matchId ? (
+                   <VSPreview
+                      currentUser={effectiveUser}
+                      opponentStats={opponentStats}
+                      matchData={matchData}
+                      categoryId={category}
+                      getRankColor={getRankColor}
+                      onCancel={abortMatch}
+                      message="Connecting to opponent..."
+                   />
+                ) : (
+                   <ConnectingView />
+                )
+             )}
             {view === "countdown" && (
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
-            {view === "loading" && <LoadingView onCancel={abortMatch} />}
+            {view === "loading" && (
+               <VSPreview
+                  currentUser={effectiveUser}
+                  opponentStats={opponentStats}
+                  matchData={matchData}
+                  categoryId={category}
+                  getRankColor={getRankColor}
+                  onCancel={abortMatch}
+               />
+            )}
             {view === "battle" && (
                <BattleView
                   questions={questions} currentIdx={currentIdx} matchData={matchData}

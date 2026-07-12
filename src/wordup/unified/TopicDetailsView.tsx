@@ -99,9 +99,13 @@ export const TopicDetailsView = ({
                <ChevronLeft size={20} className="text-[#E85151]" />
             </button>
 
-            {/* Category Emoji Circle */}
-            <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center text-4xl shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4">
-               {style.emoji}
+            {/* Category Emoji/SVG Circle */}
+            <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4 overflow-hidden p-4">
+               {style.svg ? (
+                  <div className="w-full h-full text-white flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+               ) : (
+                  <span className="text-4xl">{style.emoji}</span>
+               )}
             </div>
 
             {/* Category Title & Description */}

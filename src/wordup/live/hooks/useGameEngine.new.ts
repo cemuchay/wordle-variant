@@ -694,7 +694,7 @@ export function useGameEngine(props: EngineProps) {
             const p1 = roleRef.current === "player1" ? matchDataRef.current.player2_id : matchDataRef.current.player1_id;
             const p2 = roleRef.current === "player1" ? matchDataRef.current.player1_id : matchDataRef.current.player2_id;
 
-            await supabase.from("wordup_matches").insert({
+            await supabase.from("wordup_matches").upsert({
                 id: newMatchId,
                 category,
                 player1_id: p1,

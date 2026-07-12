@@ -17,7 +17,7 @@ import { LobbyView } from "./components/LobbyView";
 import { PlayNowLaterPopup } from "./components/PlayNowLaterPopup";
 import { BattleView } from "./components/BattleView";
 import { GameOverView } from "./components/GameOverView";
-import { LoadingView } from "../shared/LoadingView";
+import { VSPreview } from "../shared/VSPreview";
 import { CountdownView } from "./components/CountdownView";
 import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
@@ -498,7 +498,17 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                     onBackToClassic={onBackToClassic}
                />
             )}
-            {view === "loading" && <LoadingView message={connectingMsg} onCancel={handleCancelChallenge} />}
+            {view === "loading" && (
+               <VSPreview
+                  currentUser={effectiveUser}
+                  opponentStats={opponentStats}
+                  matchData={matchData}
+                  categoryId={category}
+                  getRankColor={getRankColor}
+                  onCancel={handleCancelChallenge}
+                  message={connectingMsg}
+               />
+            )}
             {view === "countdown" && <CountdownView countdownText={String(countdownText || "3")} />}
             {view === "battle" && (
                <BattleView

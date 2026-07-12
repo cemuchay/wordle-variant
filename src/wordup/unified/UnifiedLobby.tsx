@@ -444,8 +444,12 @@ export const UnifiedLobby = ({
                                        onClick={() => setSelectedCategoryId(cat.id)}
                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                     >
-                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
-                                          {style.emoji}
+                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
+                                          {style.svg ? (
+                                             <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+                                          ) : (
+                                             <span className="text-xl">{style.emoji}</span>
+                                          )}
                                        </div>
                                        <div className="min-w-0">
                                           <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
@@ -471,8 +475,12 @@ export const UnifiedLobby = ({
                                        onClick={() => setSelectedCategoryId(cat.id)}
                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                     >
-                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
-                                          {style.emoji}
+                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
+                                          {style.svg ? (
+                                             <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+                                          ) : (
+                                             <span className="text-xl">{style.emoji}</span>
+                                          )}
                                        </div>
                                        <div className="min-w-0">
                                           <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
@@ -497,8 +505,12 @@ export const UnifiedLobby = ({
                                     onClick={() => setSelectedCategoryId(cat.id)}
                                     className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                  >
-                                    <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
-                                       {style.emoji}
+                                    <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
+                                       {style.svg ? (
+                                          <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+                                       ) : (
+                                          <span className="text-xl">{style.emoji}</span>
+                                       )}
                                     </div>
                                     <div className="min-w-0">
                                        <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>

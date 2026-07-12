@@ -2,7 +2,7 @@ export const CATEGORIES = [
    {
       id: "mixed",
       name: "Words",
-      desc: "All word question types, random word lengths",
+      desc: "Embark on the ultimate vocabulary quest. Decipher anagrams, spot hidden letters, climb word ladders, and test your linguistic reflexes in a high-speed battle of wits.",
       featured: true,
    },
 
@@ -47,7 +47,7 @@ export const CATEGORIES = [
    {
       id: "maths",
       name: "Mathematics",
-      desc: "Calculations, geometry puzzles, equations, and mathematical theories",
+      desc: "Enter the calculation chamber. Master rapid arithmetic, solve geometric sequences, tackle algebraic equations, and prove your numerical dominance under pressure.",
       featured: true,
    },
    {
@@ -75,7 +75,7 @@ export const CATEGORIES = [
    {
       id: "flag_bearer",
       name: "Flags",
-      desc: "Identify countries by their flag colors and properties",
+      desc: "A global vexillological challenge. Decode national flags, identify country coordinates from color bands, and prove your cartographic memory across all continents.",
       featured: true,
    },
    {
@@ -110,7 +110,7 @@ export const CATEGORIES = [
    {
       id: "football",
       name: "Football (Soccer)",
-      desc: "Players, clubs, competitions, rules, and history of world football",
+      desc: "Step onto the pitch. Recall legendary World Cup milestones, track active club transfers, identify iconic stadium names, and showcase your tactical soccer knowledge.",
       featured: true,
    },
    {
