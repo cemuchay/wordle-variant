@@ -39,6 +39,7 @@ export interface AppContextType {
     // Global Presence & Audio Chat
     onlineUsers: PresenceUser[];
     allProfiles: PresenceUser[];
+    refreshProfiles: () => Promise<void>;
     audioChat: AudioChatState;
     activeVoiceRooms: { challengeId: string, user: PresenceUser }[];
     realtimeStatus: 'connected' | 'disconnected';

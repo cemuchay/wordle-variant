@@ -163,7 +163,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, [user?.id, queryClient]);
 
     // 4. Presence
-    const { onlineUsers, allProfiles } = useGlobalPresence(
+    const { onlineUsers, allProfiles, refreshProfiles } = useGlobalPresence(
         user?.id,
         (activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected')) ? activeCall.channelId : null,
         profile
@@ -812,6 +812,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsChatOpen,
         onlineUsers,
         allProfiles,
+        refreshProfiles,
         audioChat,
         activeVoiceRooms,
         initiatePrivateCall,
@@ -836,6 +837,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsChatOpen,
         onlineUsers,
         allProfiles,
+        refreshProfiles,
         audioChat, activeVoiceRooms, initiatePrivateCall,
         acceptCall, rejectCall, hangUpCall, realtimeStatus,
         incomingWordUpInvite, setIncomingWordUpInvite,
