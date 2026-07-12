@@ -65,6 +65,14 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
     const [statusFilter, setStatusFilter] = useState<'missing' | 'has' | 'excluded' | 'all'>('missing');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // DB-level pre-fetch filters (refs to avoid triggering re-fetches on change)
+    const [noImageOnly, setNoImageOnly] = useState(false);
+    const [fetchLimit, setFetchLimit] = useState(100);
+    const noImageOnlyRef = useRef(noImageOnly);
+    const fetchLimitRef = useRef(fetchLimit);
+    noImageOnlyRef.current = noImageOnly;
+    fetchLimitRef.current = fetchLimit;
+
     // Selection & Asset editing states
     const [selectedQuestion, setSelectedQuestion] = useState<HandcraftedQuestion | null>(null);
     const [imageUrlVal, setImageUrlVal] = useState('');
@@ -80,13 +88,20 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
 
     const fetchQuestions = useCallback(async () => {
         setLoading(true);
+        setSelectedQuestion(null);
+        setSelectedCategory('all');
+        setStatusFilter('all');
+        setSearchQuery('');
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('wordup_handcrafted_questions')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(100);
-
+                .limit(fetchLimitRef.current);
+            if (noImageOnlyRef.current) {
+                query = query.is('image_url', null).is('no_image_needed', false);
+            }
+            const { data, error } = await query;
             if (error) throw error;
             setQuestions(data || []);
         } catch (err: any) {
@@ -409,6 +424,32 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                             <option value="excluded" className="bg-gray-900 text-white">Excluded (Skip)</option>
                             <option value="all" className="bg-gray-900 text-white">All Questions</option>
                         </select>
+                    </div>
+
+                    {/* DB-level pre-fetch filters */}
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={noImageOnly}
+                                onChange={e => setNoImageOnly(e.target.checked)}
+                                className="accent-correct w-3.5 h-3.5"
+                            />
+                            No images
+                        </label>
+
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <span>Limit:</span>
+                            <input
+                                type="number"
+                                min={10}
+                                max={500}
+                                step={10}
+                                value={fetchLimit}
+                                onChange={e => setFetchLimit(Number(e.target.value) || 100)}
+                                className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-correct/50 text-center"
+                            />
+                        </div>
                     </div>
                 </div>
 
