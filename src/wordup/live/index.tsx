@@ -228,12 +228,13 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    }, [setMatchId, setRole]);
 
    useEffect(() => {
+      if (matchDataFromStore?.status === "completed") return;
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
          // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
-   }, [matchId, role, view]);
+   }, [matchId, role, view, matchDataFromStore?.status]);
 
    useEffect(() => {
       setIsBattlePlaying(view === "battle");
@@ -350,21 +351,22 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       return () => { cancelled = true; };
    }, []);
 
-   const handleSelectHistoryMatch = useCallback(async (match: any) => {
-      if (!effectiveUser) return;
-      try {
-         const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
-         const seen = seenStr ? JSON.parse(seenStr) : [];
-         if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
-      } catch (e) { console.error("Failed to mark history match as seen:", e); }
-
-      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-      setRole(myRole as any);
-      setMatchData(match);
-      try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
-      catch (e) { console.error("Failed to decrypt history match questions:", e); }
-      setView("gameover");
-   }, [effectiveUser, setRole, setMatchData, setQuestions, setView]);
+    const handleSelectHistoryMatch = useCallback(async (match: any) => {
+       if (!effectiveUser) return;
+       try {
+          const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
+          const seen = seenStr ? JSON.parse(seenStr) : [];
+          if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
+       } catch (e) { console.error("Failed to mark history match as seen:", e); }
+ 
+       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+       setMatchId(match.id);
+       setRole(myRole as any);
+       setMatchData(match);
+       try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
+       catch (e) { console.error("Failed to decrypt history match questions:", e); }
+       setView("gameover");
+    }, [effectiveUser, setMatchId, setRole, setMatchData, setQuestions, setView]);
 
    if (authLoading) {
       return (

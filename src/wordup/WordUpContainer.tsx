@@ -91,17 +91,35 @@ export const WordUpContainer = ({
    // Bridge: Review History Match from Unified Lobby
    const handleSelectHistoryMatch = useCallback(async (match: any) => {
       if (!effectiveUser) return;
+      const isAsync = match.game_type === "async" || !!match.encrypted_questions;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-      useLiveStore.getState().setRole(myRole);
-      useLiveStore.getState().setCategory(match.category);
-      useLiveStore.getState().setMatchData(match);
-      try {
-         const decrypted = await decryptMatchQuestions(match);
-         useLiveStore.getState().setQuestions(decrypted);
-         useLiveStore.getState().setView("gameover");
-         setWordupMode("live");
-      } catch (e) {
-         console.warn("Failed to decrypt history match questions:", e);
+      
+      if (isAsync) {
+         useAsyncStore.getState().setMatchId(match.id);
+         useAsyncStore.getState().setRole(myRole);
+         useAsyncStore.getState().setCategory(match.category);
+         useAsyncStore.getState().setMatchData(match);
+         try {
+            const decrypted = await decryptMatchQuestions(match);
+            useAsyncStore.getState().setQuestions(decrypted);
+            useAsyncStore.getState().setView("gameover");
+            setWordupMode("async");
+         } catch (e) {
+            console.warn("Failed to decrypt history match questions:", e);
+         }
+      } else {
+         useLiveStore.getState().setMatchId(match.id);
+         useLiveStore.getState().setRole(myRole);
+         useLiveStore.getState().setCategory(match.category);
+         useLiveStore.getState().setMatchData(match);
+         try {
+            const decrypted = await decryptMatchQuestions(match);
+            useLiveStore.getState().setQuestions(decrypted);
+            useLiveStore.getState().setView("gameover");
+            setWordupMode("live");
+         } catch (e) {
+            console.warn("Failed to decrypt history match questions:", e);
+         }
       }
    }, [effectiveUser, setWordupMode]);
 

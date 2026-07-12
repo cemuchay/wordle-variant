@@ -269,13 +269,14 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       setIsBattlePlaying(view === "battle");
    }, [view, setIsBattlePlaying]);
 
-   // Auto-trigger startMatch when store is set externally (e.g., invite accept)
-   useEffect(() => {
-      if (view === "loading" && matchId && role && engine.state.phase === "idle") {
-         startMatch?.(matchId, role);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [view, matchId, role, startMatch]);
+    // Auto-trigger startMatch when store is set externally (e.g., invite accept)
+    useEffect(() => {
+       if (matchData?.status === "completed") return;
+       if (view === "loading" && matchId && role && engine.state.phase === "idle") {
+          startMatch?.(matchId, role);
+       }
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view, matchId, role, startMatch, matchData?.status]);
 
    const pendingChallengePlayer = useAsyncStore((s) => s.pendingChallengePlayer);
    const setPendingChallengePlayer = useAsyncStore((s) => s.setPendingChallengePlayer);
@@ -389,20 +390,21 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       });
    }, [pendingAsyncMatchId, effectiveUser?.id, view, handlePlayTurn, setPendingAsyncMatchId]);
 
-   const handleSelectHistoryMatch = useCallback(async (match: any) => {
-      if (!effectiveUser) return;
-      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-      setRole(myRole);
-      setCategory(match.category);
-      setMatchData(match);
-      try {
-         const decrypted = await decryptMatchQuestions(match);
-         setQuestions(decrypted);
-      } catch (e) {
-         console.warn("Failed to decrypt history match questions:", e);
-      }
-      setView("gameover");
-   }, [effectiveUser, setRole, setCategory, setMatchData, setQuestions, setView]);
+    const handleSelectHistoryMatch = useCallback(async (match: any) => {
+       if (!effectiveUser) return;
+       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+       setMatchId(match.id);
+       setRole(myRole);
+       setCategory(match.category);
+       setMatchData(match);
+       try {
+          const decrypted = await decryptMatchQuestions(match);
+          setQuestions(decrypted);
+       } catch (e) {
+          console.warn("Failed to decrypt history match questions:", e);
+       }
+       setView("gameover");
+    }, [effectiveUser, setMatchId, setRole, setCategory, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();

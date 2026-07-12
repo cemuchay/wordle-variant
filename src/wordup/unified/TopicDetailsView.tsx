@@ -108,7 +108,7 @@ export const TopicDetailsView = ({
             <h1 className="text-2xl font-black uppercase tracking-wider text-white mb-2">
                {categoryObj.name}
             </h1>
-            <p className="text-xs text-white/60 font-bold max-w-sm">
+            <p className="text-xs text-white font-bold max-w-sm">
                {categoryObj.desc}
             </p>
          </div>
@@ -120,7 +120,7 @@ export const TopicDetailsView = ({
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
                   activeSection === "play"
                      ? "text-[#E85151] border-b-2 border-[#E85151]"
-                     : "text-white/40 hover:text-white"
+                     : "text-white/70 hover:text-white"
                }`}
             >
                <Play size={14} />
@@ -131,7 +131,7 @@ export const TopicDetailsView = ({
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
                   activeSection === "rankings"
                      ? "text-[#E85151] border-b-2 border-[#E85151]"
-                     : "text-white/40 hover:text-white"
+                     : "text-white/70 hover:text-white"
                }`}
             >
                <Trophy size={14} />
@@ -154,19 +154,19 @@ export const TopicDetailsView = ({
                      {categoryStats && (
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
                            <div>
-                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Rating</p>
+                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rating</p>
                               <p className="text-base font-black text-white">{categoryStats.rating} ELO</p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Rank</p>
+                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rank</p>
                               <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(categoryStats.rank_name)}`}>
                                  {categoryStats.rank_name}
                               </p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Record</p>
+                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Record</p>
                               <p className="text-base font-black text-[#E85151]">
-                                 {categoryStats.games_won}<span className="text-white/40 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
+                                 {categoryStats.games_won}<span className="text-white/80 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
                               </p>
                            </div>
                         </div>
@@ -214,13 +214,13 @@ export const TopicDetailsView = ({
                               </div>
 
                               <div className="bg-black/40 border border-white/10 rounded-xl p-2.5 flex items-center gap-2">
-                                 <Search size={16} className="text-white/40 shrink-0" />
+                                 <Search size={16} className="text-white/60 shrink-0" />
                                  <input
                                     type="text"
                                     placeholder="Search username..."
                                     value={playerSearch}
                                     onChange={(e) => setPlayerSearch(e.target.value)}
-                                    className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30 font-bold"
+                                    className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/40 font-bold"
                                  />
                               </div>
 
@@ -251,7 +251,7 @@ export const TopicDetailsView = ({
                                        </div>
                                     ))
                                  ) : (
-                                    <div className="text-center py-4 text-white/40 text-[10px] font-bold uppercase tracking-wider">
+                                    <div className="text-center py-4 text-white/60 text-[10px] font-bold uppercase tracking-wider">
                                        No players found
                                     </div>
                                  )}

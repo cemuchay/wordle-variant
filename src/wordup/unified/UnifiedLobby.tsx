@@ -313,7 +313,7 @@ export const UnifiedLobby = ({
                               </div>
                            </div>
                            <div className="text-right">
-                              <p className="text-[9px] text-white/40 font-black uppercase">ELO rating</p>
+                              <p className="text-[9px] text-white/80 font-black uppercase">ELO rating</p>
                               <p className="text-lg font-black text-white flex items-center gap-1 justify-end">
                                  <Flame size={16} fill="#E85151" className="text-[#E85151]" />
                                  {userStats.rating}
@@ -324,7 +324,7 @@ export const UnifiedLobby = ({
 
                      {/* Activity Feed */}
                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 text-white/40">
+                        <div className="flex items-center gap-1.5 text-white/80">
                            <Radio size={14} className="text-[#E85151] animate-pulse" />
                            <span className="text-[10px] font-black uppercase tracking-wider">Latest Activity</span>
                         </div>
@@ -343,7 +343,7 @@ export const UnifiedLobby = ({
                                                 <p className="text-[11px] text-white font-bold leading-tight truncate">
                                                    Challenge vs <span className="text-[#E85151]">{item.oppName}</span>
                                                 </p>
-                                                <p className="text-[8px] text-white/40 font-extrabold uppercase mt-0.5">
+                                                <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
                                                    {itemCatObj?.name || "Trivia"}
                                                 </p>
                                              </div>
@@ -356,17 +356,17 @@ export const UnifiedLobby = ({
                                                 Play Turn
                                              </button>
                                           ) : (
-                                             <span className="text-[7.5px] font-black uppercase text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-md shrink-0">
+                                             <span className="text-[7.5px] font-black uppercase text-yellow-505 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-md shrink-0">
                                                 Waiting
                                              </span>
                                           )}
                                        </div>
-                                    );
+                                     );
                                  }
 
                                  if (item.type === "completed_match") {
                                     let outcome = "DRAW";
-                                    let outcomeStyle = "text-white/60 border-white/10 bg-white/5";
+                                    let outcomeStyle = "text-white border-white/10 bg-white/5";
                                     if (item.won) {
                                        outcome = "WIN";
                                        outcomeStyle = "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10";
@@ -387,7 +387,7 @@ export const UnifiedLobby = ({
                                                 <p className="text-[11px] text-white font-bold leading-tight truncate">
                                                    vs {item.oppName}
                                                 </p>
-                                                <p className="text-[8px] text-white/40 font-extrabold uppercase mt-0.5">
+                                                <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
                                                    {itemCatObj?.name || "Trivia"}
                                                 </p>
                                              </div>
@@ -410,7 +410,7 @@ export const UnifiedLobby = ({
                                              <p className="text-[11px] text-white font-bold leading-tight">
                                                 Rank Update: <span className="text-[#E85151]">{item.rankName}</span>
                                              </p>
-                                             <p className="text-[8px] text-white/40 font-extrabold uppercase mt-0.5">
+                                             <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
                                                 Currently holding {item.rating} rating ELO
                                              </p>
                                           </div>
@@ -421,7 +421,7 @@ export const UnifiedLobby = ({
                                  return null;
                               })
                            ) : (
-                              <div className="text-center py-6 text-white/40 text-[10px] font-black uppercase tracking-wider">
+                              <div className="text-center py-6 text-white/60 text-[10px] font-black uppercase tracking-wider">
                                  No recent matches or activities.
                               </div>
                            )}
@@ -431,7 +431,7 @@ export const UnifiedLobby = ({
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (
                         <div className="space-y-2">
-                           <p className="text-[10px] font-black uppercase tracking-wider text-white/40">Frequently Played</p>
+                           <p className="text-[10px] font-black uppercase tracking-wider text-white/80">Frequently Played</p>
                            <div className="grid grid-cols-2 gap-2">
                               {frequentCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -457,7 +457,7 @@ export const UnifiedLobby = ({
 
                      {/* All Topics */}
                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-white/40">Topics</p>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-white/80">Topics</p>
                         <div className="grid grid-cols-2 gap-2">
                            {allCategories.map((cat) => {
                               const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -472,7 +472,7 @@ export const UnifiedLobby = ({
                                     </div>
                                     <div className="min-w-0">
                                        <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
-                                       <p className="text-[8px] text-white/40 font-extrabold uppercase tracking-widest">Details</p>
+                                       <p className="text-[8px] text-white font-extrabold uppercase tracking-widest">Details</p>
                                     </div>
                                  </div>
                               );
@@ -484,7 +484,7 @@ export const UnifiedLobby = ({
                      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
                         <button
                            onClick={() => setShowHelp(!showHelp)}
-                           className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-white/80 hover:text-white transition-colors cursor-pointer"
+                           className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-white hover:text-white transition-colors cursor-pointer"
                         >
                            <div className="flex items-center gap-2">
                               <HelpCircle size={14} className="text-[#E85151]" />
@@ -499,7 +499,7 @@ export const UnifiedLobby = ({
                                  animate={{ opacity: 1, height: "auto" }}
                                  exit={{ opacity: 0, height: 0 }}
                                  transition={{ duration: 0.2 }}
-                                 className="px-4 pb-5 text-[11px] text-white/60 space-y-4 border-t border-white/10 pt-4 overflow-hidden"
+                                 className="px-4 pb-5 text-[11px] text-white space-y-4 border-t border-white/10 pt-4 overflow-hidden"
                               >
                                  <div>
                                     <p className="font-black text-white uppercase tracking-wider mb-1">Game Flow</p>
@@ -509,7 +509,7 @@ export const UnifiedLobby = ({
                                     <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
                                     <ul className="list-disc pl-4 space-y-1">
                                        <li><strong className="text-[#E85151]">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays based on speed).</li>
-                                       <li><strong className="text-pink-500">Round 7 (Final Round)</strong>: All points are <strong className="text-pink-500">DOUBLED</strong>!</li>
+                                       <li><strong className="text-[#E85151]">Round 7 (Final Round)</strong>: All points are <strong className="text-[#E85151]">DOUBLED</strong>!</li>
                                     </ul>
                                  </div>
                               </motion.div>
@@ -527,7 +527,7 @@ export const UnifiedLobby = ({
                               <div className="flex-1 text-left">
                                  <p className="text-xs font-black text-white group-hover:text-[#E85151] transition-colors">Classic Daily Wordle</p>
                               </div>
-                              <Clock size={14} className="text-white/40 group-hover:text-white" />
+                              <Clock size={14} className="text-white/80 group-hover:text-white" />
                            </button>
                         )}
                      </div>
@@ -546,37 +546,37 @@ export const UnifiedLobby = ({
                      {userStats && (
                         <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center shadow-md">
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rating</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Rating</p>
                               <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rank</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Rank</p>
                               <p className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
                                  {userStats.rank_name}
                               </p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Wins/Losses</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Wins/Losses</p>
                               <p className="text-lg font-black text-correct">
-                                 {userStats.games_won}<span className="text-white/40 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
+                                 {userStats.games_won}<span className="text-white/80 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
                               </p>
                            </div>
                         </div>
                      )}
 
                      <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase text-white/40 tracking-wider">Active Arena Category</p>
+                        <p className="text-[10px] font-black uppercase text-white/85 tracking-wider">Active Arena Category</p>
                         <div className={`bg-linear-to-br ${catStyle.gradient} border ${catStyle.border.split(" ")[0]} ${catStyle.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg`}>
                            <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
                                  {catStyle.emoji}
                               </div>
                               <div className="min-w-0">
-                                 <p className="text-[9px] text-white/60 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
+                                 <p className="text-[9px] text-white/90 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
                                  <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{catObj.name}</p>
                               </div>
                            </div>
-                           <p className="text-xs text-white/80 leading-relaxed font-bold">{catObj.desc}</p>
+                           <p className="text-xs text-white leading-relaxed font-bold">{catObj.desc}</p>
                            <button
                               onClick={() => setShowCategoryModalFor("live")}
                               className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
@@ -615,37 +615,37 @@ export const UnifiedLobby = ({
                      {userStats && (
                         <div className="grid grid-cols-3 bg-white/5 border border-white/10 rounded-2xl p-4 text-center shadow-md">
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rating</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Rating</p>
                               <p className="text-lg font-black text-white">{userStats.rating} ELO</p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Rank</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Rank</p>
                               <p className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
                                  {userStats.rank_name}
                               </p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Wins/Losses</p>
+                              <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider">Wins/Losses</p>
                               <p className="text-lg font-black text-indigo-400">
-                                 {userStats.games_won}<span className="text-white/40 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
+                                 {userStats.games_won}<span className="text-white/80 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
                               </p>
                            </div>
                         </div>
                      )}
 
                      <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase text-white/40 tracking-wider">Active Arena Category</p>
+                        <p className="text-[10px] font-black uppercase text-white/85 tracking-wider">Active Arena Category</p>
                         <div className={`bg-linear-to-br ${asyncCatStyle.gradient} border ${asyncCatStyle.border.split(" ")[0]} ${asyncCatStyle.glow} rounded-2xl p-4 flex flex-col gap-3 shadow-lg ring-1 ring-[#E85151]/15`}>
                            <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/25 flex items-center justify-center text-lg shadow-inner shrink-0">
                                  {asyncCatStyle.emoji}
                               </div>
                               <div className="min-w-0">
-                                 <p className="text-[9px] text-white/60 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
+                                 <p className="text-[9px] text-white/90 font-extrabold uppercase tracking-widest leading-none mb-1">Active Arena</p>
                                  <p className="text-base font-black uppercase tracking-wider text-white truncate leading-none">{asyncCatObj.name}</p>
                               </div>
                            </div>
-                           <p className="text-xs text-white/80 leading-relaxed font-bold">{asyncCatObj.desc}</p>
+                           <p className="text-xs text-white leading-relaxed font-bold">{asyncCatObj.desc}</p>
                            <button
                               onClick={() => setShowCategoryModalFor("async")}
                               className="w-full mt-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all cursor-pointer text-center"
@@ -656,18 +656,18 @@ export const UnifiedLobby = ({
                      </div>
 
                      <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase text-white/40 tracking-wider">Challenge Players</p>
+                        <p className="text-[10px] font-black uppercase text-white/85 tracking-wider">Challenge Players</p>
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex items-center gap-2">
-                           <Search size={16} className="text-white/40 shrink-0" />
+                           <Search size={16} className="text-white/60 shrink-0" />
                            <input
                               type="text"
                               placeholder="Search by username..."
                               value={playerSearch}
                               onChange={(e) => setPlayerSearch(e.target.value)}
-                              className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30 font-bold"
+                              className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/40 font-bold"
                            />
                            {playerSearch && (
-                              <button onClick={() => setPlayerSearch("")} className="text-[10px] font-black uppercase text-white/40 hover:text-white tracking-widest cursor-pointer">
+                              <button onClick={() => setPlayerSearch("")} className="text-[10px] font-black uppercase text-white/60 hover:text-white tracking-widest cursor-pointer">
                                  Clear
                               </button>
                            )}
@@ -700,7 +700,7 @@ export const UnifiedLobby = ({
                                  </div>
                               ))
                            ) : (
-                              <div className="text-center py-6 text-white/40 text-[10px] font-bold uppercase tracking-wider">
+                              <div className="text-center py-6 text-white/60 text-[10px] font-bold uppercase tracking-wider">
                                  {playerSearch ? "No players found" : "No other players available"}
                               </div>
                            )}
@@ -722,7 +722,7 @@ export const UnifiedLobby = ({
                      {/* Pending Challenges Subsection */}
                      {pendingMatches.length > 0 && (
                         <div className="space-y-3">
-                           <p className="text-[10px] font-black uppercase text-white/40 tracking-wider pt-2 border-t border-white/10">
+                           <p className="text-[10px] font-black uppercase text-white/80 tracking-wider pt-2 border-t border-white/10">
                               Pending Challenges {pendingCount > 0 && <span className="text-[#E85151]">({pendingCount} your turn)</span>}
                            </p>
                            {pendingMatches.map((match: any) => {
@@ -744,7 +744,7 @@ export const UnifiedLobby = ({
                                              {myTurn ? "Your Turn" : "Waiting"}
                                           </span>
                                        </div>
-                                       <p className="text-[9px] text-white/40 font-bold uppercase mt-0.5">{match.category?.replace(/_/g, " ")}</p>
+                                       <p className="text-[9px] text-white/70 font-bold uppercase mt-0.5">{match.category?.replace(/_/g, " ")}</p>
                                     </div>
                                     {myTurn ? (
                                        <button
@@ -816,7 +816,7 @@ export const UnifiedLobby = ({
                               const oppName = match.is_bot_match ? "Word Bot" : (oppProfile?.username || "Opponent");
 
                               let outcome = "DRAW";
-                              let outcomeStyle = "text-white/60 border-white/10 bg-white/5";
+                              let outcomeStyle = "text-white border-white/10 bg-white/5";
                               if (myScore > oppScore) {
                                  outcome = "WIN";
                                  outcomeStyle = "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10";
@@ -845,7 +845,7 @@ export const UnifiedLobby = ({
                                           <p className="font-black text-white truncate">vs {oppName}</p>
                                           <span className={`text-[7.5px] font-black uppercase ${modeColor}`}>{mode}</span>
                                        </div>
-                                       <p className="text-[9px] text-white/40 font-bold uppercase mt-0.5">
+                                       <p className="text-[9px] text-white/70 font-bold uppercase mt-0.5">
                                           {match.category?.replace(/_/g, " ")} • {dateStr}
                                        </p>
                                     </div>
@@ -860,7 +860,7 @@ export const UnifiedLobby = ({
                            })}
                         </div>
                      ) : (
-                        <div className="text-center py-12 text-white/40">
+                        <div className="text-center py-12 text-white/60">
                            <p className="text-[10px] uppercase font-black tracking-wider">No completed matches</p>
                         </div>
                      )}
