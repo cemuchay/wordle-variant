@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
@@ -7,6 +7,7 @@ import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConst
 import { type ProfileStats } from "../shared/types";
 import { RankingView } from "../shared/RankingView";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
+import { supabase } from "../../lib/supabaseClient";
 
 interface TopicDetailsViewProps {
    categoryId: string;
@@ -32,6 +33,45 @@ export const TopicDetailsView = ({
    const [activeSection, setActiveSection] = useState<"play" | "rankings">("play");
    const [playerSearch, setPlayerSearch] = useState("");
    const [showInviteOverlay, setShowInviteOverlay] = useState(false);
+   const [categoryStats, setCategoryStats] = useState<ProfileStats | null>(null);
+
+   useEffect(() => {
+      if (!currentUser || !categoryId) return;
+
+      if (categoryId === "mixed") {
+         setCategoryStats(userStats);
+         return;
+      }
+
+      const fetchCategoryStats = async () => {
+         try {
+            const { data, error } = await supabase
+               .from("wordup_category_profiles")
+               .select("*")
+               .eq("user_id", currentUser.id)
+               .eq("category", categoryId)
+               .maybeSingle();
+
+            if (!error && data) {
+               setCategoryStats(data as any);
+            } else {
+               setCategoryStats({
+                  rating: 600,
+                  xp: 0,
+                  games_played: 0,
+                  games_won: 0,
+                  games_lost: 0,
+                  games_tied: 0,
+                  rank_name: "Bronze"
+               } as any);
+            }
+         } catch (err) {
+            console.error("Failed to fetch category stats:", err);
+         }
+      };
+
+      fetchCategoryStats();
+   }, [currentUser, categoryId, userStats]);
 
    const categoryObj = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
    const style = CATEGORY_STYLE_MAP[categoryId] || DEFAULT_STYLE;
@@ -106,22 +146,22 @@ export const TopicDetailsView = ({
                      className="space-y-6"
                   >
                      {/* User Stats Card */}
-                     {userStats && (
+                     {categoryStats && (
                         <div className="bg-[#181818] border border-white/5 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
                            <div>
                               <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Rating</p>
-                              <p className="text-base font-black text-white">{userStats.rating} ELO</p>
+                              <p className="text-base font-black text-white">{categoryStats.rating} ELO</p>
                            </div>
                            <div>
                               <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Rank</p>
-                              <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(userStats.rank_name)}`}>
-                                 {userStats.rank_name}
+                              <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(categoryStats.rank_name)}`}>
+                                 {categoryStats.rank_name}
                               </p>
                            </div>
                            <div>
                               <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Record</p>
                               <p className="text-base font-black text-[#ff4b5c]">
-                                 {userStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{userStats.games_lost}</span>
+                                 {categoryStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
                               </p>
                            </div>
                         </div>
@@ -215,7 +255,7 @@ export const TopicDetailsView = ({
                      exit={{ opacity: 0, y: -10 }}
                      className="space-y-4"
                   >
-                     <RankingView currentUser={currentUser} userStats={userStats} />
+                     <RankingView currentUser={currentUser} userStats={categoryStats} categoryId={categoryId} />
                   </motion.div>
                )}
             </AnimatePresence>

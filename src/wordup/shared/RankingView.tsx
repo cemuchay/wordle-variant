@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Loader2, Trophy, Medal } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
@@ -6,6 +6,7 @@ import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { type ProfileStats } from "./types";
 import { RATING, INACTIVITY, RANKS, WORDUP_GAME } from "../../constants/wordup";
 import formatUsername from '../../utils/formatUsername';
+import { CATEGORIES } from "./constants";
 
 interface LeaderboardEntry extends ProfileStats {
    id: string;
@@ -18,9 +19,10 @@ interface LeaderboardEntry extends ProfileStats {
 interface RankingViewProps {
    currentUser: { id: string; user_metadata?: { full_name?: string; avatar_url?: string } } | null;
    userStats: ProfileStats | null;
+   categoryId?: string;
 }
 
-export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
+export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewProps) => {
    const [rankings, setRankings] = useState<LeaderboardEntry[]>([]);
    const [loading, setLoading] = useState(true);
    const [myRankPosition, setMyRankPosition] = useState<number | null>(null);
@@ -39,17 +41,33 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
    const loadLeaderboard = useCallback(async () => {
       setLoading(true);
       try {
+         const isGlobal = !categoryId || categoryId === "mixed";
+
          // 1. Fetch top 30 active players
-         const { data, error } = await supabase
-            .from("wordup_profiles")
-            .select(`
-               *,
-               profiles:id (
-                  username,
-                  avatar_url
-               )
-            `)
-            .gt("games_played", 0)
+         const query = isGlobal
+            ? supabase
+               .from("wordup_profiles")
+               .select(`
+                  *,
+                  profiles:id (
+                     username,
+                     avatar_url
+                  )
+               `)
+               .gt("games_played", 0)
+            : supabase
+               .from("wordup_category_profiles")
+               .select(`
+                  *,
+                  profiles:user_id (
+                     username,
+                     avatar_url
+                  )
+               `)
+               .eq("category", categoryId)
+               .gt("games_played", 0);
+
+         const { data, error } = await query
             .order("rating", { ascending: false })
             .limit(WORDUP_GAME.LEADERBOARD_LIMIT);
 
@@ -58,6 +76,7 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
          // Resolve decayed ratings for everyone on the fly
          const processed: LeaderboardEntry[] = ((data as any[]) || []).map((entry) => ({
             ...entry,
+            id: isGlobal ? entry.id : entry.user_id,
             rating: getDecayedRating(entry)
          }));
 
@@ -66,16 +85,41 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
 
          setRankings(processed);
 
-         // 2. If current user is active, find their rank position if not in top 30
-         if (currentUser && userStats && userStats.games_played > 0) {
+         // 2. Fetch current user's stats for this category if not global
+         let myStats = userStats;
+         if (!isGlobal && currentUser) {
+            const { data: catData } = await supabase
+               .from("wordup_category_profiles")
+               .select("*")
+               .eq("user_id", currentUser.id)
+               .eq("category", categoryId)
+               .maybeSingle();
+            if (catData) {
+               myStats = catData as any;
+            } else {
+               myStats = null;
+            }
+         }
+
+         // 3. If current user is active, find their rank position if not in top 30
+         if (currentUser && myStats && myStats.games_played > 0) {
             const inTop30 = processed.some(entry => entry.id === currentUser.id);
             if (!inTop30) {
-               const myCurrentDecayedRating = getDecayedRating(userStats);
-               const { count, error: countError } = await supabase
-                  .from("wordup_profiles")
-                  .select("id", { count: "exact", head: true })
-                  .gt("games_played", 0)
-                  .gt("rating", myCurrentDecayedRating);
+               const myCurrentDecayedRating = getDecayedRating(myStats);
+               const countQuery = isGlobal
+                  ? supabase
+                     .from("wordup_profiles")
+                     .select("id", { count: "exact", head: true })
+                     .gt("games_played", 0)
+                     .gt("rating", myCurrentDecayedRating)
+                  : supabase
+                     .from("wordup_category_profiles")
+                     .select("user_id", { count: "exact", head: true })
+                     .eq("category", categoryId)
+                     .gt("games_played", 0)
+                     .gt("rating", myCurrentDecayedRating);
+
+               const { count, error: countError } = await countQuery;
 
                if (!countError && count !== null) {
                   setMyRankPosition(count + 1);
@@ -89,7 +133,7 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
       } finally {
          setLoading(false);
       }
-   }, [currentUser, userStats, getDecayedRating]);
+   }, [currentUser, userStats, categoryId, getDecayedRating]);
 
    useEffect(() => {
       let active = true;
@@ -140,11 +184,15 @@ export const RankingView = ({ currentUser, userStats }: RankingViewProps) => {
    const userInTop30Index = rankings.findIndex(entry => entry.id === currentUser?.id);
    const showSelfBottomCard = currentUser && userStats && userStats.games_played > 0 && userInTop30Index === -1 && myRankPosition !== null;
 
+   const catName = categoryId
+      ? CATEGORIES.find(c => c.id === categoryId)?.name || "Topic"
+      : "Global";
+
    return (
       <div className="space-y-4">
          <div className="flex items-center gap-2 px-1">
             <Trophy size={16} className="text-yellow-500" />
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">Global Leaderboard</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white">{catName} Leaderboard</h3>
          </div>
 
          {/* Rankings Table */}

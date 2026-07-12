@@ -98,7 +98,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
       }
    }, []);
 
-   const updateStats = useCallback(async (eloGain: number, xpReward: number, won: boolean, tied: boolean) => {
+   const updateStats = useCallback(async (eloGain: number, xpReward: number, won: boolean, tied: boolean, category?: string | null) => {
       if (!user) return;
       try {
          await (async () => {
@@ -156,6 +156,51 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                      .eq("id", user.id);
                   if (error) throw error;
                }, 3, 1000);
+
+               // Category specific profile update
+               if (category && category !== "mixed") {
+                  await fetchWithRetry(async () => {
+                     const { data: topicProf, error: topicFetchError } = await supabase
+                        .from("wordup_category_profiles")
+                        .select("*")
+                        .eq("user_id", user.id)
+                        .eq("category", category)
+                        .maybeSingle();
+                     if (topicFetchError) throw topicFetchError;
+
+                     const startRating = topicProf ? topicProf.rating : RATING.DEFAULT;
+                     const startXp = topicProf ? topicProf.xp : 0;
+                     const startPlayed = topicProf ? topicProf.games_played : 0;
+                     const startWon = topicProf ? topicProf.games_won : 0;
+                     const startLost = topicProf ? topicProf.games_lost : 0;
+                     const startTied = topicProf ? topicProf.games_tied : 0;
+
+                     const newTopicRating = Math.max(RATING.FLOOR, startRating + eloGain);
+                     const newTopicXp = startXp + xpReward;
+
+                     let topicRank = RANKS.BRONZE.NAME;
+                     if (newTopicRating >= RANKS.MASTER.THRESHOLD) topicRank = RANKS.MASTER.NAME;
+                     else if (newTopicRating >= RANKS.DIAMOND.THRESHOLD) topicRank = RANKS.DIAMOND.NAME;
+                     else if (newTopicRating >= RANKS.GOLD.THRESHOLD) topicRank = RANKS.GOLD.NAME;
+                     else if (newTopicRating >= RANKS.SILVER.THRESHOLD) topicRank = RANKS.SILVER.NAME;
+
+                     const { error: topicUpsertError } = await supabase
+                        .from("wordup_category_profiles")
+                        .upsert({
+                           user_id: user.id,
+                           category: category,
+                           rating: newTopicRating,
+                           xp: newTopicXp,
+                           games_played: startPlayed + 1,
+                           games_won: startWon + (won ? 1 : 0),
+                           games_lost: startLost + (won || tied ? 0 : 1),
+                           games_tied: startTied + (tied ? 1 : 0),
+                           rank_name: topicRank,
+                           updated_at: new Date().toISOString()
+                        }, { onConflict: "user_id,category" });
+                     if (topicUpsertError) throw topicUpsertError;
+                  }, 3, 1000);
+               }
 
                fetchUserProfile();
             }

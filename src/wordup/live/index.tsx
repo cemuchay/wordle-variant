@@ -119,7 +119,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
       if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
 
-      try { await updateStats(eloGain, xpReward, won, tied); }
+      try { await updateStats(eloGain, xpReward, won, tied, match.category); }
       catch { triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION); }
 
       // Fire-and-forget: record handcrafted question answers for difficulty tracking
