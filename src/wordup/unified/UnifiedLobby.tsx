@@ -149,8 +149,11 @@ export const UnifiedLobby = ({
    const asyncCatObj = CATEGORIES.find(c => c.id === asyncCategory) || CATEGORIES[0];
    const asyncCatStyle = CATEGORY_STYLE_MAP[asyncCatObj.id] || DEFAULT_STYLE;
 
-   const frequentCategories = CATEGORIES.filter((c) => recentCategoryIds.includes(c.id));
-   const allCategories = CATEGORIES;
+   const frequentCategories = recentCategoryIds
+      .map(id => CATEGORIES.find(c => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => !!c);
+    const featuredCategories = CATEGORIES.filter((c) => c.featured);
+    const allCategories = CATEGORIES.filter((c) => !c.featured);
 
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
       p.id !== currentUser?.id &&
@@ -439,9 +442,36 @@ export const UnifiedLobby = ({
                                     <div
                                        key={cat.id}
                                        onClick={() => setSelectedCategoryId(cat.id)}
-                                       className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md"
+                                       className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                     >
-                                       <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xl shrink-0">
+                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
+                                          {style.emoji}
+                                       </div>
+                                       <div className="min-w-0">
+                                          <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
+                                          <p className="text-[8px] text-[#E85151] font-black uppercase tracking-widest">Select Topic</p>
+                                       </div>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     )}
+
+                     {/* Featured Topics */}
+                     {featuredCategories.length > 0 && (
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black uppercase tracking-wider text-[#E85151]">Featured Topics</p>
+                           <div className="grid grid-cols-2 gap-2">
+                              {featuredCategories.slice(0, 4).map((cat) => {
+                                 const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                                 return (
+                                    <div
+                                       key={cat.id}
+                                       onClick={() => setSelectedCategoryId(cat.id)}
+                                       className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
+                                    >
+                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
                                           {style.emoji}
                                        </div>
                                        <div className="min-w-0">
@@ -465,9 +495,9 @@ export const UnifiedLobby = ({
                                  <div
                                     key={cat.id}
                                     onClick={() => setSelectedCategoryId(cat.id)}
-                                    className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md"
+                                    className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                  >
-                                    <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xl shrink-0">
+                                    <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
                                        {style.emoji}
                                     </div>
                                     <div className="min-w-0">

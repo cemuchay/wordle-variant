@@ -151,26 +151,36 @@ export const TopicDetailsView = ({
                      className="space-y-6"
                   >
                      {/* User Stats Card */}
-                     {categoryStats && (
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
-                           <div>
-                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rating</p>
+                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
+                        <div>
+                           <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rating</p>
+                           {categoryStats ? (
                               <p className="text-base font-black text-white">{categoryStats.rating} ELO</p>
-                           </div>
-                           <div>
-                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rank</p>
+                           ) : (
+                              <div className="h-5 w-16 bg-white/10 rounded-md animate-pulse mx-auto mt-1" />
+                           )}
+                        </div>
+                        <div>
+                           <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Rank</p>
+                           {categoryStats ? (
                               <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(categoryStats.rank_name)}`}>
                                  {categoryStats.rank_name}
                               </p>
-                           </div>
-                           <div>
-                              <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Record</p>
+                           ) : (
+                              <div className="h-5 w-14 bg-white/10 rounded-md animate-pulse mx-auto mt-1" />
+                           )}
+                        </div>
+                        <div>
+                           <p className="text-[9px] text-white/80 font-black uppercase tracking-wider">Record</p>
+                           {categoryStats ? (
                               <p className="text-base font-black text-[#E85151]">
                                  {categoryStats.games_won}<span className="text-white/80 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
                               </p>
-                           </div>
+                           ) : (
+                              <div className="h-5 w-12 bg-white/10 rounded-md animate-pulse mx-auto mt-1" />
+                           )}
                         </div>
-                     )}
+                     </div>
 
                      {/* Action Buttons */}
                      <div className="space-y-3">
