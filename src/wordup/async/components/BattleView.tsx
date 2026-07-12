@@ -121,8 +121,8 @@ export const BattleView = ({
 
       bar.style.transition = "none";
       bar.style.width = "100%";
-      bar.style.backgroundColor = "#818cf8";
-      bar.style.boxShadow = "0 0 8px #818cf8";
+      bar.style.backgroundColor = "#E85151";
+      bar.style.boxShadow = "0 0 8px #E85151";
 
       void bar.offsetHeight;
 
@@ -214,7 +214,7 @@ export const BattleView = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.4 }}
-                  className="text-sm sm:text-base font-black text-pink-500 mt-2 animate-pulse tracking-wider"
+                  className="text-sm sm:text-base font-black text-[#E85151] mt-2 animate-pulse tracking-wider"
                >
                   DOUBLE POINTS
                </motion.p>
@@ -228,10 +228,10 @@ export const BattleView = ({
                    userId={playerProfile?.id || undefined}
                    src={playerProfile?.avatar_url || undefined}
                    username={playerProfile?.username || "You"}
-                   className="w-10 h-10 rounded-full border border-indigo-500/30 shrink-0"
+                   className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
                 />
                  <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                     <p className="text-base font-black text-white">{myScore} pts</p>
                  </div>
                  {scorePopups.filter((p) => p.side === "my").map((p) => (
@@ -240,7 +240,7 @@ export const BattleView = ({
                        initial={{ opacity: 0, y: 0, scale: 0.5 }}
                        animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
                        transition={{ duration: 2.5, ease: "easeOut" }}
-                       className="absolute -top-1 right-0 text-indigo-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(99,102,241,0.8)] pointer-events-none"
+                       className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
                     >
                        +{p.points}
                     </motion.span>
@@ -249,17 +249,17 @@ export const BattleView = ({
 
               <div className="flex flex-col items-center">
                  {categoryName && (
-                    <span className="text-[9px] font-black text-cyan-400 uppercase tracking-wider mb-0.5">{categoryName}</span>
+                    <span className="text-[9px] font-black text-[#E85151] uppercase tracking-wider mb-0.5">{categoryName}</span>
                  )}
-                 <span className="text-xs font-black text-gray-400">Q{currentIdx + 1}/{WORDUP_GAME.TOTAL_ROUNDS}</span>
+                 <span className="text-xs font-black text-white/40">Q{currentIdx + 1}/{WORDUP_GAME.TOTAL_ROUNDS}</span>
                  {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
-                    <span className="text-[9px] font-black text-pink-500 animate-pulse tracking-wider">⚡ 2X</span>
+                    <span className="text-[9px] font-black text-[#E85151] animate-pulse tracking-wider">⚡ 2X</span>
                  )}
               </div>
 
               <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
                  <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-gray-400 font-bold uppercase truncate">{opponentName}</p>
+                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
                     <p className="text-base font-black text-white">{oppScore} pts</p>
                  </div>
                 {scorePopups.filter((p) => p.side === "opp").map((p) => (
@@ -268,7 +268,7 @@ export const BattleView = ({
                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
                       animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
                       transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 left-0 text-pink-400 font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none"
+                      className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
                    >
                       +{p.points}
                    </motion.span>
@@ -277,13 +277,13 @@ export const BattleView = ({
                    userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
                    src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
                    username={opponentName}
-                   className="w-10 h-10 rounded-full border border-pink-500/30 shrink-0"
+                   className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
                 />
              </div>
           </div>
 
           {/* Timer Bar */}
-          <div className="w-full h-2 bg-indigo-500/20 rounded-full overflow-hidden shrink-0 shadow-inner">
+          <div className="w-full h-2 bg-[#E85151]/20 rounded-full overflow-hidden shrink-0 shadow-inner">
              {!revealAnswers && (
                 <div
                    ref={timerBarRef}
@@ -295,15 +295,15 @@ export const BattleView = ({
            {/* Question Container */}
            <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1 sm:space-y-2">
-               <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center justify-center gap-1">
-                  {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-pink-500 animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
+               <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+                  {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                 <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
-                  <p className="text-[10px] sm:text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
+                  <p className="text-[10px] sm:text-xs text-white/60 bg-white/5 px-2.5 py-0.5 sm:py-1 rounded-lg inline-block">
                      {activeQuestion.subPrompt}
                   </p>
                )}
@@ -329,10 +329,10 @@ export const BattleView = ({
             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
                <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5 min-h-[180px]">
                   <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-indigo-500" />
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
                   <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice, index) => {
                      const isSelected = selectedAnswer === choice;
@@ -348,7 +348,7 @@ export const BattleView = ({
                      } else {
                         cardClass += " cursor-default";
                         if (isCorrect) {
-                           cardClass += " border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.6)] bg-indigo-500/10";
+                           cardClass += " border-correct shadow-[0_0_20px_rgba(106,170,100,0.6)] bg-correct/10";
                         } else if (isSelected) {
                            cardClass += " border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] bg-red-500/10";
                         } else {
@@ -357,7 +357,7 @@ export const BattleView = ({
                      }
 
                      if (isOppSelected) {
-                        cardClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                        cardClass += " ring-2 ring-[#E85151] ring-offset-2 ring-offset-dark animate-pulse";
                      }
 
                      let buttonAnimate: TargetAndTransition | undefined = undefined;
@@ -398,10 +398,10 @@ export const BattleView = ({
                            </div>
                            <div className="absolute right-1.5 bottom-1.5 flex gap-1 items-center z-10">
                               {isSelected && (
-                                 <span className="bg-indigo-500 text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                                 <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
-                                 <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
                                     {opponentName.slice(0, 5)}
                                  </span>
                               )}
@@ -413,10 +413,10 @@ export const BattleView = ({
             ) : (
                <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5 min-h-[180px]">
                   <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-indigo-500" />
+                     <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
                   <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
-                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-pink-500" />
+                     <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice) => {
                      const isSelected = selectedAnswer === choice;
@@ -429,16 +429,16 @@ export const BattleView = ({
                      } else {
                         btnClass += " cursor-default";
                         if (isCorrect) {
-                           btnClass += " bg-gradient-to-r from-indigo-500/40 to-indigo-500/60 border-indigo-500 text-white font-extrabold shadow-[0_0_25px_rgba(99,102,241,0.65)]";
+                           btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
                         } else {
-                           btnClass += " bg-gray-100 border-gray-200 text-gray-400 opacity-60";
+                           btnClass += " bg-white/5 border-white/10 text-white/40 opacity-60";
                         }
                      }
 
                      if (isOppSelected) {
-                        btnClass += " ring-2 ring-pink-500 ring-offset-2 ring-offset-dark animate-pulse";
+                        btnClass += " ring-2 ring-[#E85151] ring-offset-2 ring-offset-dark animate-pulse";
                      }
 
                      let buttonAnimate: TargetAndTransition | undefined = undefined;
@@ -450,10 +450,10 @@ export const BattleView = ({
                               scale: [1, 1.15, 0.95, 1.05, 1],
                               rotate: [0, -3, 3, -2, 2, 0],
                               boxShadow: [
-                                 "0 0 0px rgba(99,102,241,0)",
-                                 "0 0 45px rgba(99,102,241,0.95)",
-                                 "0 0 20px rgba(99,102,241,0.5)",
-                                 "0 0 0px rgba(99,102,241,0)"
+                                 "0 0 0px rgba(106,170,100,0)",
+                                 "0 0 45px rgba(106,170,100,0.95)",
+                                 "0 0 20px rgba(106,170,100,0.5)",
+                                 "0 0 0px rgba(106,170,100,0)"
                               ]
                            };
                            buttonTransition = { duration: 0.65, ease: "easeInOut" };
@@ -487,10 +487,10 @@ export const BattleView = ({
 
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (
-                                 <span className="bg-indigo-500 text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
+                                 <span className="bg-correct text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow">YOU</span>
                               )}
                               {isOppSelected && (
-                                 <span className="bg-pink-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
+                                 <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0 shadow animate-bounce">
                                     {opponentName.slice(0, 5)}
                                  </span>
                               )}

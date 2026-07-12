@@ -89,13 +89,14 @@ export const TopicDetailsView = ({
    return (
       <div className="flex flex-col flex-1 bg-[#121212] text-white min-h-0 relative select-none">
          {/* Cover Header */}
-         <div className="relative pt-6 pb-8 px-6 bg-linear-to-b from-[#ff4b5c]/20 via-[#181818]/60 to-[#121212] border-b border-white/5 flex flex-col items-center text-center">
+         {/* Cover Header */}
+         <div className="relative pt-6 pb-8 px-6 bg-linear-to-b from-[#E85151]/20 via-[#181818]/60 to-[#121212] border-b border-white/10 flex flex-col items-center text-center">
             {/* Back Button */}
             <button
                onClick={onBack}
                className="absolute top-4 left-4 p-2 bg-black/40 hover:bg-black/60 rounded-full border border-white/10 transition-all cursor-pointer"
             >
-               <ChevronLeft size={20} className="text-[#ff4b5c]" />
+               <ChevronLeft size={20} className="text-[#E85151]" />
             </button>
 
             {/* Category Emoji Circle */}
@@ -107,19 +108,19 @@ export const TopicDetailsView = ({
             <h1 className="text-2xl font-black uppercase tracking-wider text-white mb-2">
                {categoryObj.name}
             </h1>
-            <p className="text-xs text-gray-400 font-bold max-w-sm">
+            <p className="text-xs text-white/60 font-bold max-w-sm">
                {categoryObj.desc}
             </p>
          </div>
 
          {/* Navigation Tab Bar */}
-         <div className="flex border-b border-white/5 bg-[#181818] p-1">
+         <div className="flex border-b border-white/10 bg-[#181818] p-1">
             <button
                onClick={() => setActiveSection("play")}
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
                   activeSection === "play"
-                     ? "text-[#ff4b5c] border-b-2 border-[#ff4b5c]"
-                     : "text-gray-500 hover:text-white"
+                     ? "text-[#E85151] border-b-2 border-[#E85151]"
+                     : "text-white/40 hover:text-white"
                }`}
             >
                <Play size={14} />
@@ -129,8 +130,8 @@ export const TopicDetailsView = ({
                onClick={() => setActiveSection("rankings")}
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
                   activeSection === "rankings"
-                     ? "text-[#ff4b5c] border-b-2 border-[#ff4b5c]"
-                     : "text-gray-500 hover:text-white"
+                     ? "text-[#E85151] border-b-2 border-[#E85151]"
+                     : "text-white/40 hover:text-white"
                }`}
             >
                <Trophy size={14} />
@@ -151,21 +152,21 @@ export const TopicDetailsView = ({
                   >
                      {/* User Stats Card */}
                      {categoryStats && (
-                        <div className="bg-[#181818] border border-white/5 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-3 text-center shadow-lg">
                            <div>
-                              <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Rating</p>
+                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Rating</p>
                               <p className="text-base font-black text-white">{categoryStats.rating} ELO</p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Rank</p>
+                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Rank</p>
                               <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-block mt-1 ${getRankColor(categoryStats.rank_name)}`}>
                                  {categoryStats.rank_name}
                               </p>
                            </div>
                            <div>
-                              <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Record</p>
-                              <p className="text-base font-black text-[#ff4b5c]">
-                                 {categoryStats.games_won}<span className="text-gray-500 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
+                              <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Record</p>
+                              <p className="text-base font-black text-[#E85151]">
+                                 {categoryStats.games_won}<span className="text-white/40 text-xs">/</span><span className="text-red-400">{categoryStats.games_lost}</span>
                               </p>
                            </div>
                         </div>
@@ -175,7 +176,7 @@ export const TopicDetailsView = ({
                      <div className="space-y-3">
                         <button
                            onClick={onPlayLive}
-                           className="w-full bg-[#ff4b5c] hover:bg-[#ff3548] text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-[0_4px_25px_rgba(255,75,92,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                           className="w-full bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-[0_4px_25px_rgba(232,81,81,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                         >
                            <Swords size={18} className="stroke-3" />
                            <span>Play Live Match</span>
@@ -205,21 +206,21 @@ export const TopicDetailsView = ({
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                               exit={{ opacity: 0, height: 0 }}
-                              className="bg-[#181818] border border-white/5 rounded-2xl p-4 space-y-4 overflow-hidden"
+                              className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4 overflow-hidden"
                            >
-                              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                                 <Users size={16} className="text-[#ff4b5c]" />
+                              <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+                                 <Users size={16} className="text-[#E85151]" />
                                  <span className="text-xs font-black uppercase tracking-wider text-white">Select Opponent</span>
                               </div>
 
-                              <div className="bg-[#121212] border border-white/5 rounded-xl p-2.5 flex items-center gap-2">
-                                 <Search size={16} className="text-gray-500 shrink-0" />
+                              <div className="bg-black/40 border border-white/10 rounded-xl p-2.5 flex items-center gap-2">
+                                 <Search size={16} className="text-white/40 shrink-0" />
                                  <input
                                     type="text"
                                     placeholder="Search username..."
                                     value={playerSearch}
                                     onChange={(e) => setPlayerSearch(e.target.value)}
-                                    className="w-full bg-transparent text-xs text-white outline-none placeholder:text-gray-600 font-bold"
+                                    className="w-full bg-transparent text-xs text-white outline-none placeholder:text-white/30 font-bold"
                                  />
                               </div>
 
@@ -228,7 +229,7 @@ export const TopicDetailsView = ({
                                     filteredPlayers.map((profile: any) => (
                                        <div
                                           key={profile.id}
-                                          className="flex items-center justify-between bg-[#121212] border border-white/5 rounded-xl p-2.5 hover:bg-white/5 transition-all"
+                                          className="flex items-center justify-between bg-black/25 border border-white/10 rounded-xl p-2.5 hover:bg-white/5 transition-all"
                                        >
                                           <div className="flex items-center gap-2.5 min-w-0">
                                              <ProtectedAvatar
@@ -243,14 +244,14 @@ export const TopicDetailsView = ({
                                           </div>
                                           <button
                                              onClick={() => onChallengePlayer(profile)}
-                                             className="flex items-center gap-1 bg-[#ff4b5c]/10 hover:bg-[#ff4b5c]/20 border border-[#ff4b5c]/25 text-[#ff4b5c] text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                                             className="flex items-center gap-1 bg-[#E85151]/10 hover:bg-[#E85151]/20 border border-[#E85151]/25 text-[#E85151] text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
                                           >
                                              Challenge
                                           </button>
                                        </div>
                                     ))
                                  ) : (
-                                    <div className="text-center py-4 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
+                                    <div className="text-center py-4 text-white/40 text-[10px] font-bold uppercase tracking-wider">
                                        No players found
                                     </div>
                                  )}

@@ -174,8 +174,8 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
 
    if (loading) {
       return (
-         <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
-            <Loader2 className="animate-spin text-correct" size={24} />
+         <div className="flex flex-col items-center justify-center py-16 text-white/40 gap-3">
+            <Loader2 className="animate-spin text-[#E85151]" size={24} />
             <p className="text-[10px] font-black uppercase tracking-widest animate-pulse">Loading Rankings...</p>
          </div>
       );
@@ -207,7 +207,7 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                   <div
                      key={entry.id}
                      className={`flex items-center justify-between p-3.5 transition-all ${
-                        isMe ? "bg-correct/10" : "hover:bg-white/5"
+                        isMe ? "bg-[#E85151]/10 border-y border-[#E85151]/20" : "hover:bg-white/5"
                      }`}
                   >
                      <div className="flex items-center gap-3 min-w-0">
@@ -229,7 +229,7 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                            <p className="text-xs font-black text-white truncate flex items-center gap-1.5">
                               {formatUsername(entry.profiles?.username) || "Player"}
                               {isMe && (
-                                 <span className="bg-correct text-black text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
+                                 <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
                               )}
                            </p>
                            <p className={`text-[8px] font-black uppercase tracking-wider ${getRankNameColor(entry.rating)}`}>
@@ -241,15 +241,15 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                      {/* Stats */}
                      <div className="flex items-center gap-6 shrink-0 text-right">
                         <div>
-                           <p className="text-[9px] text-gray-500 font-bold uppercase">W / L</p>
+                           <p className="text-[9px] text-white/40 font-bold uppercase">W / L</p>
                            <p className="text-xs font-black text-white">
-                              {entry.games_won}<span className="text-gray-500 text-[10px]">/</span><span className="text-red-400/90">{entry.games_lost}</span>
-                              <span className="text-[9px] text-gray-500 font-bold ml-1">({winLossRatio})</span>
+                              {entry.games_won}<span className="text-white/40 text-[10px]">/</span><span className="text-red-400/90">{entry.games_lost}</span>
+                              <span className="text-[9px] text-white/40 font-bold ml-1">({winLossRatio})</span>
                            </p>
                         </div>
                         <div className="w-16">
-                           <p className="text-[9px] text-gray-500 font-bold uppercase">Rating</p>
-                           <p className="text-xs font-black text-correct">{entry.rating} ELO</p>
+                           <p className="text-[9px] text-white/40 font-bold uppercase">Rating</p>
+                           <p className="text-xs font-black text-[#E85151]">{entry.rating} ELO</p>
                         </div>
                      </div>
                   </div>
@@ -259,13 +259,13 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
             {/* Self Hoisted Bottom Row */}
             {showSelfBottomCard && (
                <div
-                  className="flex items-center justify-between p-3.5 bg-correct/10"
+                  className="flex items-center justify-between p-3.5 bg-[#E85151]/10"
                   style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.25)" }}
                >
                   <div className="flex items-center gap-3 min-w-0">
                      {/* Rank Badge */}
                      <div className="w-8 flex items-center justify-center">
-                        <span className="text-[10px] text-correct font-black">#{myRankPosition}</span>
+                        <span className="text-[10px] text-[#E85151] font-black">#{myRankPosition}</span>
                      </div>
 
                      {/* Avatar */}
@@ -273,14 +273,14 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                          userId={currentUser?.id}
                          src={currentUser?.user_metadata?.avatar_url}
                          username={formatUsername(currentUser?.user_metadata?.full_name) || "You"}
-                         className="w-7 h-7 rounded-full border border-correct/30 shrink-0"
+                         className="w-7 h-7 rounded-full border border-[#E85151]/30 shrink-0"
                       />
 
                       {/* Username & Rank */}
                       <div className="truncate">
                          <p className="text-xs font-black text-white truncate flex items-center gap-1.5">
                             {formatUsername(currentUser?.user_metadata?.full_name) || "You"}
-                           <span className="bg-correct text-black text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
+                           <span className="bg-[#E85151] text-white text-[8px] font-extrabold px-1 py-0.25 rounded-md shrink-0">YOU</span>
                         </p>
                         <p className={`text-[8px] font-black uppercase tracking-wider ${getRankNameColor(getDecayedRating(userStats))}`}>
                            {getRankName(getDecayedRating(userStats))}
@@ -291,24 +291,24 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                   {/* Stats */}
                   <div className="flex items-center gap-6 shrink-0 text-right">
                      <div>
-                        <p className="text-[9px] text-gray-500 font-bold uppercase">W / L</p>
+                        <p className="text-[9px] text-white/40 font-bold uppercase">W / L</p>
                         <p className="text-xs font-black text-white">
-                           {userStats.games_won}<span className="text-gray-500 text-[10px]">/</span><span className="text-red-400/90">{userStats.games_lost}</span>
-                           <span className="text-[9px] text-gray-500 font-bold ml-1">
+                           {userStats.games_won}<span className="text-white/40 text-[10px]">/</span><span className="text-red-400/90">{userStats.games_lost}</span>
+                           <span className="text-[9px] text-white/40 font-bold ml-1">
                               ({userStats.games_lost === 0 ? userStats.games_won : parseFloat((userStats.games_won / userStats.games_lost).toFixed(1))})
                            </span>
                         </p>
                      </div>
                      <div className="w-16">
-                        <p className="text-[9px] text-gray-500 font-bold uppercase">Rating</p>
-                        <p className="text-xs font-black text-correct">{getDecayedRating(userStats)} ELO</p>
+                        <p className="text-[9px] text-white/40 font-bold uppercase">Rating</p>
+                        <p className="text-xs font-black text-[#E85151]">{getDecayedRating(userStats)} ELO</p>
                      </div>
                   </div>
                </div>
             )}
 
             {rankings.length === 0 && (
-               <div className="text-center py-12 text-gray-500 text-xs font-bold uppercase tracking-wider">
+               <div className="text-center py-12 text-white/40 text-xs font-bold uppercase tracking-wider">
                   No active rankings found yet.
                </div>
             )}

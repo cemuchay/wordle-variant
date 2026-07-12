@@ -48,12 +48,12 @@ export const GameOverView = ({
    const statusColor = !isCompleted
       ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
       : isWinner
-         ? "text-indigo-400 border-indigo-500/20 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
+         ? "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10 shadow-[0_0_15px_rgba(232,81,81,0.1)]"
          : isDraw
             ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
             : "text-red-400 border-red-500/20 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.1)]";
 
-   const statusTextClass = !isCompleted ? "text-yellow-500" : isWinner ? "text-indigo-400" : isDraw ? "text-yellow-500" : "text-red-400";
+   const statusTextClass = !isCompleted ? "text-yellow-500" : isWinner ? "text-[#E85151]" : isDraw ? "text-yellow-500" : "text-red-400";
 
    return (
       <motion.div
@@ -66,7 +66,7 @@ export const GameOverView = ({
             <h2 className={`text-2xl font-black uppercase tracking-wider ${statusTextClass}`}>
                {!isCompleted ? "Challenge Pending" : isWinner ? "Victory!" : isDraw ? "Draw!" : "Defeat"}
             </h2>
-            <p className="text-xs text-gray-400 uppercase tracking-widest font-black">
+            <p className="text-xs text-white/60 uppercase tracking-widest font-black">
                {!isCompleted ? "Waiting for Opponent" : "Match Completed"}
             </p>
          </div>
@@ -79,7 +79,7 @@ export const GameOverView = ({
                   username={myUsername}
                   className="w-10 h-10 rounded-full"
                />
-               <p className="text-[10px] text-gray-500 font-black uppercase">You</p>
+               <p className="text-[10px] text-white/40 font-black uppercase">You</p>
                <p className="text-2xl font-black text-white">{myScore} pts</p>
             </div>
             <div className="border-l border-white/10 flex flex-col items-center justify-center gap-1.5">
@@ -88,7 +88,7 @@ export const GameOverView = ({
                   username={opponentName}
                   className="w-10 h-10 rounded-full"
                />
-               <p className="text-[10px] text-gray-500 font-black uppercase">{opponentName}</p>
+               <p className="text-[10px] text-white/40 font-black uppercase">{opponentName}</p>
                <p className="text-2xl font-black text-white">{oppScore} pts</p>
             </div>
          </div>
@@ -99,7 +99,7 @@ export const GameOverView = ({
                {!isCompleted ? "Rating & XP will calculate upon completion" : `Rating Change: ${isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}`}
             </p>
             {isCompleted && (
-               <p className="text-[10px] text-gray-400 uppercase font-black">
+               <p className="text-[10px] text-white/60 uppercase font-black">
                   Earned: +{50 + (isWinner ? 100 : 0) + ((myAnswers || []).filter((a: any) => a.correct).length * 10)} XP
                </p>
             )}
@@ -109,7 +109,7 @@ export const GameOverView = ({
          <div className="grid grid-cols-2 gap-3">
             <button
                onClick={() => setView("menu")}
-               className="bg-indigo-500 hover:bg-indigo-500/90 text-black font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
+               className="bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-[0_4px_20px_rgba(232,81,81,0.3)] cursor-pointer hover:scale-102 active:scale-98 transition-all animate-pulse"
             >
                Play Again
             </button>
@@ -124,7 +124,7 @@ export const GameOverView = ({
          {/* Round Breakdown */}
          {questions && questions.length > 0 && (
             <div className="space-y-4 bg-white/5 border border-white/10 rounded-2xl p-4 mt-2">
-               <h3 className="text-xs font-black uppercase text-gray-400 tracking-wider border-b border-white/10 pb-2 text-left">
+               <h3 className="text-xs text-white/60 tracking-wider border-b border-white/10 pb-2 text-left font-black uppercase">
                   Round Breakdown
                </h3>
                <div className="divide-y divide-white/5">
@@ -138,12 +138,12 @@ export const GameOverView = ({
                      return (
                         <div key={idx} className="py-3 first:pt-0 last:pb-0 space-y-2 text-left">
                            <div className="flex justify-between items-baseline">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase">Round {idx + 1}</span>
-                              <span className="text-[9px] text-gray-500 font-bold uppercase">{q.type.replace("_", " ")}</span>
+                              <span className="text-[10px] font-black text-[#E85151] uppercase">Round {idx + 1}</span>
+                              <span className="text-[9px] text-white/40 font-bold uppercase">{q.type.replace("_", " ")}</span>
                            </div>
                            <p className="text-xs font-bold text-white leading-relaxed">{q.prompt}</p>
                            {q.subPrompt && (
-                              <p className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded inline-block">
+                              <p className="text-[10px] text-white/60 bg-white/5 px-2 py-0.5 rounded inline-block">
                                  {q.subPrompt}
                               </p>
                            )}
@@ -165,7 +165,7 @@ export const GameOverView = ({
                                     <div
                                        key={i}
                                        className={`rounded-lg overflow-hidden border ${q.choices[i] === q.answer
-                                             ? "border-indigo-500 ring-1 ring-indigo-500"
+                                             ? "border-green-500 ring-1 ring-green-500"
                                              : "border-white/10"
                                           } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
                                     >
@@ -179,28 +179,28 @@ export const GameOverView = ({
                                  ))}
                               </div>
                            )}
-                           <p className="text-[10px] text-gray-400 mt-1">
-                              Correct Answer: <span className="text-indigo-400 font-extrabold">{q.answer}</span>
+                           <p className="text-[10px] text-white/40 mt-1">
+                              Correct Answer: <span className="text-green-500 font-extrabold">{q.answer}</span>
                            </p>
                            {q.explanation && (
-                              <p className="text-[10px] text-gray-300 bg-white/5 px-2 py-1 rounded italic mt-1 leading-relaxed">
+                              <p className="text-[10px] text-white/80 bg-white/5 px-2 py-1 rounded italic mt-1 leading-relaxed">
                                  💡 {q.explanation}
                               </p>
                            )}
                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
-                                 <p className="font-black text-gray-500 uppercase">You</p>
+                                 <p className="font-black text-white/40 uppercase">You</p>
                                  <p className="font-bold text-white truncate">
-                                    Played: <span className={myAns?.correct ? "text-indigo-400" : "text-red-400"}>{myAns?.choice || "No Answer"}</span>
+                                    Played: <span className={myAns?.correct ? "text-green-500" : "text-red-400"}>{myAns?.choice || "No Answer"}</span>
                                  </p>
-                                 <p className="text-gray-400 font-black">+{myAns?.points || 0} pts ({myAns?.time_taken || 0}s)</p>
+                                 <p className="text-white/60 font-black">+{myAns?.points || 0} pts ({myAns?.time_taken || 0}s)</p>
                               </div>
                               <div className="bg-white/5 p-2 rounded-lg space-y-0.5 border border-white/5">
-                                 <p className="font-black text-gray-500 uppercase">{opponentName}</p>
+                                 <p className="font-black text-white/40 uppercase">{opponentName}</p>
                                  <p className="font-bold text-white truncate">
-                                    Played: <span className={oppAns?.correct ? "text-indigo-400" : "text-red-400"}>{oppAns?.choice || "No Answer"}</span>
+                                    Played: <span className={oppAns?.correct ? "text-green-500" : "text-red-400"}>{oppAns?.choice || "No Answer"}</span>
                                  </p>
-                                 <p className="text-gray-400 font-black">+{oppAns?.points || 0} pts ({oppAns?.time_taken || 0}s)</p>
+                                 <p className="text-white/60 font-black">+{oppAns?.points || 0} pts ({oppAns?.time_taken || 0}s)</p>
                               </div>
                            </div>
                         </div>
