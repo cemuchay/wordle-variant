@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
    Radio, Shield, Play, HelpCircle, ChevronDown, ChevronUp,
    Clock, Flame, Swords, Search, UserPlus, Loader2, Trophy,
-    Volume2, VolumeX
+    Volume2, VolumeX, Home
 } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents } from "../shared/categorySelectConstants";
@@ -221,6 +221,15 @@ export const UnifiedLobby = ({
          {/* Header */}
          <div className="flex items-center justify-between px-4 pb-2 border-b border-white/5 shrink-0">
             <div className="flex items-center gap-2">
+               {onBackToClassic && (
+                  <button
+                     onClick={onBackToClassic}
+                     className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                     title="Back to Classic"
+                  >
+                     <Home size={14} />
+                  </button>
+               )}
                <div className="w-7 h-7 rounded-xl bg-[#ff4b5c] flex items-center justify-center text-white shadow-md shadow-[#ff4b5c]/35">
                   <Play size={14} fill="white" />
                </div>
