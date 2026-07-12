@@ -464,14 +464,14 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                 <GameOverView
                    matchData={matchData}
                    setView={(newView) => {
-                      if (newView === "menu") { resetGame(); onBack?.(); }
-                      else if (newView === "matchmaking") {
-                        engineCleanupRef.current?.();
-                        resetGame();
-                        setView("connecting");
-                        startMatchmaking();
-                     }
-                  }}
+                       if (newView === "menu") { resetGame(); onBack?.(); }
+                       else if (newView === "matchmaking" || newView === "playbot") {
+                         engineCleanupRef.current?.();
+                         resetGame();
+                         setView("connecting");
+                         startMatchmaking(newView === "playbot");
+                      }
+                   }}
                   role={role} rematchState={rematchState} rematchCountdown={rematchCountdown}
                   showRematchButton={showRematchButton} sendRematch={sendRematch}
                   acceptRematch={() => acceptRematch(onMatchFound)}

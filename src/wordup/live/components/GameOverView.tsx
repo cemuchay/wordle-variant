@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
-import { Award } from "lucide-react";
+import { Award, Cpu } from "lucide-react";
 import { useLiveStore } from "../store/useLiveStore";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
@@ -9,7 +9,7 @@ import { useApp } from "../../../context/AppContext";
 
 interface GameOverViewProps {
    matchData: any;
-   setView: (view: "menu" | "matchmaking") => void;
+   setView: (view: "menu" | "matchmaking" | "playbot") => void;
    role: "player1" | "player2" | null;
    rematchState: "idle" | "sent" | "received" | "expired";
    rematchCountdown: number;
@@ -159,12 +159,19 @@ export const GameOverView = ({
                 Play Again
              </button>
              <button
-                onClick={() => setView("menu")}
-                className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
+                onClick={() => setView("playbot")}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all"
              >
-                Return to Lobby
+                <Cpu size={16} className="stroke-3" />
+                <span>Practice vs Bot</span>
              </button>
           </div>
+          <button
+             onClick={() => setView("menu")}
+             className="w-full bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
+          >
+             Return to Lobby
+          </button>
 
          {/* Round Breakdown */}
          {questions && questions.length > 0 && (
