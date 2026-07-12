@@ -138,12 +138,16 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     const extraWidth = maxAttempts > 6 ? 32 : 0;
 
     const usableWidth = maxGridWidth - padding - extraWidth;
-    const usableHeight = maxGridHeight - padding;
 
-    const cellWidthLimit = (usableWidth - (wordLength - 1) * gapSize) / wordLength;
-    const cellHeightLimit = (usableHeight - (maxAttempts - 1) * gapSize) / maxAttempts;
+    const cellWidthLimit = Math.max(20, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
 
-    cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
+    if (maxAttempts > 6) {
+      cellSizePx = Math.floor(cellWidthLimit);
+    } else {
+      const usableHeight = maxGridHeight - padding;
+      const cellHeightLimit = (usableHeight - (maxAttempts - 1) * gapSize) / maxAttempts;
+      cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
+    }
 
     // On desktop in challenge mode, apply the 85% resize scale
     const isChallenge = gameplayType === 'challenge' || compact;

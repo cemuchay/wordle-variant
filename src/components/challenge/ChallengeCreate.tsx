@@ -917,6 +917,39 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         validate();
     }, [length, marathonGames, isCustomWord, customWord, customMarathonWords, customSentence, isHandicap, handicapMode, handicapStarter, handicapStartersArray, editingChallenge, isBotMarathon, lifespanHours]);
 
+    const resetAllFormState = useCallback(() => {
+        setStep(0);
+        setActiveTooltip(null);
+        setErrors([]);
+        setMarathonForceOrder(false);
+        setMarathonType('standard');
+        setSentenceWordCount(5);
+        setCustomSentence('');
+        setMarathonGames([3, 4, 5, 6, 7]);
+        setGlobalDifficulty('normal');
+        setMarathonDifficultyMode('uniform');
+        setMarathonDifficulties([]);
+        setIsPublic(false);
+        setMaxParticipants(10);
+        setMaxParticipantsInput("10");
+        setLifespanHours(24);
+        setNotifyCreator(false);
+        setIsCustomWord(false);
+        setCustomWord('');
+        setCustomMarathonWords(Array(5).fill(''));
+        setTimerType('same');
+        setMarathonTimersArray([3, 5, 5, 10, 10]);
+        setMarathonTimersInput(['3', '5', '5', '10', '10']);
+        setIsBotMarathon(false);
+        setIsHandicap(false);
+        setDisableHints(false);
+        setIsShapeshifter(false);
+        setHandicapMode('random');
+        setHandicapEnforced(false);
+        setHandicapStarter('');
+        setHandicapStartersArray(Array(5).fill(''));
+    }, []);
+
     const handleCreateTrigger = useCallback(async () => {
         if (errors.length > 0) return;
 
@@ -993,11 +1026,13 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         } else {
             await handleCreate(customParams, true);
         }
+
+        resetAllFormState();
         
         if (onSuccess) {
             onSuccess();
         }
-    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties, notifyCreator]);
+    }, [errors, isPublic, maxParticipants, isCustomWord, customWord, customMarathonWords, customSentence, sentenceWordCount, isHandicap, handicapEnforced, handicapMode, handicapStarter, handicapStartersArray, lifespanHours, length, handleCreate, handleEdit, mode, timerType, marathonTimersArray, marathonGames, marathonForceOrder, onSuccess, editingChallenge, invitedIds, ask, isShapeshifter, isBotMarathon, disableHints, globalDifficulty, marathonDifficultyMode, marathonDifficulties, notifyCreator, resetAllFormState]);
 
     const summarySettings = useMemo((): ChallengeFormSettings => ({
         mode,

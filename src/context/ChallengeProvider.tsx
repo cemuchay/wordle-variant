@@ -601,7 +601,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         } finally {
             setBootstrappingMessage(null);
         }
-    }, [mode, length, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast, refetchChallenges]);
+    }, [mode, length, maxAttempts, maxTime, invitedIds, effectiveUser, createMutation, availableProfiles, onChallengeCreated, resetForm, handleViewChallenge, triggerToast, refetchChallenges]);
 
     const handleEdit = useCallback(async (challengeId: string, params: any) => {
         try {

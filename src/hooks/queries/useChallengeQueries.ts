@@ -454,12 +454,13 @@ export const useChallengeMutations = () => {
    const queryClient = useQueryClient();
 
    const createChallenge = useMutation({
-      mutationFn: async ({
-         creatorId,
-         mode,
-         length,
-         maxTime,
-         invitedIds,
+       mutationFn: async ({
+          creatorId,
+          mode,
+          length,
+          max_attempts,
+          maxTime,
+          invitedIds,
          isPublic = false,
          maxParticipants = null,
          isCustomWord = false,
@@ -639,11 +640,12 @@ export const useChallengeMutations = () => {
             .insert([
                {
                   creator_id: creatorId,
-                  mode,
-                  word_length: actualLength,
-                  target_word: targetWord,
-                  salt: salt,
-                  max_time: maxTime,
+                   mode,
+                   word_length: actualLength,
+                   target_word: targetWord,
+                   salt: salt,
+                   max_attempts: max_attempts ?? 6,
+                   max_time: maxTime,
                   expires_at: expiresAt.toISOString(),
                   is_public: isPublic,
                   max_participants: maxParticipants,
