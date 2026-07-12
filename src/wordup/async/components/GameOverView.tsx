@@ -4,6 +4,8 @@ import { Award } from "lucide-react";
 import { useAsyncStore } from "../store/useAsyncStore";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
+import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
+import { useApp } from "../../../context/AppContext";
 
 interface GameOverViewProps {
    matchData: any;
@@ -16,10 +18,19 @@ export const GameOverView = ({
    setView,
    role,
 }: GameOverViewProps) => {
+   const questions = useAsyncStore((s) => s.questions);
+   const { profile: myProfile } = useApp();
+   const opponentStats = useAsyncStore((s) => s.opponentStats);
+
    if (!matchData) return null;
 
-   // eslint-disable-next-line react-hooks/rules-of-hooks
-   const questions = useAsyncStore((s) => s.questions);
+   const guestId = localStorage.getItem("wordle_anon_id");
+   const myAvatarUrl = myProfile?.avatar_url || (guestId ? `https://api.dicebear.com/7.x/bottts/svg?seed=${guestId}` : undefined);
+   const myUsername = myProfile?.username || localStorage.getItem("wordle_anon_username") || "You";
+
+   const opponentAvatarUrl = (matchData.is_bot_match
+      ? `https://api.dicebear.com/7.x/bottts/svg?seed=${matchData.bot_profile || "average"}`
+      : opponentStats?.avatar_url) ?? undefined;
 
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
@@ -62,11 +73,21 @@ export const GameOverView = ({
 
          {/* Side-by-Side Scores */}
          <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-            <div>
+            <div className="flex flex-col items-center justify-center gap-1.5">
+               <ProtectedAvatar
+                  src={myAvatarUrl}
+                  username={myUsername}
+                  className="w-10 h-10 rounded-full"
+               />
                <p className="text-[10px] text-gray-500 font-black uppercase">You</p>
                <p className="text-2xl font-black text-white">{myScore} pts</p>
             </div>
-            <div className="border-l border-white/10">
+            <div className="border-l border-white/10 flex flex-col items-center justify-center gap-1.5">
+               <ProtectedAvatar
+                  src={opponentAvatarUrl}
+                  username={opponentName}
+                  className="w-10 h-10 rounded-full"
+               />
                <p className="text-[10px] text-gray-500 font-black uppercase">{opponentName}</p>
                <p className="text-2xl font-black text-white">{oppScore} pts</p>
             </div>

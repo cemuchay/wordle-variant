@@ -149,7 +149,7 @@ export const useWordUpMatchmaking = (
       matchmakingChannelRef.current = channel;
    }, [user, cleanUpMatchmaking, onMatchFound]);
 
-   const startMatchmaking = useCallback(async () => {
+   const startMatchmaking = useCallback(async (vsBotOnly = false) => {
       if (isStartingRef.current) {
          console.warn(
             "Matchmaking request already in progress, ignoring duplicate request.",
@@ -163,6 +163,15 @@ export const useWordUpMatchmaking = (
 
       isStartingRef.current = true;
       cleanUpMatchmaking();
+
+      if (vsBotOnly) {
+         try {
+            await triggerBotFallback();
+         } finally {
+            isStartingRef.current = false;
+         }
+         return;
+      }
 
       try {
          const result = await wordupNetworkGate.enqueue(

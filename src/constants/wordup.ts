@@ -61,10 +61,19 @@ export const WORDUP_GAME = {
 export const BOT_PROFILES_RATINGS: Record<string, number> = {
    impossible: 2200,
    master: 1800,
-   expert: 1400,
-   gold: 1400,
+   naija_flash: 1650,
+   eko_flash: 1450,
+   fast: 1400,
+   ogbonge_mind: 1350,
+   agbada_mode: 1200,
+   okada_rider: 1150,
+   jollof_brain: 1100,
+   pepper_soup: 1050,
+   lagos_boy: 1000,
    average: 1000,
+   suya_thinker: 950,
    slow_thinker: 800,
+   street_king: 700,
 } as const;
 
 /** Timeout and interval durations for WordUp match flow. */

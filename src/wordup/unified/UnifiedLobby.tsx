@@ -26,7 +26,7 @@ interface UnifiedLobbyProps {
    onSelectHistoryMatch?: (match: any) => void;
    soundEnabled: boolean;
    onToggleSound: () => void;
-   onPlayLive: (catId: string) => void;
+   onPlayLive: (catId: string, vsBot?: boolean) => void;
    onPlayAsync: (targetUser: any, catId: string) => void;
    onPlayAsyncTurn: (match: any) => void;
    pendingMatches: any[];
@@ -73,7 +73,9 @@ export const UnifiedLobby = ({
    const [playerSearch, setPlayerSearch] = useState("");
 
    useEffect(() => {
-      setRecentCategoryIds(loadRecents());
+      Promise.resolve().then(() => {
+         setRecentCategoryIds(loadRecents());
+      });
    }, [selectedCategoryId]);
 
    const fetchHistory = useCallback(async () => {
@@ -115,7 +117,11 @@ export const UnifiedLobby = ({
    }, [currentUser]);
 
    useEffect(() => {
-      if (activeTab === "history") fetchHistory();
+      if (activeTab === "history") {
+         Promise.resolve().then(() => {
+            fetchHistory();
+         });
+      }
    }, [activeTab, fetchHistory]);
 
    const allHistory = [...(historyMatches || []), ...(asyncHistoryMatches || [])]
@@ -130,8 +136,9 @@ export const UnifiedLobby = ({
             userStats={userStats}
             getRankColor={getRankColor}
             allProfiles={allProfiles}
-            onPlayLive={() => onPlayLive(selectedCategoryId)}
+            onPlayLive={() => onPlayLive(selectedCategoryId, false)}
             onChallengePlayer={(targetUser) => onPlayAsync(targetUser, selectedCategoryId)}
+            onPlayBot={() => onPlayLive(selectedCategoryId, true)}
          />
       );
    }

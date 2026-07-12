@@ -288,6 +288,12 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       }
    }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
 
+   useEffect(() => {
+      if (view === "menu" && !pendingChallengePlayer) {
+         onBack?.();
+      }
+   }, [view, pendingChallengePlayer, onBack]);
+
    // Load pending and history matches
    const refreshPending = useCallback(async () => {
       setIsLoadingData(true);

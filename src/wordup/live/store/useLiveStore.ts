@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import { type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { type ProfileStats } from "../../shared/types";
@@ -31,6 +32,7 @@ interface LiveState {
     opponentChoice: string | null;
     revealAnswers: boolean;
     autoStartMatchmaking: boolean;
+    vsBotOnly: boolean;
 
     setIsBattlePlaying: (playing: boolean) => void;
    setView: (view: "menu" | "connecting" | "matchmaking" | "countdown" | "battle" | "gameover" | "loading") => void;
@@ -49,6 +51,7 @@ interface LiveState {
     setRevealAnswers: (reveal: boolean) => void;
    setActiveTab: (tab: LiveTab) => void;
    setAutoStartMatchmaking: (val: boolean) => void;
+   setVsBotOnly: (val: boolean) => void;
    resetGame: () => void;
 }
 
@@ -70,6 +73,7 @@ export const useLiveStore = create<LiveState>((set) => ({
     opponentChoice: null,
     revealAnswers: false,
     autoStartMatchmaking: false,
+    vsBotOnly: false,
 
    setIsBattlePlaying: (playing) => set({ isBattlePlaying: playing }),
    setView: (view) => set({ view }),
@@ -98,6 +102,7 @@ export const useLiveStore = create<LiveState>((set) => ({
       set({ activeTab });
    },
    setAutoStartMatchmaking: (autoStartMatchmaking) => set({ autoStartMatchmaking }),
+   setVsBotOnly: (vsBotOnly) => set({ vsBotOnly }),
    resetGame: () => {
       safeLocalStorage.removeItem("wordup_active_game");
       const state = useLiveStore.getState();
@@ -117,6 +122,7 @@ export const useLiveStore = create<LiveState>((set) => ({
           opponentChoice: null,
           revealAnswers: false,
           autoStartMatchmaking: false,
+          vsBotOnly: false,
       });
    },
 }));

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
 import { LiveView } from "./live";
 import { AsyncView } from "./async";
@@ -50,16 +51,19 @@ export const WordUpContainer = ({
    }, [effectiveUser, loadPendingMatches]);
 
    useEffect(() => {
-      refreshPending();
+      Promise.resolve().then(() => {
+         refreshPending();
+      });
    }, [effectiveUser?.id, refreshPending]);
 
     // Bridge: Play Live Match from Unified Lobby
-    const handlePlayLive = useCallback((catId: string) => {
+    const handlePlayLive = useCallback((catId: string, vsBot = false) => {
        setLastCategory(catId);
        useLiveStore.getState().setCategory(catId);
        useLiveStore.getState().resetGame();
        useLiveStore.getState().setView("connecting");
-       useLiveStore.getState().setAutoStartMatchmaking(true);
+       useLiveStore.getState().setAutoStartMatchmaking(!vsBot);
+       useLiveStore.getState().setVsBotOnly(vsBot);
        setWordupMode("live");
     }, [setWordupMode]);
 

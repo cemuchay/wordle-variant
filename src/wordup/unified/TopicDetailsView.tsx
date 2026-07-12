@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users } from "lucide-react";
+import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Cpu } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
@@ -18,6 +18,7 @@ interface TopicDetailsViewProps {
    allProfiles: any[];
    onPlayLive: () => void;
    onChallengePlayer: (targetUser: any) => void;
+   onPlayBot: () => void;
 }
 
 export const TopicDetailsView = ({
@@ -29,6 +30,7 @@ export const TopicDetailsView = ({
    allProfiles,
    onPlayLive,
    onChallengePlayer,
+   onPlayBot,
 }: TopicDetailsViewProps) => {
    const [activeSection, setActiveSection] = useState<"play" | "rankings">("play");
    const [playerSearch, setPlayerSearch] = useState("");
@@ -39,7 +41,9 @@ export const TopicDetailsView = ({
       if (!currentUser || !categoryId) return;
 
       if (categoryId === "mixed") {
-         setCategoryStats(userStats);
+         Promise.resolve().then(() => {
+            setCategoryStats(userStats);
+         });
          return;
       }
 
@@ -175,6 +179,14 @@ export const TopicDetailsView = ({
                         >
                            <Swords size={18} className="stroke-3" />
                            <span>Play Live Match</span>
+                        </button>
+
+                        <button
+                           onClick={onPlayBot}
+                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                        >
+                           <Cpu size={18} className="stroke-3" />
+                           <span>Practice vs Bot</span>
                         </button>
 
                         <button

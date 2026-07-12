@@ -30,11 +30,11 @@ import {
     generateSecretKey,
     encryptQuestions,
     simulateBotResponse,
-    getRandomBotProfile,
 } from "../../../utils/wordupQuestionGenerator";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
+import { BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import type { WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import type { ProfileStats } from "../../shared/types";
@@ -52,6 +52,7 @@ interface EngineProps {
     triggerToast: (msg: string, dur?: number) => void;
     onGameOver: (match: Record<string, unknown>) => void;
     onRematchAccepted: (newMatchId: string, role: "player1" | "player2") => void;
+    userId?: string;
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────
@@ -781,19 +782,53 @@ export function useGameEngine(props: EngineProps) {
                     encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
                     encryptionKeyRef.current = fKey;
                 }
-                const bp = getRandomBotProfile();
+                let userRating = 600;
+                if (props.userId) {
+                    if (category === "mixed") {
+                        const { data } = await supabase
+                            .from("profiles")
+                            .select("rating")
+                            .eq("id", props.userId)
+                            .maybeSingle();
+                        if (data?.rating) userRating = data.rating;
+                    } else {
+                        const { data } = await supabase
+                            .from("wordup_category_profiles")
+                            .select("rating")
+                            .eq("user_id", props.userId)
+                            .eq("category", category)
+                            .maybeSingle();
+                        if (data?.rating) userRating = data.rating;
+                    }
+                }
+
+                const botKeys = Object.keys(BOT_PROFILES);
+                let closestBp = "average";
+                let minDiff = Infinity;
+                for (const key of botKeys) {
+                    const botRating = BOT_PROFILES_RATINGS[key] || 1000;
+                    const diff = Math.abs(botRating - userRating);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestBp = key;
+                    }
+                }
+
+                const bp = closestBp;
                 botProfileRef.current = bp;
                 const prof = BOT_PROFILES[bp];
+                const botRating = BOT_PROFILES_RATINGS[bp] || 1000;
+
                 oppStats = {
                     username: prof?.name || "Bot",
-                    avatar_url: undefined,
-                    rating: 600,
+                    avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${bp}`,
+                    rating: botRating,
                     xp: 0,
                     games_played: 0,
                     games_won: 0,
                     games_lost: 0,
                     games_tied: 0,
-                    rank_name: "Bronze",
+                    rank_name: botRating >= 1700 ? "Master" : botRating >= 1400 ? "Diamond" : botRating >= 1100 ? "Gold" : botRating >= 800 ? "Silver" : "Bronze",
                 };
             } else {
                 // ── Live match — load from Supabase ──
@@ -906,7 +941,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = ch;
             }
         },
-        [handleOpponentAnswer, onRematchAccepted],
+        [handleOpponentAnswer, onRematchAccepted, props.userId],
     );
 
     // ── Derive computed state shape for LiveView ─────────────────

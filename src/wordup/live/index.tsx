@@ -73,6 +73,12 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       wordupAudio.setEnabled(newVal);
    }, [soundEnabled]);
 
+   useEffect(() => {
+      if (view === "menu") {
+         onBack?.();
+      }
+   }, [view, onBack]);
+
    const matchDataFromStore = useLiveStore((s) => s.matchData);
    const gameType = !matchDataFromStore ? null
       : matchDataFromStore.game_type
@@ -202,6 +208,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
        triggerToast,
        onGameOver,
        onRematchAccepted,
+       userId: effectiveUser?.id,
     });
 
    const launchedMatchRef = useRef<string | null>(null);
@@ -298,19 +305,28 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
        };
     }, [resetGame]);
 
-    const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
-    const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
+     const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
+     const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
+     const vsBotOnly = useLiveStore((s) => s.vsBotOnly);
+     const setVsBotOnly = useLiveStore((s) => s.setVsBotOnly);
 
-    useEffect(() => {
-       if (autoStartMatchmaking && effectiveUser && (view === "menu" || view === "connecting")) {
-          setAutoStartMatchmaking(false);
-          if (view === "menu") {
-             resetGame();
-             setView("connecting");
-          }
-          startMatchmaking();
-       }
-    }, [autoStartMatchmaking, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking]);
+     useEffect(() => {
+        if (vsBotOnly && effectiveUser && (view === "menu" || view === "connecting")) {
+           setVsBotOnly(false);
+           if (view === "menu") {
+              resetGame();
+              setView("connecting");
+           }
+           startMatchmaking(true);
+        } else if (autoStartMatchmaking && effectiveUser && (view === "menu" || view === "connecting")) {
+           setAutoStartMatchmaking(false);
+           if (view === "menu") {
+              resetGame();
+              setView("connecting");
+           }
+           startMatchmaking(false);
+        }
+     }, [autoStartMatchmaking, vsBotOnly, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking, setVsBotOnly]);
 
    // Retry pending bot match saves on mount
    useEffect(() => {
@@ -326,7 +342,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   const remaining = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
                   safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(remaining.filter((m: any) => m.id !== record.id)));
                }
-            } catch {}
+             } catch {
+                // ignore
+             }
          }
       })();
       return () => { cancelled = true; };
