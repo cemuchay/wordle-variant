@@ -50,9 +50,9 @@ export const GameOverView = ({
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
 
-   const opponentName = matchData.is_bot_match
+   const opponentName = opponentStats?.username || (matchData.is_bot_match
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
-      : "Opponent";
+      : "Opponent");
 
    const statusColor = isWinner 
       ? "text-correct border-correct/20 bg-correct/10 shadow-[0_0_15px_rgba(46,204,113,0.1)]"

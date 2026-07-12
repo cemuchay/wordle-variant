@@ -41,9 +41,9 @@ export const GameOverView = ({
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
 
-   const opponentName = matchData.is_bot_match
+   const opponentName = opponentStats?.username || (matchData.is_bot_match
       ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
-      : "Opponent";
+      : "Opponent");
 
    const statusColor = !isCompleted
       ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
