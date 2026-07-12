@@ -178,7 +178,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                      const newTopicRating = Math.max(RATING.FLOOR, startRating + eloGain);
                      const newTopicXp = startXp + xpReward;
 
-                     let topicRank = RANKS.BRONZE.NAME;
+                     let topicRank: string = RANKS.BRONZE.NAME;
                      if (newTopicRating >= RANKS.MASTER.THRESHOLD) topicRank = RANKS.MASTER.NAME;
                      else if (newTopicRating >= RANKS.DIAMOND.THRESHOLD) topicRank = RANKS.DIAMOND.NAME;
                      else if (newTopicRating >= RANKS.GOLD.THRESHOLD) topicRank = RANKS.GOLD.NAME;
