@@ -43,22 +43,34 @@ export const DynamicIslandStatus = () => {
     const toastTimerRef = useRef<number>(null);
     const prevMascotKeyRef = useRef<string>('');
     const mascotRainbowTimerRef = useRef<number>(null);
+    const isFirstRender = useRef(true);
 
     // Filter out the current user from the online count, cross-referencing with
     // freshly fetched profile last_seen_at to catch stale presence entries
-    const otherOnlineUsers = onlineUsers.filter(u => {
-        if (u.id === user?.id) return false;
-        const profile = allProfiles.find(p => p.id === u.id);
-        if (!profile?.last_seen_at) return true;
-        return Date.now() - new Date(profile.last_seen_at).getTime() < 120_000;
-    });
-    const [lastOnlineCount, setLastOnlineCount] = useState(otherOnlineUsers.length);
+    const [otherOnlineUsers, setOtherOnlineUsers] = useState<Array<{ id: string; username: string; avatar_url: string; activeVoiceRoomId?: string | null }>>([]);
+    const [lastOnlineCount, setLastOnlineCount] = useState(0);
+
+    useEffect(() => {
+        const filtered = onlineUsers.filter(u => {
+            if (u.id === user?.id) return false;
+            const profile = allProfiles.find(p => p.id === u.id);
+            if (!profile?.last_seen_at) return true;
+            return Date.now() - new Date(profile.last_seen_at).getTime() < 120_000;
+        });
+        Promise.resolve().then(() => {
+            setOtherOnlineUsers(filtered);
+        });
+    }, [onlineUsers, allProfiles, user?.id]);
 
     // Default persistent state
     const [localTime, setLocalTime] = useState("");
     const [resumeKey, setResumeKey] = useState(0);
-    const lastFetchRef = useRef(Date.now());
+    const lastFetchRef = useRef(0);
     const REFRESH_INTERVAL_MS = 60_000;
+
+    useEffect(() => {
+        lastFetchRef.current = Date.now();
+    }, []);
 
     // Force re-render on resume to fix PWA layout bugs + background refresh
     useEffect(() => {
@@ -173,6 +185,11 @@ export const DynamicIslandStatus = () => {
 
     // Trigger brief online notification when user count increases
     useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            setLastOnlineCount(otherOnlineUsers.length);
+            return;
+        }
         if (otherOnlineUsers.length > lastOnlineCount) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowOnlineNotification(true);

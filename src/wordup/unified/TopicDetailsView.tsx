@@ -89,7 +89,7 @@ export const TopicDetailsView = ({
    return (
       <div className="flex flex-col flex-1 bg-[#121212] text-white min-h-0 relative select-none">
          {/* Cover Header */}
-         <div className="relative pt-6 pb-8 px-6 bg-gradient-to-b from-[#ff4b5c]/20 via-[#181818]/60 to-[#121212] border-b border-white/5 flex flex-col items-center text-center">
+         <div className="relative pt-6 pb-8 px-6 bg-linear-to-b from-[#ff4b5c]/20 via-[#181818]/60 to-[#121212] border-b border-white/5 flex flex-col items-center text-center">
             {/* Back Button */}
             <button
                onClick={onBack}

@@ -1058,7 +1058,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         isBotMarathon,
         isEditing: !!editingChallenge,
         errorCount: errors.length,
-    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors, notifyCreator]);
+    }), [mode, length, maxAttempts, maxTime, marathonGames, marathonForceOrder, timerType, marathonTimersArray, invitedIds, isPublic, maxParticipants, lifespanHours, isCustomWord, customMarathonWords, isHandicap, handicapMode, handicapEnforced, isShapeshifter, disableHints, isBotMarathon, editingChallenge, errors]);
 
     const handleNextStep = useCallback(() => {
         setStep(s => Math.min(s + 1, 3));

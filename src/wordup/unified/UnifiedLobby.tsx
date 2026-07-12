@@ -293,7 +293,7 @@ export const UnifiedLobby = ({
                   >
                      {/* Profile summary card */}
                      {userStats && (
-                        <div className="relative overflow-hidden bg-gradient-to-r from-[#ff4b5c]/15 to-[#ff4b5c]/5 border border-[#ff4b5c]/20 rounded-2xl p-4 flex items-center justify-between shadow-md">
+                        <div className="relative overflow-hidden bg-linear-to-r from-[#ff4b5c]/15 to-[#ff4b5c]/5 border border-[#ff4b5c]/20 rounded-2xl p-4 flex items-center justify-between shadow-md">
                            <div className="flex items-center gap-3">
                               <div className="w-11 h-11 rounded-full border-2 border-[#ff4b5c] overflow-hidden flex items-center justify-center bg-black/40">
                                  <ProtectedAvatar

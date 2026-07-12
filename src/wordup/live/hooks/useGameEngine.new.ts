@@ -399,7 +399,9 @@ export function useGameEngine(props: EngineProps) {
     useEffect(() => {
         if (phase !== "countdown") return;
 
-        setCountdownText("3");
+        Promise.resolve().then(() => {
+            setCountdownText("3");
+        });
         wordupAudio.playCountdownTick(3);
         let count = 3;
 

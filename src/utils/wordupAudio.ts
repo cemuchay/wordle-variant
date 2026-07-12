@@ -94,7 +94,7 @@ class WordUpAudioManager {
        o.stop(now + 0.1);
     }
 
-    public playCountdownTick(num: number) {
+    public playCountdownTick(_num: number) {
        if (!this.enabled) return;
        this.initContext();
        if (!this.ctx) return;

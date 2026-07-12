@@ -220,7 +220,7 @@ export const GameOverView = ({
                                            q.choices[i] === q.answer
                                               ? "border-correct ring-1 ring-correct"
                                               : "border-white/10"
-                                        } bg-slate-950/60 flex items-center justify-center aspect-[2/1]`}
+                                        } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
                                      >
                                         <img
                                            src={getCachedFlagUrl(code)}
