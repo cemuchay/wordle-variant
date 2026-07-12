@@ -6,6 +6,7 @@ import { useLiveStore } from "../store/useLiveStore";
 import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { WORDUP_TIMEOUT } from "../../../constants/wordup";
+import { wordupAudio } from "../../../utils/wordupAudio";
 
 export const useWordUpMatchmaking = (
    user: any,
@@ -208,6 +209,9 @@ export const useWordUpMatchmaking = (
                : WORDUP_TIMEOUT.MATCHMAKING;
             setCountdownSecs(Math.floor(matchmakingTimeout / 1000));
 
+            // Play initial matchmaking tick immediately
+            wordupAudio.playMatchmakingTick();
+
             matchmakingIntervalRef.current = window.setInterval(() => {
                const current = useLiveStore.getState().countdownSecs;
                if (current <= 1) {
@@ -219,6 +223,7 @@ export const useWordUpMatchmaking = (
                   triggerBotFallback();
                } else {
                   setCountdownSecs(current - 1);
+                  wordupAudio.playMatchmakingTick();
                }
             }, 1000);
 

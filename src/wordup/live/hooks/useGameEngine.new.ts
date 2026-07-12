@@ -23,6 +23,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useLiveStore } from "../store/useLiveStore";
+import { wordupAudio } from "../../../utils/wordupAudio";
 import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
     decryptMatchQuestions,
@@ -399,12 +400,14 @@ export function useGameEngine(props: EngineProps) {
         if (phase !== "countdown") return;
 
         setCountdownText("3");
+        wordupAudio.playCountdownTick(3);
         let count = 3;
 
         countdownRef.current = window.setInterval(() => {
             count--;
             if (count <= 0) {
                 stopCountdown();
+                wordupAudio.playGameStart();
 
                 // Start the first round
                 setCurrentRound(0);
@@ -420,6 +423,7 @@ export function useGameEngine(props: EngineProps) {
                 setPhase("playing");
             } else {
                 setCountdownText(String(count));
+                wordupAudio.playCountdownTick(count);
             }
         }, 1000);
 

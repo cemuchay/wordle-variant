@@ -54,25 +54,65 @@ class WordUpAudioManager {
       });
    }
 
-   public playGameStart() {
-      if (!this.enabled) return;
-      this.initContext();
-      if (!this.ctx) return;
+    public playGameStart() {
+       if (!this.enabled) return;
+       this.initContext();
+       if (!this.ctx) return;
 
-      const now = this.ctx.currentTime;
-      const g = this.ctx.createGain();
-      g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.2, now + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      g.connect(this.ctx.destination);
+       const now = this.ctx.currentTime;
+       const g = this.ctx.createGain();
+       g.gain.setValueAtTime(0, now);
+       g.gain.linearRampToValueAtTime(0.18, now + 0.02);
+       g.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+       g.connect(this.ctx.destination);
 
-      const o = this.ctx.createOscillator();
-      o.type = "triangle";
-      o.frequency.setValueAtTime(392.0, now);
-      o.connect(g);
-      o.start(now);
-      o.stop(now + 0.3);
-   }
+       const o = this.ctx.createOscillator();
+       o.type = "sine";
+       o.frequency.setValueAtTime(880.0, now); // C5 / E5 start chime
+       o.connect(g);
+       o.start(now);
+       o.stop(now + 0.5);
+    }
+
+    public playMatchmakingTick() {
+       if (!this.enabled) return;
+       this.initContext();
+       if (!this.ctx) return;
+
+       const now = this.ctx.currentTime;
+       const g = this.ctx.createGain();
+       g.gain.setValueAtTime(0, now);
+       g.gain.linearRampToValueAtTime(0.06, now + 0.01);
+       g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+       g.connect(this.ctx.destination);
+
+       const o = this.ctx.createOscillator();
+       o.type = "sine";
+       o.frequency.setValueAtTime(329.63, now); // Soft E4 beat
+       o.connect(g);
+       o.start(now);
+       o.stop(now + 0.1);
+    }
+
+    public playCountdownTick(num: number) {
+       if (!this.enabled) return;
+       this.initContext();
+       if (!this.ctx) return;
+
+       const now = this.ctx.currentTime;
+       const g = this.ctx.createGain();
+       g.gain.setValueAtTime(0, now);
+       g.gain.linearRampToValueAtTime(0.12, now + 0.01);
+       g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+       g.connect(this.ctx.destination);
+
+       const o = this.ctx.createOscillator();
+       o.type = "sine";
+       o.frequency.setValueAtTime(440.0, now); // A4 boop
+       o.connect(g);
+       o.start(now);
+       o.stop(now + 0.18);
+    }
 
    public playFinalRound() {
       if (!this.enabled) return;
