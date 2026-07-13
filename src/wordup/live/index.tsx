@@ -99,6 +99,14 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       const won = myScore > oppScore;
       const tied = myScore === oppScore;
 
+      if (won) {
+         wordupAudio.playVictory();
+      } else if (tied) {
+         wordupAudio.playDraw();
+      } else {
+         wordupAudio.playDefeat();
+      }
+
       const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
       const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
 

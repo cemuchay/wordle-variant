@@ -5,6 +5,8 @@ import { Swords, Trophy, Activity, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { BOT_PROFILES } from "../../utils/wordupQuestionGenerator";
+import { CATEGORIES } from "./constants";
+import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "./categorySelectConstants";
 
 interface VSPreviewProps {
    currentUser: any;
@@ -152,6 +154,9 @@ export const VSPreview = ({
       return "bg-white/20 text-white";
    };
 
+   const categoryObj = CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[0];
+   const catStyle = CATEGORY_STYLE_MAP[categoryObj.id] || DEFAULT_STYLE;
+
    return (
       <motion.div
          initial={{ opacity: 0 }}
@@ -159,6 +164,15 @@ export const VSPreview = ({
          exit={{ opacity: 0 }}
          className="flex flex-col flex-1 min-h-[460px] relative overflow-hidden bg-[#121212] select-none rounded-3xl border border-white/10"
       >
+         {/* Category Label Pill */}
+         <div className="pt-4 px-5 flex flex-col items-center z-10 shrink-0">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#E85151]">Match Category</span>
+            <div className="flex items-center gap-1.5 mt-1 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+               <span className="text-xs">{catStyle.emoji}</span>
+               <span className="text-xs font-black uppercase text-white tracking-wider">{categoryObj.name}</span>
+            </div>
+         </div>
+
          {/* Top Half: Player 1 (You) */}
          <div className="flex-1 flex flex-col items-center justify-center p-5 bg-linear-to-b from-[#E85151]/10 to-[#121212] relative">
             <motion.div
@@ -207,7 +221,7 @@ export const VSPreview = ({
 
          {/* Middle Splitter Badge */}
          <div className="relative h-12 flex items-center justify-center z-10">
-            <div className="absolute w-full h-[1px] bg-white/10" />
+            <div className="absolute w-full h-px bg-white/10" />
             <motion.div
                initial={{ scale: 0 }}
                animate={{ scale: 1 }}

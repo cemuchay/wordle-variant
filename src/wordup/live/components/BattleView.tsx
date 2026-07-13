@@ -17,6 +17,7 @@ import { CircularTimer } from "../../shared/CircularTimer";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { SignalBar } from "../../shared/SignalBar";
 import { GameStatusToast } from "../../shared/GameStatusToast";
+import { CATEGORIES } from "../../shared/constants";
 
 interface MatchData {
    p1_score?: number;
@@ -110,7 +111,6 @@ export const BattleView = ({
    const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);
 
    // Detect score changes and create +points popups
-   // eslint-disable-next-line react-hooks/rules-of-hooks
    useEffect(() => {
       if (myScore > prevMyScoreRef.current) {
          const diff = myScore - prevMyScoreRef.current;
@@ -132,6 +132,7 @@ export const BattleView = ({
 
    if (!activeQuestion) return null;
 
+   const categoryName = CATEGORIES.find(c => c.id === matchData?.category)?.name || matchData?.category?.replace(/_/g, " ") || "Trivia";
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
 
  
@@ -255,7 +256,7 @@ export const BattleView = ({
                     <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
                     <p className="text-base font-black text-white">{myScore} pts</p>
                  </div>
-                 {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as any} className="ml-1" />}
+                 {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
                  {scorePopups.filter((p) => p.side === "my").map((p) => (
                     <motion.span
                        key={p.id}
@@ -276,7 +277,7 @@ export const BattleView = ({
                     <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
                     <p className="text-base font-black text-white">{oppScore} pts</p>
                  </div>
-                 {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as any} className="ml-1" />}
+                 {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
                  {scorePopups.filter((p) => p.side === "opp").map((p) => (
                    <motion.span
                       key={p.id}
@@ -318,7 +319,16 @@ export const BattleView = ({
 
           {/* Question Container */}
           <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
-            <div className="text-center space-y-1 sm:space-y-2">
+            <div className="text-center space-y-1.5 sm:space-y-2">
+               <div className="flex items-center justify-center gap-1.5 shrink-0">
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/90">
+                     {categoryName}
+                  </span>
+                  <span className="text-white/20">•</span>
+                  <span className="text-[8px] font-black uppercase text-correct tracking-widest">
+                     Round {currentIdx + 1}/7
+                  </span>
+               </div>
                <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}

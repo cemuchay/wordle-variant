@@ -10,6 +10,7 @@ import { useAsyncMatchmaking } from "./async/hooks/useMatchmaking";
 import { useLiveStore } from "./live/store/useLiveStore";
 import { useAsyncStore } from "./async/store/useAsyncStore";
 import { decryptMatchQuestions } from "../utils/wordupQuestionGenerator";
+import { wordupAudio } from "../utils/wordupAudio";
 
 interface WordUpContainerProps {
    wordupMode: "live" | "async" | null;
@@ -40,8 +41,24 @@ export const WordUpContainer = ({
    const { loadPendingMatches } = useAsyncMatchmaking(effectiveUser, "mixed", triggerToast);
 
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
-   const [soundEnabled, setSoundEnabled] = useState(true);
+   const [soundEnabled, setSoundEnabled] = useState(() => wordupAudio.isEnabled());
    const [lastCategory, setLastCategory] = useState<string | null>(null);
+
+   useEffect(() => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const lastPromptDate = localStorage.getItem("wordup_sound_prompt_date");
+      const isSoundOff = !wordupAudio.isEnabled();
+      if (lastPromptDate !== todayStr && isSoundOff) {
+         localStorage.setItem("wordup_sound_prompt_date", todayStr);
+         const enable = window.confirm("Would you like to enable in-game sound effects for WordUp?");
+         if (enable) {
+            wordupAudio.setEnabled(true);
+            setSoundEnabled(true);
+         }
+      } else if (lastPromptDate !== todayStr) {
+         localStorage.setItem("wordup_sound_prompt_date", todayStr);
+      }
+   }, []);
 
    const refreshPending = useCallback(async () => {
       if (effectiveUser) {
@@ -132,7 +149,11 @@ export const WordUpContainer = ({
               currentUser={effectiveUser}
               onSelectHistoryMatch={handleSelectHistoryMatch}
               soundEnabled={soundEnabled}
-              onToggleSound={() => setSoundEnabled(!soundEnabled)}
+               onToggleSound={() => {
+                  const val = !soundEnabled;
+                  wordupAudio.setEnabled(val);
+                  setSoundEnabled(val);
+               }}
               onPlayLive={handlePlayLive}
               onPlayAsync={handlePlayAsync}
               onPlayAsyncTurn={handlePlayAsyncTurn}
