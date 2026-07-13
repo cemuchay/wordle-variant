@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
    Radio, Shield, Play, HelpCircle, ChevronDown, ChevronUp,
    Clock, Flame, Swords, Search, UserPlus, Loader2, Trophy,
-    Volume2, VolumeX, Home
+   Volume2, VolumeX, Home
 } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents } from "../shared/categorySelectConstants";
@@ -32,14 +32,14 @@ interface UnifiedLobbyProps {
    pendingMatches: any[];
    onRefreshPending: () => void;
    onBackToClassic?: () => void;
-    onTutorial?: () => void;
-    restoreCategory?: string | null;
+   onTutorial?: () => void;
+   restoreCategory?: string | null;
 }
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
    { id: "home", label: "Home", icon: <Play size={13} /> },
-   { id: "live", label: "Live", icon: <Radio size={13} /> },
-   { id: "async", label: "1v1", icon: <Shield size={13} /> },
+   // { id: "live", label: "Live", icon: <Radio size={13} /> },
+   // { id: "async", label: "1v1", icon: <Shield size={13} /> },
    { id: "rankings", label: "Rankings", icon: <Trophy size={13} /> },
    { id: "history", label: "History", icon: <Clock size={13} /> },
 ];
@@ -152,8 +152,12 @@ export const UnifiedLobby = ({
    const frequentCategories = recentCategoryIds
       .map(id => CATEGORIES.find(c => c.id === id))
       .filter((c): c is NonNullable<typeof c> => !!c);
-    const featuredCategories = CATEGORIES.filter((c) => c.featured);
-    const allCategories = CATEGORIES.filter((c) => !c.featured);
+   const featuredCategories = CATEGORIES.filter((c) => c.featured);
+   const extraFeatured = featuredCategories.slice(4);
+   const allCategories = [
+      ...CATEGORIES.filter((c) => !c.featured),
+      ...extraFeatured,
+   ];
 
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
       p.id !== currentUser?.id &&
@@ -270,11 +274,10 @@ export const UnifiedLobby = ({
                <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                     activeTab === tab.id
-                        ? "bg-[#E85151] text-white shadow-md shadow-[#E85151]/30"
-                        : "text-white/40 hover:text-white hover:bg-white/5"
-                  }`}
+                  className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${activeTab === tab.id
+                     ? "bg-[#E85151] text-white shadow-md shadow-[#E85151]/30"
+                     : "text-white/40 hover:text-white hover:bg-white/5"
+                     }`}
                >
                   {tab.icon}
                   <span>{tab.label}</span>
@@ -364,7 +367,7 @@ export const UnifiedLobby = ({
                                              </span>
                                           )}
                                        </div>
-                                     );
+                                    );
                                  }
 
                                  if (item.type === "completed_match") {
@@ -434,7 +437,7 @@ export const UnifiedLobby = ({
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (
                         <div className="space-y-2">
-                           <p className="text-[10px] font-black uppercase tracking-wider text-white/80">Frequently Played</p>
+                           <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
                            <div className="grid grid-cols-2 gap-2">
                               {frequentCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -465,7 +468,7 @@ export const UnifiedLobby = ({
                      {/* Featured Topics */}
                      {featuredCategories.length > 0 && (
                         <div className="space-y-2">
-                           <p className="text-[10px] font-black uppercase tracking-wider text-[#E85151]">Featured Topics</p>
+                           <p className="text-[12px] font-black uppercase tracking-wider text-[#E85151]">Featured Topics</p>
                            <div className="grid grid-cols-2 gap-2">
                               {featuredCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -495,7 +498,7 @@ export const UnifiedLobby = ({
 
                      {/* All Topics */}
                      <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-white/80">Topics</p>
+                        <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
                         <div className="grid grid-cols-2 gap-2">
                            {allCategories.map((cat) => {
                               const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;

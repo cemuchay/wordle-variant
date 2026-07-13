@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { safeLocalStorage } from "../../utils/storage";
 
 export const RECENTS_KEY = "wordup_recent_categories";
@@ -290,7 +289,13 @@ export const CATEGORY_STYLE_MAP: Record<
    },
 };
 
-export const DEFAULT_STYLE = {
+export const DEFAULT_STYLE: {
+   emoji: string;
+   gradient: string;
+   glow: string;
+   border: string;
+   svg?: string;
+} = {
    emoji: "💡",
    gradient: "from-slate-950/40 via-slate-900/30 to-slate-950/40",
    glow: "shadow-[0_0_15px_rgba(255,255,255,0.05)]",
