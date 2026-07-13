@@ -142,6 +142,8 @@ export function useGameEngine(props: EngineProps) {
     // Mutable mirrors of state so timer callbacks never read stale closures
     const myChoiceRef = useRef<string | null>(null);
     const opponentChoiceRef = useRef<string | null>(null);
+    const myTimeTakenRef = useRef<number>(0);
+    const opponentTimeTakenRef = useRef<number>(0);
     const currentRoundRef = useRef(0);
     const myScoreRef = useRef(0);
     const opponentScoreRef = useRef(0);
@@ -258,10 +260,12 @@ export function useGameEngine(props: EngineProps) {
         const p1Choice = isP1 ? myChoiceRef.current : opponentChoiceRef.current;
         const p1Correct = p1Choice === questionsRef.current[currentRoundRef.current]?.answer;
         const p1Points = isP1 ? myCurrentPointsRef.current : opponentCurrentPointsRef.current;
+        const p1Time = isP1 ? myTimeTakenRef.current : opponentTimeTakenRef.current;
 
         const p2Choice = isP1 ? opponentChoiceRef.current : myChoiceRef.current;
         const p2Correct = p2Choice === questionsRef.current[currentRoundRef.current]?.answer;
         const p2Points = isP1 ? opponentCurrentPointsRef.current : myCurrentPointsRef.current;
+        const p2Time = isP1 ? opponentTimeTakenRef.current : myTimeTakenRef.current;
 
         if (Array.isArray(p1Arr)) {
             p1Arr.push({
@@ -269,7 +273,7 @@ export function useGameEngine(props: EngineProps) {
                 choice: p1Choice,
                 correct: p1Correct,
                 points: p1Points,
-                time_taken: 0,
+                time_taken: p1Time,
             });
         }
         if (Array.isArray(p2Arr)) {
@@ -278,7 +282,7 @@ export function useGameEngine(props: EngineProps) {
                 choice: p2Choice,
                 correct: p2Correct,
                 points: p2Points,
-                time_taken: 0,
+                time_taken: p2Time,
             });
         }
 
@@ -312,10 +316,12 @@ export function useGameEngine(props: EngineProps) {
         const p1Choice = isP1 ? myChoiceRef.current : opponentChoiceRef.current;
         const p1Correct = p1Choice === questionsRef.current[currentRoundRef.current]?.answer;
         const p1Points = isP1 ? myCurrentPointsRef.current : opponentCurrentPointsRef.current;
+        const p1Time = isP1 ? myTimeTakenRef.current : opponentTimeTakenRef.current;
 
         const p2Choice = isP1 ? opponentChoiceRef.current : myChoiceRef.current;
         const p2Correct = p2Choice === questionsRef.current[currentRoundRef.current]?.answer;
         const p2Points = isP1 ? opponentCurrentPointsRef.current : myCurrentPointsRef.current;
+        const p2Time = isP1 ? opponentTimeTakenRef.current : myTimeTakenRef.current;
 
         if (Array.isArray(p1Arr)) {
             p1Arr.push({
@@ -323,7 +329,7 @@ export function useGameEngine(props: EngineProps) {
                 choice: p1Choice,
                 correct: p1Correct,
                 points: p1Points,
-                time_taken: 0,
+                time_taken: p1Time,
             });
         }
         if (Array.isArray(p2Arr)) {
@@ -332,7 +338,7 @@ export function useGameEngine(props: EngineProps) {
                 choice: p2Choice,
                 correct: p2Correct,
                 points: p2Points,
-                time_taken: 0,
+                time_taken: p2Time,
             });
         }
 
@@ -612,6 +618,7 @@ export function useGameEngine(props: EngineProps) {
         const correct = choice !== "" && choice === q.answer;
         const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
 
+        myTimeTakenRef.current = timeTaken;
         setMyChoice(choice);
         setMyCurrentPoints(pts);
 
@@ -647,6 +654,7 @@ export function useGameEngine(props: EngineProps) {
                 duration,
                 currentRoundRef.current === 6,
             );
+            opponentTimeTakenRef.current = br.time_taken;
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
@@ -664,6 +672,7 @@ export function useGameEngine(props: EngineProps) {
         const correct = choice === q?.answer;
         const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
 
+        opponentTimeTakenRef.current = timeTaken;
         setOpponentChoice(choice);
         setOpponentCurrentPoints(pts);
     }, []);

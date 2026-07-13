@@ -126,6 +126,18 @@ export const CATEGORIES = [
       // featured: true,
    },
    {
+      id: "bible",
+      name: "Bible",
+      desc: "Bible trivia. Test your knowledge of Old and New Testament stories, characters, and verses.",
+      featured: true,
+   },
+   {
+      id: "global-politics",
+      name: "Politics",
+      desc: "Global Politics trivia. Test your knowledge of political events and timelines",
+      featured: true,
+   },
+   {
       id: "history",
       name: "History",
       desc: "Historical events, ancient civilizations, world wars, and key figures",
