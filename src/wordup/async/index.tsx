@@ -100,6 +100,15 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          const oppScore = isP1 ? match.p2_score : match.p1_score;
          const won = myScore > oppScore;
          const tied = myScore === oppScore;
+
+         if (won) {
+            wordupAudio.playVictory();
+         } else if (tied) {
+            wordupAudio.playDraw();
+         } else {
+            wordupAudio.playDefeat();
+         }
+
          const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
          const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
          const xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
@@ -262,7 +271,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          setPendingChallenge({ matchId: mId, targetUser });
          setView("menu");
       }, 15000));
-   }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources]);
+   }, [effectiveUser, onlineUsers, category, createMatch, setView, setMatchId, setRole, startMatch, triggerToast, clearChallengeResources, resetGame]);
 
    // Hide global headers during battle
    useEffect(() => {
@@ -281,13 +290,15 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
    const pendingChallengePlayer = useAsyncStore((s) => s.pendingChallengePlayer);
    const setPendingChallengePlayer = useAsyncStore((s) => s.setPendingChallengePlayer);
 
-   useEffect(() => {
-      if (pendingChallengePlayer && effectiveUser && view === "menu") {
-         const player = pendingChallengePlayer;
-         setPendingChallengePlayer(null);
-         handleChallengePlayer(player);
-      }
-   }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
+    useEffect(() => {
+       if (pendingChallengePlayer && effectiveUser && view === "menu") {
+          const player = pendingChallengePlayer;
+          setTimeout(() => {
+             setPendingChallengePlayer(null);
+             handleChallengePlayer(player);
+          }, 0);
+       }
+    }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
 
    useEffect(() => {
       if (view === "menu" && !pendingChallengePlayer) {
@@ -376,7 +387,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       setCategory(match.category);
       setView("loading");
       startMatch?.(match.id, mRole);
-   }, [effectiveUser, setMatchId, setRole, setCategory, setView, startMatch]);
+   }, [effectiveUser, setMatchId, setRole, setCategory, setView, startMatch, resetGame]);
 
    // Auto-load match from notification click (pendingAsyncMatchId)
    const pendingAsyncMatchId = useAppStore((s) => s.pendingAsyncMatchId);

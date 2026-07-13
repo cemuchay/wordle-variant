@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useReducer, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { type RealtimeChannel } from "@supabase/supabase-js";
 import { fetchWithRetry } from "../../../utils/fetchWithRetry";
 import { wordupAudio } from "../../../utils/wordupAudio";
 import { decryptMatchQuestions } from "../../../utils/wordupQuestionGenerator";
@@ -14,6 +16,15 @@ import { gameEngineReducer, initialState } from "./useGameEngine.types";
 function getQuestionDuration(type: string): number {
    return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
 }
+
+const phaseToView: Record<string, string> = {
+   loading: "loading",
+   countdown: "countdown",
+   playing: "battle",
+   reveal: "battle",
+   gameover: "gameover",
+   turn_submitted: "turn_submitted",
+};
 
 interface EngineProps {
    gameType: "async";
@@ -54,27 +65,31 @@ export function useGameEngine(props: EngineProps) {
       roundStartedAt: 0,
    });
 
-   const channel = useRef<any>(null);
+   const channel = useRef<RealtimeChannel | null>(null);
    const launchedId = useRef<string | null>(null);
 
-   S.current.matchData = state.matchData;
-   S.current.questions = state.questions;
-   S.current.currentRound = state.currentRound;
-   S.current.revealAnswers = state.revealAnswers;
-   S.current.timeLeft = state.timeLeft;
-   S.current.role = role;
-   S.current.maxTime = state.maxTime;
+   useEffect(() => {
+      S.current.matchData = state.matchData;
+      S.current.questions = state.questions;
+      S.current.currentRound = state.currentRound;
+      S.current.revealAnswers = state.revealAnswers;
+      S.current.timeLeft = state.timeLeft;
+      S.current.role = role;
+      S.current.maxTime = state.maxTime;
+   }, [state.matchData, state.questions, state.currentRound, state.revealAnswers, state.timeLeft, role, state.maxTime]);
 
-   function clearT(name: keyof typeof T.current) {
+   const clearT = useCallback((name: keyof typeof T.current) => {
       const h = T.current[name];
       if (h === null) return;
       if (name === "roundInterval" || name === "countdownInterval") clearInterval(h);
       else clearTimeout(h);
       T.current[name] = null;
-   }
-   function clearAllT() {
+   }, []);
+
+   const clearAllT = useCallback(() => {
       for (const k of Object.keys(T.current) as (keyof typeof T.current)[]) clearT(k);
-   }
+      wordupAudio.stopFinalRoundBeat();
+   }, [clearT]);
 
    const cb = useRef({
       handleMatchUpdate: null as ((m: any) => void) | null,
@@ -83,15 +98,6 @@ export function useGameEngine(props: EngineProps) {
       endGame: null as ((m: any) => void) | null,
       startQuestionRound: null as ((m: any, idx: number) => void) | null,
    });
-
-   const phaseToView: Record<string, string> = {
-      loading: "loading",
-      countdown: "countdown",
-      playing: "battle",
-      reveal: "battle",
-      gameover: "gameover",
-      turn_submitted: "turn_submitted",
-   };
 
    useEffect(() => {
       const store = useAsyncStore.getState();
@@ -163,13 +169,16 @@ export function useGameEngine(props: EngineProps) {
          clearT("roundInterval");
          dispatch({ type: "REVEAL" });
          const nextIdx = merged.current_question_index + 1;
-         if (nextIdx === 6) triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+         if (nextIdx === 6) {
+            wordupAudio.playFinalRoundAnticipationStart();
+            triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+         }
       clearT("revealTimeout");
       T.current.revealTimeout = window.setTimeout(() => {
          G.current.isRevealing = false;
          clearT("revealTimeout");
          if (nextIdx >= WORDUP_GAME.TOTAL_ROUNDS) {
-            // All answered — persistTurn in handleAnswerSelect handles phase
+            // End of match
          } else if (nextIdx === 6) {
             dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
             clearT("lastRoundPopupTimeout");
@@ -177,6 +186,7 @@ export function useGameEngine(props: EngineProps) {
                dispatch({ type: "SET_LAST_ROUND_POPUP", show: false });
                clearT("lastRoundPopupTimeout");
                cb.current.advanceRound?.(merged.id, nextIdx);
+               wordupAudio.startFinalRoundBeat();
             }, 1500);
          } else {
             cb.current.advanceRound?.(merged.id, nextIdx);
@@ -184,70 +194,8 @@ export function useGameEngine(props: EngineProps) {
       }, nextIdx === 6 ? 3200 : 1800);
       }
    }, [triggerToast]);
-   cb.current.handleMatchUpdate = handleMatchUpdate;
 
-   const advanceRound = useCallback((_mId: string, nextIdx: number) => {
-      if (G.current.isAdvancing) return;
-      G.current.isAdvancing = true;
-      const isP1 = S.current.role === "player1";
-      const upd: any = {
-         ...S.current.matchData,
-         current_question_index: nextIdx,
-         [isP1 ? "p1_answered" : "p2_answered"]: false,
-      };
-      dispatch({ type: "SET_MATCH_DATA", data: upd });
-      cb.current.startQuestionRound?.(upd, nextIdx);
-      G.current.isAdvancing = false;
-   }, []);
-   cb.current.advanceRound = advanceRound;
 
-   const handleAnswerSelect = useCallback(async (choice: string) => {
-      if (G.current.isSubmitting || state.selectedAnswer !== null || state.revealAnswers || !matchId) return;
-      G.current.isSubmitting = true;
-      dispatch({ type: "ANSWER_SELECTED", answer: choice });
-      clearT("roundInterval");
-
-      const q = S.current.questions[S.current.currentRound];
-      const duration = q ? getQuestionDuration(q.type) : 30;
-      const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
-      const correct = choice === q?.answer;
-      let points = 0;
-      if (correct) {
-         const eff = Math.max(0, elapsed - 1.5);
-         const denom = duration - 1.5;
-         points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
-      }
-      if (S.current.currentRound === 6) points *= 2;
-      if (choice !== "") {
-         if (correct) wordupAudio.playCorrect(); else wordupAudio.playIncorrect();
-      }
-
-      const sub = { question_idx: S.current.currentRound, correct, time_taken: elapsed, points, choice };
-      const lm = S.current.matchData;
-      if (!lm) { G.current.isSubmitting = false; return; }
-
-      const isP1 = S.current.role === "player1";
-      const answers = [...((isP1 ? lm.p1_answers : lm.p2_answers) || [])];
-      answers.push(sub);
-      const ns = ((isP1 ? lm.p1_score : lm.p2_score) ?? 0) + points;
-      const upd = {
-         ...lm,
-         [isP1 ? "p1_answers" : "p2_answers"]: answers,
-         [isP1 ? "p1_answered" : "p2_answered"]: true,
-         [isP1 ? "p1_score" : "p2_score"]: ns,
-      };
-
-      cb.current.handleMatchUpdate?.(upd);
-
-      const myDone = answers.length >= WORDUP_GAME.TOTAL_ROUNDS;
-      if (myDone) {
-         await persistTurn(upd);
-      }
-      G.current.isSubmitting = false;
-   }, [matchId, state.selectedAnswer, state.revealAnswers]);
-   cb.current.handleAnswerSelect = handleAnswerSelect;
-
-   // ── Async turn persistence ────────────────────────────────────────────
    const persistTurn = useCallback(async (upd: any) => {
       const isP1 = S.current.role === "player1";
       const myA = isP1 ? upd.p1_answers : upd.p2_answers;
@@ -295,6 +243,66 @@ export function useGameEngine(props: EngineProps) {
       }
    }, [triggerToast, onGameOver]);
 
+   const advanceRound = useCallback((_mId: string, nextIdx: number) => {
+      if (G.current.isAdvancing) return;
+      G.current.isAdvancing = true;
+      const isP1 = S.current.role === "player1";
+      const upd: any = {
+         ...S.current.matchData,
+         current_question_index: nextIdx,
+         [isP1 ? "p1_answered" : "p2_answered"]: false,
+      };
+      dispatch({ type: "SET_MATCH_DATA", data: upd });
+      cb.current.startQuestionRound?.(upd, nextIdx);
+      G.current.isAdvancing = false;
+   }, []);
+
+
+   const handleAnswerSelect = useCallback(async (choice: string) => {
+      if (G.current.isSubmitting || state.selectedAnswer !== null || state.revealAnswers || !matchId) return;
+      G.current.isSubmitting = true;
+      dispatch({ type: "ANSWER_SELECTED", answer: choice });
+      clearT("roundInterval");
+
+      const q = S.current.questions[S.current.currentRound];
+      const duration = q ? getQuestionDuration(q.type) : 30;
+      const elapsed = parseFloat((duration - S.current.timeLeft).toFixed(2));
+      const correct = choice === q?.answer;
+      let points = 0;
+      if (correct) {
+         const eff = Math.max(0, elapsed - 1.5);
+         const denom = duration - 1.5;
+         points = Math.max(11, Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))));
+      }
+      if (S.current.currentRound === 6) points *= 2;
+      if (choice !== "") {
+         if (correct) wordupAudio.playCorrect(); else wordupAudio.playIncorrect();
+      }
+
+      const sub = { question_idx: S.current.currentRound, correct, time_taken: elapsed, points, choice };
+      const lm = S.current.matchData;
+      if (!lm) { G.current.isSubmitting = false; return; }
+
+      const isP1 = S.current.role === "player1";
+      const answers = [...((isP1 ? lm.p1_answers : lm.p2_answers) || [])];
+      answers.push(sub);
+      const ns = ((isP1 ? lm.p1_score : lm.p2_score) ?? 0) + points;
+      const upd = {
+         ...lm,
+         [isP1 ? "p1_answers" : "p2_answers"]: answers,
+         [isP1 ? "p1_answered" : "p2_answered"]: true,
+         [isP1 ? "p1_score" : "p2_score"]: ns,
+      };
+
+      cb.current.handleMatchUpdate?.(upd);
+
+      const myDone = answers.length >= WORDUP_GAME.TOTAL_ROUNDS;
+      if (myDone) {
+         await persistTurn(upd);
+      }
+      G.current.isSubmitting = false;
+   }, [matchId, state.selectedAnswer, state.revealAnswers, persistTurn]);
+
    const endGame = useCallback(async (match: any) => {
       if (G.current.isEnding) return;
       G.current.isEnding = true;
@@ -321,7 +329,7 @@ export function useGameEngine(props: EngineProps) {
       dispatch({ type: "SET_PHASE", phase: "gameover" });
       onGameOver(finalMatch);
    }, [triggerToast, onGameOver]);
-   cb.current.endGame = endGame;
+
 
    const startQuestionRound = useCallback((_match: any, index: number) => {
       if (S.current.currentRound >= index && T.current.roundInterval !== null) return;
@@ -341,7 +349,9 @@ export function useGameEngine(props: EngineProps) {
                const now = getSyncedNow();
                elapsed = Math.max(0, (now - parsed.roundStartedAt) / 1000);
             }
-         } catch {}
+         } catch {
+            // Ignore parse errors
+         }
       }
       const remaining = Math.max(0, duration - elapsed);
 
@@ -350,11 +360,12 @@ export function useGameEngine(props: EngineProps) {
       dispatch({ type: "HIDE_REVEAL" });
       G.current.isSubmitting = false;
 
-      if (index === 6) {
-         wordupAudio.playFinalRound();
-      } else if (index > 0) {
-         wordupAudio.playRoundTransition();
-      }
+       if (index === 6) {
+          wordupAudio.playFinalRound();
+          wordupAudio.startFinalRoundBeat();
+       } else if (index > 0) {
+          wordupAudio.playRoundTransition();
+       }
 
       const startTime = getSyncedNow() - (elapsed * 1000);
       S.current.roundStartedAt = startTime;
@@ -375,8 +386,8 @@ export function useGameEngine(props: EngineProps) {
              if (useAsyncStore.getState().selectedAnswer === null) { wordupAudio.playTimeUp(); cb.current.handleAnswerSelect?.(""); }
           }
       }, 50);
-   }, [getSyncedNow]);
-   cb.current.startQuestionRound = startQuestionRound;
+   }, [getSyncedNow, matchId]);
+
 
    const startCountdown = useCallback((match: any) => {
       clearT("countdownInterval");
@@ -394,7 +405,15 @@ export function useGameEngine(props: EngineProps) {
             dispatch({ type: "SET_COUNTDOWN_TEXT", text: String(c) });
          }
       }, 1000);
-   }, []);
+   }, [clearT]);
+
+   useEffect(() => {
+      cb.current.handleMatchUpdate = handleMatchUpdate;
+      cb.current.advanceRound = advanceRound;
+      cb.current.handleAnswerSelect = handleAnswerSelect;
+      cb.current.endGame = endGame;
+      cb.current.startQuestionRound = startQuestionRound;
+   }, [handleMatchUpdate, advanceRound, handleAnswerSelect, endGame, startQuestionRound]);
 
    // ══════════════════════════════════════════════════════════════════════
    // MATCH LOADING
@@ -506,7 +525,7 @@ export function useGameEngine(props: EngineProps) {
          dispatch({ type: "RESET" });
          useAsyncStore.getState().resetGame();
       }
-   }, [triggerToast, onGameOver]);
+   }, [triggerToast, onGameOver, getSyncedNow, startCountdown]);
 
    // ── Persist active game state ─────────────────────────────────────────
    useEffect(() => {
@@ -535,13 +554,13 @@ export function useGameEngine(props: EngineProps) {
       clearAllT();
       dispatch({ type: "RESET" });
       await loadMatch(mId, activeRole);
-   }, [loadMatch]);
+    }, [loadMatch, clearAllT]);
 
    const cleanup = useCallback(() => {
       clearAllT();
       if (channel.current) { supabase.removeChannel(channel.current); channel.current = null; }
       launchedId.current = null;
-   }, []);
+   }, [clearAllT]);
 
    const abortMatch = useCallback(() => {
       cleanup();

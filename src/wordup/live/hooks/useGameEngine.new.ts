@@ -237,6 +237,7 @@ export function useGameEngine(props: EngineProps) {
         stopOverall();
         stopBotTimer();
         stopRematchInterval();
+        wordupAudio.stopFinalRoundBeat();
     }, [stopCountdown, stopRoundTick, stopReveal, stopOverall, stopBotTimer, stopRematchInterval]);
 
     // ══════════════════════════════════════════════════════════════════
@@ -379,6 +380,7 @@ export function useGameEngine(props: EngineProps) {
             if (isLast) {
                 endGame();
             } else if (currentRoundRef.current === 5) {
+                wordupAudio.playFinalRoundAnticipationStart();
                 triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
                 setLastRoundPopup(true);
 
@@ -386,6 +388,7 @@ export function useGameEngine(props: EngineProps) {
                     revealRef.current = null;
                     setLastRoundPopup(false);
                     advanceRound();
+                    wordupAudio.startFinalRoundBeat();
                 }, 3000);
             } else {
                 advanceRound();
@@ -518,6 +521,7 @@ export function useGameEngine(props: EngineProps) {
         return () => {
             stopRoundTick();
             stopBotTimer();
+            wordupAudio.stopFinalRoundBeat();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, currentRound]);
@@ -900,6 +904,10 @@ export function useGameEngine(props: EngineProps) {
             matchDataRef.current = matchData;
             opponentStatsRef.current = oppStats;
             roleRef.current = activeRole;
+
+            useLiveStore.getState().setMatchData(matchData);
+            useLiveStore.getState().setOpponentStats(oppStats);
+            useLiveStore.getState().setQuestions(questions);
 
             // Reset scores and choices for new game
             setMyScore(0);

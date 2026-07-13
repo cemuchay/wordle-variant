@@ -3,6 +3,7 @@
 class WordUpAudioManager {
    private ctx: AudioContext | null = null;
    private enabled = false;
+   private finalRoundInterval: number | null = null;
 
    constructor() {
       const saved = localStorage.getItem("wordup_sound_enabled");
@@ -11,10 +12,12 @@ class WordUpAudioManager {
 
    private initContext() {
       if (!this.ctx) {
-         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-         this.ctx = new AudioCtx();
+         const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+         if (AudioCtx) {
+            this.ctx = new AudioCtx();
+         }
       }
-      if (this.ctx.state === "suspended") {
+      if (this.ctx && this.ctx.state === "suspended") {
          this.ctx.resume();
       }
    }
@@ -94,7 +97,8 @@ class WordUpAudioManager {
        o.stop(now + 0.1);
     }
 
-    public playCountdownTick(_num: number) {
+    public playCountdownTick(num?: number) {
+       void num;
        if (!this.enabled) return;
        this.initContext();
        if (!this.ctx) return;
@@ -226,6 +230,8 @@ class WordUpAudioManager {
          s.type = "sine";
          s.frequency.setValueAtTime(freq, t);
          s.connect(g);
+         s.start(t);
+         s.stop(t + 1.0);
 
          if (idx === 3) {
             const t2 = this.ctx.createOscillator();
@@ -240,10 +246,52 @@ class WordUpAudioManager {
             t2.start(t);
             t2.stop(t + 1.0);
          }
-
-         s.start(t);
-         s.stop(t + 1.0);
       });
+
+      // Synthesize crowd cheering noise
+      try {
+         const sampleRate = this.ctx.sampleRate;
+         const bufferSize = sampleRate * 2.5;
+         const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+         const data = buffer.getChannelData(0);
+         for (let i = 0; i < bufferSize; i++) {
+            const t = i / sampleRate;
+            let envelope = 0;
+            if (t < 0.3) {
+               envelope = t / 0.3;
+            } else if (t < 1.5) {
+               envelope = 1.0 - 0.2 * ((t - 0.3) / 1.2);
+            } else {
+               envelope = 0.8 * (1.0 - (t - 1.5) / 1.0);
+            }
+            const noise = Math.random() * 2 - 1;
+            const modulation = 1 + 0.25 * Math.sin(2 * Math.PI * 8 * t);
+            data[i] = noise * envelope * modulation * 0.12;
+         }
+
+         const noiseNode = this.ctx.createBufferSource();
+         noiseNode.buffer = buffer;
+
+         const filter = this.ctx.createBiquadFilter();
+         filter.type = "bandpass";
+         filter.frequency.setValueAtTime(1000, now);
+         filter.frequency.exponentialRampToValueAtTime(1500, now + 0.3);
+         filter.frequency.linearRampToValueAtTime(1200, now + 1.5);
+         filter.Q.setValueAtTime(1.5, now);
+
+         const filter2 = this.ctx.createBiquadFilter();
+         filter2.type = "highpass";
+         filter2.frequency.setValueAtTime(400, now);
+
+         noiseNode.connect(filter);
+         filter.connect(filter2);
+         filter2.connect(this.ctx.destination);
+
+         noiseNode.start(now);
+         noiseNode.stop(now + 2.5);
+      } catch (e) {
+         console.warn("Victory cheers synthesis failed:", e);
+      }
    }
 
    public playDefeat() {
@@ -269,6 +317,111 @@ class WordUpAudioManager {
          o.start(t);
          o.stop(t + 1.2);
       });
+   }
+
+   public playDraw() {
+      if (!this.enabled) return;
+      this.initContext();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const notes = [392.0, 440.0, 392.0];
+      notes.forEach((freq, idx) => {
+         if (!this.ctx) return;
+         const t = now + idx * 0.15;
+         const g = this.ctx.createGain();
+         g.gain.setValueAtTime(0, t);
+         g.gain.linearRampToValueAtTime(0.12, t + 0.03);
+         g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+         g.connect(this.ctx.destination);
+
+         const o = this.ctx.createOscillator();
+         o.type = "sine";
+         o.frequency.setValueAtTime(freq, t);
+         o.connect(g);
+         o.start(t);
+         o.stop(t + 0.6);
+      });
+   }
+
+   public playFinalRoundAnticipationStart() {
+      if (!this.enabled) return;
+      this.initContext();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const notes = [220.0, 277.18, 329.63, 440.0];
+      notes.forEach((freq, idx) => {
+         if (!this.ctx) return;
+         const t = now + idx * 0.08;
+         const g = this.ctx.createGain();
+         g.gain.setValueAtTime(0, t);
+         g.gain.linearRampToValueAtTime(0.15, t + 0.04);
+         g.gain.setValueAtTime(0.15, t + 0.3);
+         g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+         g.connect(this.ctx.destination);
+
+         const o = this.ctx.createOscillator();
+         o.type = "sawtooth";
+         o.frequency.setValueAtTime(freq, t);
+         o.connect(g);
+         o.start(t);
+         o.stop(t + 0.9);
+      });
+   }
+
+   public startFinalRoundBeat() {
+      if (!this.enabled) return;
+      this.initContext();
+      if (!this.ctx) return;
+
+      this.stopFinalRoundBeat();
+
+      let step = 0;
+      const bassNotes = [110.0, 110.0, 130.81, 146.83];
+      
+      const tick = () => {
+         if (!this.ctx || !this.enabled) return;
+         const now = this.ctx.currentTime;
+         const freq = bassNotes[step % bassNotes.length];
+         step++;
+
+         const g = this.ctx.createGain();
+         g.gain.setValueAtTime(0, now);
+         g.gain.linearRampToValueAtTime(0.16, now + 0.02);
+         g.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+         g.connect(this.ctx.destination);
+
+         const o = this.ctx.createOscillator();
+         o.type = "triangle";
+         o.frequency.setValueAtTime(freq, now);
+         o.connect(g);
+         o.start(now);
+         o.stop(now + 0.5);
+
+         const cg = this.ctx.createGain();
+         cg.gain.setValueAtTime(0, now);
+         cg.gain.linearRampToValueAtTime(0.05, now + 0.01);
+         cg.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+         cg.connect(this.ctx.destination);
+
+         const co = this.ctx.createOscillator();
+         co.type = "square";
+         co.frequency.setValueAtTime(freq * 4, now);
+         co.connect(cg);
+         co.start(now);
+         co.stop(now + 0.2);
+      };
+
+      tick();
+      this.finalRoundInterval = window.setInterval(tick, 600);
+   }
+
+   public stopFinalRoundBeat() {
+      if (this.finalRoundInterval) {
+         clearInterval(this.finalRoundInterval);
+         this.finalRoundInterval = null;
+      }
    }
 
    public playMatchStart() {
