@@ -14,9 +14,10 @@ import { useWordleStats } from "../useStats";
 import { useConfirmation } from "../../context/ConfirmationContext";
 
 import { safeLocalStorage } from "../../utils/storage";
-import { getLocalSalt, areGuessesCoherent } from "./utils";
+import { getLocalSalt, areGuessesCoherent, saveGameWithBackup } from "./utils";
 import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
+import { supabase } from "../../lib/supabaseClient";
 
 export const useGameEngine = (
    date: string,
@@ -252,7 +253,14 @@ export const useGameEngine = (
                   payload.config &&
                   payload.config.word !== currentConfig.word
                ) {
+                  // Guard: If the saved game is authenticated, but user is currently null,
+                  // do not purge or update local storage. Wait for auth to settle.
+                  if (!payload.isGuest && !user) {
+                     return;
+                  }
+
                   safeLocalStorage.removeItem(`wordle-${date}`);
+                  safeLocalStorage.removeItem(`wordle-${date}-backup`);
 
                   // If moving from Guest -> Auth (they are logged in now, but previous game was explicitly a guest game)
                   if (user && payload.isGuest) {
@@ -275,10 +283,7 @@ export const useGameEngine = (
                            ),
                         },
                      };
-                     safeLocalStorage.setItem(
-                        `wordle-${date}`,
-                        JSON.stringify(savedPayload),
-                     );
+                     saveGameWithBackup(date, savedPayload);
                   } else {
                      dispatch({ type: "LOAD_STATE", payload: initialState });
                   }
@@ -314,10 +319,7 @@ export const useGameEngine = (
                                  ),
                               },
                            };
-                           safeLocalStorage.setItem(
-                              `wordle-${date}`,
-                              JSON.stringify(savedPayload),
-                           );
+                           saveGameWithBackup(date, savedPayload);
                         } else if (
                            payload.guesses.length > cloudPayload.guesses.length
                         ) {
@@ -353,10 +355,41 @@ export const useGameEngine = (
                               ),
                            },
                         };
-                        safeLocalStorage.setItem(
-                           `wordle-${date}`,
-                           JSON.stringify(savedPayload),
-                        );
+
+                        // Get daily backup guesses if present to enrich admin logs
+                        let backupData = null;
+                        const backupRaw = safeLocalStorage.getItem(`wordle-${date}-backup`);
+                        if (backupRaw) {
+                           try {
+                              backupData = JSON.parse(backupRaw);
+                           } catch {}
+                        }
+
+                        triggerToast("Sync conflict resolved: restored from cloud.", 5000);
+
+                        // Trigger admin email notification
+                        supabase.functions.invoke("send-error-email", {
+                           body: {
+                              record: {
+                                 level: "fatal",
+                                 message: `CONFLICT RESOLUTION: ${user.email || "User"} (${user.id})`,
+                                 context: {
+                                    reason: "Sync conflict: incoherent guesses between local storage and cloud. Cloud was restored as authoritative.",
+                                    localGuesses: payload.guesses,
+                                    cloudGuesses: cloudPayload.guesses,
+                                    backupGuesses: backupData?.guesses || null,
+                                    gameDate: date,
+                                    userId: user.id,
+                                    email: user.email,
+                                 },
+                                 session_id: "conflict-monitor",
+                                 user_id: user.id,
+                                 created_at: new Date().toISOString(),
+                              },
+                           },
+                        }).catch(e => console.warn("[Sync] Admin email alert failed:", e));
+
+                        saveGameWithBackup(date, savedPayload);
                      }
                   } else {
                      // No cloud payload exists (or guest)
@@ -384,10 +417,7 @@ export const useGameEngine = (
                   word: obfuscateWord(cloudPayload.config.word, localSalt),
                },
             };
-            safeLocalStorage.setItem(
-               `wordle-${date}`,
-               JSON.stringify(savedPayload),
-            );
+            saveGameWithBackup(date, savedPayload);
          } else {
             // Fresh start
             dispatch({ type: "LOAD_STATE", payload: initialState });

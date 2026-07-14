@@ -1,3 +1,5 @@
+import { safeLocalStorage } from "../../utils/storage";
+
 export const getLocalSalt = (date: string, userId: string | undefined) => {
    const base = `local_salt_${date}_${userId || "guest"}`;
    let hash = 0;
@@ -6,6 +8,12 @@ export const getLocalSalt = (date: string, userId: string | undefined) => {
       hash |= 0;
    }
    return Math.abs(hash).toString(16);
+};
+
+export const saveGameWithBackup = (date: string, payload: any) => {
+   const serialized = JSON.stringify(payload);
+   safeLocalStorage.setItem(`wordle-${date}`, serialized);
+   safeLocalStorage.setItem(`wordle-${date}-backup`, serialized);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -45,6 +45,7 @@ export const useWordleStats = (
             if (
                key.startsWith(prefix) &&
                key !== todayKey &&
+               key !== `${todayKey}-backup` &&
                key !== "wordle-statistics"
             ) {
                safeLocalStorage.removeItem(key);

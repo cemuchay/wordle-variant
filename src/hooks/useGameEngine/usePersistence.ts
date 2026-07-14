@@ -5,6 +5,7 @@ import { syncWithRetry, getLetterStatuses } from '../../lib/game-logic';
 import { logger } from '../../lib/logger';
 import { TOAST_DURATION } from '../../constants/ui';
 import { safeLocalStorage } from '../../utils/storage';
+import { saveGameWithBackup } from './utils';
 
 interface UsePersistenceProps {
    user: any;
@@ -62,10 +63,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                const current = JSON.parse(saved);
                if (current.needsSync) {
                   delete current.needsSync;
-                  safeLocalStorage.setItem(
-                     `wordle-${date}`,
-                     JSON.stringify(current),
-                  );
+                  saveGameWithBackup(date, current);
                }
             }
 
@@ -150,10 +148,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
             if (saved) {
                const current = JSON.parse(saved);
                current.needsSync = true;
-               safeLocalStorage.setItem(
-                  `wordle-${date}`,
-                  JSON.stringify(current),
-               );
+               saveGameWithBackup(date, current);
             }
             return false;
          }
