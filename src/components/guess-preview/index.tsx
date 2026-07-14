@@ -456,6 +456,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       usedHint: gameData.hint_record !== null,
       gameMessage: "",
       wordLength: targetWordToUse.length,
+      isAuthenticated: !entry.guest_id,
     });
     if (isMarathon) {
       return text.replace(

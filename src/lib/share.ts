@@ -45,6 +45,7 @@ export const generateShareText = ({
    usedHint,
    gameMessage,
    wordLength,
+   isAuthenticated,
 }: {
    date: string;
    guesses: GuessResult[][];
@@ -53,16 +54,31 @@ export const generateShareText = ({
    usedHint: boolean;
    gameMessage: string;
    wordLength: number;
+   isAuthenticated?: boolean;
 }) => {
    const score = won ? guesses.length : "X";
    const hintMarker = usedHint ? " 💡" : "";
    
-   // Format the date based on the user's system locale (e.g., DD/MM or MM/DD)
-   const localDate = new Date(date).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-   });
+   // Format the date strictly to DD/MM/YYYY
+   let localDate = "";
+   if (date && date.includes("-")) {
+      const parts = date.split("-");
+      if (parts.length === 3) {
+         // YYYY-MM-DD -> DD/MM/YYYY
+         localDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+   }
+   if (!localDate) {
+      const parsedDate = new Date(date);
+      const dd = String(parsedDate.getDate()).padStart(2, '0');
+      const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+      const yyyy = parsedDate.getFullYear();
+      localDate = `${dd}/${mm}/${yyyy}`;
+   }
+
+   if (!isAuthenticated) {
+      localDate += "**";
+   }
    
    const header = `Variant - ${localDate} \n
   ${score}/${maxAttempts}${` (${wordLength}L)`}${hintMarker}\n`;

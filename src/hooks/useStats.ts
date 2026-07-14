@@ -39,6 +39,7 @@ export const useWordleStats = (
       if (userId && date) {
          const prefix = "wordle-";
          const todayKey = `${prefix}${date}`;
+         const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
          safeLocalStorage.getAllKeys().forEach((key) => {
             // Remove only daily wordle keys that aren't for today
@@ -49,6 +50,24 @@ export const useWordleStats = (
                key !== "wordle-statistics"
             ) {
                safeLocalStorage.removeItem(key);
+            }
+
+            // Remove stale challenge progression keys older than 7 days
+            if (key.startsWith("challenge-prog-")) {
+               try {
+                  const val = safeLocalStorage.getItem(key);
+                  if (val) {
+                     const parsed = JSON.parse(val);
+                     if (parsed.timestamp && parsed.timestamp < sevenDaysAgo) {
+                        safeLocalStorage.removeItem(key);
+                     }
+                  } else {
+                     safeLocalStorage.removeItem(key);
+                  }
+               } catch {
+                  // Purge if corrupted or invalid JSON
+                  safeLocalStorage.removeItem(key);
+               }
             }
          });
       }
