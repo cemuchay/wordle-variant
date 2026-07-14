@@ -7,7 +7,7 @@ import {
    Volume2, VolumeX, Home
 } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
-import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents } from "../shared/categorySelectConstants";
+import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadClickData, recordClick, getTopFrequentCategories } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
 import { supabase } from "../../lib/supabaseClient";
 import { TopicDetailsView } from "./TopicDetailsView";
@@ -69,14 +69,16 @@ export const UnifiedLobby = ({
    const [isLoadingHistory, setIsLoadingHistory] = useState(true);
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModalFor, setShowCategoryModalFor] = useState<"live" | "async" | null>(null);
-   const [recentCategoryIds, setRecentCategoryIds] = useState<string[]>([]);
+   const [frequentCategoryIds, setFrequentCategoryIds] = useState<string[]>(() =>
+      getTopFrequentCategories(loadClickData(), 4)
+   );
    const [playerSearch, setPlayerSearch] = useState("");
 
-   useEffect(() => {
-      Promise.resolve().then(() => {
-         setRecentCategoryIds(loadRecents());
-      });
-   }, [selectedCategoryId]);
+   const trackTopicClick = useCallback((catId: string) => {
+      const data = recordClick(catId);
+      setFrequentCategoryIds(getTopFrequentCategories(data, 4));
+      setSelectedCategoryId(catId);
+   }, []);
 
    const fetchHistory = useCallback(async () => {
       if (!currentUser) {
@@ -150,7 +152,7 @@ export const UnifiedLobby = ({
    const asyncCatObj = CATEGORIES.find(c => c.id === asyncCategory) || CATEGORIES[0];
    const asyncCatStyle = CATEGORY_STYLE_MAP[asyncCatObj.id] || DEFAULT_STYLE;
 
-   const frequentCategories = recentCategoryIds
+   const frequentCategories = frequentCategoryIds
       .map(id => CATEGORIES.find(c => c.id === id))
       .filter((c): c is NonNullable<typeof c> => !!c);
    const featuredCategories = CATEGORIES.filter((c) => c.featured)
@@ -455,12 +457,12 @@ export const UnifiedLobby = ({
                         <div className="space-y-2">
                            <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
                            <div className="grid grid-cols-2 gap-2">
-                              {frequentCategories.slice(0, 4).map((cat) => {
-                                 const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                                 return (
-                                    <div
-                                       key={cat.id}
-                                       onClick={() => setSelectedCategoryId(cat.id)}
+               {frequentCategories.slice(0, 4).map((cat) => {
+                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                                  return (
+                                     <div
+                                        key={cat.id}
+                                        onClick={() => trackTopicClick(cat.id)}
                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                     >
                                        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
@@ -489,39 +491,39 @@ export const UnifiedLobby = ({
                               {featuredCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                                  return (
-                                    <div
-                                       key={cat.id}
-                                       onClick={() => setSelectedCategoryId(cat.id)}
-                                       className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
-                                    >
-                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
-                                          {style.svg ? (
-                                             <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
-                                          ) : (
-                                             <span className="text-xl">{style.emoji}</span>
-                                          )}
-                                       </div>
-                                       <div className="min-w-0">
-                                          <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
-                                          <p className="text-[8px] text-[#E85151] font-black uppercase tracking-widest">Select Topic</p>
-                                       </div>
-                                    </div>
-                                 );
-                              })}
-                           </div>
-                        </div>
-                     )}
+                                  <div
+                                        key={cat.id}
+                                        onClick={() => trackTopicClick(cat.id)}
+                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
+                                     >
+                                        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
+                                           {style.svg ? (
+                                              <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+                                           ) : (
+                                              <span className="text-xl">{style.emoji}</span>
+                                           )}
+                                        </div>
+                                        <div className="min-w-0">
+                                           <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
+                                           <p className="text-[8px] text-[#E85151] font-black uppercase tracking-widest">Select Topic</p>
+                                        </div>
+                                     </div>
+                                  );
+                               })}
+                            </div>
+                         </div>
+                      )}
 
-                     {/* All Topics */}
-                     <div className="space-y-2">
-                        <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
-                        <div className="grid grid-cols-2 gap-2">
-                           {allCategories.map((cat) => {
-                              const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                              return (
-                                 <div
-                                    key={cat.id}
-                                    onClick={() => setSelectedCategoryId(cat.id)}
+                      {/* All Topics */}
+                      <div className="space-y-2">
+                         <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
+                         <div className="grid grid-cols-2 gap-2">
+                            {allCategories.map((cat) => {
+                               const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                               return (
+                                  <div
+                                     key={cat.id}
+                                     onClick={() => trackTopicClick(cat.id)}
                                     className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                  >
                                     <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">

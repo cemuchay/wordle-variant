@@ -10,7 +10,7 @@ export const getLocalSalt = (date: string, userId: string | undefined) => {
    return Math.abs(hash).toString(16);
 };
 
-export const saveGameWithBackup = (date: string, payload: any) => {
+export const saveGameWithBackup = (date: string, payload: unknown) => {
    const serialized = JSON.stringify(payload);
    safeLocalStorage.setItem(`wordle-${date}`, serialized);
    safeLocalStorage.setItem(`wordle-${date}-backup`, serialized);

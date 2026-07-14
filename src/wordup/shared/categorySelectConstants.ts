@@ -3,6 +3,13 @@ import { safeLocalStorage } from "../../utils/storage";
 export const RECENTS_KEY = "wordup_recent_categories";
 export const MAX_RECENTS = 5;
 
+export const CLICKS_KEY = "wordup_topic_clicks";
+
+export interface TopicClickData {
+   count: number;
+   lastClicked: number;
+}
+
 export function loadRecents(): string[] {
    try {
       const raw = safeLocalStorage.getItem(RECENTS_KEY);
@@ -23,6 +30,50 @@ export function saveRecents(ids: string[]) {
 export function pushRecent(ids: string[], id: string): string[] {
    const filtered = ids.filter((i) => i !== id);
    return [id, ...filtered].slice(0, MAX_RECENTS);
+}
+
+export function loadClickData(): Record<string, TopicClickData> {
+   try {
+      const raw = safeLocalStorage.getItem(CLICKS_KEY);
+      return raw ? JSON.parse(raw) : {};
+   } catch {
+      return {};
+   }
+}
+
+function saveClickData(data: Record<string, TopicClickData>) {
+   try {
+      safeLocalStorage.setItem(CLICKS_KEY, JSON.stringify(data));
+   } catch {
+      /* ignore */
+   }
+}
+
+export function recordClick(id: string): Record<string, TopicClickData> {
+   const data = loadClickData();
+   const existing = data[id];
+   data[id] = {
+      count: (existing?.count || 0) + 1,
+      lastClicked: Date.now(),
+   };
+   saveClickData(data);
+   return data;
+}
+
+function clickScore(item: TopicClickData): number {
+   const hoursAgo = (Date.now() - item.lastClicked) / 3600000;
+   const recencyBoost = Math.max(0, 1 - hoursAgo / 24);
+   return item.count + recencyBoost;
+}
+
+export function getTopFrequentCategories(
+   data: Record<string, TopicClickData>,
+   topN: number = 4
+): string[] {
+   return Object.entries(data)
+      .sort(([, a], [, b]) => clickScore(b) - clickScore(a))
+      .slice(0, topN)
+      .map(([id]) => id);
 }
 
 export const CATEGORY_STYLE_MAP: Record<

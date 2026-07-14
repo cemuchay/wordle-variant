@@ -4,21 +4,51 @@ class WordUpAudioManager {
    private ctx: AudioContext | null = null;
    private enabled = false;
    private finalRoundInterval: number | null = null;
+   private interrupted = false;
 
    constructor() {
       const saved = localStorage.getItem("wordup_sound_enabled");
       this.enabled = saved === "true";
+      this.listenForInterruptions();
    }
 
-   private initContext() {
+   private listenForInterruptions() {
+      if (typeof document === "undefined") return;
+      const handler = () => {
+         if (document.visibilityState === "visible" && this.ctx?.state === "suspended" && this.interrupted) {
+            this.interrupted = false;
+            this.ensureContext();
+         }
+      };
+      document.addEventListener("visibilitychange", handler);
+      document.addEventListener("pointerdown", handler, { once: false });
+   }
+
+   private ensureContext() {
+      if (this.ctx?.state === "closed") {
+         this.ctx = null;
+      }
       if (!this.ctx) {
          const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
          if (AudioCtx) {
             this.ctx = new AudioCtx();
+            this.ctx.onstatechange = () => {
+               if (this.ctx?.state === "interrupted") {
+                  this.interrupted = true;
+               }
+               if (this.ctx?.state === "suspended" && this.interrupted) {
+                  this.ctx.resume().catch(() => {});
+               }
+            };
          }
       }
-      if (this.ctx && this.ctx.state === "suspended") {
-         this.ctx.resume();
+      if (this.ctx?.state === "suspended") {
+         this.ctx.resume().catch(() => {
+            if (this.ctx?.state !== "running") {
+               this.ctx?.close();
+               this.ctx = null;
+            }
+         });
       }
    }
 
@@ -30,13 +60,13 @@ class WordUpAudioManager {
       this.enabled = val;
       localStorage.setItem("wordup_sound_enabled", String(val));
       if (val) {
-         this.initContext();
+         this.ensureContext();
       }
    }
 
    public playMatchFound() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -59,7 +89,7 @@ class WordUpAudioManager {
 
     public playGameStart() {
        if (!this.enabled) return;
-       this.initContext();
+       this.ensureContext();
        if (!this.ctx) return;
 
        const now = this.ctx.currentTime;
@@ -79,7 +109,7 @@ class WordUpAudioManager {
 
     public playMatchmakingTick() {
        if (!this.enabled) return;
-       this.initContext();
+       this.ensureContext();
        if (!this.ctx) return;
 
        const now = this.ctx.currentTime;
@@ -100,7 +130,7 @@ class WordUpAudioManager {
     public playCountdownTick(num?: number) {
        void num;
        if (!this.enabled) return;
-       this.initContext();
+       this.ensureContext();
        if (!this.ctx) return;
 
        const now = this.ctx.currentTime;
@@ -120,7 +150,7 @@ class WordUpAudioManager {
 
    public playFinalRound() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -159,7 +189,7 @@ class WordUpAudioManager {
 
    public playRoundTransition() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -183,7 +213,7 @@ class WordUpAudioManager {
 
    public playTimeUp() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -211,7 +241,7 @@ class WordUpAudioManager {
 
    public playVictory() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -296,7 +326,7 @@ class WordUpAudioManager {
 
    public playDefeat() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -321,7 +351,7 @@ class WordUpAudioManager {
 
    public playDraw() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -346,7 +376,7 @@ class WordUpAudioManager {
 
    public playFinalRoundAnticipationStart() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -372,7 +402,7 @@ class WordUpAudioManager {
 
    public startFinalRoundBeat() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       this.stopFinalRoundBeat();
@@ -426,7 +456,7 @@ class WordUpAudioManager {
 
    public playMatchStart() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -451,7 +481,7 @@ class WordUpAudioManager {
 
    public playCorrect() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -473,7 +503,7 @@ class WordUpAudioManager {
 
    public playIncorrect() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;
@@ -494,7 +524,7 @@ class WordUpAudioManager {
 
    public playTicking() {
       if (!this.enabled) return;
-      this.initContext();
+      this.ensureContext();
       if (!this.ctx) return;
 
       const now = this.ctx.currentTime;

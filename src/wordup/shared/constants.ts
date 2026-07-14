@@ -18,11 +18,6 @@ export const CATEGORIES = [
       desc: "Vocabulary synonyms, grammar checks, spelling, and literary devices",
    },
    {
-      id: "english_fundamentals",
-      name: "English Fundamentals",
-      desc: "Grammar rules, tenses, punctuation, literary devices, and word usage",
-   },
-   {
       id: "flag_bearer",
       name: "Flags",
       desc: "A global vexillological challenge. Decode national flags, identify country coordinates from color bands, and prove your cartographic memory across all continents.",

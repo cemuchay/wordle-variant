@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from "framer-motion";
-import { Award, Cpu } from "lucide-react";
+import { Award, } from "lucide-react";
 import { useLiveStore } from "../store/useLiveStore";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
@@ -127,7 +127,7 @@ export const GameOverView = ({
                      <div
                         className="absolute bottom-0 left-0 h-1 bg-[#E85151]/40 transition-all duration-1000 ease-linear"
                         style={{ width: `${(rematchCountdown / 20) * 100}%` }}
-                      />
+                     />
                   </div>
                )}
                {rematchState === "received" && (
@@ -160,10 +160,9 @@ export const GameOverView = ({
             </button>
             <button
                onClick={() => setView("playbot")}
-               className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
+               className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 px-2 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
             >
-               <Cpu size={16} className="stroke-3" />
-               <span>Practice vs Bot</span>
+               <span>Play vs Bot</span>
             </button>
          </div>
          <button
@@ -217,8 +216,8 @@ export const GameOverView = ({
                                     <div
                                        key={i}
                                        className={`rounded-lg overflow-hidden border ${q.choices[i] === q.answer
-                                             ? "border-correct ring-1 ring-correct"
-                                             : "border-white/10"
+                                          ? "border-correct ring-1 ring-correct"
+                                          : "border-white/10"
                                           } bg-slate-950/60 flex items-center justify-center aspect-2/1`}
                                     >
                                        <img

@@ -498,6 +498,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                        if (newView === "menu") { resetGame(); onBack?.(); }
                        else if (newView === "matchmaking" || newView === "playbot") {
                          engineCleanupRef.current?.();
+                         if (matchData?.category) {
+                            setCategory(matchData.category);
+                         }
                          resetGame();
                          setView("connecting");
                          startMatchmaking(newView === "playbot");

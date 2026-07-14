@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Cpu } from "lucide-react";
+import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
@@ -121,22 +121,20 @@ export const TopicDetailsView = ({
          <div className="flex border-b border-white/10 bg-[#181818] p-1">
             <button
                onClick={() => setActiveSection("play")}
-               className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
-                  activeSection === "play"
+               className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeSection === "play"
                      ? "text-[#E85151] border-b-2 border-[#E85151]"
                      : "text-white/70 hover:text-white"
-               }`}
+                  }`}
             >
                <Play size={14} />
                <span>Play</span>
             </button>
             <button
                onClick={() => setActiveSection("rankings")}
-               className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${
-                  activeSection === "rankings"
+               className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeSection === "rankings"
                      ? "text-[#E85151] border-b-2 border-[#E85151]"
                      : "text-white/70 hover:text-white"
-               }`}
+                  }`}
             >
                <Trophy size={14} />
                <span>Rankings</span>
@@ -198,10 +196,10 @@ export const TopicDetailsView = ({
 
                         <button
                            onClick={onPlayBot}
-                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 px-2 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                         >
-                           <Cpu size={18} className="stroke-3" />
-                           <span>Practice vs Bot</span>
+
+                           <span>Play vs Bot</span>
                         </button>
 
                         <button

@@ -163,11 +163,29 @@ export async function preloadMatchImages(
  
  /** @deprecated Use `preloadMatchImages` instead */
  export const preloadMatchFlags = preloadMatchImages;
+
+ function decodeEntities(text: string): string {
+    if (typeof document === "undefined" || !text) return text;
+    const el = document.createElement("textarea");
+    el.innerHTML = text;
+    return el.value;
+ }
+
+ function decodeQuestion(q: WordUpQuestion): WordUpQuestion {
+    return {
+       ...q,
+       prompt: decodeEntities(q.prompt),
+       subPrompt: q.subPrompt ? decodeEntities(q.subPrompt) : undefined,
+       answer: decodeEntities(q.answer),
+       choices: q.choices.map(decodeEntities),
+       explanation: q.explanation ? decodeEntities(q.explanation) : undefined,
+    };
+ }
  
  export function postProcessQuestions(
     questions: WordUpQuestion[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _category: string,
  ): WordUpQuestion[] {
-    return questions;
+    return questions.map(decodeQuestion);
  }
