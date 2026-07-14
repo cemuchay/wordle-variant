@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Search, Play, Clock } from "lucide-react";
 import { CATEGORIES } from "./constants";
-import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents, saveRecents, pushRecent } from "./categorySelectConstants";
+import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadRecents, saveRecents, pushRecent, recordClick } from "./categorySelectConstants";
 
 interface CategorySelectModalProps {
    isOpen: boolean;
@@ -54,25 +54,27 @@ export const CategorySelectModal = ({
       .map((id) => CATEGORIES.find((c) => c.id === id))
       .filter(Boolean) as typeof CATEGORIES;
 
-   const recordRecent = (id: string) => {
-      setRecents((prev) => {
-         const next = pushRecent(prev, id);
-         saveRecents(next);
-         return next;
-      });
-   };
-
-    const handleCategoryClick = (id: string) => {
-       setCategory(id);
-       recordRecent(id);
-       onClose();
+    const recordRecent = (id: string) => {
+       setRecents((prev) => {
+          const next = pushRecent(prev, id);
+          saveRecents(next);
+          return next;
+       });
     };
 
-    const handleSelectAndPlay = () => {
-        recordRecent(category);
-        startMatchmaking();
+    const handleCategoryClick = (id: string) => {
+        setCategory(id);
+        recordRecent(id);
+        recordClick(id);
         onClose();
      };
+
+     const handleSelectAndPlay = () => {
+         recordRecent(category);
+         recordClick(category);
+         startMatchmaking();
+         onClose();
+      };
 
    return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]">
