@@ -13,8 +13,7 @@ import { generateRoast } from "../../utils/roastEngine";
 import returnAnimationTime from "../../utils/returnAnimationTime";
 import { TOAST_DURATION, ANIMATION_DURATION } from "../../constants/ui";
 import { ANIMATION } from "../../constants/game";
-import { safeLocalStorage } from "../../utils/storage";
-import { getLocalSalt } from "./utils";
+import { getLocalSalt, saveGameWithBackup } from "./utils";
 
 interface UseActionsProps {
    state: any;
@@ -160,10 +159,7 @@ export const useActions = ({
                word: obfuscateWord(payload.config.word, localSalt),
             },
          };
-         safeLocalStorage.setItem(
-            `wordle-${date}`,
-            JSON.stringify(savedPayload),
-         );
+         saveGameWithBackup(date, savedPayload);
 
          // 2. Update UI immediately (flips row) — show result instantly
          dispatch({
@@ -283,10 +279,7 @@ export const useActions = ({
                word: obfuscateWord(payload.config.word, localSalt),
             },
          };
-         safeLocalStorage.setItem(
-            `wordle-${date}`,
-            JSON.stringify(savedPayload),
-         );
+         saveGameWithBackup(date, savedPayload);
 
          dispatch({ type: "SET_HINT", hint: hintWithRow });
 
@@ -295,47 +288,47 @@ export const useActions = ({
             if (!success) {
                triggerToast(
                   "Sync failed after 3 attempts. Hint saved locally.",
-                );
-             }
-          }
-          triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
-       }
-    }, [
-       state.guesses,
-       state.isGameOver,
-       state.usedHint,
-       config,
-       date,
-       user,
-       triggerToast,
-       performSync,
-       dispatch,
-    ]);
- 
-    const setGameOverModalOpen = useCallback(
-       (isOpen: boolean) => {
-          dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
-       },
-       [dispatch],
-    );
- 
-    const loadState = useCallback(
-       (payload: any) => {
-          dispatch({ type: "LOAD_STATE", payload });
-       },
-       [dispatch],
-    );
- 
-    return {
-       onChar,
-       onDelete,
-       onEnter,
-       handleHint,
-       setGameOverModalOpen,
-       loadState,
-       onSetCursor,
-       onSetEditIndex,
-       onCursorLeft,
-       onCursorRight,
-    };
- };
+               );
+            }
+         }
+         triggerToast(`Hint: "${hint.letter}" at position ${hint.index + 1}.`);
+      }
+   }, [
+      state.guesses,
+      state.isGameOver,
+      state.usedHint,
+      config,
+      date,
+      user,
+      triggerToast,
+      performSync,
+      dispatch,
+   ]);
+
+   const setGameOverModalOpen = useCallback(
+      (isOpen: boolean) => {
+         dispatch({ type: "SET_GAME_OVER_MODAL", isOpen });
+      },
+      [dispatch],
+   );
+
+   const loadState = useCallback(
+      (payload: any) => {
+         dispatch({ type: "LOAD_STATE", payload });
+      },
+      [dispatch],
+   );
+
+   return {
+      onChar,
+      onDelete,
+      onEnter,
+      handleHint,
+      setGameOverModalOpen,
+      loadState,
+      onSetCursor,
+      onSetEditIndex,
+      onCursorLeft,
+      onCursorRight,
+   };
+};

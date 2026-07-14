@@ -66,7 +66,7 @@ export const UnifiedLobby = ({
    const [asyncCategory, setAsyncCategory] = useState("mixed");
    const [historyMatches, setHistoryMatches] = useState<any[]>([]);
    const [asyncHistoryMatches, setAsyncHistoryMatches] = useState<any[]>([]);
-   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModalFor, setShowCategoryModalFor] = useState<"live" | "async" | null>(null);
    const [recentCategoryIds, setRecentCategoryIds] = useState<string[]>([]);
@@ -79,7 +79,10 @@ export const UnifiedLobby = ({
    }, [selectedCategoryId]);
 
    const fetchHistory = useCallback(async () => {
-      if (!currentUser) return;
+      if (!currentUser) {
+         setIsLoadingHistory(false);
+         return;
+      }
       setIsLoadingHistory(true);
       try {
          const { data: liveData } = await supabase
@@ -117,12 +120,10 @@ export const UnifiedLobby = ({
    }, [currentUser]);
 
    useEffect(() => {
-      if (activeTab === "history") {
-         Promise.resolve().then(() => {
-            fetchHistory();
-         });
-      }
-   }, [activeTab, fetchHistory]);
+      Promise.resolve().then(() => {
+         fetchHistory();
+      });
+   }, [fetchHistory, activeTab]);
 
    const allHistory = [...(historyMatches || []), ...(asyncHistoryMatches || [])]
       .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime());
@@ -152,12 +153,13 @@ export const UnifiedLobby = ({
    const frequentCategories = recentCategoryIds
       .map(id => CATEGORIES.find(c => c.id === id))
       .filter((c): c is NonNullable<typeof c> => !!c);
-   const featuredCategories = CATEGORIES.filter((c) => c.featured);
+   const featuredCategories = CATEGORIES.filter((c) => c.featured)
+      .sort((a, b) => a.name.localeCompare(b.name));
    const extraFeatured = featuredCategories.slice(4);
    const allCategories = [
       ...CATEGORIES.filter((c) => !c.featured),
       ...extraFeatured,
-   ];
+   ].sort((a, b) => a.name.localeCompare(b.name));
 
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
       p.id !== currentUser?.id &&
@@ -335,7 +337,21 @@ export const UnifiedLobby = ({
                            <span className="text-[10px] font-black uppercase tracking-wider">Latest Activity</span>
                         </div>
                         <div className="space-y-2 bg-white/5 border border-white/10 p-3 rounded-2xl shadow-inner min-h-[80px]">
-                           {buildActivityFeed().length > 0 ? (
+                           {isLoadingHistory ? (
+                              <div className="space-y-2 animate-pulse">
+                                 {[1, 2, 3].map((n) => (
+                                    <div key={n} className="flex items-center justify-between bg-black/10 border border-white/5 rounded-xl p-2.5 h-[46px]">
+                                       <div className="flex items-center gap-2.5 w-full">
+                                          <div className="w-6 h-6 rounded-md bg-white/10 shrink-0"></div>
+                                          <div className="space-y-1.5 flex-1">
+                                             <div className="h-2.5 bg-white/10 rounded-sm w-1/3"></div>
+                                             <div className="h-1.5 bg-white/10 rounded-sm w-1/6"></div>
+                                          </div>
+                                       </div>
+                                    </div>
+                                 ))}
+                              </div>
+                           ) : buildActivityFeed().length > 0 ? (
                               buildActivityFeed().map((item) => {
                                  const itemCatObj = CATEGORIES.find(c => c.id === item.category);
                                  const emoji = CATEGORY_STYLE_MAP[item.category]?.emoji || "💡";

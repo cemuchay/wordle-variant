@@ -42,6 +42,7 @@ export const WordUpContainer = ({
 
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
    const [soundEnabled, setSoundEnabled] = useState(() => wordupAudio.isEnabled());
+   const [showSoundPrompt, setShowSoundPrompt] = useState(false);
    const [lastCategory, setLastCategory] = useState<string | null>(null);
 
    useEffect(() => {
@@ -50,11 +51,7 @@ export const WordUpContainer = ({
       const isSoundOff = !wordupAudio.isEnabled();
       if (lastPromptDate !== todayStr && isSoundOff) {
          localStorage.setItem("wordup_sound_prompt_date", todayStr);
-         const enable = window.confirm("Would you like to enable in-game sound effects for WordUp?");
-         if (enable) {
-            wordupAudio.setEnabled(true);
-            setSoundEnabled(true);
-         }
+         setShowSoundPrompt(true);
       } else if (lastPromptDate !== todayStr) {
          localStorage.setItem("wordup_sound_prompt_date", todayStr);
       }
@@ -140,50 +137,86 @@ export const WordUpContainer = ({
       }
    }, [effectiveUser, setWordupMode]);
 
-   if (wordupMode === null) {
-      return (
-           <UnifiedLobby
-              userStats={userStats}
-              getRankColor={getRankColor}
-              allProfiles={allProfiles}
-              currentUser={effectiveUser}
-              onSelectHistoryMatch={handleSelectHistoryMatch}
-              soundEnabled={soundEnabled}
+   return (
+      <>
+         {wordupMode === null && (
+            <UnifiedLobby
+               userStats={userStats}
+               getRankColor={getRankColor}
+               allProfiles={allProfiles}
+               currentUser={effectiveUser}
+               onSelectHistoryMatch={handleSelectHistoryMatch}
+               soundEnabled={soundEnabled}
                onToggleSound={() => {
                   const val = !soundEnabled;
                   wordupAudio.setEnabled(val);
                   setSoundEnabled(val);
                }}
-              onPlayLive={handlePlayLive}
-              onPlayAsync={handlePlayAsync}
-              onPlayAsyncTurn={handlePlayAsyncTurn}
-              pendingMatches={pendingMatches}
-              onRefreshPending={refreshPending}
+               onPlayLive={handlePlayLive}
+               onPlayAsync={handlePlayAsync}
+               onPlayAsyncTurn={handlePlayAsyncTurn}
+               pendingMatches={pendingMatches}
+               onRefreshPending={refreshPending}
                onBackToClassic={onBackToClassic}
                onTutorial={onTutorial}
                restoreCategory={lastCategory}
             />
-      );
-   }
+         )}
 
-   if (wordupMode === "live") {
-      return (
-         <LiveView
-            onBack={() => setWordupMode(null)}
-            onSwitchMode={setWordupMode}
-            onTutorial={onTutorial}
-            onBackToClassic={onBackToClassic}
-         />
-      );
-   }
+         {wordupMode === "live" && (
+            <LiveView
+               onBack={() => setWordupMode(null)}
+               onSwitchMode={setWordupMode}
+               onTutorial={onTutorial}
+               onBackToClassic={onBackToClassic}
+            />
+         )}
 
-   return (
-      <AsyncView
-         onBack={() => setWordupMode(null)}
-         onSwitchMode={setWordupMode}
-         onTutorial={onTutorial}
-         onBackToClassic={onBackToClassic}
-      />
+         {wordupMode === "async" && (
+            <AsyncView
+               onBack={() => setWordupMode(null)}
+               onSwitchMode={setWordupMode}
+               onTutorial={onTutorial}
+               onBackToClassic={onBackToClassic}
+            />
+         )}
+
+         {showSoundPrompt && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+               <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5 max-w-xs w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="w-12 h-12 rounded-full bg-[#E85151]/10 border border-[#E85151]/20 flex items-center justify-center mx-auto text-xl">
+                     🔊
+                  </div>
+                  <div className="space-y-1">
+                     <h3 className="text-sm font-black uppercase tracking-wider text-white">Enable Game Sounds?</h3>
+                     <p className="text-[11px] text-white/60 font-bold leading-normal">
+                        Enhance your experience with in-game sound effects for correct answers, timers, and match results.
+                     </p>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                     <button
+                        onClick={() => {
+                           setShowSoundPrompt(false);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase tracking-wider text-white/60 hover:text-white transition-all cursor-pointer"
+                     >
+                        Keep Muted
+                     </button>
+                     <button
+                        onClick={() => {
+                           wordupAudio.setEnabled(true);
+                           setSoundEnabled(true);
+                           setShowSoundPrompt(false);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-[#E85151] hover:bg-[#d44343] text-[9px] font-black uppercase tracking-wider text-white shadow-md shadow-[#E85151]/20 transition-all cursor-pointer"
+                     >
+                        Enable
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
+      </>
    );
 };
 

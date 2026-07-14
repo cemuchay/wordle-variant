@@ -223,6 +223,7 @@ export const GameOverModal: React.FC<Props> = ({
                 usedHint,
                 gameMessage,
                 wordLength: config?.word?.length || 0,
+                isAuthenticated,
               })}
             />
           </div>

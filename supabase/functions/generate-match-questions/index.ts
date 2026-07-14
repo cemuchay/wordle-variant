@@ -791,6 +791,51 @@ function _generateQuestion(
    };
 }
 
+function resolveHandcraftedQuestion(hq: any, rng: () => number): any {
+   let finalPrompt = hq.prompt;
+   let finalAnswer = hq.answer;
+   let finalChoices = hq.choices || [];
+   let finalExplanation = hq.explanation;
+   let finalImageUrl = hq.image_url;
+
+   // If variations exist, resolve a variation
+   if (hq.variations && Array.isArray(hq.variations) && hq.variations.length > 0) {
+      const varIdx = Math.floor(rng() * hq.variations.length);
+      const variation = hq.variations[varIdx];
+      if (variation) {
+         if (variation.params) {
+            for (const [k, v] of Object.entries(variation.params)) {
+               finalPrompt = finalPrompt.replace(new RegExp(`\\$\\{${k}\\}`, "g"), String(v));
+               if (finalExplanation) {
+                  finalExplanation = finalExplanation.replace(new RegExp(`\\$\\{${k}\\}`, "g"), String(v));
+               }
+            }
+         }
+         if (variation.answer) finalAnswer = variation.answer;
+         if (variation.choices) finalChoices = variation.choices;
+         if (variation.explanation) finalExplanation = variation.explanation;
+         if (variation.image_url) finalImageUrl = variation.image_url;
+      }
+   }
+
+   // Randomize options (limit to 4: correct + 3 wrong)
+   const wrongChoices = finalChoices.filter((c: string) => c !== finalAnswer);
+   const shuffledWrong = seededShuffle(wrongChoices, rng);
+   const chosenWrong = shuffledWrong.slice(0, Math.min(3, shuffledWrong.length));
+   const mergedChoices = [finalAnswer, ...chosenWrong];
+   const shuffledFinalChoices = seededShuffle(mergedChoices, rng);
+
+   return {
+      type: "definition",
+      id: hq.id,
+      prompt: finalPrompt,
+      choices: shuffledFinalChoices,
+      answer: finalAnswer,
+      explanation: finalExplanation,
+      ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
+   };
+}
+
 // ── Main handler ─────────────────────────────────────────────
 
 serve(async (req) => {
@@ -1059,45 +1104,7 @@ serve(async (req) => {
                   hq = shuffledHandcrafted[handcraftedCursor];
                   handcraftedCursor++;
                }
-               let finalPrompt = hq.prompt;
-               let finalAnswer = hq.answer;
-               let finalChoices = hq.choices || [];
-               let finalExplanation = hq.explanation;
-               let finalImageUrl = hq.image_url;
-
-               // If variations exist, resolve a variation
-               if (hq.variations && Array.isArray(hq.variations) && hq.variations.length > 0) {
-                  const varIdx = Math.floor(roundRng() * hq.variations.length);
-                  const variation = hq.variations[varIdx];
-                  if (variation) {
-                     if (variation.params) {
-                        for (const [k, v] of Object.entries(variation.params)) {
-                           finalPrompt = finalPrompt.replace(new RegExp(`\\$\\{${k}\\}`, "g"), String(v));
-                        }
-                     }
-                     if (variation.answer) finalAnswer = variation.answer;
-                     if (variation.choices) finalChoices = variation.choices;
-                     if (variation.explanation) finalExplanation = variation.explanation;
-                     if (variation.image_url) finalImageUrl = variation.image_url;
-                  }
-               }
-
-               // Randomize options (limit to 4: correct + 3 wrong)
-               const wrongChoices = finalChoices.filter((c: string) => c !== finalAnswer);
-               const shuffledWrong = seededShuffle(wrongChoices, roundRng);
-               const chosenWrong = shuffledWrong.slice(0, Math.min(3, shuffledWrong.length));
-               const mergedChoices = [finalAnswer, ...chosenWrong];
-               const shuffledFinalChoices = seededShuffle(mergedChoices, roundRng);
-
-               q = {
-                  type: "definition",
-                  id: hq.id,
-                  prompt: finalPrompt,
-                  choices: shuffledFinalChoices,
-                  answer: finalAnswer,
-                  explanation: finalExplanation,
-                  ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
-               };
+               q = resolveHandcraftedQuestion(hq, roundRng);
                chosenEntity = null;
                hqChosen = hq;
             } else if (category === "maths") {
@@ -1139,10 +1146,7 @@ serve(async (req) => {
                   if (shuffledHandcrafted.length > 0) {
                      const hq = shuffledHandcrafted[handcraftedCursor % shuffledHandcrafted.length];
                      handcraftedCursor++;
-                     q = {
-                        type: "definition",
-                        ...hq,
-                     };
+                     q = resolveHandcraftedQuestion(hq, roundRng);
                      hqChosen = hq;
                   } else {
                      q = generateMathsQuestion(
