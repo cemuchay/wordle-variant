@@ -4,7 +4,7 @@ import type { TargetAndTransition, Transition } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { type ProfileStats } from "../../shared/types";
-import { FormulaRenderer } from "../../shared/FormulaRenderer";
+import FormulaRenderer from "../../shared/FormulaRenderer";
 import { PreloadedImage } from "../../shared/PreloadedImage";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { ScoreBar } from "../../shared/ScoreBar";
@@ -68,15 +68,15 @@ export const BattleView = ({
    playerProfile,
    lastRoundPopup
 }: BattleViewProps) => {
-    const [particles, setParticles] = useState<Particle[]>([]);
-    const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
+   const [particles, setParticles] = useState<Particle[]>([]);
+   const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
 
-    const [lastIdx, setLastIdx] = useState(currentIdx);
-    if (currentIdx !== lastIdx) {
-       setLastIdx(currentIdx);
-       setParticles([]);
-       setScorePopups([]);
-    }
+   const [lastIdx, setLastIdx] = useState(currentIdx);
+   if (currentIdx !== lastIdx) {
+      setLastIdx(currentIdx);
+      setParticles([]);
+      setScorePopups([]);
+   }
    const prevMyScoreRef = useRef(0);
    const prevOppScoreRef = useRef(0);
    const popupIdRef = useRef(0);
@@ -173,16 +173,16 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
    const choiceLUT: Record<string, Record<string, string>> = {
-      a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
-      b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-      c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      c: { "2": "text-lg sm:text-xl",   "4": "text-base sm:text-lg" },
    };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
@@ -193,7 +193,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-           className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
       >
          {lastRoundPopup && (
             <motion.div
@@ -222,79 +222,79 @@ export const BattleView = ({
             </motion.div>
          )}
 
-          {/* Top Bar: Player | Round/Category | Opponent */}
-          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
-             <div className="flex items-center gap-2 min-w-0 relative">
-                <ProtectedAvatar
-                   userId={playerProfile?.id || undefined}
-                   src={playerProfile?.avatar_url || undefined}
-                   username={playerProfile?.username || "You"}
-                   className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
-                />
-                 <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                    <p className="text-base font-black text-white">{myScore} pts</p>
-                 </div>
-                 {scorePopups.filter((p) => p.side === "my").map((p) => (
-                    <motion.span
-                       key={p.id}
-                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                       animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                       transition={{ duration: 2.5, ease: "easeOut" }}
-                       className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                    >
-                       +{p.points}
-                    </motion.span>
-                 ))}
-              </div>
+         {/* Top Bar: Player | Round/Category | Opponent */}
+         <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
+            <div className="flex items-center gap-2 min-w-0 relative">
+               <ProtectedAvatar
+                  userId={playerProfile?.id || undefined}
+                  src={playerProfile?.avatar_url || undefined}
+                  username={playerProfile?.username || "You"}
+                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+               />
+               <div className="truncate max-w-[100px]">
+                  <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                  <p className="text-base font-black text-white">{myScore} pts</p>
+               </div>
+               {scorePopups.filter((p) => p.side === "my").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+            </div>
 
-              <div className="flex flex-col items-center">
-                 {categoryName && (
-                    <span className="text-[9px] font-black text-[#E85151] uppercase tracking-wider mb-0.5">{categoryName}</span>
-                 )}
-                 <span className="text-xs font-black text-white/40">Q{currentIdx + 1}/{WORDUP_GAME.TOTAL_ROUNDS}</span>
-                 {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
-                    <span className="text-[9px] font-black text-[#E85151] animate-pulse tracking-wider">⚡ 2X</span>
-                 )}
-              </div>
+            <div className="flex flex-col items-center">
+               {categoryName && (
+                  <span className="text-[9px] font-black text-[#E85151] uppercase tracking-wider mb-0.5">{categoryName}</span>
+               )}
+               <span className="text-xs font-black text-white/40">Q{currentIdx + 1}/{WORDUP_GAME.TOTAL_ROUNDS}</span>
+               {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && (
+                  <span className="text-[9px] font-black text-[#E85151] animate-pulse tracking-wider">⚡ 2X</span>
+               )}
+            </div>
 
-              <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
-                 <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
-                    <p className="text-base font-black text-white">{oppScore} pts</p>
-                 </div>
-                {scorePopups.filter((p) => p.side === "opp").map((p) => (
-                   <motion.span
-                      key={p.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
-                   >
-                      +{p.points}
-                   </motion.span>
-                ))}
-                <ProtectedAvatar
-                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                   src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
-                   username={opponentName}
-                   className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
-                />
-             </div>
-          </div>
+            <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
+               <div className="truncate max-w-[100px]">
+                  <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
+                  <p className="text-base font-black text-white">{oppScore} pts</p>
+               </div>
+               {scorePopups.filter((p) => p.side === "opp").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+               <ProtectedAvatar
+                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  username={opponentName}
+                  className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
+               />
+            </div>
+         </div>
 
-          {/* Timer Bar */}
-          <div className="w-full h-2 bg-[#E85151]/20 rounded-full overflow-hidden shrink-0 shadow-inner">
-             {!revealAnswers && (
-                <div
-                   ref={timerBarRef}
-                   className="h-full rounded-full"
-                />
-             )}
-           </div>
+         {/* Timer Bar */}
+         <div className="w-full h-2 bg-[#E85151]/20 rounded-full overflow-hidden shrink-0 shadow-inner">
+            {!revealAnswers && (
+               <div
+                  ref={timerBarRef}
+                  className="h-full rounded-full"
+               />
+            )}
+         </div>
 
-           {/* Question Container */}
-           <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
+         {/* Question Container */}
+         <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1.5 sm:space-y-2">
                {categoryName && (
                   <div className="flex items-center justify-center gap-1.5 shrink-0">
@@ -311,7 +311,7 @@ export const BattleView = ({
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
-                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
+               <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
@@ -328,12 +328,12 @@ export const BattleView = ({
                      animate={{ opacity: 1, scale: 1 }}
                      className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
-                      <PreloadedImage
-                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
-                         alt="Question Clue"
-                         className="max-h-full max-w-full object-contain rounded-lg select-none"
-                         draggable={false}
-                      />
+                     <PreloadedImage
+                        src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
+                        alt="Question Clue"
+                        className="max-h-full max-w-full object-contain rounded-lg select-none"
+                        draggable={false}
+                     />
                   </motion.div>
                </div>
             )}
@@ -399,12 +399,12 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={cardClass}
                         >
-                            <PreloadedImage
-                               src={imageUrl}
-                               alt={`Flag Option ${optionLetter}`}
-                               className="w-full h-full object-cover rounded-lg"
-                               draggable={false}
-                            />
+                           <PreloadedImage
+                              src={imageUrl}
+                              alt={`Flag Option ${optionLetter}`}
+                              className="w-full h-full object-cover rounded-lg"
+                              draggable={false}
+                           />
                            <div className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md select-none">
                               {optionLetter}
                            </div>
@@ -545,22 +545,22 @@ export const BattleView = ({
             </div>
          )}
 
-          {/* Pre-render upcoming round images to keep decoded bitmaps ready */}
-          <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-0 -z-10">
-             {questions.map((q, idx) => {
-                if (idx <= currentIdx) return null;
-                return (
-                   <Fragment key={idx}>
-                      {q.imageUrl && (
-                         <img src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl} alt="" />
-                      )}
-                      {q.imageUrls?.map((url, i) => (
-                         <img key={`${idx}-${i}`} src={getCachedFlagUrl(url)} alt="" />
-                      ))}
-                   </Fragment>
-                );
-             })}
-          </div>
-       </motion.div>
+         {/* Pre-render upcoming round images to keep decoded bitmaps ready */}
+         <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-0 -z-10">
+            {questions.map((q, idx) => {
+               if (idx <= currentIdx) return null;
+               return (
+                  <Fragment key={idx}>
+                     {q.imageUrl && (
+                        <img src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl} alt="" />
+                     )}
+                     {q.imageUrls?.map((url, i) => (
+                        <img key={`${idx}-${i}`} src={getCachedFlagUrl(url)} alt="" />
+                     ))}
+                  </Fragment>
+               );
+            })}
+         </div>
+      </motion.div>
    );
 };

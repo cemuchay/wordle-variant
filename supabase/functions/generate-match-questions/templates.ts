@@ -894,9 +894,198 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
        explanations: [
           "A person from the country represented by this flag ({label}) is called a {demonym}.",
        ],
-       answerKey: "demonym",
-       weight: 1,
-    }];
+        answerKey: "demonym",
+        weight: 1,
+     },
+
+   // ═══════════════════════════════════════════════════════════
+   // BIBLE (11 templates — 5 main + 5 bonus + 1 pair variant)
+   // ═══════════════════════════════════════════════════════════
+
+   // ── TYPE 1: "Who said this?" ──
+   {
+      id: "bible_quote",
+      category: "bible",
+      requiredKeys: ["quote"],
+      prompts: [
+         'Who said, "{quote}"?',
+         'Which Bible figure spoke these words: "{quote}"?',
+         '"Quote" — {quote}. Who is the speaker?',
+         'Identify the person who said, "{quote}":',
+      ],
+      explanations: [
+         'The words "{quote}" were spoken by {label}.',
+         '{label} is credited with saying, "{quote}".',
+      ],
+   },
+
+   // ── TYPE 2: "Who did this?" ──
+   {
+      id: "bible_action",
+      category: "bible",
+      requiredKeys: ["action"],
+      prompts: [
+         "Who {action}?",
+         "Which Bible figure {action}?",
+         "Identify the person who {action}:",
+         "In the Bible, who {action}?",
+      ],
+      explanations: [
+         "{label} {action}.",
+         "It was {label} who {action}.",
+      ],
+   },
+
+   // ── TYPE 3: "Which book contains...?" ──
+   {
+      id: "bible_book_event",
+      category: "bible",
+      requiredKeys: ["event"],
+      prompts: [
+         "Which book of the Bible describes {event}?",
+         "The account of {event} is found in which book?",
+         "In which biblical book does the story of {event} appear?",
+         "Identify the book of the Bible that contains {event}:",
+      ],
+      explanations: [
+         "The account of {event} is found in the book of {label}.",
+         "{event} is described in the biblical book of {label}.",
+      ],
+   },
+
+   // ── TYPE 4a: "Complete the pair" ──
+   {
+      id: "bible_pair",
+      category: "bible",
+      requiredKeys: ["pair_partner"],
+      prompts: [
+         "Complete the pair: {label} and _____",
+         "Which name completes the famous Bible pair '{label} and _'?",
+         "Who is famously paired with {label} in the Bible?",
+      ],
+      explanations: [
+         "{label} and {pair_partner} are a well-known Bible pair.",
+         "The famous pair consists of {label} and {pair_partner}.",
+      ],
+      answerKey: "pair_partner",
+   },
+
+   // ── TYPE 4b: "Who was the [relation] of [relative]?" ──
+   {
+      id: "bible_relation",
+      category: "bible",
+      requiredKeys: ["relation", "relative"],
+      prompts: [
+         "Who was the {relation} {relative}?",
+         "In the Bible, who was the {relation} {relative}?",
+         "Identify the person who was the {relation} {relative}:",
+         "Which biblical figure is known as the {relation} {relative}?",
+      ],
+      explanations: [
+         "{label} was the {relation} {relative}.",
+         "The {relation} {relative} was {label}.",
+      ],
+   },
+
+   // ── TYPE 5: "Where did this happen?" ──
+   {
+      id: "bible_location_event",
+      category: "bible",
+      requiredKeys: ["event"],
+      prompts: [
+         "Where did {event} take place?",
+         "In the Bible, where did {event} occur?",
+         "At which location did {event} happen?",
+         "Identify the place where {event}:",
+      ],
+      explanations: [
+         "{event} took place at {label}.",
+         "The location where {event} occurred is {label}.",
+      ],
+   },
+
+   // ── BONUS 1: Numbers ──
+   {
+      id: "bible_number",
+      category: "bible",
+      requiredKeys: ["number_context"],
+      prompts: [
+         "How many {number_context}?",
+         "What number is associated with {number_context}?",
+         "In the Bible, how many {number_context} were there?",
+      ],
+      explanations: [
+         "There were {label} {number_context}.",
+         "The number associated with {number_context} is {label}.",
+      ],
+   },
+
+   // ── BONUS 2: Before / After ──
+   {
+      id: "bible_before_after",
+      category: "bible",
+      requiredKeys: ["predecessor", "succession_role"],
+      prompts: [
+         "Who became {succession_role} after {predecessor}?",
+         "After {predecessor}, who was the next {succession_role}?",
+         "Who succeeded {predecessor} as {succession_role}?",
+         "Identify who followed {predecessor} as {succession_role}:",
+      ],
+      explanations: [
+         "{label} succeeded {predecessor} as {succession_role}.",
+         "After {predecessor}, {label} became the next {succession_role}.",
+      ],
+   },
+
+   // ── BONUS 3: Object Matching ──
+   {
+      id: "bible_object",
+      category: "bible",
+      requiredKeys: ["object_context"],
+      prompts: [
+         "Who {object_context}?",
+         "Which Bible figure {object_context}?",
+         "Identify the person who {object_context}:",
+      ],
+      explanations: [
+         "{label} is the one who {object_context}.",
+         "The person who {object_context} was {label}.",
+      ],
+   },
+
+   // ── BONUS 4: Animal Matching ──
+   {
+      id: "bible_animal",
+      category: "bible",
+      requiredKeys: ["animal_context"],
+      prompts: [
+         "Who {animal_context}?",
+         "Which Bible figure {animal_context}?",
+         "Identify the biblical character who {animal_context}:",
+      ],
+      explanations: [
+         "{label} is the one who {animal_context}.",
+         "The person who {animal_context} was {label}.",
+      ],
+   },
+
+   // ── BONUS 5: Miracles ──
+   {
+      id: "bible_miracle",
+      category: "bible",
+      requiredKeys: ["miracle"],
+      prompts: [
+         "Who performed the miracle of {miracle}?",
+         "Which Bible figure is credited with the miracle of {miracle}?",
+         "The miracle of {miracle} was performed by whom?",
+         "Identify who performed the miracle of {miracle}:",
+      ],
+      explanations: [
+         "{label} performed the miracle of {miracle}.",
+         "The miracle of {miracle} was performed by {label}.",
+      ],
+   },
+];
 
 export function getRandomMatchingTemplate(
    // eslint-disable-next-line @typescript-eslint/no-explicit-any

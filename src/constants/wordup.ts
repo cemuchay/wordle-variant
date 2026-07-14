@@ -179,17 +179,17 @@ export const CHAT_BUBBLE = {
 /** Character-length thresholds that control question-prompt font size. */
 export const PROMPT_FONT_SIZE = {
    /** Prompts above this length get the smallest font class. */
-   LONG_THRESHOLD: 80,
+   LONG_THRESHOLD: 100,
    /** Prompts above this length (but below LONG) get a medium font class. */
-   MEDIUM_THRESHOLD: 50,
+   MEDIUM_THRESHOLD: 65,
 } as const;
 
 /** Character-length thresholds that control answer-choice font size. */
 export const CHOICE_FONT_SIZE = {
    /** Choices above this length get the smallest font class. */
-   LONG_THRESHOLD: 25,
+   LONG_THRESHOLD: 30,
    /** Choices above this length (but below LONG) get a medium font class. */
-   MEDIUM_THRESHOLD: 15,
+   MEDIUM_THRESHOLD: 20,
 } as const;
 
 /** Delay (ms) before recovering an active game after a page refresh. */

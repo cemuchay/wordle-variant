@@ -256,7 +256,7 @@ export const DynamicIslandStatus = () => {
         if (user && otherOnlineUsers.length > 1) return '145px';
 
         // Persistent default state (Smiley + Time)
-        return '150px';
+        return '160px';
     };
 
     return (

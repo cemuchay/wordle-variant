@@ -369,6 +369,21 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
          timeline: 1,
       },
    }),
+   define("bible", {
+      proceduralWeight: 0.6,
+      handcraftedWeaveProbability: 0.3,
+      weights: {
+         forward: 3,
+         reverse: 2,
+         oddOneOut: 1,
+         trueFalse: 2.5,
+         multiClue: 1.5,
+         correctError: 1,
+         tagMatch: 1,
+         compare: 1,
+         timeline: 1.5,
+      },
+   }),
    define("us_tech_trivia", {
       weights: {
          forward: 2,
