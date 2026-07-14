@@ -23,7 +23,7 @@ export const WordUpContainer = ({
    wordupMode,
    setWordupMode,
    onTutorial,
-    onBackToClassic,
+   onBackToClassic,
 }: WordUpContainerProps) => {
    const { user: authUser } = useAuth();
    const { triggerToast, allProfiles } = useApp();
@@ -51,6 +51,7 @@ export const WordUpContainer = ({
       const isSoundOff = !wordupAudio.isEnabled();
       if (lastPromptDate !== todayStr && isSoundOff) {
          localStorage.setItem("wordup_sound_prompt_date", todayStr);
+         // eslint-disable-next-line react-hooks/set-state-in-effect
          setShowSoundPrompt(true);
       } else if (lastPromptDate !== todayStr) {
          localStorage.setItem("wordup_sound_prompt_date", todayStr);
@@ -70,26 +71,26 @@ export const WordUpContainer = ({
       });
    }, [effectiveUser?.id, refreshPending]);
 
-    // Bridge: Play Live Match from Unified Lobby
-    const handlePlayLive = useCallback((catId: string, vsBot = false) => {
-       setLastCategory(catId);
-       useLiveStore.getState().setCategory(catId);
-       useLiveStore.getState().resetGame();
-       useLiveStore.getState().setView("connecting");
-       useLiveStore.getState().setAutoStartMatchmaking(!vsBot);
-       useLiveStore.getState().setVsBotOnly(vsBot);
-       setWordupMode("live");
-    }, [setWordupMode]);
+   // Bridge: Play Live Match from Unified Lobby
+   const handlePlayLive = useCallback((catId: string, vsBot = false) => {
+      setLastCategory(catId);
+      useLiveStore.getState().setCategory(catId);
+      useLiveStore.getState().resetGame();
+      useLiveStore.getState().setView("connecting");
+      useLiveStore.getState().setAutoStartMatchmaking(!vsBot);
+      useLiveStore.getState().setVsBotOnly(vsBot);
+      setWordupMode("live");
+   }, [setWordupMode]);
 
-    // Bridge: Play Async Challenge from Unified Lobby
-    const handlePlayAsync = useCallback((targetUser: any, catId: string) => {
-       setLastCategory(catId);
-       useAsyncStore.getState().setCategory(catId);
-       useAsyncStore.getState().resetGame();
-       useAsyncStore.getState().setView("menu");
-       useAsyncStore.getState().setPendingChallengePlayer(targetUser);
-       setWordupMode("async");
-    }, [setWordupMode]);
+   // Bridge: Play Async Challenge from Unified Lobby
+   const handlePlayAsync = useCallback((targetUser: any, catId: string) => {
+      setLastCategory(catId);
+      useAsyncStore.getState().setCategory(catId);
+      useAsyncStore.getState().resetGame();
+      useAsyncStore.getState().setView("menu");
+      useAsyncStore.getState().setPendingChallengePlayer(targetUser);
+      setWordupMode("async");
+   }, [setWordupMode]);
 
    // Bridge: Play Async Turn from Unified Lobby
    const handlePlayAsyncTurn = useCallback((match: any) => {
@@ -107,7 +108,7 @@ export const WordUpContainer = ({
       if (!effectiveUser) return;
       const isAsync = match.game_type === "async" || !!match.encrypted_questions;
       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-      
+
       if (isAsync) {
          useAsyncStore.getState().setMatchId(match.id);
          useAsyncStore.getState().setRole(myRole);
@@ -182,7 +183,7 @@ export const WordUpContainer = ({
          )}
 
          {showSoundPrompt && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
                <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-5 max-w-xs w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
                   <div className="w-12 h-12 rounded-full bg-[#E85151]/10 border border-[#E85151]/20 flex items-center justify-center mx-auto text-xl">
                      🔊
