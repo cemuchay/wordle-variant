@@ -24,7 +24,7 @@ const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, className = "" 
                     return (
                         <span
                             key={index}
-                            className="block my-3 p-3.5 text-center bg-slate-950/50 backdrop-blur-md border border-white/10 rounded-xl shadow-md font-serif text-lg sm:text-xl text-sky-200 select-none tracking-wide"
+                            className="block my-3 p-3.5 text-center bg-slate-950/50 backdrop-blur-md border border-white/10 rounded-xl shadow-md font-serif text-xl sm:text-2xl text-sky-200 select-none tracking-wide"
                             style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
                             dangerouslySetInnerHTML={{ __html: htmlContent }}
                         />

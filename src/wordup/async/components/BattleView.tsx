@@ -173,16 +173,16 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
    const choiceLUT: Record<string, Record<string, string>> = {
-      a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
-      b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-      c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      c: { "2": "text-lg sm:text-xl",   "4": "text-base sm:text-lg" },
    };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];

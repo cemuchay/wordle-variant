@@ -171,16 +171,16 @@ export const BattleView = ({
    };
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
    const choiceLUT: Record<string, Record<string, string>> = {
-      a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
-      b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-      c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      c: { "2": "text-lg sm:text-xl", "4": "text-base sm:text-lg" },
    };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
@@ -191,7 +191,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]"
       >
          <GameStatusToast />
          {lastRoundPopup && (
@@ -320,18 +320,18 @@ export const BattleView = ({
          {/* Question Container */}
          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1.5 sm:space-y-2">
-               <div className="flex items-center justify-center gap-1.5 shrink-0 py-2 sm:py-0">
-                  <span className="text-[11px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/90">
+               <div className="flex items-center justify-center gap-1.5 shrink-0 pb-2 mb-2 sm:py-0">
+                  <span className="text-[12px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/90">
                      {categoryName}
                   </span>
                   <span className="text-white/20">•</span>
-                  <span className="text-[11px] font-black uppercase text-correct tracking-widest">
+                  <span className="text-[12px] font-black uppercase text-correct tracking-widest">
                      Round {currentIdx + 1}/7
                   </span>
                </div>
-               <p className="text-[11px] sm:text-[12px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+               <p className="text-[12px] sm:text-[12px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
-                  {/* {(activeQuestion.type || "definition").replace("_", " ")} */}
+                  {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
