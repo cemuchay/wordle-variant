@@ -890,41 +890,70 @@ serve(async (req) => {
          playerIds.push(existing.player2_id);
       }
 
-      // Call the RPC function to get randomized entities with even type distribution and user history filter
-      const { data: entities, error: entityError } = await supabaseClient.rpc(
-         "get_wordup_entities_v2",
-         {
-            p_category: category,
-            p_user_ids: playerIds,
-            p_limit_per_type: 40,
-         },
-      );
+       // Fetch category profile ratings and compute target difficulty
+       let targetDifficulty = 3;
+       let categoryRating = 600;
+       try {
+          const ratingResults = await Promise.all(
+             playerIds.map((uid: string) =>
+                supabaseClient.rpc("get_category_profile_rating", {
+                   p_user_id: uid,
+                   p_category: category,
+                })
+             )
+          );
+          const ratings = ratingResults
+             .filter((r) => !r.error)
+             .map((r) => Number(r.data ?? 600));
+          categoryRating = ratings.length > 0 ? Math.min(...ratings) : 600;
+          if (categoryRating < 800) targetDifficulty = 1;
+          else if (categoryRating < 1100) targetDifficulty = 2;
+          else if (categoryRating < 1400) targetDifficulty = 3;
+          else if (categoryRating < 1700) targetDifficulty = 4;
+          else targetDifficulty = 5;
+       } catch {
+          targetDifficulty = 3;
+       }
+        console.log(
+           `${logPrefix} Category rating=${categoryRating} → target difficulty=${targetDifficulty}`,
+        );
 
-      if (entityError) {
-         console.warn(
-            "[generate-match-questions] RPC get_wordup_entities_v2 error:",
-            entityError,
-         );
-      }
+       // Call the RPC function to get randomized entities with even type distribution, user history filter, and difficulty cap
+       const { data: entities, error: entityError } = await supabaseClient.rpc(
+          "get_wordup_entities_v2",
+          {
+             p_category: category,
+             p_user_ids: playerIds,
+             p_limit_per_type: 40,
+             p_difficulty_max: targetDifficulty,
+          },
+       );
 
-      const entityList: any[] = entities || [];
-      console.log(
-         `${logPrefix} Fetched ${entityList.length} entities for category="${category}"`,
-      );
-      if (entityList.length > 0) {
-         console.log(
-            `${logPrefix} Entity sample:`,
-            JSON.stringify(entityList.slice(0, 2)).substring(0, 300),
-         );
-      } else {
-         console.warn(
-            `${logPrefix} No entities returned from RPC — will fallback to procedural questions`,
-         );
-      }
+       if (entityError) {
+          console.warn(
+             "[generate-match-questions] RPC get_wordup_entities_v2 error:",
+             entityError,
+          );
+       }
 
-      // Fetch active handcrafted questions with stats
-      let handcraftedList: any[] = [];
-      let userTopicSkill = 1500;
+       const entityList: any[] = entities || [];
+       console.log(
+          `${logPrefix} Fetched ${entityList.length} entities for category="${category}"`,
+       );
+       if (entityList.length > 0) {
+          console.log(
+             `${logPrefix} Entity sample:`,
+             JSON.stringify(entityList.slice(0, 2)).substring(0, 300),
+          );
+       } else {
+          console.warn(
+             `${logPrefix} No entities returned from RPC — will fallback to procedural questions`,
+          );
+       }
+
+        // Fetch active handcrafted questions with stats
+       let handcraftedList: any[] = [];
+       let userTopicSkill = 1500;
       try {
          // Fetch user skill for this topic (use minimum skill across players)
          try {
@@ -944,7 +973,11 @@ serve(async (req) => {
             userTopicSkill = 1500;
          }
 
-         const { data: hcData, error: hcError } = await supabaseClient
+          // Compute difficulty range around target
+          const diffMin = Math.max(1, targetDifficulty - 1);
+          const diffMax = Math.min(5, targetDifficulty + 1);
+
+          const { data: hcData, error: hcError } = await supabaseClient
             .from("wordup_handcrafted_questions")
             .select(`
                id,
@@ -954,10 +987,13 @@ serve(async (req) => {
                explanation,
                variations,
                image_url,
+               difficulty,
                history:wordup_user_handcrafted_history(user_id, seen_at),
                stats:wordup_question_stats(difficulty_elo, topic_elo)
             `)
             .eq("category", category)
+            .gte("difficulty", diffMin)
+            .lte("difficulty", diffMax)
             .or("expires_at.is.null,expires_at.gt.now()");
 
          if (hcError) {
@@ -966,42 +1002,49 @@ serve(async (req) => {
                hcError,
             );
          } else {
-            const enriched = (hcData || []).map((hq: any) => {
-               const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
-               const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
-               const seenCount = seenUsers.size;
-               const topicElo = hq.stats?.topic_elo ?? 1500;
-               const diffScore = Math.abs(topicElo - userTopicSkill);
-               return {
-                  id: hq.id,
-                  prompt: hq.prompt,
-                  choices: hq.choices,
-                  answer: hq.answer,
-                  explanation: hq.explanation,
-                  variations: hq.variations,
-                  image_url: hq.image_url,
-                  seenCount,
-                  diffScore,
-                  topicElo,
-               };
-            });
+             const enriched = (hcData || []).map((hq: any) => {
+                const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
+                const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
+                const seenCount = seenUsers.size;
+                const difficulty = hq.difficulty ?? 3;
+                const topicElo = hq.stats?.topic_elo ?? 1500;
+                const diffScore = Math.abs(topicElo - userTopicSkill);
+                const difficultyProximity = Math.abs(difficulty - targetDifficulty);
+                return {
+                   id: hq.id,
+                   prompt: hq.prompt,
+                   choices: hq.choices,
+                   answer: hq.answer,
+                   explanation: hq.explanation,
+                   variations: hq.variations,
+                   image_url: hq.image_url,
+                   difficulty,
+                   seenCount,
+                   diffScore,
+                   topicElo,
+                   difficultyProximity,
+                };
+             });
 
-            // Tiered bucket: neither → one → both, sorted by difficulty proximity within each
-            const buckets = { neither: [] as any[], one: [] as any[], both: [] as any[] };
-            for (const hq of enriched) {
-               if (hq.seenCount === 0) buckets.neither.push(hq);
-               else if (hq.seenCount < playerIds.length) buckets.one.push(hq);
-               else buckets.both.push(hq);
-            }
-            for (const key of ["neither", "one", "both"] as const) {
-               buckets[key].sort((a, b) => a.diffScore - b.diffScore);
-            }
+             // Tiered bucket: neither → one → both, sorted by difficulty proximity first, then diffScore
+             const buckets = { neither: [] as any[], one: [] as any[], both: [] as any[] };
+             for (const hq of enriched) {
+                if (hq.seenCount === 0) buckets.neither.push(hq);
+                else if (hq.seenCount < playerIds.length) buckets.one.push(hq);
+                else buckets.both.push(hq);
+             }
+             for (const key of ["neither", "one", "both"] as const) {
+                buckets[key].sort((a, b) => {
+                   const dp = a.difficultyProximity - b.difficultyProximity;
+                   return dp !== 0 ? dp : a.diffScore - b.diffScore;
+                });
+             }
 
-            handcraftedList = [
-               ...buckets.neither,
-               ...buckets.one,
-               ...buckets.both,
-            ];
+             handcraftedList = [
+                ...buckets.neither,
+                ...buckets.one,
+                ...buckets.both,
+             ];
          }
       } catch (e: any) {
          console.warn(`${logPrefix} Handcrafted query exception:`, e.message);
@@ -1092,7 +1135,9 @@ serve(async (req) => {
             const roundRng = createSeededRandom(hashSeed(roundSeed));
             const variant = variantSequence[i] ?? 0;
 
-            const weaveProb = config.handcraftedWeaveProbability ?? 0.4;
+             const baseWeave = config.handcraftedWeaveProbability ?? 0.4;
+             // Beginners get more handcrafted questions, advanced get more procedural
+             const weaveProb = baseWeave * (1.5 - targetDifficulty * 0.15);
             // ── Mix Strategy: Weave unexpired handcrafted questions from DB ──
             if (
                shuffledHandcrafted.length > handcraftedCursor &&
