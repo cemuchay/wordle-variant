@@ -64,15 +64,42 @@ export const UnifiedLobby = ({
    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
    const [liveCategory, setLiveCategory] = useState("mixed");
    const [asyncCategory, setAsyncCategory] = useState("mixed");
-   const [historyMatches, setHistoryMatches] = useState<any[]>([]);
-   const [asyncHistoryMatches, setAsyncHistoryMatches] = useState<any[]>([]);
-   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+   const [historyMatches, setHistoryMatches] = useState<any[]>(() => {
+      try {
+         const cached = localStorage.getItem("wordup_cached_history_matches");
+         return cached ? JSON.parse(cached) : [];
+      } catch {
+         return [];
+      }
+   });
+   const [asyncHistoryMatches, setAsyncHistoryMatches] = useState<any[]>(() => {
+      try {
+         const cached = localStorage.getItem("wordup_cached_async_history_matches");
+         return cached ? JSON.parse(cached) : [];
+      } catch {
+         return [];
+      }
+   });
+   const [isLoadingHistory, setIsLoadingHistory] = useState(() => {
+      try {
+         const cached1 = localStorage.getItem("wordup_cached_history_matches");
+         const cached2 = localStorage.getItem("wordup_cached_async_history_matches");
+         return !(cached1 || cached2);
+      } catch {
+         return true;
+      }
+   });
    const [showHelp, setShowHelp] = useState(false);
    const [showCategoryModalFor, setShowCategoryModalFor] = useState<"live" | "async" | null>(null);
    const [frequentCategoryIds, setFrequentCategoryIds] = useState<string[]>(() =>
       getTopFrequentCategories(loadClickData(), 4)
    );
    const [playerSearch, setPlayerSearch] = useState("");
+
+   const historyMatchesRef = useState<any[]>(historyMatches);
+   const asyncHistoryMatchesRef = useState<any[]>(asyncHistoryMatches);
+   historyMatchesRef[0] = historyMatches;
+   asyncHistoryMatchesRef[0] = asyncHistoryMatches;
 
    const trackTopicClick = useCallback((catId: string) => {
       const data = recordClick(catId);
@@ -85,7 +112,10 @@ export const UnifiedLobby = ({
          setIsLoadingHistory(false);
          return;
       }
-      setIsLoadingHistory(true);
+      const hasCache = historyMatchesRef[0].length > 0 || asyncHistoryMatchesRef[0].length > 0;
+      if (!hasCache) {
+         setIsLoadingHistory(true);
+      }
       try {
          const { data: liveData } = await supabase
             .from("wordup_matches")
@@ -99,7 +129,10 @@ export const UnifiedLobby = ({
             .order("completed_at", { ascending: false })
             .limit(30);
 
-         if (liveData) setHistoryMatches(liveData);
+         if (liveData) {
+            setHistoryMatches(liveData);
+            try { localStorage.setItem("wordup_cached_history_matches", JSON.stringify(liveData)); } catch (e) { console.warn(e); }
+         }
 
          const { data: asyncData } = await supabase
             .from("wordup_async_matches")
@@ -113,7 +146,10 @@ export const UnifiedLobby = ({
             .order("completed_at", { ascending: false })
             .limit(30);
 
-         if (asyncData) setAsyncHistoryMatches(asyncData);
+         if (asyncData) {
+            setAsyncHistoryMatches(asyncData);
+            try { localStorage.setItem("wordup_cached_async_history_matches", JSON.stringify(asyncData)); } catch (e) { console.warn(e); }
+         }
       } catch (e) {
          console.error("Failed to fetch history:", e);
       } finally {
