@@ -16,11 +16,11 @@ import { CreateSummaryStep, type ChallengeFormSettings } from './create/CreateSu
 import { DifficultySelector } from './create/DifficultySelector';
 import { MarathonTimerInputs } from './create/MarathonTimerInputs';
 
-const LoadPresetsList = memo(({ 
-    onLoad, 
+const LoadPresetsList = memo(({
+    onLoad,
     presets,
     onRemove
-}: { 
+}: {
     onLoad: (preset: ChallengePreset) => void,
     presets: ChallengePreset[],
     onRemove: (id: string) => void
@@ -109,7 +109,7 @@ const SavePresetForm = memo(({ onSave, canSave }: { onSave: (name: string) => vo
                     </button>
                     <button
                         onClick={() => setIsSaving(false)}
-                        className="bg-white/10 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase"
+                        className="bg-white/10 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase cursor-pointer"
                     >
                         <X size={14} />
                     </button>
@@ -162,19 +162,19 @@ const OptionLabel = memo(({ label, tooltip, activeTooltip, setActiveTooltip, too
     );
 });
 
-const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: { 
-    mode: 'LIVE' | 'ANYTIME', 
+const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: {
+    mode: 'LIVE' | 'ANYTIME',
     setMode: (m: 'LIVE' | 'ANYTIME') => void,
     activeTooltip: string | null,
     setActiveTooltip: (id: string | null) => void
 }) => (
     <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-        <OptionLabel 
-            label="Mode" 
-            tooltip="Choose between 'Anytime' (play at your own pace within 24h, results updated async) and 'Live' (synchronous race against other players with a timer, and real-time audio chat)." 
-            activeTooltip={activeTooltip} 
-            setActiveTooltip={setActiveTooltip} 
-            tooltipId="mode" 
+        <OptionLabel
+            label="Mode"
+            tooltip="Choose between 'Anytime' (play at your own pace within 24h, results updated async) and 'Live' (synchronous race against other players with a timer, and real-time audio chat)."
+            activeTooltip={activeTooltip}
+            setActiveTooltip={setActiveTooltip}
+            tooltipId="mode"
         />
         <div className="grid grid-cols-2 gap-3">
             <button
@@ -205,19 +205,19 @@ const ModeSelector = memo(({ mode, setMode, activeTooltip, setActiveTooltip }: {
     </div>
 ));
 
-const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveTooltip }: { 
-    length: number, 
+const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveTooltip }: {
+    length: number,
     setLength: (l: number) => void,
     activeTooltip: string | null,
     setActiveTooltip: (id: string | null) => void
 }) => (
     <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-        <OptionLabel 
-            label="Word Length" 
-            tooltip="Select word length for the challenge. Choose 'Random' for a surprise length, or 'Marathon' to compete across a sequence of multiple word lengths." 
-            activeTooltip={activeTooltip} 
-            setActiveTooltip={setActiveTooltip} 
-            tooltipId="length" 
+        <OptionLabel
+            label="Word Length"
+            tooltip="Select word length for the challenge. Choose 'Random' for a surprise length, or 'Marathon' to compete across a sequence of multiple word lengths."
+            activeTooltip={activeTooltip}
+            setActiveTooltip={setActiveTooltip}
+            tooltipId="length"
         />
         <div className="flex gap-2 flex-wrap">
             {[3, 4, 5, 6, 7, 8, 9, 10].map((l) => (
@@ -255,19 +255,19 @@ const LengthSelector = memo(({ length, setLength, activeTooltip, setActiveToolti
     </div>
 ));
 
-const TimeLimitSelector = memo(({ maxTime, setMaxTime, activeTooltip, setActiveTooltip }: { 
-    maxTime: number | null, 
+const TimeLimitSelector = memo(({ maxTime, setMaxTime, activeTooltip, setActiveTooltip }: {
+    maxTime: number | null,
     setMaxTime: (t: number) => void,
     activeTooltip: string | null,
     setActiveTooltip: (id: string | null) => void
 }) => (
     <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-        <OptionLabel 
-            label="Time Limit (Per Game)" 
-            tooltip="The maximum duration allowed for each participant to guess the word (Only applies to Live mode)." 
-            activeTooltip={activeTooltip} 
-            setActiveTooltip={setActiveTooltip} 
-            tooltipId="timeLimit" 
+        <OptionLabel
+            label="Time Limit (Per Game)"
+            tooltip="The maximum duration allowed for each participant to guess the word (Only applies to Live mode)."
+            activeTooltip={activeTooltip}
+            setActiveTooltip={setActiveTooltip}
+            tooltipId="timeLimit"
         />
         <div className="flex gap-3">
             {[3, 5, 10].map((t) => (
@@ -284,9 +284,9 @@ const TimeLimitSelector = memo(({ maxTime, setMaxTime, activeTooltip, setActiveT
     </div>
 ));
 
-const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite, activeTooltip, setActiveTooltip }: { 
-    availableProfiles: any[], 
-    invitedIds: string[], 
+const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite, activeTooltip, setActiveTooltip }: {
+    availableProfiles: any[],
+    invitedIds: string[],
     toggleInvite: (id: string) => void,
     activeTooltip: string | null,
     setActiveTooltip: (id: string | null) => void
@@ -297,8 +297,8 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
     const filteredProfiles = useMemo(() => {
         const query = profileSearch.toLowerCase();
         if (!query && !isDropdownOpen) return [];
-        return availableProfiles.filter(p => 
-            !invitedIds.includes(p.id) && 
+        return availableProfiles.filter(p =>
+            !invitedIds.includes(p.id) &&
             p.username.toLowerCase().includes(query)
         ).slice(0, 10); // Limit results for performance
     }, [availableProfiles, invitedIds, profileSearch, isDropdownOpen]);
@@ -315,14 +315,14 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
 
     return (
         <div className="bg-indigo-950/20 border-2 border-indigo-500/30 p-5 rounded-2xl space-y-4 hover:border-indigo-400/50 shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all relative">
-            <OptionLabel 
-                label="Invite Friends" 
-                tooltip="Search and invite other registered players to join this challenge lobby." 
-                activeTooltip={activeTooltip} 
-                setActiveTooltip={setActiveTooltip} 
-                tooltipId="inviteFriends" 
+            <OptionLabel
+                label="Invite Friends"
+                tooltip="Search and invite other registered players to join this challenge lobby."
+                activeTooltip={activeTooltip}
+                setActiveTooltip={setActiveTooltip}
+                tooltipId="inviteFriends"
             />
-            
+
             <div className="space-y-3">
                 {/* Selected Users Chips */}
                 {invitedProfiles.length > 0 && (
@@ -333,7 +333,7 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                                 <span className="text-[10px] font-black uppercase text-correct">{p.username}</span>
                                 <ReigningBadge userId={p.id} type="weekly" />
                                 <ReigningBadge userId={p.id} type="bot_marathon" />
-                                <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors">
+                                <button onClick={() => toggleInvite(p.id)} className="text-correct hover:text-white transition-colors cursor-pointer">
                                     <X size={12} />
                                 </button>
                             </div>
@@ -354,9 +354,9 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
                             className="w-full bg-white/5 border border-white/15 rounded-2xl py-3.5 pl-11 pr-4 text-sm focus:outline-none focus:border-correct/60 focus:bg-white/10 focus:ring-1 focus:ring-correct/30 transition-all text-white placeholder-white/60"
                         />
                         {profileSearch && (
-                            <button 
+                            <button
                                 onClick={() => setProfileSearch('')}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white cursor-pointer"
                             >
                                 <X size={14} />
                             </button>
@@ -393,8 +393,8 @@ const ProfileInviteSystem = memo(({ availableProfiles, invitedIds, toggleInvite,
 
             {/* Click outside to close dropdown backdrop */}
             {isDropdownOpen && (
-                <div 
-                    className="fixed inset-0 z-40 pointer-events-auto" 
+                <div
+                    className="fixed inset-0 z-40 pointer-events-auto"
                     onClick={() => setIsDropdownOpen(false)}
                 />
             )}
@@ -591,7 +591,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     const isCreatorPlayer = !editingChallenge.is_custom_word;
                     if (editingChallenge.word_length === 1 && Array.isArray(editingChallenge.handicap_starters)) {
                         setHandicapStartersArray(
-                            isCreatorPlayer 
+                            isCreatorPlayer
                                 ? Array(editingChallenge.handicap_starters.length).fill('__MASKED__')
                                 : editingChallenge.handicap_starters
                         );
@@ -703,7 +703,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
     const handleUpdateMarathonGames = useCallback((newGames: number[]) => {
         setMarathonGames(newGames);
-        
+
         // Adjust custom target words
         setCustomMarathonWords(prev => {
             const next = [...prev];
@@ -733,7 +733,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                 while (next.length < newGames.length) {
                     const addedLen = newGames[next.length];
                     const idx = next.length;
-                    
+
                     // Look for existing timer in CURRENT state first
                     let existingTime = null;
                     for (let i = 0; i < next.length; i++) {
@@ -1028,7 +1028,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
         }
 
         resetAllFormState();
-        
+
         if (onSuccess) {
             onSuccess();
         }
@@ -1075,7 +1075,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             {step === 0 && (
                 <>
                     {!editingChallenge && (
-                        <LoadPresetsList 
+                        <LoadPresetsList
                             presets={challengePresets}
                             onLoad={handleLoadPreset}
                             onRemove={removeChallengePreset}
@@ -1085,12 +1085,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     <LengthSelector length={length} setLength={setLength} activeTooltip={activeTooltip} setActiveTooltip={setActiveTooltip} />
 
                     <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-                        <OptionLabel 
-                            label="Max Attempts" 
-                            tooltip="The maximum number of guesses allowed for this challenge (between 3 and 10). Default is 6." 
-                            activeTooltip={activeTooltip} 
-                            setActiveTooltip={setActiveTooltip} 
-                            tooltipId="maxAttempts" 
+                        <OptionLabel
+                            label="Max Attempts"
+                            tooltip="The maximum number of guesses allowed for this challenge (between 3 and 10). Default is 6."
+                            activeTooltip={activeTooltip}
+                            setActiveTooltip={setActiveTooltip}
+                            tooltipId="maxAttempts"
                         />
                         <div className="flex gap-2 flex-wrap">
                             {[3, 4, 5, 6, 7, 8, 9, 10].map((a) => (
@@ -1131,12 +1131,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     )}
                     {length === 2 && (
                         <div className="bg-white/5 border border-white/10 p-5 rounded-2xl space-y-4 hover:border-white/25 transition-all">
-                            <OptionLabel 
-                                label="Sentence Length (Words)" 
-                                tooltip="Select how many words the coherent sentence should contain (between 3 and 10 words)." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="sentenceLength" 
+                            <OptionLabel
+                                label="Sentence Length (Words)"
+                                tooltip="Select how many words the coherent sentence should contain (between 3 and 10 words)."
+                                activeTooltip={activeTooltip}
+                                setActiveTooltip={setActiveTooltip}
+                                tooltipId="sentenceLength"
                             />
                             <div className="flex gap-2 flex-wrap">
                                 {[3, 4, 5, 6, 7, 8, 9, 10].map((w) => (
@@ -1165,12 +1165,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {length !== 2 && (
                         <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                             <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Shape Shifter Mode" 
-                                    tooltip="The target word shifts in the background with each guess. Feedback is respected, and you must uniquely identify the word to win (up to 10 tries)." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="isShapeshifter" 
+                                <OptionLabel
+                                    label="Shape Shifter Mode"
+                                    tooltip="The target word shifts in the background with each guess. Feedback is respected, and you must uniquely identify the word to win (up to 10 tries)."
+                                    activeTooltip={activeTooltip}
+                                    setActiveTooltip={setActiveTooltip}
+                                    tooltipId="isShapeshifter"
                                 />
                                 <input
                                     type="checkbox"
@@ -1189,12 +1189,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {/* Disable Hints Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Disable Hints" 
-                                tooltip="If enabled, players will not be allowed to use lightbulb hints during gameplay." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="disableHints" 
+                            <OptionLabel
+                                label="Disable Hints"
+                                tooltip="If enabled, players will not be allowed to use lightbulb hints during gameplay."
+                                activeTooltip={activeTooltip}
+                                setActiveTooltip={setActiveTooltip}
+                                tooltipId="disableHints"
                             />
                             <input
                                 type="checkbox"
@@ -1209,12 +1209,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {!isShapeshifter && (
                         <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                             <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label={length === 2 ? "Custom Sentence" : "Custom Word Challenge"} 
-                                    tooltip={length === 2 ? "Write your own coherent sentence. Every word must be 3-10 letters and present in the guessable dictionary." : "Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)."} 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="customWord" 
+                                <OptionLabel
+                                    label={length === 2 ? "Custom Sentence" : "Custom Word Challenge"}
+                                    tooltip={length === 2 ? "Write your own coherent sentence. Every word must be 3-10 letters and present in the guessable dictionary." : "Creator handpicks the target word(s) instead of system generating them. (Note: As creator, you cannot play in custom word challenges)."}
+                                    activeTooltip={activeTooltip}
+                                    setActiveTooltip={setActiveTooltip}
+                                    tooltipId="customWord"
                                 />
                                 <input
                                     type="checkbox"
@@ -1259,12 +1259,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {/* Handicap Options */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Handicap Challenge" 
-                                tooltip="Set a designated starter word for all players, which limits their opening guesses." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="handicap" 
+                            <OptionLabel
+                                label="Handicap Challenge"
+                                tooltip="Set a designated starter word for all players, which limits their opening guesses."
+                                activeTooltip={activeTooltip}
+                                setActiveTooltip={setActiveTooltip}
+                                tooltipId="handicap"
                             />
                             <input
                                 type="checkbox"
@@ -1276,12 +1276,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         {isHandicap && (
                             <div className="space-y-3.5 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
                                 <div className="space-y-2">
-                                    <OptionLabel 
-                                        label="Starter Type" 
-                                        tooltip="Choose whether the starter word is selected randomly by the system or explicitly typed by the creator." 
-                                        activeTooltip={activeTooltip} 
-                                        setActiveTooltip={setActiveTooltip} 
-                                        tooltipId="starterType" 
+                                    <OptionLabel
+                                        label="Starter Type"
+                                        tooltip="Choose whether the starter word is selected randomly by the system or explicitly typed by the creator."
+                                        activeTooltip={activeTooltip}
+                                        setActiveTooltip={setActiveTooltip}
+                                        tooltipId="starterType"
                                     />
                                     <div className="grid grid-cols-2 gap-2">
                                         <button type="button" onClick={() => setHandicapMode('random')}
@@ -1327,12 +1327,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {isAdmin && (
                         <div className="space-y-3 bg-indigo-950/20 p-4 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
                             <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Daily Bot Challenge" 
-                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="dailyBotChallenge" 
+                                <OptionLabel
+                                    label="Daily Bot Challenge"
+                                    tooltip="If enabled, the challenge creator will be set to 'Variant Bot'. Anyone can join, and all game words are pre-salted and saved at creation time."
+                                    activeTooltip={activeTooltip}
+                                    setActiveTooltip={setActiveTooltip}
+                                    tooltipId="dailyBotChallenge"
                                 />
                                 <input
                                     type="checkbox"
@@ -1347,12 +1347,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {/* Public Challenge Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
-                            <OptionLabel 
-                                label="Public Challenge" 
-                                tooltip="When enabled, anyone with the challenge link can join. Otherwise, only explicitly invited players can enter." 
-                                activeTooltip={activeTooltip} 
-                                setActiveTooltip={setActiveTooltip} 
-                                tooltipId="publicChallenge" 
+                            <OptionLabel
+                                label="Public Challenge"
+                                tooltip="When enabled, anyone with the challenge link can join. Otherwise, only explicitly invited players can enter."
+                                activeTooltip={activeTooltip}
+                                setActiveTooltip={setActiveTooltip}
+                                tooltipId="publicChallenge"
                             />
                             <input
                                 type="checkbox"
@@ -1363,12 +1363,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         </div>
                         {isPublic && (
                             <div className="space-y-2 pl-4 border-l border-white/10 animate-in slide-in-from-left duration-200">
-                                <OptionLabel 
-                                    label="Max Participants" 
-                                    tooltip="Limit the total number of players allowed in this public lobby (between 2 and 100)." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="maxParticipants" 
+                                <OptionLabel
+                                    label="Max Participants"
+                                    tooltip="Limit the total number of players allowed in this public lobby (between 2 and 100)."
+                                    activeTooltip={activeTooltip}
+                                    setActiveTooltip={setActiveTooltip}
+                                    tooltipId="maxParticipants"
                                 />
                                 <input
                                     type="number"
@@ -1400,12 +1400,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     {(isPublic || isCustomWord) && (
                         <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5 animate-in fade-in duration-200">
                             <div className="flex items-center justify-between">
-                                <OptionLabel 
-                                    label="Notify Me of Progress" 
-                                    tooltip="Get notifications when a new participant joins, completes a game, or finishes the challenge." 
-                                    activeTooltip={activeTooltip} 
-                                    setActiveTooltip={setActiveTooltip} 
-                                    tooltipId="notifyCreator" 
+                                <OptionLabel
+                                    label="Notify Me of Progress"
+                                    tooltip="Get notifications when a new participant joins, completes a game, or finishes the challenge."
+                                    activeTooltip={activeTooltip}
+                                    setActiveTooltip={setActiveTooltip}
+                                    tooltipId="notifyCreator"
                                 />
                                 <input
                                     type="checkbox"
@@ -1419,12 +1419,12 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
 
                     {/* Lifespan Option */}
                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                        <OptionLabel 
-                            label="Challenge Lifespan" 
-                            tooltip="The number of hours this challenge lobby will remain open before automatically expiring." 
-                            activeTooltip={activeTooltip} 
-                            setActiveTooltip={setActiveTooltip} 
-                            tooltipId="lifespan" 
+                        <OptionLabel
+                            label="Challenge Lifespan"
+                            tooltip="The number of hours this challenge lobby will remain open before automatically expiring."
+                            activeTooltip={activeTooltip}
+                            setActiveTooltip={setActiveTooltip}
+                            tooltipId="lifespan"
                         />
                         <div className={`grid gap-2 ${isBotMarathon ? 'grid-cols-7' : 'grid-cols-4'}`}>
                             {(isBotMarathon ? [24, 48, 72, 96, 120, 144, 168] : [1, 6, 12, 24]).map(h => (
@@ -1462,10 +1462,10 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                         </div>
                     )}
 
-                    <ProfileInviteSystem 
-                        availableProfiles={availableProfiles} 
-                        invitedIds={invitedIds} 
-                        toggleInvite={toggleInvite} 
+                    <ProfileInviteSystem
+                        availableProfiles={availableProfiles}
+                        invitedIds={invitedIds}
+                        toggleInvite={toggleInvite}
                         activeTooltip={activeTooltip}
                         setActiveTooltip={setActiveTooltip}
                     />

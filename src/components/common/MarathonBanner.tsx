@@ -86,7 +86,7 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
                     )}
                 </div>
                 {navigation ? navigation : (
-                    <span className=" text-[8px] sm:text-[10px] font-black text-white/30 uppercase tracking-wider font-mono">
+                    <span className=" text-[8px] sm:text-[10px] font-black text-white uppercase tracking-wider font-mono">
                         Host: Variant Bot
                     </span>
                 )}
@@ -97,7 +97,7 @@ const BannerItem = ({ challenge, onClick, showTimer, navigation }: { challenge: 
                     {config.title}
                 </h3>
                 <div className="flex items-end justify-between gap-4">
-                    <p className="text-[11px] text-white/50 mt-0.5 font-medium leading-relaxed">
+                    <p className="text-[11px] text-white mt-0.5 font-medium leading-relaxed">
                         {config.description}
                     </p>
                     <span className={`text-[10px] font-black uppercase tracking-wider ${config.textAccent} flex items-center gap-1 group-hover:gap-2 transition-all shrink-0 mb-0.5`}>

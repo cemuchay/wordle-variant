@@ -40,10 +40,12 @@ export const DynamicIslandStatus = () => {
     const [mascot, setMascot] = useState<{ expression: MascotExpression; label: string } | null>(null);
     const [showOnlineNotification, setShowOnlineNotification] = useState(false);
     const [showRainbowBorder, setShowRainbowBorder] = useState(false);
+    const [scaleMultiplier, setScaleMultiplier] = useState(1);
     const toastTimerRef = useRef<number>(null);
     const prevMascotKeyRef = useRef<string>('');
     const mascotRainbowTimerRef = useRef<number>(null);
     const isFirstRender = useRef(true);
+    const lastStatusKey = useRef('');
 
     // Filter out the current user from the online count, cross-referencing with
     // freshly fetched profile last_seen_at to catch stale presence entries
@@ -204,6 +206,44 @@ export const DynamicIslandStatus = () => {
     // Get the first active voice room to show in the island
     const currentVoiceSession = activeVoiceRooms[0];
 
+    const getStatusKey = () => {
+        if (isExpanded) return 'expanded';
+        if (toast.show) return `toast-${toast.message}`;
+        if (activeCall) return `call-${activeCall.status}`;
+        if (currentVoiceSession) return `voice-${currentVoiceSession.challengeId}`;
+        if (mascot) return `mascot-${mascot.expression}`;
+        if (otherOnlineUsers.length > 0) return 'online';
+        return 'default';
+    };
+
+    // Watch status changes to trigger rainbow lightup & micro-expansion/scale animation
+    useEffect(() => {
+        const key = getStatusKey();
+        if (isFirstRender.current) {
+            lastStatusKey.current = key;
+            return;
+        }
+        if (key !== lastStatusKey.current) {
+            lastStatusKey.current = key;
+
+            // Trigger rainbow border
+            setShowRainbowBorder(true);
+            if (mascotRainbowTimerRef.current) clearTimeout(mascotRainbowTimerRef.current);
+            mascotRainbowTimerRef.current = setTimeout(() => {
+                setShowRainbowBorder(false);
+            }, 3000); // 3 seconds of rainbow lightup
+
+            // Brief scale-up animation/pop whenever status changes
+            setScaleMultiplier(1.08);
+            const scaleTimer = setTimeout(() => {
+                setScaleMultiplier(1);
+            }, 300);
+            return () => {
+                clearTimeout(scaleTimer);
+            };
+        }
+    }, [toast.show, toast.message, activeCall?.status, currentVoiceSession, mascot, otherOnlineUsers.length, isExpanded]);
+
     const handleGoToLobby = (e: React.MouseEvent, challengeId: string) => {
         e.stopPropagation();
         if (challengeId === 'global') {
@@ -240,7 +280,8 @@ export const DynamicIslandStatus = () => {
         if (toast.show) {
             const len = toast.message?.length || 0;
             // Expand dynamically if text is long
-            const dynamicWidth = Math.max(280, Math.min(420, 160 + len * 5.5));
+            const multiplier = len > 40 ? 6.5 : 5.5;
+            const dynamicWidth = Math.max(280, Math.min(440, 160 + len * multiplier));
             return `min(95vw, ${dynamicWidth}px)`;
         }
         if (user && activeCall) {
@@ -259,6 +300,8 @@ export const DynamicIslandStatus = () => {
         return '160px';
     };
 
+    const isLongText = toast.show && (toast.message?.length > 25 || toast.isLarge);
+
     return (
         <div key={resumeKey} className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
             <motion.div
@@ -266,15 +309,15 @@ export const DynamicIslandStatus = () => {
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
                 animate={{
                     opacity: 1,
-                    scale: 1,
+                    scale: scaleMultiplier,
                     y: isExpanded ? 8 : 0,
                 }}
                 style={{
                     borderRadius: isExpanded ? '32px' : '20px',
                     width: getPillWidth(),
-                    height: isExpanded ? 'min(75vh, 480px)' : toast.show && toast.isLarge ? 'auto' : '32px',
-                    minHeight: toast.show && toast.isLarge ? '48px' : '32px',
-                    padding: toast.show && toast.isLarge ? '8px 12px' : '0'
+                    height: isExpanded ? 'min(75vh, 480px)' : isLongText ? 'auto' : '32px',
+                    minHeight: isLongText ? '48px' : '32px',
+                    padding: isLongText ? '8px 16px' : '0'
                 }}
                 transition={{
                     layout: {
@@ -386,7 +429,7 @@ export const DynamicIslandStatus = () => {
                                                 </button>
                                                 <button
                                                     onClick={rejectCall}
-                                                    className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95"
+                                                    className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
                                                 >
                                                     <X size={10} strokeWidth={3} />
                                                 </button>

@@ -1,35 +1,23 @@
--- 110_bible_entities_seed.sql
--- Seed data for Bible book facts (procedural questions).
--- Single entity type: Book — all 66 books of the Protestant canon.
--- Each entity supplies metadata keys that match the bible_book_* templates.
--- Requires: 88_wordup_knowledge_engine.sql
+-- 111_fix_bible_entities_facts.sql
+-- Fixes the Bible facts seeding by splitting predicate registration from entity/fact insertion.
+-- This resolves the Postgres CTE visibility issue where predicates inserted in the CTE 
+-- are not yet visible to the join in the same statement.
 
--- ══════════════════════════════════════════════════════════════════════════════
--- 1. Register the Bible topic
--- ══════════════════════════════════════════════════════════════════════════════
-INSERT INTO public.topics (slug, name) 
-VALUES ('bible', 'Bible') 
-ON CONFLICT (slug) DO NOTHING;
+-- 1. Ensure all predicates are inserted and committed first
+INSERT INTO public.predicates (topic_id, name, value_type)
+VALUES
+  ((SELECT id FROM public.topics WHERE slug = 'bible'), 'canonical_order', 'integer'),
+  ((SELECT id FROM public.topics WHERE slug = 'bible'), 'chapter_count', 'integer'),
+  ((SELECT id FROM public.topics WHERE slug = 'bible'), 'testament', 'text'),
+  ((SELECT id FROM public.topics WHERE slug = 'bible'), 'previous_book', 'text'),
+  ((SELECT id FROM public.topics WHERE slug = 'bible'), 'next_book', 'text')
+ON CONFLICT (topic_id, name) DO NOTHING;
 
--- ══════════════════════════════════════════════════════════════════════════════
--- 2. Clean up: drop old entity types (Person, Location, NumberFact) and their
---    entities for the Bible topic. Keep only the Book entity type.
--- ══════════════════════════════════════════════════════════════════════════════
+-- 2. Clean up previous empty-metadata entities
 DELETE FROM public.entities
 WHERE topic_id = (SELECT id FROM public.topics WHERE slug = 'bible');
 
-DELETE FROM public.entity_types
-WHERE topic_id = (SELECT id FROM public.topics WHERE slug = 'bible')
-  AND name IN ('Person', 'Location', 'NumberFact');
-
--- Ensure Book entity type exists
-INSERT INTO public.entity_types (topic_id, name)
-SELECT id, 'Book' FROM public.topics WHERE slug = 'bible'
-ON CONFLICT (topic_id, name) DO NOTHING;
-
--- ══════════════════════════════════════════════════════════════════════════════
--- 3. Seed all 66 books
--- ══════════════════════════════════════════════════════════════════════════════
+-- 3. Seed entities and facts (joining now-visible predicates)
 WITH input_data (label, metadata, difficulty, tags) AS (
   VALUES
     -- Old Testament (canonical_order 1-39)
@@ -110,16 +98,6 @@ inserted_entities AS (
       label, difficulty, tags
   FROM input_data
   RETURNING id, label
-),
-register_predicates AS (
-  INSERT INTO public.predicates (topic_id, name, value_type)
-  SELECT DISTINCT
-      (SELECT id FROM public.topics WHERE slug = 'bible'),
-      key,
-      CASE WHEN key = 'canonical_order' OR key = 'chapter_count' THEN 'integer' ELSE 'text' END
-  FROM input_data,
-  LATERAL jsonb_each_text(metadata)
-  ON CONFLICT (topic_id, name) DO NOTHING
 )
 INSERT INTO public.facts (subject_id, predicate_id, value)
 SELECT e.id, p.id, kv.value

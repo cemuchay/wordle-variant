@@ -205,14 +205,14 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
     useEffect(() => {
         Promise.resolve().then(() => {
             setExploreTitle(null); // Clear active exploration status on question switch
-            
+
             if (selectedQuestion) {
                 setImageUrlVal(selectedQuestion.image_url || '');
                 setImageUrlsList(selectedQuestion.image_urls || []);
                 setNoImageNeededVal(selectedQuestion.no_image_needed || false);
                 setWikiSearchTerm(selectedQuestion.answer);
                 setWikiResults([]);
-                
+
                 // Scroll the curator dashboard back to top
                 const container = document.querySelector('.h-screen.overflow-y-auto');
                 if (container) {
@@ -477,8 +477,8 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                     key={q.id}
                                     onClick={() => setSelectedQuestion(q)}
                                     className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${isSelected
-                                            ? 'bg-correct border-correct text-black shadow-lg shadow-correct/10'
-                                            : 'bg-black/40 border-white/5 text-gray-300 hover:border-white/20 hover:bg-white/5'
+                                        ? 'bg-correct border-correct text-black shadow-lg shadow-correct/10'
+                                        : 'bg-black/40 border-white/5 text-gray-300 hover:border-white/20 hover:bg-white/5'
                                         }`}
                                 >
                                     <div className="mt-1">
@@ -552,8 +552,8 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                         <div
                                             key={i}
                                             className={`p-3 rounded-xl border text-xs font-bold ${isCorrect
-                                                    ? 'bg-correct/10 border-correct text-correct'
-                                                    : 'bg-black/30 border-white/5 text-gray-400'
+                                                ? 'bg-correct/10 border-correct text-correct'
+                                                : 'bg-black/30 border-white/5 text-gray-400'
                                                 }`}
                                         >
                                             <span className="text-[10px] opacity-40 uppercase block mb-1">Choice {i + 1}</span>
@@ -628,7 +628,7 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                                 <span className="truncate max-w-[150px]">{url}</span>
                                                 <button
                                                     onClick={() => setImageUrlsList(prev => prev.filter((_, idx) => idx !== index))}
-                                                    className="text-gray-500 hover:text-white rounded-full p-0.5"
+                                                    className="text-gray-500 hover:text-white rounded-full p-0.5 cursor-pointer"
                                                 >
                                                     <X size={10} />
                                                 </button>
@@ -716,7 +716,7 @@ const WordUpCurator = ({ triggerToast }: { triggerToast: (text: string, type?: '
                                 </div>
                             </div>
 
-                             <div className="flex gap-2">
+                            <div className="flex gap-2">
                                 <input
                                     type="text"
                                     placeholder="Enter entity query e.g. Lionel Messi, Oxygen, France flag..."
@@ -1710,7 +1710,7 @@ SELECT create_admin_user(
                                     <div className="bg-gray-900 border border-white/10 rounded-2xl p-5 mb-2 relative">
                                         <button
                                             onClick={() => setShowSqlHelper(false)}
-                                            className="absolute top-4 right-4 text-gray-500 hover:text-white"
+                                            className="absolute top-4 right-4 text-gray-500 hover:text-white cursor-pointer"
                                         >
                                             <X size={18} />
                                         </button>
@@ -1872,7 +1872,7 @@ SELECT create_admin_user(
                                     {searchQuery && (
                                         <button
                                             onClick={() => setSearchQuery('')}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white cursor-pointer"
                                         >
                                             <X size={16} />
                                         </button>
@@ -2127,7 +2127,7 @@ SELECT create_admin_user(
                                     setSelectedWord(null);
                                     setReviewReason('');
                                 }}
-                                className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                                className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
                             >
                                 <X size={20} />
                             </button>

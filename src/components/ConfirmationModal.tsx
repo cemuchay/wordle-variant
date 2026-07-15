@@ -58,11 +58,10 @@ export const ConfirmationModal = ({
                             onClick={() => {
                                 onConfirm();
                             }}
-                            className={`flex-1 py-2.5 font-black text-xs rounded-xl transition-all shadow-lg uppercase tracking-widest ${
-                                isDanger 
-                                ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/20' 
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20'
-                            }`}
+                            className={`flex-1 py-2.5 font-black text-xs rounded-xl transition-all shadow-lg uppercase tracking-widest ${isDanger
+                                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/20'
+                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20'
+                                }`}
                         >
                             {confirmLabel}
                         </button>
@@ -70,9 +69,9 @@ export const ConfirmationModal = ({
                 </div>
 
                 {/* Close Button */}
-                <button 
+                <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white"
+                    className="absolute top-4 right-4 p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white cursor-pointer"
                 >
                     <X size={16} />
                 </button>

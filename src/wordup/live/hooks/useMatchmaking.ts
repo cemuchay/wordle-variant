@@ -97,7 +97,7 @@ export const useWordUpMatchmaking = (
             },
             async (payload) => {
                const match = payload.new as any;
-               if (match.status === "countdown" || match.status === "waiting") {
+               if (match.status === "countdown") {
                   cleanUpMatchmaking();
                   setMatchId(match.id);
                   setRole("player1");
@@ -129,20 +129,15 @@ export const useWordUpMatchmaking = (
                   .from("wordup_matches")
                   .select("*")
                   .eq("player1_id", user.id)
-                  .in("status", ["waiting", "countdown"])
+                  .in("status", ["countdown"])
                   .order("created_at", { ascending: false })
                   .limit(1);
                if (data?.[0]) {
                   const match = data[0] as any;
-                  if (
-                     match.status === "countdown" ||
-                     match.status === "waiting"
-                  ) {
-                     cleanUpMatchmaking();
-                     setMatchId(match.id);
-                     setRole("player1");
-                     onMatchFound(match.id, "player1");
-                  }
+                  cleanUpMatchmaking();
+                  setMatchId(match.id);
+                  setRole("player1");
+                  onMatchFound(match.id, "player1");
                }
             }
          });

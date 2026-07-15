@@ -7,17 +7,17 @@ import { useAppStore } from '../../store/useAppStore';
 import { Z_INDEX, ANIMATION_DURATION } from '../../constants/ui';
 import { type AppNotification } from '../../types/notifications';
 
-const NotificationItem = memo(({ 
-    notification, 
-    onMarkRead, 
+const NotificationItem = memo(({
+    notification,
+    onMarkRead,
     onMarkUnread,
     onDelete,
     onClick,
     isSessionNew
-}: { 
-    notification: AppNotification, 
-    onMarkRead: (id: string) => void, 
-    onMarkUnread: (id: string) => void, 
+}: {
+    notification: AppNotification,
+    onMarkRead: (id: string) => void,
+    onMarkUnread: (id: string) => void,
     onDelete: (id: string) => void,
     onClick?: (n: AppNotification) => void,
     isSessionNew: boolean
@@ -32,15 +32,13 @@ const NotificationItem = memo(({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             onClick={onClick ? () => onClick(notification) : undefined}
-            className={`p-4 rounded-2xl border transition-all ${
-                onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
-            } ${
-                isNew
+            className={`p-4 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
+                } ${isNew
                     ? 'bg-white/[0.08] border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
                     : isUnread
-                    ? 'bg-white/[0.06] border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
-                    : 'bg-white/[0.03] border-white/5 opacity-90'
-            }`}
+                        ? 'bg-white/[0.06] border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
+                        : 'bg-white/[0.03] border-white/5 opacity-90'
+                }`}
         >
             <div className="flex justify-between items-start gap-3">
                 <div className="flex-1 space-y-1">
@@ -57,7 +55,7 @@ const NotificationItem = memo(({
                         {new Date(notification.created_at).toLocaleString()}
                     </span>
                 </div>
-                
+
                 <div className="flex items-center gap-1 shrink-0">
                     {isUnread ? (
                         <button
@@ -148,15 +146,15 @@ export const NotificationModal = memo(() => {
             const groupId = n.data?.group_id;
             const groupType = n.data?.group_type;
             const senderId = n.data?.sender_id;
-            
+
             const { setPendingChatGroupId, setPendingDMUserId } = useAppStore.getState();
-            
+
             if ((n.type === 'DM_MESSAGE' || groupType === 'dm') && senderId) {
                 setPendingDMUserId(senderId);
             } else if (groupId) {
                 setPendingChatGroupId(groupId);
             }
-            
+
             setIsChatOpen(true);
             setIsNotificationsOpen(false);
         }
@@ -169,8 +167,8 @@ export const NotificationModal = memo(() => {
     if (!isNotificationsOpen) return null;
 
     return (
-        <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" 
+        <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
             style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
             onClick={() => setIsNotificationsOpen(false)}
         >
@@ -197,7 +195,7 @@ export const NotificationModal = memo(() => {
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                         {unreadCount > 0 && (
                             <button
@@ -207,9 +205,9 @@ export const NotificationModal = memo(() => {
                                 Mark all as read
                             </button>
                         )}
-                        <button 
+                        <button
                             onClick={() => setIsNotificationsOpen(false)}
-                            className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                            className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
                         >
                             <X size={20} />
                         </button>
@@ -238,21 +236,21 @@ export const NotificationModal = memo(() => {
                     ) : (
                         <AnimatePresence mode="popLayout">
                             {sortedNotifications.map(n => {
-                                const isInteractive = n.type === 'CHALLENGE_INVITE' || 
-                                                     n.type === 'CHALLENGE_COMPLETED' || 
-                                                     n.type === 'MARATHON_GAME_COMPLETED' || 
-                                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
-                                                     n.type === 'DM_MESSAGE' ||
-                                                     n.type === 'CHAT_MENTION';
+                                const isInteractive = n.type === 'CHALLENGE_INVITE' ||
+                                    n.type === 'CHALLENGE_COMPLETED' ||
+                                    n.type === 'MARATHON_GAME_COMPLETED' ||
+                                    n.type === 'LEADERBOARD_OVERTAKEN' ||
+                                    n.type === 'DM_MESSAGE' ||
+                                    n.type === 'CHAT_MENTION';
                                 const isSessionNew = sessionNewIds.has(n.id);
                                 return (
-                                    <NotificationItem 
-                                        key={n.id} 
-                                        notification={n} 
+                                    <NotificationItem
+                                        key={n.id}
+                                        notification={n}
                                         isSessionNew={isSessionNew}
-                                        onMarkRead={markAsRead} 
+                                        onMarkRead={markAsRead}
                                         onMarkUnread={markAsUnread}
-                                        onDelete={deleteNotification} 
+                                        onDelete={deleteNotification}
                                         onClick={isInteractive ? handleNotificationClick : undefined}
                                     />
                                 );

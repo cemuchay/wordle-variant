@@ -757,6 +757,24 @@ export function useGameEngine(props: EngineProps) {
     }, [stopAllTimers]);
     const abortMatch = useCallback(async () => {
         stopAllTimers();
+        const mId = useLiveStore.getState().matchId;
+        if (mId && !mId.startsWith("bot-match-")) {
+            if (channelRef.current) {
+                channelRef.current.send({
+                    type: "broadcast",
+                    event: "match_abandoned",
+                    payload: { role: roleRef.current }
+                });
+            }
+            try {
+                await supabase
+                    .from("wordup_matches")
+                    .update({ status: "abandoned" })
+                    .eq("id", mId);
+            } catch (e) {
+                console.error("Failed to mark match as abandoned in DB:", e);
+            }
+        }
         setPhase("idle");
         useLiveStore.getState().setView("menu");
         useLiveStore.getState().resetGame();
@@ -884,24 +902,53 @@ export function useGameEngine(props: EngineProps) {
                     const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
                     if (oppId) {
                         try {
-                            const res = await supabase
+                            let { data: profileData } = await supabase
                                 .from("profiles")
-                                .select("username, avatar_url")
+                                .select("id, username, avatar_url")
                                 .eq("id", oppId)
-                                .single();
-                            if (res.data) {
+                                .maybeSingle();
+
+                            if (!profileData) {
+                                const { data: guestData } = await supabase
+                                    .from("guest_profiles")
+                                    .select("id, username, avatar_url")
+                                    .eq("id", oppId)
+                                    .maybeSingle();
+                                profileData = guestData;
+                            }
+
+                            if (profileData) {
+                                let rating = 600;
+                                let rankName = "Bronze";
+                                try {
+                                    const { data: wp } = await supabase
+                                        .from("wordup_profiles")
+                                        .select("rating, rank_name")
+                                        .eq("id", oppId)
+                                        .maybeSingle();
+                                    if (wp) {
+                                        rating = wp.rating;
+                                        rankName = wp.rank_name;
+                                    }
+                                } catch (e) {
+                                    console.warn("Failed to fetch opponent wordup_profile:", e);
+                                }
+
                                 oppStats = {
-                                    ...res.data,
-                                    rating: 600,
+                                    id: profileData.id,
+                                    username: profileData.username,
+                                    avatar_url: profileData.avatar_url,
+                                    rating: rating,
                                     xp: 0,
                                     games_played: 0,
                                     games_won: 0,
                                     games_lost: 0,
                                     games_tied: 0,
-                                    rank_name: "Bronze",
+                                    rank_name: rankName,
                                 };
                             }
-                        } catch {
+                        } catch (e) {
+                            console.error("Failed to load opponent details:", e);
                             oppStats = null;
                         }
                     }
@@ -974,6 +1021,13 @@ export function useGameEngine(props: EngineProps) {
                         onRematchAccepted(payload.newMatchId, nextRole);
                     }
                 })
+                .on("broadcast", { event: "match_abandoned" }, () => {
+                    triggerToast("Opponent left the match.", 3000);
+                    stopAllTimers();
+                    setPhase("idle");
+                    useLiveStore.getState().setView("menu");
+                    useLiveStore.getState().resetGame();
+                })
                 .subscribe((status) => {
                     if (status === "SUBSCRIBED") {
                         console.log(`Subscribed to match channel: ${channelName}`);
@@ -983,7 +1037,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = ch;
             }
         },
-        [handleOpponentAnswer, onRematchAccepted, props.userId],
+        [handleOpponentAnswer, onRematchAccepted, props.userId, abortMatch, triggerToast, stopAllTimers],
     );
 
     // ── Derive computed state shape for LiveView ─────────────────

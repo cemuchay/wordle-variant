@@ -103,7 +103,7 @@ export const GameOverModal: React.FC<Props> = ({
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-2 shadow-2xl text-center relative my-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-red-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5"
+          className="absolute top-4 right-4 text-red-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
           aria-label="Close"
         >
           <X size={18} />
