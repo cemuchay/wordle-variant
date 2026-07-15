@@ -68,7 +68,7 @@ export const NotificationToast = memo(() => {
                             e.stopPropagation();
                             setCurrentNotification(null);
                         }}
-                        className="text-gray-500 hover:text-white shrink-0"
+                        className="text-gray-500 hover:text-white shrink-0 cursor-pointer"
                     >
                         <X size={14} />
                     </button>

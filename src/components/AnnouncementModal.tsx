@@ -34,7 +34,7 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
               {announcement.title}
             </h2>
           </div>
-          <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>

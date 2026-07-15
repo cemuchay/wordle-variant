@@ -106,7 +106,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, durat
             {/* Close action */}
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0 self-center"
+              className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0 self-center cursor-pointer"
               aria-label="Close"
             >
               <X size={14} />

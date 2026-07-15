@@ -76,6 +76,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     return parseMarathonGames(targetWord, salt);
   }, [isMarathon, targetWord, salt]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const numDays = useMemo(() => {
     if (!challenge?.created_at || !challenge?.expires_at) return 7;
     const diffMs = new Date(challenge.expires_at).getTime() - new Date(challenge.created_at).getTime();
@@ -468,6 +469,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       /^Variant - .+\n/,
       `Challenge - #${challengeShortId} (${date})\n`,
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameData, isChallenge, isMarathon, marathonGameIndex, date, challengeShortId, targetWordToUse]);
 
   const isOwnEntry = profile?.id === entry.user_id || (!profile && !!entry.guest_id);
@@ -501,7 +503,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white z-20"
+          className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer"
         >
           <X size={20} />
         </button>

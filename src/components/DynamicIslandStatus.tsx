@@ -386,7 +386,7 @@ export const DynamicIslandStatus = () => {
                                                 </button>
                                                 <button
                                                     onClick={rejectCall}
-                                                    className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95"
+                                                    className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
                                                 >
                                                     <X size={10} strokeWidth={3} />
                                                 </button>
