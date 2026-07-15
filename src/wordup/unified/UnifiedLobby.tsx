@@ -242,16 +242,16 @@ export const UnifiedLobby = ({
                {onBackToClassic && (
                   <button
                      onClick={onBackToClassic}
-                     className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
+                     className="p-1.5 me-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
                      title="Back to Classic"
                   >
-                     <Home size={14} />
+                     <Home size={20} />
                   </button>
                )}
                <div className="w-7 h-7 rounded-xl bg-[#E85151] flex items-center justify-center text-white shadow-md shadow-[#E85151]/35">
                   <Play size={14} fill="white" />
                </div>
-               <h1 className="text-lg font-black uppercase tracking-wider text-white">WordUp Arena</h1>
+               <h1 className="text-lg font-black uppercase tracking-wider text-white">WordUp</h1>
             </div>
             <div className="flex items-center gap-1.5">
                <button
@@ -278,7 +278,7 @@ export const UnifiedLobby = ({
                <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${activeTab === tab.id
+                  className={`flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all cursor-pointer ${activeTab === tab.id
                      ? "bg-[#E85151] text-white shadow-md shadow-[#E85151]/30"
                      : "text-white/40 hover:text-white hover:bg-white/5"
                      }`}
@@ -336,13 +336,13 @@ export const UnifiedLobby = ({
                      <div className="space-y-2">
                         <div className="flex items-center gap-1.5 text-white/80">
                            <Radio size={14} className="text-[#E85151] animate-pulse" />
-                           <span className="text-[10px] font-black uppercase tracking-wider">Latest Activity</span>
+                           <span className="text-[12px] font-black uppercase tracking-wider">Latest Activity</span>
                         </div>
                         <div className="space-y-2 bg-white/5 border border-white/10 p-3 rounded-2xl shadow-inner min-h-[80px]">
                            {isLoadingHistory ? (
                               <div className="space-y-2 animate-pulse">
                                  {[1, 2, 3].map((n) => (
-                                    <div key={n} className="flex items-center justify-between bg-black/10 border border-white/5 rounded-xl p-2.5 h-[46px]">
+                                    <div key={n} className="flex items-center justify-between bg-black/10 border border-white/5 rounded-xl p-2.5 h-[56px]">
                                        <div className="flex items-center gap-2.5 w-full">
                                           <div className="w-6 h-6 rounded-md bg-white/10 shrink-0"></div>
                                           <div className="space-y-1.5 flex-1">
@@ -364,10 +364,10 @@ export const UnifiedLobby = ({
                                           <div className="flex items-center gap-2">
                                              <span className="text-lg">{emoji}</span>
                                              <div className="min-w-0">
-                                                <p className="text-[11px] text-white font-bold leading-tight truncate">
+                                                <p className="text-[12px] text-white font-bold leading-tight truncate">
                                                    Challenge vs <span className="text-[#E85151]">{item.oppName}</span>
                                                 </p>
-                                                <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
+                                                <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
                                                    {itemCatObj?.name || "Trivia"}
                                                 </p>
                                              </div>
@@ -408,16 +408,16 @@ export const UnifiedLobby = ({
                                           <div className="flex items-center gap-2 min-w-0">
                                              <span className="text-lg">{emoji}</span>
                                              <div className="min-w-0">
-                                                <p className="text-[11px] text-white font-bold leading-tight truncate">
+                                                <p className="text-[12px] text-white font-bold leading-tight truncate">
                                                    vs {item.oppName}
                                                 </p>
-                                                <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
+                                                <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
                                                    {itemCatObj?.name || "Trivia"}
                                                 </p>
                                              </div>
                                           </div>
                                           <div className="flex items-center gap-2 shrink-0">
-                                             <span className="text-[10px] font-black text-white">{item.myScore} - {item.oppScore}</span>
+                                             <span className="text-[12px] font-black text-white">{item.myScore} - {item.oppScore}</span>
                                              <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-md border ${outcomeStyle}`}>
                                                 {outcome}
                                              </span>
@@ -431,10 +431,10 @@ export const UnifiedLobby = ({
                                        <div key={item.id} className="flex items-center gap-2.5 bg-[#E85151]/10 border border-[#E85151]/25 rounded-xl p-2.5">
                                           <Shield size={16} className="text-[#E85151]" />
                                           <div>
-                                             <p className="text-[11px] text-white font-bold leading-tight">
+                                             <p className="text-[12px] text-white font-bold leading-tight">
                                                 Rank Update: <span className="text-[#E85151]">{item.rankName}</span>
                                              </p>
-                                             <p className="text-[8px] text-white/70 font-extrabold uppercase mt-0.5">
+                                             <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
                                                 Currently holding {item.rating} rating ELO
                                              </p>
                                           </div>
@@ -457,12 +457,12 @@ export const UnifiedLobby = ({
                         <div className="space-y-2">
                            <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
                            <div className="grid grid-cols-2 gap-2">
-               {frequentCategories.slice(0, 4).map((cat) => {
-                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                                  return (
-                                     <div
-                                        key={cat.id}
-                                        onClick={() => trackTopicClick(cat.id)}
+                              {frequentCategories.slice(0, 4).map((cat) => {
+                                 const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                                 return (
+                                    <div
+                                       key={cat.id}
+                                       onClick={() => trackTopicClick(cat.id)}
                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                     >
                                        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
@@ -491,39 +491,39 @@ export const UnifiedLobby = ({
                               {featuredCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                                  return (
-                                  <div
-                                        key={cat.id}
-                                        onClick={() => trackTopicClick(cat.id)}
-                                        className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
-                                     >
-                                        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
-                                           {style.svg ? (
-                                              <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
-                                           ) : (
-                                              <span className="text-xl">{style.emoji}</span>
-                                           )}
-                                        </div>
-                                        <div className="min-w-0">
-                                           <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
-                                           <p className="text-[8px] text-[#E85151] font-black uppercase tracking-widest">Select Topic</p>
-                                        </div>
-                                     </div>
-                                  );
-                               })}
-                            </div>
-                         </div>
-                      )}
+                                    <div
+                                       key={cat.id}
+                                       onClick={() => trackTopicClick(cat.id)}
+                                       className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
+                                    >
+                                       <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
+                                          {style.svg ? (
+                                             <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: style.svg }} />
+                                          ) : (
+                                             <span className="text-xl">{style.emoji}</span>
+                                          )}
+                                       </div>
+                                       <div className="min-w-0">
+                                          <p className="text-xs font-black text-white truncate uppercase tracking-wider leading-none mb-1">{cat.name}</p>
+                                          <p className="text-[8px] text-[#E85151] font-black uppercase tracking-widest">Select Topic</p>
+                                       </div>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     )}
 
-                      {/* All Topics */}
-                      <div className="space-y-2">
-                         <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
-                         <div className="grid grid-cols-2 gap-2">
-                            {allCategories.map((cat) => {
-                               const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
-                               return (
-                                  <div
-                                     key={cat.id}
-                                     onClick={() => trackTopicClick(cat.id)}
+                     {/* All Topics */}
+                     <div className="space-y-2">
+                        <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
+                        <div className="grid grid-cols-2 gap-2">
+                           {allCategories.map((cat) => {
+                              const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
+                              return (
+                                 <div
+                                    key={cat.id}
+                                    onClick={() => trackTopicClick(cat.id)}
                                     className={`bg-linear-to-br ${style.gradient} border ${style.border.split(" ")[0]} ${style.glow} rounded-2xl p-3 flex items-center gap-2.5 cursor-pointer transition-all active:scale-98 shadow-md`}
                                  >
                                     <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 p-1.5 overflow-hidden text-white">
@@ -859,11 +859,11 @@ export const UnifiedLobby = ({
                      initial={{ opacity: 0, y: 10 }}
                      animate={{ opacity: 1, y: 0 }}
                      exit={{ opacity: 0, y: -10 }}
-                     className="space-y-3 min-h-[200px]"
+                     className="space-y-3 min-h-[200px] text-[12px]"
                   >
                      <div className="flex items-center gap-2">
                         <Clock size={14} className="text-[#E85151]" />
-                        <h3 className="text-xs font-black uppercase tracking-widest text-white">Match History</h3>
+                        <h3 className="text-[12px] font-black uppercase tracking-widest text-white">Match History</h3>
                      </div>
                      {isLoadingHistory ? (
                         <div className="flex items-center justify-center py-12">
@@ -901,20 +901,20 @@ export const UnifiedLobby = ({
                                  <div
                                     key={match.id}
                                     onClick={() => onSelectHistoryMatch?.(match)}
-                                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3.5 text-xs cursor-pointer hover:bg-white/5 active:scale-98 transition-all"
+                                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-3.5 cursor-pointer hover:bg-white/5 active:scale-98 transition-all"
                                  >
                                     <div className="min-w-0">
                                        <div className="flex items-center gap-2">
                                           <p className="font-black text-white truncate">vs {oppName}</p>
-                                          <span className={`text-[7.5px] font-black uppercase ${modeColor}`}>{mode}</span>
+                                          <span className={`text-[9.5px] font-black uppercase ${modeColor}`}>{mode}</span>
                                        </div>
-                                       <p className="text-[9px] text-white/70 font-bold uppercase mt-0.5">
+                                       <p className="text-[12px] text-white/70 font-bold uppercase mt-0.5">
                                           {match.category?.replace(/_/g, " ")} • {dateStr}
                                        </p>
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">
-                                       <span className="font-bold text-white text-[11px]">{myScore} - {oppScore}</span>
-                                       <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border ${outcomeStyle}`}>
+                                       <span className="font-bold text-white text-[12px]">{myScore} - {oppScore}</span>
+                                       <span className={`text-[12px] font-black uppercase px-2 py-1 rounded-lg border ${outcomeStyle}`}>
                                           {outcome}
                                        </span>
                                     </div>
