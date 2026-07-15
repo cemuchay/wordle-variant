@@ -106,6 +106,8 @@ export const CATEGORIES = [
    },
 ];
 
+export const GRACE_DECAY = 2;
+
 export const FLAG_MAP: Record<string, string> = {
    nigeria: "ng",
    france: "fr",
