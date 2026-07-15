@@ -482,16 +482,24 @@ export function useGameEngine(props: EngineProps) {
                     setMyCurrentPoints(0);
                 }
 
-                // Live-bot: auto-submit empty for the bot too
-                if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
-                    const bq = questionsRef.current[currentRoundRef.current];
-                    if (bq) {
-                        const bDur = getQuestionDuration(bq.type);
-                        const br = simulateBotResponse(bq, botProfileRef.current, bDur);
-                        const botChoice = pickBotChoice(bq, br.correct);
-                        const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
-                        setOpponentChoice(botChoice);
-                        setOpponentCurrentPoints(pts);
+                // Auto-submit empty answer for the opponent if they haven't answered
+                if (opponentChoiceRef.current === null) {
+                    if (gameTypeRef.current === "live-bot") {
+                        const bq = questionsRef.current[currentRoundRef.current];
+                        if (bq) {
+                            const bDur = getQuestionDuration(bq.type);
+                            const br = simulateBotResponse(bq, botProfileRef.current, bDur);
+                            const botChoice = pickBotChoice(bq, br.correct);
+                            const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                            setOpponentChoice(botChoice);
+                            setOpponentCurrentPoints(pts);
+                        } else {
+                            setOpponentChoice("");
+                            setOpponentCurrentPoints(0);
+                        }
+                    } else {
+                        setOpponentChoice("");
+                        setOpponentCurrentPoints(0);
                     }
                 }
 
