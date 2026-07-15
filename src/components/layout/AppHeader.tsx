@@ -120,7 +120,7 @@ export const AppHeader = ({
                                 )}
                                 <button
                                     onClick={onReset}
-                                    className="p-1.5 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500 cursor-pointer"
+                                    className="p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all active:rotate-180 duration-500 cursor-pointer"
                                     title="Reset"
                                 >
                                     <RotateCcw size={ICON_SIZE} />
@@ -128,7 +128,7 @@ export const AppHeader = ({
                                 {isGameOver && (
                                     <button
                                         onClick={onShare}
-                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
+                                        className="p-1.5 text-white hover:text-white rounded-lg hover:bg-white/5 transition-all cursor-pointer"
                                         title="Share"
                                     >
                                         <Share size={ICON_SIZE} />
@@ -155,11 +155,11 @@ export const AppHeader = ({
 
                         {user && <NotificationBell />}
 
-                        <button onClick={onOpenInfo} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer" title="Rules & How to Play">
+                        <button onClick={onOpenInfo} className="text-white hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer" title="Rules & How to Play">
                             <HelpCircle size={ICON_SIZE} />
                         </button>
 
-                        <button onClick={onOpenSettings} className="text-gray-500 hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer" title="Settings">
+                        <button onClick={onOpenSettings} className="text-white hover:text-white transition-colors p-1.5 shrink-0 cursor-pointer" title="Settings">
                             <SettingsIcon size={ICON_SIZE} />
                         </button>
                     </div>

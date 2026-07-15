@@ -75,7 +75,7 @@ export const AppNavigation = ({
                             <div
                                 className={`transition-all duration-300 transform group-hover:scale-110 group-active:scale-95 ${isActive
                                     ? 'text-correct scale-110 drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]'
-                                    : 'text-gray-400 group-hover:text-white'
+                                    : 'text-white group-hover:text-white'
                                     }`}
                             >
                                 <Icon size={18} className="stroke-[2.5]" />
@@ -95,7 +95,7 @@ export const AppNavigation = ({
                             <span
                                 className={`text-[9px] uppercase font-black tracking-wider transition-colors duration-300 ${isActive
                                     ? 'text-white'
-                                    : 'text-gray-500 group-hover:text-gray-300'
+                                    : 'text-white group-hover:text-white-300'
                                     }`}
                             >
                                 {item.label}
