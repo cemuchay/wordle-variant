@@ -18,13 +18,12 @@ const BAR_HEIGHTS = [4, 7, 10, 13];
 
 export const SignalBar = memo(({ level, className = '' }: SignalBarProps) => {
    return (
-      <div className={`flex items-end gap-[2px] h-3 ${className}`}>
+      <div className={`flex items-end gap-[2px] h-2.5 ${className}`}>
          {BAR_HEIGHTS.map((height, i) => (
             <div
                key={i}
-               className={`w-[3px] rounded-sm transition-all duration-500 ${
-                  i < level ? LEVEL_COLORS[level] : 'bg-white/15'
-               }`}
+               className={`w-[3px] rounded-sm transition-all duration-500 ${i < level ? LEVEL_COLORS[level] : 'bg-white/15'
+                  }`}
                style={{ height: `${height}px` }}
             />
          ))}

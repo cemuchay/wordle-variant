@@ -62,7 +62,7 @@ export const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+          className="absolute top-4 right-4 p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
         >
           <X size={20} />
         </button>

@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { AudioConnectionLog } from "./components/challenge/AudioConnectionLog";
 import { ChatSkeleton } from "./components/common/Skeletons";
 import { DynamicIslandStatus } from "./components/DynamicIslandStatus";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
@@ -273,7 +272,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isHydrated || !date || tabRestoredRef.current) return;
-    
+
     let stored = safeSessionStorage.getItem("wordle_last_viewed_tab");
     let isFromSession = true;
 
@@ -293,7 +292,6 @@ export default function App() {
             setIsChallengeOpen(tab === "challenges");
             setIsStatsOpen(tab === "leaderboard");
             setIsWordUpOpen(tab === "wordup");
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsMoreOpen(tab === "more" || tab === "wordup");
             if (tab !== "wordup" && tab !== "more") {
               setWordupMode(null);
@@ -944,7 +942,6 @@ export default function App() {
     <div className="h-dvh w-full flex flex-col text-white font-sans overflow-hidden bg-dark">
       <LandscapeBlocker />
       <DynamicIslandStatus />
-      <AudioConnectionLog />
       <GlobalAudioPlayer />
       <NotificationsManager />
       {user && <FloatingChatBubble />}

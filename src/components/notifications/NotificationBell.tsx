@@ -13,8 +13,8 @@ export const NotificationBell = memo(() => {
             className="relative p-2 hover:bg-white/5 rounded-xl transition-all group"
             aria-label="Notifications"
         >
-            <Bell size={20} className="text-gray-400 group-hover:text-white transition-colors" />
-            
+            <Bell size={20} className="text-white group-hover:text-white transition-colors" />
+
             {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-black text-white ring-2 ring-background animate-in zoom-in duration-300">
                     {unreadCount > 9 ? '9+' : unreadCount}

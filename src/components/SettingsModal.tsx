@@ -395,7 +395,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 <div className="flex flex-col border-b border-gray-900 bg-gray-900/20 shrink-0">
                     <div className="flex items-center justify-between p-4 pb-2">
                         <h2 className="text-lg font-black text-white tracking-tight">Settings</h2>
-                        <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white">
+                        <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-500 hover:text-white cursor-pointer">
                             <X size={20} />
                         </button>
                     </div>
@@ -414,7 +414,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white transition-colors cursor-pointer"
                                 >
                                     <X size={12} />
                                 </button>

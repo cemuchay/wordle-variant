@@ -1,4 +1,3 @@
-
 export interface ProfileStats {
    rating: number;
    xp: number;
@@ -9,9 +8,15 @@ export interface ProfileStats {
    rank_name: string;
    username?: string;
    avatar_url?: string | null;
+   id?: string;
 }
 
-export type WordUpGameState = "menu" | "matchmaking" | "countdown" | "battle" | "gameover";
+export type WordUpGameState =
+   | "menu"
+   | "matchmaking"
+   | "countdown"
+   | "battle"
+   | "gameover";
 
 export interface MatchSubmission {
    question_idx: number;

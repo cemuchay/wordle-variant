@@ -5,7 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
-import { FormulaRenderer } from "../../shared/FormulaRenderer";
+import FormulaRenderer from "../../shared/FormulaRenderer";
 import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
@@ -135,7 +135,7 @@ export const BattleView = ({
    const categoryName = CATEGORIES.find(c => c.id === matchData?.category)?.name || matchData?.category?.replace(/_/g, " ") || "Trivia";
    const opponentName = opponentStats?.username || (matchData?.is_bot_match ? ((matchData.bot_profile && BOT_PROFILES[matchData.bot_profile]?.name) || "Word Bot") : "Opponent");
 
- 
+
    // Resolve opponent choice
    const oppAnswers = isP1 ? matchData?.p2_answers : matchData?.p1_answers;
    const oppChoice = oppAnswers?.[currentIdx]?.choice;
@@ -171,27 +171,27 @@ export const BattleView = ({
    };
 
    const promptLen = activeQuestion.prompt.length;
-    const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
 
-    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
-    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
-    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
-    const choiceLUT: Record<string, Record<string, string>> = {
-       a: { "2": "text-xs sm:text-sm", "4": "text-[10px] sm:text-xs" },
-       b: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-       c: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
-    };
-    const isFewChoices = activeQuestion.choices.length <= 2;
-    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
+   const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
+   const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
+   const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
+   const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
+   const choiceLUT: Record<string, Record<string, string>> = {
+      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
+      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
+      c: { "2": "text-lg sm:text-xl", "4": "text-base sm:text-lg" },
+   };
+   const isFewChoices = activeQuestion.choices.length <= 2;
+   const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
 
-    const choicesGapClass = activeQuestion.choices.length <= 2 ? "gap-4 sm:gap-6" : "gap-1 sm:gap-2 md:gap-3";
+   const choicesGapClass = activeQuestion.choices.length <= 2 ? "gap-4 sm:gap-6" : "gap-1 sm:gap-2 md:gap-3";
 
    return (
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-          className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
+         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]"
       >
          <GameStatusToast />
          {lastRoundPopup && (
@@ -243,97 +243,97 @@ export const BattleView = ({
                </motion.div>
             </motion.div>
          )}
-          {/* Top Bar: Player | Timer | Opponent */}
-          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">
-             <div className="flex items-center gap-2 min-w-0 relative">
-                <ProtectedAvatar
-                   userId={playerProfile?.id || undefined}
-                   src={playerProfile?.avatar_url || undefined}
-                   username={playerProfile?.username || "You"}
-                   className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
-                />
-                 <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
-                    <p className="text-base font-black text-white">{myScore} pts</p>
-                 </div>
-                 {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
-                 {scorePopups.filter((p) => p.side === "my").map((p) => (
-                    <motion.span
-                       key={p.id}
-                       initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                       animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                       transition={{ duration: 2.5, ease: "easeOut" }}
-                       className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
-                    >
-                       +{p.points}
-                    </motion.span>
-                 ))}
-              </div>
+         {/* Top Bar: Player | Timer | Opponent */}
+         <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40 pt-3">
+            <div className="flex items-center gap-2 min-w-0 relative">
+               <ProtectedAvatar
+                  userId={playerProfile?.id || undefined}
+                  src={playerProfile?.avatar_url || undefined}
+                  username={playerProfile?.username || "You"}
+                  className="w-10 h-10 rounded-full border border-correct/30 shrink-0"
+               />
+               <div className="truncate max-w-[100px]">
+                  <p className="text-[9px] text-white/40 font-bold uppercase truncate">{playerProfile?.username || "You"}</p>
+                  <p className="text-base font-black text-white">{myScore} pts</p>
+               </div>
+               {typeof playerSignalLevel === 'number' && <SignalBar level={playerSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
+               {scorePopups.filter((p) => p.side === "my").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 right-0 text-correct font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(106,170,100,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+            </div>
 
-              <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} />
+            <CircularTimer maxTime={qMaxTime} currentIdx={currentIdx} />
 
-              <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
-                 <div className="truncate max-w-[100px]">
-                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
-                    <p className="text-base font-black text-white">{oppScore} pts</p>
-                 </div>
-                 {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
-                 {scorePopups.filter((p) => p.side === "opp").map((p) => (
-                   <motion.span
-                      key={p.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
-                      transition={{ duration: 2.5, ease: "easeOut" }}
-                      className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
-                   >
-                      +{p.points}
-                   </motion.span>
-                ))}
-                <ProtectedAvatar
-                   userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
-                   src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
-                   username={opponentName}
-                   className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
-                />
-             </div>
-          </div>
+            <div className="flex items-center gap-2 min-w-0 justify-end text-right relative">
+               <div className="truncate max-w-[100px]">
+                  <p className="text-[9px] text-white/40 font-bold uppercase truncate">{opponentName}</p>
+                  <p className="text-base font-black text-white">{oppScore} pts</p>
+               </div>
+               {typeof opponentSignalLevel === 'number' && <SignalBar level={opponentSignalLevel as 0 | 1 | 2 | 3 | 4} className="ml-1" />}
+               {scorePopups.filter((p) => p.side === "opp").map((p) => (
+                  <motion.span
+                     key={p.id}
+                     initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                     animate={{ opacity: [0, 1, 1, 0], y: [-10, -30, -50], scale: [0.5, 1.3, 1] }}
+                     transition={{ duration: 2.5, ease: "easeOut" }}
+                     className="absolute -top-1 left-0 text-[#E85151] font-black text-sm sm:text-base drop-shadow-[0_0_8px_rgba(232,81,81,0.8)] pointer-events-none"
+                  >
+                     +{p.points}
+                  </motion.span>
+               ))}
+               <ProtectedAvatar
+                  userId={matchData?.is_bot_match ? undefined : ((isP1 ? matchData?.player2_id : matchData?.player1_id) || undefined)}
+                  src={matchData?.is_bot_match ? `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(opponentName)}` : (opponentStats?.avatar_url || undefined)}
+                  username={opponentName}
+                  className="w-10 h-10 rounded-full border border-[#E85151]/30 shrink-0"
+               />
+            </div>
+         </div>
 
-          {/* Floating Abort Button */}
-          <button
-             onClick={async () => {
-                const confirmed = await ask({
-                   title: "Forfeit Match",
-                   message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
-                   confirmLabel: "Forfeit",
-                   type: "danger"
-                });
-                if (confirmed) {
-                   onAbort();
-                }
-             }}
-             className="absolute bottom-3 right-3 z-40 flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-          >
-             <AlertTriangle size={12} />
-             <span>Abort</span>
-          </button>
+         {/* Floating Abort Button */}
+         <button
+            onClick={async () => {
+               const confirmed = await ask({
+                  title: "Forfeit Match",
+                  message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                  confirmLabel: "Forfeit",
+                  type: "danger"
+               });
+               if (confirmed) {
+                  onAbort();
+               }
+            }}
+            className="absolute bottom-3 right-3 z-40 flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+         >
+            <AlertTriangle size={12} />
+            <span>Abort</span>
+         </button>
 
-          {/* Question Container */}
-          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
+         {/* Question Container */}
+         <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1.5 sm:space-y-2">
-               <div className="flex items-center justify-center gap-1.5 shrink-0">
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/90">
+               <div className="flex items-center justify-center gap-1.5 shrink-0 pb-2 mb-2 sm:py-0">
+                  <span className="text-[12px] font-black uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/90">
                      {categoryName}
                   </span>
                   <span className="text-white/20">•</span>
-                  <span className="text-[8px] font-black uppercase text-correct tracking-widest">
+                  <span className="text-[12px] font-black uppercase text-correct tracking-widest">
                      Round {currentIdx + 1}/7
                   </span>
                </div>
-               <p className="text-[9px] sm:text-[10px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
+               <p className="text-[12px] sm:text-[12px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
                   {currentIdx === WORDUP_GAME.TOTAL_ROUNDS - 1 && <span className="text-[#E85151] animate-pulse font-black">⚡ DOUBLE POINTS -</span>}
                   {(activeQuestion.type || "definition").replace("_", " ")}
                </p>
-                <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
+               <h2 className={`${promptSizeClass} text-white whitespace-pre-line leading-relaxed`}>
                   <FormulaRenderer text={activeQuestion.prompt} />
                </h2>
                {activeQuestion.subPrompt && (
@@ -350,12 +350,12 @@ export const BattleView = ({
                      animate={{ opacity: 1, scale: 1 }}
                      className="w-full max-w-[240px] h-[120px] sm:max-w-[200px] sm:h-[100px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
-                      <PreloadedImage
-                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
-                         alt="Question Clue"
-                         className="max-h-full max-w-full object-contain rounded-lg select-none"
-                         draggable={false}
-                      />
+                     <PreloadedImage
+                        src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
+                        alt="Question Clue"
+                        className="max-h-full max-w-full object-contain rounded-lg select-none"
+                        draggable={false}
+                     />
                   </motion.div>
                </div>
             )}
@@ -422,12 +422,12 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={cardClass}
                         >
-                            <PreloadedImage
-                               src={imageUrl}
-                               alt={`Flag Option ${optionLetter}`}
-                               className="w-full h-full object-cover rounded-lg"
-                               draggable={false}
-                            />
+                           <PreloadedImage
+                              src={imageUrl}
+                              alt={`Flag Option ${optionLetter}`}
+                              className="w-full h-full object-cover rounded-lg"
+                              draggable={false}
+                           />
 
                            <div className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm border border-white/10 text-white font-extrabold text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md select-none">
                               {optionLetter}
@@ -470,9 +470,9 @@ export const BattleView = ({
                            btnClass += " bg-gradient-to-r from-correct/40 to-correct/60 border-correct text-white font-extrabold shadow-[0_0_25px_rgba(106,170,100,0.65)]";
                         } else if (isSelected) {
                            btnClass += " bg-gradient-to-r from-red-500/40 to-red-500/60 border-red-500 text-white font-extrabold shadow-[0_0_25px_rgba(239,68,68,0.65)]";
-                         } else {
-                            btnClass += " bg-white/5 border-white/10 text-white/40 opacity-60";
-                         }
+                        } else {
+                           btnClass += " bg-white/5 border-white/10 text-white/40 opacity-60";
+                        }
                      }
 
                      if (isOppSelected) {
@@ -519,9 +519,9 @@ export const BattleView = ({
                            transition={buttonTransition}
                            className={btnClass}
                         >
-                            <span className="text-center">
-                               <FormulaRenderer text={choice} />
-                            </span>
+                           <span className="text-center">
+                              <FormulaRenderer text={choice} />
+                           </span>
 
                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center z-10">
                               {isSelected && (
@@ -573,22 +573,22 @@ export const BattleView = ({
             </div>
          )}
 
-          {/* Pre-render upcoming round images to keep decoded bitmaps ready */}
-          <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-0 -z-10">
-             {questions.map((q, idx) => {
-                if (idx <= currentIdx) return null;
-                return (
-                   <Fragment key={idx}>
-                      {q.imageUrl && (
-                         <img src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl} alt="" />
-                      )}
-                      {q.imageUrls?.map((url, i) => (
-                         <img key={`${idx}-${i}`} src={getCachedFlagUrl(url)} alt="" />
-                      ))}
-                   </Fragment>
-                );
-             })}
-          </div>
-       </motion.div>
+         {/* Pre-render upcoming round images to keep decoded bitmaps ready */}
+         <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-0 -z-10">
+            {questions.map((q, idx) => {
+               if (idx <= currentIdx) return null;
+               return (
+                  <Fragment key={idx}>
+                     {q.imageUrl && (
+                        <img src={q.imageUrl.length === 2 ? getCachedFlagUrl(q.imageUrl) : q.imageUrl} alt="" />
+                     )}
+                     {q.imageUrls?.map((url, i) => (
+                        <img key={`${idx}-${i}`} src={getCachedFlagUrl(url)} alt="" />
+                     ))}
+                  </Fragment>
+               );
+            })}
+         </div>
+      </motion.div>
    );
 };

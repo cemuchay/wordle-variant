@@ -894,9 +894,118 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
        explanations: [
           "A person from the country represented by this flag ({label}) is called a {demonym}.",
        ],
-       answerKey: "demonym",
-       weight: 1,
-    }];
+        answerKey: "demonym",
+        weight: 1,
+     },
+
+    // ═══════════════════════════════════════════════════════════
+    // BIBLE (5 templates — book facts)
+    // ═══════════════════════════════════════════════════════════
+
+    // ── TYPE 1: "Which book comes before X?" ──
+    {
+       id: "bible_book_before",
+       category: "bible",
+       requiredKeys: ["previous_book", "canonical_order"],
+       prompts: [
+          "Which book of the Bible comes immediately before {label}?",
+          "Name the book that precedes {label} in the Bible:",
+          "What is the book right before {label} in the canon?",
+          "Identify the book that comes just before {label}:",
+       ],
+       explanations: [
+          "The book before {label} is {previous_book}.",
+          "{previous_book} comes immediately before {label}.",
+       ],
+       answerKey: "previous_book",
+    },
+
+    // ── TYPE 2: "Which book comes after X?" ──
+    {
+       id: "bible_book_after",
+       category: "bible",
+       requiredKeys: ["next_book", "canonical_order"],
+       prompts: [
+          "Which book of the Bible comes immediately after {label}?",
+          "Name the book that follows {label} in the Bible:",
+          "What is the book right after {label} in the canon?",
+          "Identify the book that comes just after {label}:",
+       ],
+       explanations: [
+          "The book after {label} is {next_book}.",
+          "{next_book} comes immediately after {label}.",
+       ],
+       answerKey: "next_book",
+    },
+
+    // ── TYPE 3: "How many chapters?" ──
+    {
+       id: "bible_chapters",
+       category: "bible",
+       requiredKeys: ["chapter_count"],
+       prompts: [
+          "How many chapters does the book of {label} have?",
+          "What is the chapter count of the book of {label}?",
+          "The book of {label} contains how many chapters?",
+          "How many chapters are in the book of {label}?",
+       ],
+       explanations: [
+          "The book of {label} has {chapter_count} chapters.",
+          "There are {chapter_count} chapters in the book of {label}.",
+       ],
+       answerKey: "chapter_count",
+    },
+
+    // ── TYPE 4: "Which book is in the Old/New Testament?" ──
+    {
+       id: "bible_testament",
+       category: "bible",
+       requiredKeys: ["testament"],
+       prompts: [
+          "Which of the following books is in the {testament} Testament?",
+          "Identify the book that belongs to the {testament} Testament:",
+          "Which book is part of the {testament} Testament?",
+       ],
+       explanations: [
+          "{label} is in the {testament} Testament.",
+          "The book of {label} belongs to the {testament} Testament.",
+       ],
+    },
+
+    // ── TYPE 5: "Which is a real book of the Bible?" ──
+    {
+       id: "bible_real_book",
+       category: "bible",
+       requiredKeys: ["testament"],
+       prompts: [
+          "Which of the following is a real book of the Bible?",
+          "Identify the actual book of the Bible from the list below:",
+          "Which one is a genuine book of the Bible?",
+       ],
+       explanations: [
+          "{label} is indeed a real book of the Bible.",
+          "The book of {label} is one of the 66 books in the Bible.",
+       ],
+    },
+];
+
+export const FAKE_BIBLE_BOOKS = [
+   "Gospel of Thomas",
+   "Book of Enoch",
+   "Gospel of Judas",
+   "Book of Jasher",
+   "Acts of Paul",
+   "Apocalypse of Peter",
+   "Gospel of Mary",
+   "Shepherd of Hermas",
+   "Didache",
+   "Epistle of Barnabas",
+   "Testament of Solomon",
+   "Book of Jubilees",
+   "Gospel of the Hebrews",
+   "Apocalypse of Abraham",
+   "Assumption of Moses",
+];
 
 export function getRandomMatchingTemplate(
    // eslint-disable-next-line @typescript-eslint/no-explicit-any

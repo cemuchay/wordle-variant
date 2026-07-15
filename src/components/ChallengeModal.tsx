@@ -81,7 +81,7 @@ const GuestChallengeView = memo(({ onClose }: { onClose: () => void }) => {
 
           <button
             onClick={onClose}
-            className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+            className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
           >
             <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
           </button>
@@ -356,7 +356,7 @@ const AuthenticatedChallengeContent = memo(
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white"
+              className="p-1.5 sm:p-2 hover:bg-white/5 rounded-full transition-colors text-white cursor-pointer"
             >
               <X className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
             </button>
@@ -585,11 +585,10 @@ const AuthenticatedChallengeContent = memo(
                                   <button
                                     key={p}
                                     onClick={() => setPlayedPage(p)}
-                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                                      p === playedPage
-                                        ? 'bg-correct text-black'
-                                        : 'bg-white/5 text-white hover:bg-white/10'
-                                    }`}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all cursor-pointer ${p === playedPage
+                                      ? 'bg-correct text-black'
+                                      : 'bg-white/5 text-white hover:bg-white/10'
+                                      }`}
                                   >
                                     {p}
                                   </button>
@@ -635,7 +634,7 @@ const AuthenticatedChallengeContent = memo(
                 </div>
                 <button
                   onClick={() => setIsCreatingChallenge(false)}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
                 >
                   <X size={20} />
                 </button>
@@ -670,7 +669,7 @@ const AuthenticatedChallengeContent = memo(
                 </div>
                 <button
                   onClick={() => setIsEditingChallenge(false)}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white"
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400 hover:text-white cursor-pointer"
                 >
                   <X size={20} />
                 </button>
@@ -706,7 +705,7 @@ const AuthenticatedChallengeContent = memo(
                 </div>
                 <button
                   onClick={() => setIsHelpOpen(false)}
-                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white"
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors text-white hover:text-white cursor-pointer"
                 >
                   <X size={20} />
                 </button>

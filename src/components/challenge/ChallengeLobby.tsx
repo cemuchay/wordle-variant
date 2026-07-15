@@ -256,7 +256,8 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
   const [nicknameInput, setNicknameInput] = useState("");
   const [showGuestInput, setShowGuestInput] = useState(false);
-  const [lobbyTab, setLobbyTab] = useState<'lobby' | 'chat'>('lobby');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [lobbyTab] = useState<'lobby' | 'chat'>('lobby');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isGuest = useMemo(() => {
@@ -270,16 +271,16 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
     isGuest
   );
 
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  // const [unreadChatCount, setUnreadChatCount] = useState(0);
   const lastProcessedMessageIdRef = useRef<string | null>(null);
 
 
   // Clear unread count when switching to chat tab
-  useEffect(() => {
-    if (lobbyTab === 'chat') {
-      setUnreadChatCount(0);
-    }
-  }, [lobbyTab]);
+  // useEffect(() => {
+  //   if (lobbyTab === 'chat') {
+  //     setUnreadChatCount(0);
+  //   }
+  // }, [lobbyTab]);
 
   // Handle new messages for unread count and mentions
   useEffect(() => {
@@ -303,7 +304,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
     if (isInitialLoad || newMessages.length === 0) return;
 
-    let newUnreadCount = 0;
+    // let newUnreadCount = 0;
     let gotMention = false;
 
     newMessages.forEach(msg => {
@@ -312,9 +313,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
         (msg.guest_sender_id && msg.guest_sender_id === effectiveUser?.id);
 
       if (!isMe) {
-        if (lobbyTab !== 'chat') {
-          newUnreadCount++;
-        }
+        // if (lobbyTab !== 'chat') {
+        //   newUnreadCount++;
+        // }
 
         // Scan for mention of the current user: @username
         const myUsername = effectiveUser?.username || effectiveUser?.user_metadata?.username || effectiveUser?.user_metadata?.full_name || '';
@@ -328,9 +329,9 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       }
     });
 
-    if (newUnreadCount > 0) {
-      setUnreadChatCount(prev => prev + newUnreadCount);
-    }
+    // if (newUnreadCount > 0) {
+    //   setUnreadChatCount(prev => prev + newUnreadCount);
+    // }
 
     if (gotMention) {
       const lastMsg = newMessages[newMessages.length - 1];
@@ -521,7 +522,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1">
+      {/* <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 gap-1">
         <button
           onClick={() => setLobbyTab('lobby')}
           className={`flex-1 py-1.5 sm:py-2.5 text-center text-xs font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lobbyTab === 'lobby' ? 'bg-correct text-black font-extrabold' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
@@ -539,7 +540,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
             </span>
           )}
         </button>
-      </div>
+      </div> */}
 
       {lobbyTab === 'chat' ? (
         <ChallengeChat
