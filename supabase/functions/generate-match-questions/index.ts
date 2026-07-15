@@ -14,7 +14,7 @@ import {
 import { formatQuestionPrompt, cleanVal } from "./promptFormatter.ts";
 import { generateMathsQuestion } from "./maths.ts";
 import { generateEnglishQuestion } from "./english.ts";
-import { getRandomMatchingTemplate } from "./templates.ts";
+import { getRandomMatchingTemplate, FAKE_BIBLE_BOOKS } from "./templates.ts";
 
 // ── Crypto ───────────────────────────────────────────────────
 
@@ -65,6 +65,7 @@ const SKIP_KEYS = new Set([
    "_distractors",
    "_symbolDistractors",
    "_directorDistractors",
+   "_entity_type",
    "id",
    "image",
    "images",
@@ -278,10 +279,15 @@ function _generateQuestion(
             .map((e) => e.label);
       }
 
-      const distractors = seededShuffle(
+      let distractors = seededShuffle(
          [...new Set(distValues)].filter((v) => v !== answerVal),
          rng,
       ).slice(0, 3);
+
+      // bible_real_book: use fake book names as distractors
+      if (template.id === "bible_real_book") {
+         distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 2);
+      }
 
       return {
          type: "definition",
