@@ -354,7 +354,7 @@ export function useGameEngine(props: EngineProps) {
         // Start rematch countdown for live PvP matches
         if (gameTypeRef.current === "live") {
             setShowRematchButton(true);
-            setRematchCountdown(15);
+            setRematchCountdown(10);
             
             stopRematchInterval();
             rematchIntervalRef.current = window.setInterval(() => {

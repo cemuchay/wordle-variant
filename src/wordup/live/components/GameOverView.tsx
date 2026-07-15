@@ -126,7 +126,7 @@ export const GameOverView = ({
                      <span className="flex items-center gap-2">⏳ Waiting for Opponent ({rematchCountdown}s)</span>
                      <div
                         className="absolute bottom-0 left-0 h-1 bg-[#E85151]/40 transition-all duration-1000 ease-linear"
-                        style={{ width: `${(rematchCountdown / 20) * 100}%` }}
+                        style={{ width: `${(rematchCountdown / 10) * 100}%` }}
                      />
                   </div>
                )}
@@ -138,7 +138,7 @@ export const GameOverView = ({
                      <span className="flex items-center gap-2">🔥 Accept Rematch! ({rematchCountdown}s)</span>
                      <div
                         className="absolute bottom-0 left-0 h-1 bg-black/20 transition-all duration-1000 ease-linear"
-                        style={{ width: `${(rematchCountdown / 20) * 100}%` }}
+                        style={{ width: `${(rematchCountdown / 10) * 100}%` }}
                      />
                   </button>
                )}
