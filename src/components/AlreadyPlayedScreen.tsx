@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Eye, Swords, HelpCircle, X, } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
 
+const logoUrl = "/pwa_192x192.png";
+
 interface AlreadyPlayedScreenProps {
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
   onAdmirePuzzle: () => void;
@@ -31,10 +33,11 @@ export const AlreadyPlayedScreen = ({
   setIsChallengeOpen,
 }: AlreadyPlayedScreenProps) => {
   const [selectedDetail, setSelectedDetail] = useState<OptionDetail | null>(null);
+  const [logoLoaded, setLogoLoaded] = useState(false);
 
   const options: OptionDetail[] = [
     {
-      title: "Admire Puzzle",
+      title: "See Your Board",
       shortDesc: "Review your completed board and share your pattern.",
       fullDesc: "Allows you to view today's solved or failed game grid. You can check the letters you guessed, copy your result to the clipboard, or share it with friends.",
       icon: <Eye className="text-emerald-400" size={20} />,
@@ -46,8 +49,8 @@ export const AlreadyPlayedScreen = ({
       icon: <Trophy className="text-amber-400" size={20} />,
     },
     {
-      title: "Try WordUp",
-      shortDesc: "Race opponents in rapid multiplayer word battles.",
+      title: "Play WordUp",
+      shortDesc: "Battle friends with quick fire questions and answers",
       fullDesc: "WordUp is a fast-paced multiplayer game mode. Play live or async matches, guess words based on definitions, and challenge friends or bots.",
       icon: <Swords className="text-indigo-400" size={20} />,
     },
@@ -61,14 +64,21 @@ export const AlreadyPlayedScreen = ({
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="text-center space-y-2"
+          className="text-center space-y-4"
         >
-
-          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider bg-clip-text text-transparent bg-linear-to-r from-white via-gray-200 to-gray-400">
-            Already Played
-          </h2>
-          <p className="text-xs sm:text-sm text-gray-400 font-medium max-w-xs mx-auto">
-            You've completed today's puzzle! Keep the momentum going with these events.
+          <div className="flex justify-center">
+            {!logoLoaded && (
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-800 rounded-2xl animate-pulse" />
+            )}
+            <img
+              src={logoUrl}
+              alt="Variant"
+              onLoad={() => setLogoLoaded(true)}
+              className={`w-14 h-14 sm:w-18 sm:h-18 object-contain ${logoLoaded ? 'block' : 'hidden'} rounded-[20px]`}
+            />
+          </div>
+          <p className="text-sm sm:text-base text-white font-medium max-w-xs mx-auto">
+            You have completed today's puzzle!.
           </p>
         </motion.div>
 
@@ -79,7 +89,7 @@ export const AlreadyPlayedScreen = ({
           transition={{ delay: 0.1, duration: 0.3 }}
           className="w-full space-y-4"
         >
-          {/* Admire Puzzle */}
+          {/* See Your Board */}
           <div className="group relative flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:border-emerald-500/30 hover:bg-slate-900/80 transition-all duration-300 shadow-lg">
             <div
               onClick={onAdmirePuzzle}
@@ -92,9 +102,9 @@ export const AlreadyPlayedScreen = ({
                 <h3 className="text-sm font-black uppercase tracking-wide text-white group-hover:text-emerald-400 transition-colors">
                   {options[0].title}
                 </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
+                {/* <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
                   {options[0].shortDesc}
-                </p>
+                </p> */}
               </div>
             </div>
             <button
@@ -119,9 +129,9 @@ export const AlreadyPlayedScreen = ({
                 <h3 className="text-sm font-black uppercase tracking-wide text-white group-hover:text-amber-400 transition-colors">
                   {options[1].title}
                 </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
+                {/* <p className="text-[11px] text-gray-400 mt-0.5 font-medium leading-tight">
                   {options[1].shortDesc}
-                </p>
+                </p> */}
               </div>
             </div>
             <button
@@ -133,7 +143,7 @@ export const AlreadyPlayedScreen = ({
             </button>
           </div>
 
-          {/* Try WordUp */}
+          {/* Play WordUp */}
           <div className="group relative flex items-center justify-between bg-slate-900/60 backdrop-blur-md border border-white/5 rounded-2xl p-4 hover:border-indigo-500/30 hover:bg-slate-900/80 transition-all duration-300 shadow-lg">
             <div
               onClick={() => onNavigate("wordup")}
@@ -238,11 +248,11 @@ export const AlreadyPlayedScreen = ({
                 onClick={() => {
                   const detail = selectedDetail;
                   setSelectedDetail(null);
-                  if (detail.title === "Admire Puzzle") {
+                  if (detail.title === "See Your Board") {
                     onAdmirePuzzle();
                   } else if (detail.title === "See Leaderboard") {
                     onNavigate("leaderboard");
-                  } else if (detail.title === "Try WordUp") {
+                  } else if (detail.title === "Play WordUp") {
                     onNavigate("wordup");
                   }
                 }}
