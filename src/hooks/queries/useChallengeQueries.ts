@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
-import { type Challenge } from "../useChallenge";
-import { safeLocalStorage, safeSessionStorage } from "../../utils/storage";
-import useMyChallengesSub from "./sub-queries/useMyChallenges";
-import useChallengeParticipantsSub from "./sub-queries/useChallengeParticipants";
+import { safeLocalStorage } from "../../utils/storage";
+import { useChallengeDataSub } from "./sub-queries/useChallengeData";
 import useChallengeMutationsSub from "./sub-queries/useChallengeMutations";
+import useChallengeParticipantsSub from "./sub-queries/useChallengeParticipants";
+import useMyChallengesSub from "./sub-queries/useMyChallenges";
+import { useBulkChallengeParticipantsSub } from "./sub-queries/useBulkChallengeParticipants";
 
 /**
  * Supabase select strings for reusable queries.
@@ -142,48 +143,7 @@ export const useChallengeParticipants = useChallengeParticipantsSub;
 /**
  * Hook to fetch a specific challenge by ID (Metadata only).
  */
-export const useChallengeData = (challengeId: string | null) => {
-   return useQuery({
-      staleTime: 60_000,
-      gcTime: 300_000,
-      queryKey: ["challenge", challengeId],
-      queryFn: async () => {
-         if (!challengeId) return null;
-         const { data, error } = await supabase
-            .from("challenges")
-            .select(CHALLENGE_DETAILS_SELECT)
-            .eq("id", challengeId)
-            .maybeSingle();
-
-         if (error) throw error;
-         const mapped = mapChallenge(data) as Challenge;
-         try {
-            safeSessionStorage.setItem(
-               `wordle_challenge_detail_${challengeId}`,
-               JSON.stringify(mapped),
-            );
-         } catch (e) {
-            console.error("Failed to cache challenge details", e);
-         }
-         return mapped;
-      },
-      enabled: !!challengeId,
-      initialData: () => {
-         if (!challengeId) return undefined;
-         try {
-            const cached = safeSessionStorage.getItem(
-               `wordle_challenge_detail_${challengeId}`,
-            );
-            if (cached) {
-               return JSON.parse(cached);
-            }
-         } catch (e) {
-            console.error("Failed to load initial challenge detail cache", e);
-         }
-         return undefined;
-      },
-   });
-};
+export const useChallengeData = useChallengeDataSub;
 
 /**
  * Hook to fetch all active public challenges for discovery (Metadata only).
@@ -236,32 +196,7 @@ export const useDiscoverChallenges = () => {
  * Hook to fetch participants for multiple challenges in one go.
  * Ideal for populating the challenge list with facepiles/leaderboards in parallel.
  */
-export const useBulkChallengeParticipants = (challengeIds: string[]) => {
-   return useQuery({
-      staleTime: 10_000,
-      gcTime: 60_000,
-      queryKey: ["bulk-challenge-participants", challengeIds.join(",")],
-      queryFn: async () => {
-         if (challengeIds.length === 0) return {};
-         const { data, error } = await supabase
-            .from("challenge_participants")
-            .select(CHALLENGE_PARTICIPANTS_SELECT)
-            .in("challenge_id", challengeIds);
-
-         if (error) throw error;
-
-         // Group participants by challenge_id
-         return (data || []).reduce((acc: any, p: any) => {
-            const challengeId = p.challenge_id;
-            if (!acc[challengeId]) acc[challengeId] = [];
-            acc[challengeId].push(mapParticipant(p));
-            return acc;
-         }, {});
-      },
-      enabled: challengeIds.length > 0,
-   });
-};
-
+export const useBulkChallengeParticipants = useBulkChallengeParticipantsSub;
 /**
  * Mutations for Challenge Lifecycle
  */
