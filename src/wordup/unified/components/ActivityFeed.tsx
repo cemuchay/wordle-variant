@@ -1,6 +1,8 @@
 import { Radio, Shield } from "lucide-react";
+import type { ActivityFeedObj } from "@/wordup/shared/types";
 
-const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGORY_STYLE_MAP, onPlayAsyncTurn, onSelectHistoryMatch }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGORY_STYLE_MAP, onPlayAsyncTurn, onSelectHistoryMatch }: any) => {
     return (
         <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-white/80">
@@ -23,8 +25,8 @@ const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGOR
                         ))}
                     </div>
                 ) : buildActivityFeed().length > 0 ? (
-                    buildActivityFeed().map((item) => {
-                        const itemCatObj = CATEGORIES.find(c => c.id === item.category);
+                    buildActivityFeed().map((item: ActivityFeedObj) => {
+                        const itemCatObj = CATEGORIES.find((c: { id: string; }) => c.id === item.category);
                         const emoji = CATEGORY_STYLE_MAP[item.category]?.emoji || "💡";
 
                         if (item.type === "async_challenge") {

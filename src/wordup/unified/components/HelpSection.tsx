@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react"
 
-const HelpSection = ({ setShowHelp, showHelp, }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const HelpSection = ({ setShowHelp, showHelp, }: any) => {
     return (
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
             <button

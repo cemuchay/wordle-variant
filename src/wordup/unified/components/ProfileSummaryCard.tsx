@@ -2,7 +2,8 @@ import { ProtectedAvatar } from "@/components/chat/ProtectedAvatar"
 import formatUsername from "@/utils/formatUsername"
 import { Flame } from "lucide-react"
 
-const ProfileSummaryCard = ({ userStats, currentUser, getRankColor }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ProfileSummaryCard = ({ userStats, currentUser, getRankColor }: any) => {
     return (
         <>
             {userStats && (
