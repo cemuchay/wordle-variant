@@ -362,7 +362,9 @@ export const useGameEngine = (
                         if (backupRaw) {
                            try {
                               backupData = JSON.parse(backupRaw);
-                           } catch {}
+                           } catch {
+                              /* empty block */
+                           }
                         }
 
                         triggerToast("Sync conflict resolved: restored from cloud.", 5000);

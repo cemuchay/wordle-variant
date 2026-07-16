@@ -7,7 +7,7 @@ import submitResultHook from "./submitResult";
 import updateChallengeHook from "./updateChallenge";
 
 const useChallengeMutationsSub = () => {
-   const createMutation = createChallengeHook();
+   const createChallenge = createChallengeHook();
    const submitResult = submitResultHook();
    const joinChallenge = joinChallengeHook();
    const submitMarathonResult = submitMarathonResultHook();
@@ -16,7 +16,7 @@ const useChallengeMutationsSub = () => {
    const deleteChallenge = deleteChallengeHook();
 
    return {
-      createChallenge: createMutation,
+      createChallenge,
       submitResult,
       joinChallenge,
       startChallenge,
