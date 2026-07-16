@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
    Radio, Shield, Play, HelpCircle, ChevronDown, ChevronUp,
@@ -96,10 +96,16 @@ export const UnifiedLobby = ({
    );
    const [playerSearch, setPlayerSearch] = useState("");
 
-   const historyMatchesRef = useState<any[]>(historyMatches);
-   const asyncHistoryMatchesRef = useState<any[]>(asyncHistoryMatches);
-   historyMatchesRef[0] = historyMatches;
-   asyncHistoryMatchesRef[0] = asyncHistoryMatches;
+   const historyMatchesRef = useRef<any[]>(historyMatches);
+   const asyncHistoryMatchesRef = useRef<any[]>(asyncHistoryMatches);
+
+   useEffect(() => {
+      historyMatchesRef.current = historyMatches;
+   }, [historyMatches]);
+
+   useEffect(() => {
+      asyncHistoryMatchesRef.current = asyncHistoryMatches;
+   }, [asyncHistoryMatches]);
 
    const trackTopicClick = useCallback((catId: string) => {
       const data = recordClick(catId);
@@ -112,7 +118,7 @@ export const UnifiedLobby = ({
          setIsLoadingHistory(false);
          return;
       }
-      const hasCache = historyMatchesRef[0].length > 0 || asyncHistoryMatchesRef[0].length > 0;
+      const hasCache = historyMatchesRef.current.length > 0 || asyncHistoryMatchesRef.current.length > 0;
       if (!hasCache) {
          setIsLoadingHistory(true);
       }
