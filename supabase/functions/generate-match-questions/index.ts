@@ -924,42 +924,82 @@ serve(async (req) => {
            `${logPrefix} Category rating=${categoryRating} → target difficulty=${targetDifficulty}`,
         );
 
-       // ── Dual-bucket entity fetch: comfort (at target difficulty) + stretch (harder but fresh) ──
+       // ── Entity fetch: unseen-first with pool-size fallback ──
        const stretchDifficultyMax = Math.min(5, targetDifficulty + 2);
-       const COMFORT_LIMIT = 40;
-       const STRETCH_LIMIT = 20;
+       const COMFORT_LIMIT = 80;
+       const STRETCH_LIMIT = 40;
+       const MIN_ENTITY_POOL = 20;
 
-       const [comfortResult, stretchResult] = await Promise.all([
-          supabaseClient.rpc("get_wordup_entities_v2", {
+       // Helper: fetch entities with given params, wrapped for resilience
+       const fetchEntities = async (params: Record<string, any>): Promise<any[]> => {
+          try {
+             const { data, error } = await supabaseClient.rpc("get_wordup_entities_v2", params);
+             if (error) {
+                console.warn(`${logPrefix} Entity RPC error:`, error.message);
+                return [];
+             }
+             return data || [];
+          } catch (e: any) {
+             console.warn(`${logPrefix} Entity RPC exception:`, e.message);
+             return [];
+          }
+       };
+
+       // First pass: try with p_exclude_seen (requires updated SQL)
+       let comfortEntities = await fetchEntities({
+          p_category: category,
+          p_user_ids: playerIds,
+          p_limit_per_type: COMFORT_LIMIT,
+          p_difficulty_max: targetDifficulty,
+          p_exclude_seen: true,
+       });
+       let stretchEntities = stretchDifficultyMax > targetDifficulty
+          ? await fetchEntities({
+               p_category: category,
+               p_user_ids: playerIds,
+               p_limit_per_type: STRETCH_LIMIT,
+               p_difficulty_min: targetDifficulty,
+               p_difficulty_max: stretchDifficultyMax,
+               p_exclude_seen: true,
+            })
+          : [];
+
+       // Dedup stretch against comfort
+       stretchEntities = stretchEntities.filter(
+          (e: any) => !comfortEntities.some((ce: any) => ce.id === e.id),
+       );
+
+       // If pool is too small, re-fetch without exclude_seen (includes seen entities, still sorted least-seen-first)
+       const totalFirstPass = comfortEntities.length + stretchEntities.length;
+       if (totalFirstPass < MIN_ENTITY_POOL) {
+          console.log(
+             `${logPrefix} Only ${totalFirstPass} unseen entities, widening pool with seen entities`,
+          );
+          const moreComfort = await fetchEntities({
              p_category: category,
              p_user_ids: playerIds,
              p_limit_per_type: COMFORT_LIMIT,
              p_difficulty_max: targetDifficulty,
-          }),
-          stretchDifficultyMax > targetDifficulty
-             ? supabaseClient.rpc("get_wordup_entities_v2", {
+          });
+          const moreStretch = stretchDifficultyMax > targetDifficulty
+             ? await fetchEntities({
                   p_category: category,
                   p_user_ids: playerIds,
                   p_limit_per_type: STRETCH_LIMIT,
                   p_difficulty_min: targetDifficulty,
                   p_difficulty_max: stretchDifficultyMax,
                })
-             : Promise.resolve({ data: [], error: null }),
-       ]);
+             : [];
 
-       if (comfortResult.error) {
-          console.warn(`${logPrefix} Comfort bucket RPC error:`, comfortResult.error);
+          // Merge: unseen first, then seen (deduped by id)
+          const seenIds = new Set([
+             ...comfortEntities.map((e: any) => e.id),
+             ...stretchEntities.map((e: any) => e.id),
+          ]);
+          comfortEntities = [...comfortEntities, ...moreComfort.filter((e: any) => !seenIds.has(e.id))];
+          stretchEntities = [...stretchEntities, ...moreStretch.filter((e: any) => !seenIds.has(e.id))];
        }
-       if (stretchResult.error) {
-          console.warn(`${logPrefix} Stretch bucket RPC error:`, stretchResult.error);
-       }
 
-       const comfortEntities: any[] = comfortResult.data || [];
-       const stretchEntities: any[] = (stretchResult.data || []).filter(
-          (e: any) => !comfortEntities.some((ce: any) => ce.id === e.id),
-       );
-
-       // Merge: comfort first (priority), then stretch for freshness
        // Mark each entity with its bucket origin for seen-count tracking
        const entityList: any[] = [
           ...comfortEntities.map((e: any) => ({ ...e, _bucket: "comfort" })),
@@ -967,7 +1007,7 @@ serve(async (req) => {
        ];
 
        console.log(
-          `${logPrefix} Fetched ${comfortEntities.length} comfort + ${stretchEntities.length} stretch entities for category="${category}"`,
+          `${logPrefix} Fetched ${entityList.length} total entities (${comfortEntities.length} comfort + ${stretchEntities.length} stretch) for category="${category}"`,
        );
        if (entityList.length > 0) {
           console.log(
@@ -1007,8 +1047,40 @@ serve(async (req) => {
           const diffMax = Math.min(5, targetDifficulty + 1);
           const MIN_HANDCRAFTED_POOL = 10;
 
-          // First pass: try tight difficulty range
-          let { data: hcData, error: hcError } = await supabaseClient
+          // Step 1: Find question IDs that BOTH players have seen (to exclude them)
+          let bothSeenIds: string[] = [];
+          if (playerIds.length >= 2) {
+             try {
+                const { data: seenData } = await supabaseClient
+                   .from("wordup_user_handcrafted_history")
+                   .select("question_id, user_id")
+                   .in("user_id", playerIds);
+
+                if (seenData) {
+                   // Group by question_id, find questions seen by ALL players
+                   const seenByQuestion = new Map<string, Set<string>>();
+                   for (const row of seenData) {
+                      if (!seenByQuestion.has(row.question_id)) {
+                         seenByQuestion.set(row.question_id, new Set());
+                      }
+                      seenByQuestion.get(row.question_id)!.add(row.user_id);
+                   }
+                   for (const [qid, users] of seenByQuestion) {
+                      if (playerIds.every((uid) => users.has(uid))) {
+                         bothSeenIds.push(qid);
+                      }
+                   }
+                }
+             } catch (e: any) {
+                console.warn(`${logPrefix} Could not fetch both-seen IDs:`, e.message);
+             }
+          }
+          console.log(
+             `${logPrefix} Both players have seen ${bothSeenIds.length} handcrafted questions — excluding from primary pool`,
+          );
+
+          // Step 2: Fetch handcrafted questions, excluding both-seen
+          let hcQuery = supabaseClient
             .from("wordup_handcrafted_questions")
             .select(`
                id,
@@ -1023,16 +1095,21 @@ serve(async (req) => {
                stats:wordup_question_stats(difficulty_elo, topic_elo)
             `)
             .eq("category", category)
-            .gte("difficulty", diffMin)
-            .lte("difficulty", diffMax)
             .or("expires_at.is.null,expires_at.gt.now()");
 
-          // Second pass: widen to all difficulties if pool is too small
+          // Exclude both-seen if we found any
+          if (bothSeenIds.length > 0) {
+             hcQuery = hcQuery.not("id", "in", `(${bothSeenIds.join(",")})`);
+          }
+
+          let { data: hcData, error: hcError } = await hcQuery;
+
+          // Step 3: Widen difficulty range if pool is too small
           if (!hcError && (hcData || []).length < MIN_HANDCRAFTED_POOL) {
              console.log(
-                `${logPrefix} Only ${(hcData || []).length} handcrafted at diff [${diffMin},${diffMax}], widening to all difficulties`,
+                `${logPrefix} Only ${(hcData || []).length} unseen handcrafted, widening difficulty range`,
              );
-             const { data: wideData, error: wideError } = await supabaseClient
+             const { data: wideData } = await supabaseClient
                .from("wordup_handcrafted_questions")
                .select(`
                   id,
@@ -1049,10 +1126,9 @@ serve(async (req) => {
                .eq("category", category)
                .or("expires_at.is.null,expires_at.gt.now()");
 
-             if (!wideError && wideData) {
-                // Merge: tight-range first, then additional from wide fetch (deduplicate by id)
-                const tightIds = new Set((hcData || []).map((q: any) => q.id));
-                const additional = wideData.filter((q: any) => !tightIds.has(q.id));
+             if (wideData) {
+                const currentIds = new Set((hcData || []).map((q: any) => q.id));
+                const additional = wideData.filter((q: any) => !currentIds.has(q.id));
                 hcData = [...(hcData || []), ...additional];
              }
           }

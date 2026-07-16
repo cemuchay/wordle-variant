@@ -1,13 +1,14 @@
 -- 114_wordup_novelty_control.sql
--- Enhances get_wordup_entities_v2 to support dual-bucket fetching and seen-count tracking.
--- Adds total_seen (history occurrences) to return value and p_difficulty_min for stretch pools.
+-- Enhances get_wordup_entities_v2 to support dual-bucket fetching, seen-count tracking,
+-- and excluding previously seen entities for freshness.
 
 CREATE OR REPLACE FUNCTION public.get_wordup_entities_v2(
     p_category VARCHAR,
     p_user_ids UUID[],
     p_limit_per_type INT DEFAULT 40,
     p_difficulty_max INT DEFAULT NULL,
-    p_difficulty_min INT DEFAULT NULL
+    p_difficulty_min INT DEFAULT NULL,
+    p_exclude_seen BOOLEAN DEFAULT FALSE
 )
 RETURNS TABLE (
     id UUID,
@@ -100,6 +101,7 @@ BEGIN
         WHERE e.topic_id = ANY(v_topic_ids)
             AND (p_difficulty_max IS NULL OR e.difficulty <= p_difficulty_max)
             AND (p_difficulty_min IS NULL OR e.difficulty >= p_difficulty_min)
+            AND (NOT p_exclude_seen OR h.total_occurrences IS NULL)
     )
     SELECT
         re.id,
