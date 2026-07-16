@@ -912,7 +912,7 @@ serve(async (req) => {
              .filter((r) => !r.error)
              .map((r) => Number(r.data ?? 600));
           categoryRating = ratings.length > 0 ? Math.min(...ratings) : 600;
-          if (categoryRating < 800) targetDifficulty = 1;
+           if (categoryRating < 700) targetDifficulty = 1;
           else if (categoryRating < 1100) targetDifficulty = 2;
           else if (categoryRating < 1400) targetDifficulty = 3;
           else if (categoryRating < 1700) targetDifficulty = 4;
@@ -924,27 +924,50 @@ serve(async (req) => {
            `${logPrefix} Category rating=${categoryRating} → target difficulty=${targetDifficulty}`,
         );
 
-       // Call the RPC function to get randomized entities with even type distribution, user history filter, and difficulty cap
-       const { data: entities, error: entityError } = await supabaseClient.rpc(
-          "get_wordup_entities_v2",
-          {
+       // ── Dual-bucket entity fetch: comfort (at target difficulty) + stretch (harder but fresh) ──
+       const stretchDifficultyMax = Math.min(5, targetDifficulty + 2);
+       const COMFORT_LIMIT = 40;
+       const STRETCH_LIMIT = 20;
+
+       const [comfortResult, stretchResult] = await Promise.all([
+          supabaseClient.rpc("get_wordup_entities_v2", {
              p_category: category,
              p_user_ids: playerIds,
-             p_limit_per_type: 40,
+             p_limit_per_type: COMFORT_LIMIT,
              p_difficulty_max: targetDifficulty,
-          },
-       );
+          }),
+          stretchDifficultyMax > targetDifficulty
+             ? supabaseClient.rpc("get_wordup_entities_v2", {
+                  p_category: category,
+                  p_user_ids: playerIds,
+                  p_limit_per_type: STRETCH_LIMIT,
+                  p_difficulty_min: targetDifficulty,
+                  p_difficulty_max: stretchDifficultyMax,
+               })
+             : Promise.resolve({ data: [], error: null }),
+       ]);
 
-       if (entityError) {
-          console.warn(
-             "[generate-match-questions] RPC get_wordup_entities_v2 error:",
-             entityError,
-          );
+       if (comfortResult.error) {
+          console.warn(`${logPrefix} Comfort bucket RPC error:`, comfortResult.error);
+       }
+       if (stretchResult.error) {
+          console.warn(`${logPrefix} Stretch bucket RPC error:`, stretchResult.error);
        }
 
-       const entityList: any[] = entities || [];
+       const comfortEntities: any[] = comfortResult.data || [];
+       const stretchEntities: any[] = (stretchResult.data || []).filter(
+          (e: any) => !comfortEntities.some((ce: any) => ce.id === e.id),
+       );
+
+       // Merge: comfort first (priority), then stretch for freshness
+       // Mark each entity with its bucket origin for seen-count tracking
+       const entityList: any[] = [
+          ...comfortEntities.map((e: any) => ({ ...e, _bucket: "comfort" })),
+          ...stretchEntities.map((e: any) => ({ ...e, _bucket: "stretch" })),
+       ];
+
        console.log(
-          `${logPrefix} Fetched ${entityList.length} entities for category="${category}"`,
+          `${logPrefix} Fetched ${comfortEntities.length} comfort + ${stretchEntities.length} stretch entities for category="${category}"`,
        );
        if (entityList.length > 0) {
           console.log(
@@ -982,8 +1005,10 @@ serve(async (req) => {
           // Compute difficulty range around target
           const diffMin = Math.max(1, targetDifficulty - 1);
           const diffMax = Math.min(5, targetDifficulty + 1);
+          const MIN_HANDCRAFTED_POOL = 10;
 
-          const { data: hcData, error: hcError } = await supabaseClient
+          // First pass: try tight difficulty range
+          let { data: hcData, error: hcError } = await supabaseClient
             .from("wordup_handcrafted_questions")
             .select(`
                id,
@@ -1002,35 +1027,70 @@ serve(async (req) => {
             .lte("difficulty", diffMax)
             .or("expires_at.is.null,expires_at.gt.now()");
 
+          // Second pass: widen to all difficulties if pool is too small
+          if (!hcError && (hcData || []).length < MIN_HANDCRAFTED_POOL) {
+             console.log(
+                `${logPrefix} Only ${(hcData || []).length} handcrafted at diff [${diffMin},${diffMax}], widening to all difficulties`,
+             );
+             const { data: wideData, error: wideError } = await supabaseClient
+               .from("wordup_handcrafted_questions")
+               .select(`
+                  id,
+                  prompt,
+                  choices,
+                  answer,
+                  explanation,
+                  variations,
+                  image_url,
+                  difficulty,
+                  history:wordup_user_handcrafted_history(user_id, seen_at),
+                  stats:wordup_question_stats(difficulty_elo, topic_elo)
+               `)
+               .eq("category", category)
+               .or("expires_at.is.null,expires_at.gt.now()");
+
+             if (!wideError && wideData) {
+                // Merge: tight-range first, then additional from wide fetch (deduplicate by id)
+                const tightIds = new Set((hcData || []).map((q: any) => q.id));
+                const additional = wideData.filter((q: any) => !tightIds.has(q.id));
+                hcData = [...(hcData || []), ...additional];
+             }
+          }
+
          if (hcError) {
             console.warn(
                `${logPrefix} Error fetching handcrafted questions:`,
                hcError,
             );
          } else {
-             const enriched = (hcData || []).map((hq: any) => {
-                const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
-                const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
-                const seenCount = seenUsers.size;
-                const difficulty = hq.difficulty ?? 3;
-                const topicElo = hq.stats?.topic_elo ?? 1500;
-                const diffScore = Math.abs(topicElo - userTopicSkill);
-                const difficultyProximity = Math.abs(difficulty - targetDifficulty);
-                return {
-                   id: hq.id,
-                   prompt: hq.prompt,
-                   choices: hq.choices,
-                   answer: hq.answer,
-                   explanation: hq.explanation,
-                   variations: hq.variations,
-                   image_url: hq.image_url,
-                   difficulty,
-                   seenCount,
-                   diffScore,
-                   topicElo,
-                   difficultyProximity,
-                };
-             });
+              const enriched = (hcData || []).map((hq: any) => {
+                 const playerHistory = (hq.history || []).filter((h: any) => playerIds.includes(h.user_id));
+                 const seenUsers = new Set(playerHistory.map((h: any) => h.user_id));
+                 const seenCount = seenUsers.size;
+                 const difficulty = hq.difficulty ?? 3;
+                 const topicElo = hq.stats?.topic_elo ?? 1500;
+                 const diffScore = Math.abs(topicElo - userTopicSkill);
+                 const difficultyProximity = Math.abs(difficulty - targetDifficulty);
+                 // seenStatus: "none" = unseen by both, "some" = seen by 1, "all" = seen by all
+                 let seenStatus: "none" | "some" | "all" = "none";
+                 if (seenCount >= playerIds.length) seenStatus = "all";
+                 else if (seenCount > 0) seenStatus = "some";
+                 return {
+                    id: hq.id,
+                    prompt: hq.prompt,
+                    choices: hq.choices,
+                    answer: hq.answer,
+                    explanation: hq.explanation,
+                    variations: hq.variations,
+                    image_url: hq.image_url,
+                    difficulty,
+                    seenCount,
+                    seenStatus,
+                    diffScore,
+                    topicElo,
+                    difficultyProximity,
+                 };
+              });
 
              // Tiered bucket: neither → one → both, sorted by difficulty proximity first, then diffScore
              const buckets = { neither: [] as any[], one: [] as any[], both: [] as any[] };
@@ -1103,13 +1163,41 @@ serve(async (req) => {
       // Weighted variant selection from config
       const variantSequence = pickVariants(config.variantWeights, matchRng, 7);
 
-      // Random difficulty — single shuffled pool, no progression
-      const shuffledEntities = seededShuffle(entityList, matchRng);
+      // Shuffle comfort entities first (priority), then stretch for variety
+      const comfortPool = entityList.filter((e: any) => e._bucket === "comfort");
+      const stretchPool = entityList.filter((e: any) => e._bucket === "stretch");
+      const shuffledComfort = seededShuffle(comfortPool, matchRng);
+      const shuffledStretch = seededShuffle(stretchPool, matchRng);
+      const shuffledEntities = [...shuffledComfort, ...shuffledStretch];
       let entityCursor = 0;
 
       const chosenEntities: any[] = [];
       const usedIds = new Set<string>();
       const questions: any[] = [];
+      let matchSeenCount = 0;
+      const MATCH_SEEN_CAP = 2;
+      let difficulty1Count = 0;
+      const DIFFICULTY1_CAP = 3;
+
+      const isDifficulty1Capped = (e: any) =>
+         (e.difficulty || 1) <= 1 && difficulty1Count >= DIFFICULTY1_CAP;
+
+      // Returns the next unseen entity (total_seen === 0) from the pool
+      const getNextUnseenEntity = (): any => {
+         if (shuffledEntities.length === 0) return null;
+         const startCursor = entityCursor;
+         const total = shuffledEntities.length;
+         for (let attempt = 0; attempt < total; attempt++) {
+            const e = shuffledEntities[entityCursor % total];
+            entityCursor++;
+            if (!usedIds.has(e.id) && (e.total_seen || 0) === 0 && !isDifficulty1Capped(e)) {
+               usedIds.add(e.id);
+               return e;
+            }
+            if (entityCursor - startCursor >= total) break;
+         }
+         return null;
+      };
 
       const getNextEntity = (): any => {
          if (shuffledEntities.length === 0) return null;
@@ -1117,7 +1205,7 @@ serve(async (req) => {
          for (let attempt = 0; attempt < attempts; attempt++) {
             const e = shuffledEntities[entityCursor % shuffledEntities.length];
             entityCursor++;
-            if (!usedIds.has(e.id)) {
+            if (!usedIds.has(e.id) && !isDifficulty1Capped(e)) {
                usedIds.add(e.id);
                return e;
             }
@@ -1131,7 +1219,7 @@ serve(async (req) => {
       const chosenHandcraftedIds: string[] = [];
 
       for (let i = 0; i < 7; i++) {
-         let attempts = 5;
+         const attempts = 5;
          let q: any = null;
          let chosenEntity: any = null;
          let hqChosen: any = null;
@@ -1144,106 +1232,186 @@ serve(async (req) => {
              const baseWeave = config.handcraftedWeaveProbability ?? 0.4;
              // Beginners get more handcrafted questions, advanced get more procedural
              const weaveProb = baseWeave * (1.5 - targetDifficulty * 0.15);
+
             // ── Mix Strategy: Weave unexpired handcrafted questions from DB ──
+            // Handcrafted questions are always higher quality than procedural — prefer them
             if (
                shuffledHandcrafted.length > handcraftedCursor &&
                roundRng() < weaveProb
             ) {
+               const isValidHq = (s: any) =>
+                  s && s.prompt && s.choices && s.choices.length >= 2;
+
+               // Walk forward to find a valid, non-duplicate handcrafted question
                let hq = shuffledHandcrafted[handcraftedCursor];
                handcraftedCursor++;
-               while (generatedPrompts.has(hq.prompt.trim().toLowerCase()) && handcraftedCursor < shuffledHandcrafted.length) {
+               while (
+                  handcraftedCursor < shuffledHandcrafted.length &&
+                  (!isValidHq(hq) || generatedPrompts.has(hq.prompt.trim().toLowerCase()))
+               ) {
                   hq = shuffledHandcrafted[handcraftedCursor];
                   handcraftedCursor++;
                }
-               q = resolveHandcraftedQuestion(hq, roundRng);
-               chosenEntity = null;
-               hqChosen = hq;
-            } else if (category === "maths") {
-               chosenEntity = entityList.length > 0 ? getNextEntity() : null;
-               q = generateMathsQuestion(
-                  roundSeed,
-                  chosenEntity,
-                  entityList,
-                  roundRng,
-                  variant,
-                  config.proceduralWeight,
-               );
-               hqChosen = null;
-            } else if (category === "english_language") {
-               chosenEntity = entityList.length > 0 ? getNextEntity() : null;
-               q = generateEnglishQuestion(
-                  roundSeed,
-                  chosenEntity,
-                  entityList,
-                  roundRng,
-                  variant,
-                  config.proceduralWeight,
-               );
-               if (!q && chosenEntity) {
-                  q = generateQuestion(
+
+               // If current candidate is invalid, scan the full list for any valid unseen
+               if (!isValidHq(hq) || generatedPrompts.has(hq.prompt.trim().toLowerCase())) {
+                  let found = false;
+                  for (let j = 0; j < shuffledHandcrafted.length; j++) {
+                     const candidate = shuffledHandcrafted[j];
+                     if (isValidHq(candidate) && !generatedPrompts.has(candidate.prompt.trim().toLowerCase())) {
+                        hq = candidate;
+                        found = true;
+                        break;
+                     }
+                  }
+                  if (!found) q = null; // truly no valid handcrafted — fall through to procedural
+               }
+
+               if (q === null && isValidHq(hq) && !generatedPrompts.has(hq.prompt.trim().toLowerCase())) {
+                  q = resolveHandcraftedQuestion(hq, roundRng);
+                  if (hq.seenStatus !== "none") {
+                     matchSeenCount++;
+                  }
+                  chosenEntity = null;
+                  hqChosen = hq;
+               }
+            }
+
+            // Procedural paths (if handcrafted didn't produce a question)
+            if (!q) {
+               if (category === "maths") {
+                  // When under seen cap, prefer unseen entities
+                  chosenEntity = matchSeenCount < MATCH_SEEN_CAP
+                     ? (entityList.length > 0 ? getNextUnseenEntity() || getNextEntity() : null)
+                     : (entityList.length > 0 ? getNextEntity() : null);
+                  q = generateMathsQuestion(
                      roundSeed,
                      chosenEntity,
                      entityList,
+                     roundRng,
                      variant,
-                     category,
-                     config.variantWeights,
-                     dbTemplatesList,
+                     config.proceduralWeight,
                   );
-               }
-               hqChosen = null;
-            } else {
-               // Standard entity-based procedural category logic
-               if (entityList.length === 0) {
-                  if (shuffledHandcrafted.length > 0) {
-                     const hq = shuffledHandcrafted[handcraftedCursor % shuffledHandcrafted.length];
-                     handcraftedCursor++;
-                     q = resolveHandcraftedQuestion(hq, roundRng);
-                     hqChosen = hq;
-                  } else {
-                     q = generateMathsQuestion(
+                  hqChosen = null;
+               } else if (category === "english_language") {
+                  chosenEntity = matchSeenCount < MATCH_SEEN_CAP
+                     ? (entityList.length > 0 ? getNextUnseenEntity() || getNextEntity() : null)
+                     : (entityList.length > 0 ? getNextEntity() : null);
+                  q = generateEnglishQuestion(
+                     roundSeed,
+                     chosenEntity,
+                     entityList,
+                     roundRng,
+                     variant,
+                     config.proceduralWeight,
+                  );
+                  if (!q && chosenEntity) {
+                     q = generateQuestion(
                         roundSeed,
-                        null,
-                        [],
-                        roundRng,
+                        chosenEntity,
+                        entityList,
                         variant,
-                        config.proceduralWeight,
+                        category,
+                        config.variantWeights,
+                        dbTemplatesList,
+                     );
+                  }
+                  hqChosen = null;
+               } else {
+                   // Standard entity-based procedural category logic
+                   if (entityList.length === 0) {
+                      if (shuffledHandcrafted.length > 0) {
+                         const isValidHq = (s: any) =>
+                            s && s.prompt && s.choices && s.choices.length >= 2;
+                         let fallbackHq: any = null;
+                         for (let j = 0; j < shuffledHandcrafted.length; j++) {
+                            const candidate = shuffledHandcrafted[(handcraftedCursor + j) % shuffledHandcrafted.length];
+                            if (isValidHq(candidate) && !generatedPrompts.has(candidate.prompt.trim().toLowerCase())) {
+                               fallbackHq = candidate;
+                               handcraftedCursor = (handcraftedCursor + j + 1) % shuffledHandcrafted.length;
+                               break;
+                            }
+                         }
+                         if (fallbackHq) {
+                            q = resolveHandcraftedQuestion(fallbackHq, roundRng);
+                            if (fallbackHq.seenStatus !== "none") {
+                               matchSeenCount++;
+                            }
+                            hqChosen = fallbackHq;
+                         } else {
+                            q = generateMathsQuestion(
+                               roundSeed,
+                               null,
+                               [],
+                               roundRng,
+                               variant,
+                               config.proceduralWeight,
+                            );
+                            hqChosen = null;
+                         }
+                      } else {
+                         q = generateMathsQuestion(
+                            roundSeed,
+                            null,
+                            [],
+                            roundRng,
+                            variant,
+                            config.proceduralWeight,
+                         );
+                         hqChosen = null;
+                      }
+                      chosenEntity = null;
+                  } else {
+                     chosenEntity = matchSeenCount < MATCH_SEEN_CAP
+                        ? getNextUnseenEntity() || getNextEntity()
+                        : getNextEntity();
+                     q = generateQuestion(
+                        roundSeed,
+                        chosenEntity,
+                        entityList,
+                        variant,
+                        category,
+                        config.variantWeights,
+                        dbTemplatesList,
                      );
                      hqChosen = null;
                   }
-                  chosenEntity = null;
-               } else {
-                  chosenEntity = getNextEntity();
-                  q = generateQuestion(
-                     roundSeed,
-                     chosenEntity,
-                     entityList,
-                     variant,
-                     category,
-                     config.variantWeights,
-                     dbTemplatesList,
-                  );
-                  hqChosen = null;
                }
             }
 
             if (q) {
                const cleanedPrompt = q.prompt.trim().toLowerCase();
                // Allow duplicates only if we run out of unique entities to prevent infinite loops
-               if (!generatedPrompts.has(cleanedPrompt) || shuffledEntities.length <= questions.length) {
-                  generatedPrompts.add(cleanedPrompt);
-                  if (chosenEntity) {
-                     chosenEntities.push(chosenEntity);
-                  }
+                if (!generatedPrompts.has(cleanedPrompt) || shuffledEntities.length <= questions.length) {
+                   generatedPrompts.add(cleanedPrompt);
+                   if (chosenEntity) {
+                      // Track seen count for entities
+                      if ((chosenEntity.total_seen || 0) > 0) {
+                         matchSeenCount++;
+                      }
+                      // Track difficulty 1 usage for cap
+                      if ((chosenEntity.difficulty || 1) <= 1) {
+                         difficulty1Count++;
+                      }
+                      chosenEntities.push(chosenEntity);
+                   }
                   if (hqChosen && hqChosen.id) {
                      chosenHandcraftedIds.push(hqChosen.id);
                   }
                   break;
                } else {
-                  // Revert entity mapping for duplicate prompts so they can be tried with other variations/rounds
+                  // Revert entity mapping and seen count for duplicate prompts
                   if (chosenEntity) {
                      usedIds.delete(chosenEntity.id);
+                     if ((chosenEntity.total_seen || 0) > 0) {
+                        matchSeenCount = Math.max(0, matchSeenCount - 1);
+                     }
+                  }
+                  if (hqChosen && hqChosen.seenStatus !== "none") {
+                     matchSeenCount = Math.max(0, matchSeenCount - 1);
                   }
                   q = null;
+                  hqChosen = null;
                }
             }
          }
@@ -1258,10 +1426,10 @@ serve(async (req) => {
          }
       }
 
-      console.log(`${logPrefix} Generated ${questions.length} questions total`);
+      console.log(`${logPrefix} Generated ${questions.length} questions total (seen in match: ${matchSeenCount}/${MATCH_SEEN_CAP} cap)`);
       console.log(
          `${logPrefix} Chosen entities:`,
-         chosenEntities.filter(Boolean).map((e: any) => e.label),
+         chosenEntities.filter(Boolean).map((e: any) => `${e.label} (seen:${e.total_seen || 0})`),
       );
 
       // Encrypt and persist
