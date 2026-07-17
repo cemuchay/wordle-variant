@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAvailableProfiles, useChallengeMutations, useMyChallenges, mapChallenge, useDiscoverChallenges, useBulkChallengeParticipants, CHALLENGE_DETAILS_SELECT } from '../hooks/queries/useChallengeQueries';

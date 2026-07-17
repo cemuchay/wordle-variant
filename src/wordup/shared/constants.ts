@@ -38,18 +38,17 @@ export const CATEGORIES = [
       id: "sports",
       name: "Sports",
       desc: "General sports trivia including football, basketball, tennis, and olympics",
-      //  featured: true,
    },
    {
       id: "geography",
       name: "Geography",
       desc: "World maps, capitals, continents, landmarks, and earth science",
-      // featured: true,
    },
    {
       id: "bible",
       name: "Bible",
       desc: "Bible trivia. Test your knowledge of Old and New Testament stories, characters, and verses.",
+      featured: true,
    },
    {
       id: "global-politics",
@@ -60,51 +59,45 @@ export const CATEGORIES = [
       id: "history",
       name: "History",
       desc: "Historical events, ancient civilizations, world wars, and key figures",
-      // featured: true,
    },
    {
       id: "general_knowledge",
       name: "General Knowledge",
       desc: "Diverse trivia across pop culture, science, history, and miscellaneous facts",
-      // featured: true,
    },
    {
       id: "movies",
       name: "Movies & Cinema",
       desc: "Classic films, blockbusters, actors, directors, and Academy Awards",
-      // featured: true,
    },
    {
       id: "television",
       name: "Television",
       desc: "Famous TV series, classic sitcoms, streaming releases, and trivia",
-      // featured: true,
    },
    {
       id: "video_games",
       name: "Video Games",
       desc: "Gaming history, console wars, retro arcade, and modern e-sports",
-      // featured: true,
    },
    {
       id: "music",
       name: "Music",
       desc: "Popular bands, hit songs, genres, instruments, and music history",
-      // featured: true,
    },
    {
       id: "animals",
       name: "Animals & Wildlife",
       desc: "Mammals, birds, reptiles, marine life, and zoological details",
-      // featured: true,
    },
    {
       id: "computers",
       name: "Computer Science",
       desc: "Software development, internet history, hardware, coding, and technology",
-      // featured: true,
    },
 ];
+
+export const GRACE_DECAY = 2;
 
 export const FLAG_MAP: Record<string, string> = {
    nigeria: "ng",

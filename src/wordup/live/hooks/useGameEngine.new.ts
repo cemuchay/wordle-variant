@@ -354,7 +354,7 @@ export function useGameEngine(props: EngineProps) {
         // Start rematch countdown for live PvP matches
         if (gameTypeRef.current === "live") {
             setShowRematchButton(true);
-            setRematchCountdown(15);
+            setRematchCountdown(10);
             
             stopRematchInterval();
             rematchIntervalRef.current = window.setInterval(() => {
@@ -482,16 +482,24 @@ export function useGameEngine(props: EngineProps) {
                     setMyCurrentPoints(0);
                 }
 
-                // Live-bot: auto-submit empty for the bot too
-                if (gameTypeRef.current === "live-bot" && opponentChoiceRef.current === null) {
-                    const bq = questionsRef.current[currentRoundRef.current];
-                    if (bq) {
-                        const bDur = getQuestionDuration(bq.type);
-                        const br = simulateBotResponse(bq, botProfileRef.current, bDur);
-                        const botChoice = pickBotChoice(bq, br.correct);
-                        const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
-                        setOpponentChoice(botChoice);
-                        setOpponentCurrentPoints(pts);
+                // Auto-submit empty answer for the opponent if they haven't answered
+                if (opponentChoiceRef.current === null) {
+                    if (gameTypeRef.current === "live-bot") {
+                        const bq = questionsRef.current[currentRoundRef.current];
+                        if (bq) {
+                            const bDur = getQuestionDuration(bq.type);
+                            const br = simulateBotResponse(bq, botProfileRef.current, bDur);
+                            const botChoice = pickBotChoice(bq, br.correct);
+                            const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                            setOpponentChoice(botChoice);
+                            setOpponentCurrentPoints(pts);
+                        } else {
+                            setOpponentChoice("");
+                            setOpponentCurrentPoints(0);
+                        }
+                    } else {
+                        setOpponentChoice("");
+                        setOpponentCurrentPoints(0);
                     }
                 }
 
@@ -840,19 +848,21 @@ export function useGameEngine(props: EngineProps) {
                 }
                 let userRating = 600;
                 if (props.userId) {
-                    if (category === "mixed") {
+                    // First: try category-specific rating (all categories including "mixed")
+                    const { data: catProfile } = await supabase
+                        .from("wordup_category_profiles")
+                        .select("rating")
+                        .eq("user_id", props.userId)
+                        .eq("category", category)
+                        .maybeSingle();
+                    if (catProfile?.rating) {
+                        userRating = catProfile.rating;
+                    } else if (category === "mixed") {
+                        // Fallback for "mixed": use global profile rating
                         const { data } = await supabase
-                            .from("profiles")
+                            .from("wordup_profiles")
                             .select("rating")
                             .eq("id", props.userId)
-                            .maybeSingle();
-                        if (data?.rating) userRating = data.rating;
-                    } else {
-                        const { data } = await supabase
-                            .from("wordup_category_profiles")
-                            .select("rating")
-                            .eq("user_id", props.userId)
-                            .eq("category", category)
                             .maybeSingle();
                         if (data?.rating) userRating = data.rating;
                     }
@@ -898,59 +908,57 @@ export function useGameEngine(props: EngineProps) {
                 questions = await decryptMatchQuestions(match);
                 await preloadMatchImages(questions);
 
-                if (gameTypeRef.current === "live") {
-                    const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
-                    if (oppId) {
-                        try {
-                            let { data: profileData } = await supabase
-                                .from("profiles")
+                const oppId = activeRole === "player1" ? match.player2_id : match.player1_id;
+                if (oppId) {
+                    try {
+                        let { data: profileData } = await supabase
+                            .from("profiles")
+                            .select("id, username, avatar_url")
+                            .eq("id", oppId)
+                            .maybeSingle();
+
+                        if (!profileData) {
+                            const { data: guestData } = await supabase
+                                .from("guest_profiles")
                                 .select("id, username, avatar_url")
                                 .eq("id", oppId)
                                 .maybeSingle();
+                            profileData = guestData;
+                        }
 
-                            if (!profileData) {
-                                const { data: guestData } = await supabase
-                                    .from("guest_profiles")
-                                    .select("id, username, avatar_url")
+                        if (profileData) {
+                            let rating = 600;
+                            let rankName = "Bronze";
+                            try {
+                                const { data: wp } = await supabase
+                                    .from("wordup_profiles")
+                                    .select("rating, rank_name")
                                     .eq("id", oppId)
                                     .maybeSingle();
-                                profileData = guestData;
-                            }
-
-                            if (profileData) {
-                                let rating = 600;
-                                let rankName = "Bronze";
-                                try {
-                                    const { data: wp } = await supabase
-                                        .from("wordup_profiles")
-                                        .select("rating, rank_name")
-                                        .eq("id", oppId)
-                                        .maybeSingle();
-                                    if (wp) {
-                                        rating = wp.rating;
-                                        rankName = wp.rank_name;
-                                    }
-                                } catch (e) {
-                                    console.warn("Failed to fetch opponent wordup_profile:", e);
+                                if (wp) {
+                                    rating = wp.rating;
+                                    rankName = wp.rank_name;
                                 }
-
-                                oppStats = {
-                                    id: profileData.id,
-                                    username: profileData.username,
-                                    avatar_url: profileData.avatar_url,
-                                    rating: rating,
-                                    xp: 0,
-                                    games_played: 0,
-                                    games_won: 0,
-                                    games_lost: 0,
-                                    games_tied: 0,
-                                    rank_name: rankName,
-                                };
+                            } catch (e) {
+                                console.warn("Failed to fetch opponent wordup_profile:", e);
                             }
-                        } catch (e) {
-                            console.error("Failed to load opponent details:", e);
-                            oppStats = null;
+
+                            oppStats = {
+                                id: profileData.id,
+                                username: profileData.username,
+                                avatar_url: profileData.avatar_url,
+                                rating: rating,
+                                xp: 0,
+                                games_played: 0,
+                                games_won: 0,
+                                games_lost: 0,
+                                games_tied: 0,
+                                rank_name: rankName,
+                            };
                         }
+                    } catch (e) {
+                        console.error("Failed to load opponent details:", e);
+                        oppStats = null;
                     }
                 }
             }

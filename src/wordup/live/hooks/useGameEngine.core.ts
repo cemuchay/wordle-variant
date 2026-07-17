@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ── Shared game engine core (React-free, side-effect-free) ─────────
 // Imported by both the React hook (useGameEngine.ts) and the headless
 // simulator (scripts/simEngine.ts).  Any bug fix here applies to both.
 
+import { GRACE_DECAY } from "@/wordup/shared/constants";
 import { QUESTION_DURATION } from "../../../constants/wordup";
 
 // ── Question duration ──────────────────────────────────────────────
@@ -19,8 +21,9 @@ export function calcPoints(
    isRound6: boolean,
 ): number {
    if (!correct) return 0;
-   const eff = Math.max(0, elapsed - 1.5);
-   const denom = duration - 1.5;
+   const grace = GRACE_DECAY;
+   const eff = Math.max(0, elapsed - grace);
+   const denom = duration - grace;
    let p = Math.max(
       11,
       Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
@@ -56,7 +59,12 @@ export function buildBotAnswer(
    duration: number,
    isRound6: boolean,
 ): AnswerPayload {
-   const pts = calcPoints(botAction.correct, botAction.time_taken, duration, isRound6);
+   const pts = calcPoints(
+      botAction.correct,
+      botAction.time_taken,
+      duration,
+      isRound6,
+   );
    let choice = question?.answer ?? "";
    if (!botAction.correct && question?.choices) {
       const wrong = question.choices.filter((c) => c !== question.answer);

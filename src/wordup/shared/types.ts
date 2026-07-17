@@ -24,3 +24,18 @@ export interface MatchSubmission {
    time_taken: number;
    points: number;
 }
+
+export interface ActivityFeedObj {
+   category: string;
+   type: string;
+   id: string;
+   oppName: string;
+   myTurn: boolean;
+   data: object;
+   won: boolean;
+   draw: boolean;
+   myScore: number;
+   oppScore: number;
+   rankName: string;
+   rating: number;
+}
