@@ -359,9 +359,9 @@ export const UnifiedLobby = ({
                   >
                      {/* Profile summary card */}
                      <ProfileSummaryCard
-                        userStats
-                        currentUser
-                        getRankColor />
+                        userStats={userStats}
+                        currentUser={currentUser}
+                        getRankColor={getRankColor} />
 
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (
