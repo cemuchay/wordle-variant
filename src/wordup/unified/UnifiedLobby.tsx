@@ -1,20 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-   Radio, Shield, Play, HelpCircle, ChevronDown, ChevronUp,
-   Clock, Flame, Swords, Search, UserPlus, Loader2, Trophy,
-   Volume2, VolumeX, Home
+   Clock,
+   Home,
+   Loader2,
+   Play,
+   Search,
+   Swords,
+   Trophy,
+   UserPlus,
+   Volume2, VolumeX
 } from "lucide-react";
-import { CATEGORIES } from "../shared/constants";
-import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, loadClickData, recordClick, getTopFrequentCategories } from "../shared/categorySelectConstants";
-import { type ProfileStats } from "../shared/types";
-import { supabase } from "../../lib/supabaseClient";
-import { TopicDetailsView } from "./TopicDetailsView";
-import { RankingView } from "../shared/RankingView";
-import { CategorySelectModal } from "../shared/CategorySelectModal";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
-import formatUsername from "../../utils/formatUsername";
+import { supabase } from "../../lib/supabaseClient";
+import { CATEGORY_STYLE_MAP, DEFAULT_STYLE, getTopFrequentCategories, loadClickData, recordClick } from "../shared/categorySelectConstants";
+import { CategorySelectModal } from "../shared/CategorySelectModal";
+import { CATEGORIES } from "../shared/constants";
+import { RankingView } from "../shared/RankingView";
+import { type ProfileStats } from "../shared/types";
+import ActivityFeed from "./components/ActivityFeed";
+import ProfileSummaryCard from "./components/ProfileSummaryCard";
+import { TopicDetailsView } from "./TopicDetailsView";
+import { safeLocalStorage } from "@/utils/storage";
+import HelpSection from "./components/HelpSection";
 
 type TabId = "home" | "live" | "async" | "rankings" | "history";
 
@@ -66,7 +75,7 @@ export const UnifiedLobby = ({
    const [asyncCategory, setAsyncCategory] = useState("mixed");
    const [historyMatches, setHistoryMatches] = useState<any[]>(() => {
       try {
-         const cached = localStorage.getItem("wordup_cached_history_matches");
+         const cached = safeLocalStorage.getItem("wordup_cached_history_matches");
          return cached ? JSON.parse(cached) : [];
       } catch {
          return [];
@@ -74,7 +83,7 @@ export const UnifiedLobby = ({
    });
    const [asyncHistoryMatches, setAsyncHistoryMatches] = useState<any[]>(() => {
       try {
-         const cached = localStorage.getItem("wordup_cached_async_history_matches");
+         const cached = safeLocalStorage.getItem("wordup_cached_async_history_matches");
          return cached ? JSON.parse(cached) : [];
       } catch {
          return [];
@@ -82,8 +91,8 @@ export const UnifiedLobby = ({
    });
    const [isLoadingHistory, setIsLoadingHistory] = useState(() => {
       try {
-         const cached1 = localStorage.getItem("wordup_cached_history_matches");
-         const cached2 = localStorage.getItem("wordup_cached_async_history_matches");
+         const cached1 = safeLocalStorage.getItem("wordup_cached_history_matches");
+         const cached2 = safeLocalStorage.getItem("wordup_cached_async_history_matches");
          return !(cached1 || cached2);
       } catch {
          return true;
@@ -96,10 +105,16 @@ export const UnifiedLobby = ({
    );
    const [playerSearch, setPlayerSearch] = useState("");
 
-   const historyMatchesRef = useState<any[]>(historyMatches);
-   const asyncHistoryMatchesRef = useState<any[]>(asyncHistoryMatches);
-   historyMatchesRef[0] = historyMatches;
-   asyncHistoryMatchesRef[0] = asyncHistoryMatches;
+   const historyMatchesRef = useRef<any[]>(historyMatches);
+   const asyncHistoryMatchesRef = useRef<any[]>(asyncHistoryMatches);
+
+   useEffect(() => {
+      historyMatchesRef.current = historyMatches;
+   }, [historyMatches]);
+
+   useEffect(() => {
+      asyncHistoryMatchesRef.current = asyncHistoryMatches;
+   }, [asyncHistoryMatches]);
 
    const trackTopicClick = useCallback((catId: string) => {
       const data = recordClick(catId);
@@ -112,43 +127,48 @@ export const UnifiedLobby = ({
          setIsLoadingHistory(false);
          return;
       }
-      const hasCache = historyMatchesRef[0].length > 0 || asyncHistoryMatchesRef[0].length > 0;
+
+      const hasCache = historyMatchesRef.current.length > 0 || asyncHistoryMatchesRef.current.length > 0;
       if (!hasCache) {
          setIsLoadingHistory(true);
       }
-      try {
-         const { data: liveData } = await supabase
-            .from("wordup_matches")
-            .select(`
-               *,
-               player1:player1_id (username, avatar_url),
-               player2:player2_id (username, avatar_url)
-            `)
-            .eq("status", "completed")
-            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-            .order("completed_at", { ascending: false })
-            .limit(30);
 
-         if (liveData) {
-            setHistoryMatches(liveData);
-            try { localStorage.setItem("wordup_cached_history_matches", JSON.stringify(liveData)); } catch (e) { console.warn(e); }
+      try {
+         // Fire both queries concurrently
+         const queryLimit = 20
+         const [liveResponse, asyncResponse] = await Promise.all([
+            supabase
+               .from("wordup_matches")
+               .select(`
+           *,
+           player1:player1_id (username, avatar_url),
+           player2:player2_id (username, avatar_url)
+        `)
+               .eq("status", "completed")
+               .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+               .order("completed_at", { ascending: false })
+               .limit(queryLimit),
+            supabase
+               .from("wordup_async_matches")
+               .select(`
+           *,
+           player1:player1_id (username, avatar_url),
+           player2:player2_id (username, avatar_url)
+        `)
+               .eq("status", "completed")
+               .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
+               .order("completed_at", { ascending: false })
+               .limit(queryLimit)
+         ]);
+
+         if (liveResponse.data) {
+            setHistoryMatches(liveResponse.data);
+            try { safeLocalStorage.setItem("wordup_cached_history_matches", JSON.stringify(liveResponse.data)); } catch (e) { console.warn(e); }
          }
 
-         const { data: asyncData } = await supabase
-            .from("wordup_async_matches")
-            .select(`
-               *,
-               player1:player1_id (username, avatar_url),
-               player2:player2_id (username, avatar_url)
-            `)
-            .eq("status", "completed")
-            .or(`player1_id.eq.${currentUser.id},player2_id.eq.${currentUser.id}`)
-            .order("completed_at", { ascending: false })
-            .limit(30);
-
-         if (asyncData) {
-            setAsyncHistoryMatches(asyncData);
-            try { localStorage.setItem("wordup_cached_async_history_matches", JSON.stringify(asyncData)); } catch (e) { console.warn(e); }
+         if (asyncResponse.data) {
+            setAsyncHistoryMatches(asyncResponse.data);
+            try { safeLocalStorage.setItem("wordup_cached_async_history_matches", JSON.stringify(asyncResponse.data)); } catch (e) { console.warn(e); }
          }
       } catch (e) {
          console.error("Failed to fetch history:", e);
@@ -338,155 +358,10 @@ export const UnifiedLobby = ({
                      className="flex flex-col gap-4"
                   >
                      {/* Profile summary card */}
-                     {userStats && (
-                        <div className="relative overflow-hidden bg-linear-to-r from-[#E85151]/15 to-[#E85151]/5 border border-[#E85151]/20 rounded-2xl p-4 flex items-center justify-between shadow-md">
-                           <div className="flex items-center gap-3">
-                              <div className="w-11 h-11 rounded-full border-2 border-[#E85151] overflow-hidden flex items-center justify-center bg-black/40">
-                                 <ProtectedAvatar
-                                    userId={currentUser?.id}
-                                    src={currentUser?.user_metadata?.avatar_url}
-                                    username={formatUsername(currentUser?.user_metadata?.full_name)}
-                                    className="w-full h-full"
-                                 />
-                              </div>
-                              <div>
-                                 <h3 className="text-sm font-black text-white leading-none mb-1">
-                                    {formatUsername(currentUser?.user_metadata?.full_name) || "Player"}
-                                 </h3>
-                                 <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${getRankColor(userStats.rank_name)}`}>
-                                    {userStats.rank_name}
-                                 </span>
-                              </div>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-[9px] text-white/80 font-black uppercase">ELO rating</p>
-                              <p className="text-lg font-black text-white flex items-center gap-1 justify-end">
-                                 <Flame size={16} fill="#E85151" className="text-[#E85151]" />
-                                 {userStats.rating}
-                              </p>
-                           </div>
-                        </div>
-                     )}
-
-                     {/* Activity Feed */}
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 text-white/80">
-                           <Radio size={14} className="text-[#E85151] animate-pulse" />
-                           <span className="text-[12px] font-black uppercase tracking-wider">Latest Activity</span>
-                        </div>
-                        <div className="space-y-2 bg-white/5 border border-white/10 p-3 rounded-2xl shadow-inner min-h-[80px]">
-                           {isLoadingHistory ? (
-                              <div className="space-y-2 animate-pulse">
-                                 {[1, 2, 3].map((n) => (
-                                    <div key={n} className="flex items-center justify-between bg-black/10 border border-white/5 rounded-xl p-2.5 h-[56px]">
-                                       <div className="flex items-center gap-2.5 w-full">
-                                          <div className="w-6 h-6 rounded-md bg-white/10 shrink-0"></div>
-                                          <div className="space-y-1.5 flex-1">
-                                             <div className="h-2.5 bg-white/10 rounded-sm w-1/3"></div>
-                                             <div className="h-1.5 bg-white/10 rounded-sm w-1/6"></div>
-                                          </div>
-                                       </div>
-                                    </div>
-                                 ))}
-                              </div>
-                           ) : buildActivityFeed().length > 0 ? (
-                              buildActivityFeed().map((item) => {
-                                 const itemCatObj = CATEGORIES.find(c => c.id === item.category);
-                                 const emoji = CATEGORY_STYLE_MAP[item.category]?.emoji || "💡";
-
-                                 if (item.type === "async_challenge") {
-                                    return (
-                                       <div key={item.id} className="flex items-center justify-between bg-black/35 border border-white/10 rounded-xl p-2.5">
-                                          <div className="flex items-center gap-2">
-                                             <span className="text-lg">{emoji}</span>
-                                             <div className="min-w-0">
-                                                <p className="text-[12px] text-white font-bold leading-tight truncate">
-                                                   Challenge vs <span className="text-[#E85151]">{item.oppName}</span>
-                                                </p>
-                                                <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
-                                                   {itemCatObj?.name || "Trivia"}
-                                                </p>
-                                             </div>
-                                          </div>
-                                          {item.myTurn ? (
-                                             <button
-                                                onClick={() => onPlayAsyncTurn(item.data)}
-                                                className="bg-[#E85151] hover:bg-[#d44343] text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow cursor-pointer transition-all active:scale-95"
-                                             >
-                                                Play Turn
-                                             </button>
-                                          ) : (
-                                             <span className="text-[7.5px] font-black uppercase text-yellow-505 text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-md shrink-0">
-                                                Waiting
-                                             </span>
-                                          )}
-                                       </div>
-                                    );
-                                 }
-
-                                 if (item.type === "completed_match") {
-                                    let outcome = "DRAW";
-                                    let outcomeStyle = "text-white border-white/10 bg-white/5";
-                                    if (item.won) {
-                                       outcome = "WIN";
-                                       outcomeStyle = "text-[#E85151] border-[#E85151]/20 bg-[#E85151]/10";
-                                    } else if (!item.draw) {
-                                       outcome = "LOSS";
-                                       outcomeStyle = "text-red-400 border-red-500/10 bg-red-500/10";
-                                    }
-
-                                    return (
-                                       <div
-                                          key={item.id}
-                                          onClick={() => onSelectHistoryMatch?.(item.data)}
-                                          className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-2.5 hover:bg-white/5 cursor-pointer transition-all"
-                                       >
-                                          <div className="flex items-center gap-2 min-w-0">
-                                             <span className="text-lg">{emoji}</span>
-                                             <div className="min-w-0">
-                                                <p className="text-[12px] text-white font-bold leading-tight truncate">
-                                                   vs {item.oppName}
-                                                </p>
-                                                <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
-                                                   {itemCatObj?.name || "Trivia"}
-                                                </p>
-                                             </div>
-                                          </div>
-                                          <div className="flex items-center gap-2 shrink-0">
-                                             <span className="text-[12px] font-black text-white">{item.myScore} - {item.oppScore}</span>
-                                             <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-md border ${outcomeStyle}`}>
-                                                {outcome}
-                                             </span>
-                                          </div>
-                                       </div>
-                                    );
-                                 }
-
-                                 if (item.type === "rank_milestone") {
-                                    return (
-                                       <div key={item.id} className="flex items-center gap-2.5 bg-[#E85151]/10 border border-[#E85151]/25 rounded-xl p-2.5">
-                                          <Shield size={16} className="text-[#E85151]" />
-                                          <div>
-                                             <p className="text-[12px] text-white font-bold leading-tight">
-                                                Rank Update: <span className="text-[#E85151]">{item.rankName}</span>
-                                             </p>
-                                             <p className="text-[12px] text-white/70 font-extrabold uppercase mt-0.5">
-                                                Currently holding {item.rating} rating ELO
-                                             </p>
-                                          </div>
-                                       </div>
-                                    );
-                                 }
-
-                                 return null;
-                              })
-                           ) : (
-                              <div className="text-center py-6 text-white/60 text-[10px] font-black uppercase tracking-wider">
-                                 No recent matches or activities.
-                              </div>
-                           )}
-                        </div>
-                     </div>
+                     <ProfileSummaryCard
+                        userStats={userStats}
+                        currentUser={currentUser}
+                        getRankColor={getRankColor} />
 
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (
@@ -550,6 +425,16 @@ export const UnifiedLobby = ({
                         </div>
                      )}
 
+                     {/* Activity Feed */}
+                     <ActivityFeed
+                        isLoadingHistory={isLoadingHistory}
+                        buildActivityFeed={buildActivityFeed}
+                        CATEGORIES={CATEGORIES}
+                        CATEGORY_STYLE_MAP={CATEGORY_STYLE_MAP}
+                        onPlayAsyncTurn={onPlayAsyncTurn}
+                        onSelectHistoryMatch={onSelectHistoryMatch}
+                     />
+
                      {/* All Topics */}
                      <div className="space-y-2">
                         <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
@@ -580,41 +465,9 @@ export const UnifiedLobby = ({
                      </div>
 
                      {/* Help Section */}
-                     <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300">
-                        <button
-                           onClick={() => setShowHelp(!showHelp)}
-                           className="w-full flex items-center justify-between p-4 text-xs font-black uppercase tracking-wider text-white hover:text-white transition-colors cursor-pointer"
-                        >
-                           <div className="flex items-center gap-2">
-                              <HelpCircle size={14} className="text-[#E85151]" />
-                              <span>How to Play & Scoring</span>
-                           </div>
-                           {showHelp ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
-                        <AnimatePresence initial={false}>
-                           {showHelp && (
-                              <motion.div
-                                 initial={{ opacity: 0, height: 0 }}
-                                 animate={{ opacity: 1, height: "auto" }}
-                                 exit={{ opacity: 0, height: 0 }}
-                                 transition={{ duration: 0.2 }}
-                                 className="px-4 pb-5 text-[11px] text-white space-y-4 border-t border-white/10 pt-4 overflow-hidden"
-                              >
-                                 <div>
-                                    <p className="font-black text-white uppercase tracking-wider mb-1">Game Flow</p>
-                                    <p>You and your opponent answer the same 7 questions. Play live in real-time or challenge your friends asynchronously at your own pace.</p>
-                                 </div>
-                                 <div>
-                                    <p className="font-black text-white uppercase tracking-wider mb-1">Scoring System</p>
-                                    <ul className="list-disc pl-4 space-y-1">
-                                       <li><strong className="text-[#E85151]">Correct answer</strong>: <strong className="text-white">11–20 points</strong> (decays based on speed).</li>
-                                       <li><strong className="text-[#E85151]">Round 7 (Final Round)</strong>: All points are <strong className="text-[#E85151]">DOUBLED</strong>!</li>
-                                    </ul>
-                                 </div>
-                              </motion.div>
-                           )}
-                        </AnimatePresence>
-                     </div>
+                     <HelpSection
+                        setShowHelp={setShowHelp}
+                        showHelp={showHelp} />
 
                      {/* Footer Nav */}
                      <div className="mt-2 pt-4 border-t border-white/10 mb-2 space-y-2">

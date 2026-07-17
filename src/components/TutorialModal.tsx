@@ -84,6 +84,7 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasScrolledToBottom(false);
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
@@ -121,7 +122,7 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
               How to Play
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed mb-6 max-w-xs">
-              Find the hidden <span className="text-white font-bold">5-letter</span> word. You have{' '}
+              Find the hidden <span className="text-white font-bold">letter</span> word. You have{' '}
               <span className="text-white font-bold">6 tries</span>.
               After each guess, the tiles change color to show how close you are.
             </p>
@@ -134,7 +135,7 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
                 </div>
               ))}
             </div>
-            <p className="text-[9px] text-gray-600 font-bold uppercase tracking-wider mt-4">
+            <p className="text-[9px] text-white font-bold uppercase tracking-wider mt-4">
               Start with a word containing common vowels like A, E, I, O, U
             </p>
           </div>
@@ -389,9 +390,8 @@ export const TutorialModal = ({ onComplete, onSkip }: TutorialModalProps) => {
             {Array.from({ length: TOTAL }).map((_, i) => (
               <div
                 key={i}
-                className={`h-1 rounded-full transition-all duration-300 ${
-                  i <= stepIndex ? 'bg-correct w-5' : 'bg-gray-700 w-1.5'
-                }`}
+                className={`h-1 rounded-full transition-all duration-300 ${i <= stepIndex ? 'bg-correct w-5' : 'bg-gray-700 w-1.5'
+                  }`}
               />
             ))}
           </div>

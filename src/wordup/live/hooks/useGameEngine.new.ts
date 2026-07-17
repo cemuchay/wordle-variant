@@ -848,19 +848,21 @@ export function useGameEngine(props: EngineProps) {
                 }
                 let userRating = 600;
                 if (props.userId) {
-                    if (category === "mixed") {
+                    // First: try category-specific rating (all categories including "mixed")
+                    const { data: catProfile } = await supabase
+                        .from("wordup_category_profiles")
+                        .select("rating")
+                        .eq("user_id", props.userId)
+                        .eq("category", category)
+                        .maybeSingle();
+                    if (catProfile?.rating) {
+                        userRating = catProfile.rating;
+                    } else if (category === "mixed") {
+                        // Fallback for "mixed": use global profile rating
                         const { data } = await supabase
-                            .from("profiles")
+                            .from("wordup_profiles")
                             .select("rating")
                             .eq("id", props.userId)
-                            .maybeSingle();
-                        if (data?.rating) userRating = data.rating;
-                    } else {
-                        const { data } = await supabase
-                            .from("wordup_category_profiles")
-                            .select("rating")
-                            .eq("user_id", props.userId)
-                            .eq("category", category)
                             .maybeSingle();
                         if (data?.rating) userRating = data.rating;
                     }

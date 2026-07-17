@@ -331,7 +331,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h2 className="text-lg sm:text-xl font-black text-white truncate pr-2 sm:pr-6">@{profile.username}</h2>
+                                    <h2 className="text-lg sm:text-xl font-black text-white truncate text-left pr-2 sm:pr-6">@{profile.username}</h2>
                                     {profile.full_name && (
                                         <div className="text-[11px] font-bold text-gray-500 mt-0.5">{profile.full_name}</div>
                                     )}

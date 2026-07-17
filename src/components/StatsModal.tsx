@@ -484,7 +484,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   if (inline) {
     return (
       <div
-        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden p-6 relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
+        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden px-2 py-3  relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
         <div className="w-full max-w-md mx-auto flex flex-col h-full relative overflow-hidden">
@@ -497,13 +497,13 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.STATS_MODAL }}>
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl px-2 py-3 shadow-2xl relative flex flex-col h-[75vh]">
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer">
           <X size={20} />
         </button>
 
-        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100">Statistics</h2>
+        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-white">Statistics</h2>
 
         {/* Tab Switcher */}
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6 shrink-0">

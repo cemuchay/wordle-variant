@@ -158,7 +158,7 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                }, 3, 1000);
 
                // Category specific profile update
-               if (category && category !== "mixed") {
+               if (category) {
                   await fetchWithRetry(async () => {
                      const { data: topicProf, error: topicFetchError } = await supabase
                         .from("wordup_category_profiles")
