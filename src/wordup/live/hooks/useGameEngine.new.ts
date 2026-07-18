@@ -870,18 +870,21 @@ export function useGameEngine(props: EngineProps) {
                 }
 
                 const botKeys = Object.keys(BOT_PROFILES);
-                let closestBp = "average";
-                let minDiff = Infinity;
-                for (const key of botKeys) {
-                    const botRating = BOT_PROFILES_RATINGS[key] || 1000;
-                    const diff = Math.abs(botRating - userRating);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        closestBp = key;
+                let bp = "average";
+
+                if (Math.random() < 1 / 3) {
+                    bp = botKeys[Math.floor(Math.random() * botKeys.length)];
+                } else {
+                    let minDiff = Infinity;
+                    for (const key of botKeys) {
+                        const botRating = BOT_PROFILES_RATINGS[key] || 1000;
+                        const diff = Math.abs(botRating - userRating);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bp = key;
+                        }
                     }
                 }
-
-                const bp = closestBp;
                 botProfileRef.current = bp;
                 const prof = BOT_PROFILES[bp];
                 const botRating = BOT_PROFILES_RATINGS[bp] || 1000;

@@ -74,6 +74,7 @@ export const BOT_PROFILES_RATINGS: Record<string, number> = {
    suya_thinker: 950,
    slow_thinker: 800,
    street_king: 700,
+   teddy: 650,
 } as const;
 
 /** Timeout and interval durations for WordUp match flow. */

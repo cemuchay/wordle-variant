@@ -172,8 +172,8 @@ export async function preloadMatchImages(
  }
 
  function decodeQuestion(q: WordUpQuestion): WordUpQuestion {
-    const resolveWiki = (url: string | undefined | null) => {
-       if (!url) return url;
+    const resolveWiki = (url: string | undefined | null): string | undefined => {
+       if (!url) return undefined;
        if (url.startsWith("wikimedia:")) {
           const fileName = url.replace(/^wikimedia:File:/, "");
           return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}`;
