@@ -100,6 +100,25 @@ export const WordUpContainer = ({
       useAsyncStore.getState().setRole(mRole);
       useAsyncStore.getState().setCategory(match.category);
       useAsyncStore.getState().setView("loading");
+
+      // Pre-populate opponent stats from match profile details if available
+      const oppProfile = mRole === "player1" ? match.player2 : match.player1;
+      const oppId = mRole === "player1" ? match.player2_id : match.player1_id;
+      if (oppProfile && oppId) {
+         useAsyncStore.getState().setOpponentStats({
+            id: oppId,
+            username: oppProfile.username || "Opponent",
+            avatar_url: oppProfile.avatar_url || null,
+            rating: oppProfile.rating || 600,
+            rank_name: oppProfile.rank_name || "Bronze",
+            xp: oppProfile.xp || 0,
+            games_played: oppProfile.games_played || 0,
+            games_won: oppProfile.games_won || 0,
+            games_lost: oppProfile.games_lost || 0,
+            games_tied: oppProfile.games_tied || 0,
+         });
+      }
+
       setWordupMode("async");
    }, [effectiveUser?.id, setWordupMode]);
 

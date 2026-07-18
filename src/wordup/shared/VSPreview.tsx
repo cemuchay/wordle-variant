@@ -5,6 +5,7 @@ import { Swords, Trophy, Activity, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { BOT_PROFILES } from "../../utils/wordupQuestionGenerator";
+import { BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { CATEGORIES } from "./constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "./categorySelectConstants";
 
@@ -72,7 +73,7 @@ export const VSPreview = ({
                   const { data: globalOpp } = await supabase
                      .from("wordup_profiles")
                      .select("rating, rank_name")
-                     .eq("user_id", opponentStats.id)
+                     .eq("id", opponentStats.id)
                      .maybeSingle();
                   if (globalOpp && active) setOppCategoryStats(globalOpp);
                } else {
@@ -137,11 +138,24 @@ export const VSPreview = ({
    const myRating = myCategoryStats?.rating ?? 600;
    const myRank = myCategoryStats?.rank_name ?? "Bronze";
 
-   const oppName = matchData?.is_bot_match
-      ? (BOT_PROFILES[matchData.bot_profile]?.name || "Word Bot")
+   const isBot = matchData?.is_bot_match;
+   const botProfileKey = matchData?.bot_profile;
+
+   const oppName = isBot
+      ? (BOT_PROFILES[botProfileKey]?.name || "Word Bot")
       : opponentStats?.username || "Opponent";
-   const oppRating = oppCategoryStats?.rating ?? (opponentStats?.rating || 600);
-   const oppRank = oppCategoryStats?.rank_name ?? (opponentStats?.rank_name || "Bronze");
+
+   const getBotRank = (rating: number) => {
+      return rating >= 1700 ? "Master" : rating >= 1400 ? "Diamond" : rating >= 1100 ? "Gold" : rating >= 800 ? "Silver" : "Bronze";
+   };
+
+   const oppRating = isBot
+      ? (BOT_PROFILES_RATINGS[botProfileKey] || 1000)
+      : oppCategoryStats?.rating ?? (opponentStats?.rating || 600);
+
+   const oppRank = isBot
+      ? getBotRank(oppRating)
+      : oppCategoryStats?.rank_name ?? (opponentStats?.rank_name || "Bronze");
 
    const myAvatarUrl = currentUser?.user_metadata?.avatar_url;
    const oppAvatarUrl = matchData?.is_bot_match

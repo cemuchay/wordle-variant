@@ -784,227 +784,227 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
    // FLAG BEARER (3 templates)
    // ═══════════════════════════════════════════════════════════
    {
-       id: "flag_identify",
-       category: "flag_bearer",
-       requiredKeys: ["flag_code"],
-       prompts: [
-          "Which country's flag is shown in the image?",
-          "Identify the country that is represented by this flag:",
-          "Whose national flag is displayed below?",
-          "Identify this flag:",
-       ],
-       explanations: [
-          "The flag shown belongs to {label}.",
-          "This is the official national flag of {label}.",
-       ],
-       weight: 15,
-    },
-    {
-       id: "flag_capital",
-       category: "flag_bearer",
-       requiredKeys: ["capital", "flag_code"],
-       prompts: [
-          "What is the capital city of the country whose flag is shown?",
-          "For the country represented by this flag, what is its capital city?",
-       ],
-       explanations: [
-          "The flag belongs to {label}, whose capital is {capital}.",
-       ],
-       answerKey: "capital",
-       weight: 5,
-    },
-    {
-       id: "flag_continent",
-       category: "flag_bearer",
-       requiredKeys: ["continent", "flag_code"],
-       prompts: [
-          "In which continent is the country located that uses this flag?",
-          "For the national flag shown, which continent does its country belong to?",
-       ],
-       explanations: [
-          "The country represented by this flag ({label}) is located in {continent}.",
-       ],
-       answerKey: "continent",
-       weight: 3,
-    },
-    {
-       id: "flag_subregion",
-       category: "flag_bearer",
-       requiredKeys: ["subregion", "flag_code"],
-       prompts: [
-          "For the national flag shown, which subregion does its country belong to?",
-          "Identify the subregion of the country represented by this flag:",
-       ],
-       explanations: [
-          "The country represented by this flag ({label}) is located in the {subregion} subregion.",
-       ],
-       answerKey: "subregion",
-       weight: 2,
-    },
-    {
-       id: "flag_language",
-       category: "flag_bearer",
-       requiredKeys: ["primary_language", "flag_code"],
-       prompts: [
-          "What is the primary language spoken in the country whose flag is shown?",
-          "For the country represented by this flag, what is the primary language?",
-       ],
-       explanations: [
-          "The country represented by this flag ({label}) has {primary_language} as its primary language.",
-       ],
-       answerKey: "primary_language",
-       weight: 2,
-    },
-    {
-       id: "flag_currency",
-       category: "flag_bearer",
-       requiredKeys: ["currency", "flag_code"],
-       prompts: [
-          "What is the official currency of the country whose flag is shown?",
-          "Identify the currency used by the country represented by this flag:",
-       ],
-       explanations: [
-          "The country represented by this flag ({label}) uses the {currency} as its official currency.",
-       ],
-       answerKey: "currency",
-       weight: 2,
-    },
-    {
-       id: "flag_independence",
-       category: "flag_bearer",
-       requiredKeys: ["independence_year", "flag_code"],
-       prompts: [
-          "In which year did the country represented by this flag gain independence?",
-          "What is the independence year of the country whose flag is shown?",
-       ],
-       explanations: [
-          "{label} gained independence in the year {independence_year}.",
-       ],
-       answerKey: "independence_year",
-       weight: 1,
-    },
-    {
-       id: "flag_demonym",
-       category: "flag_bearer",
-       requiredKeys: ["demonym", "flag_code"],
-       prompts: [
-          "What are people from the country represented by this flag commonly called (demonym)?",
-          "Identify the demonym for citizens of the country whose flag is shown:",
-       ],
-       explanations: [
-          "A person from the country represented by this flag ({label}) is called a {demonym}.",
-       ],
-        answerKey: "demonym",
-        weight: 1,
-     },
+      id: "flag_identify",
+      category: "flag_bearer",
+      requiredKeys: ["flag_code"],
+      prompts: [
+         "Which country's flag is shown in the image?",
+         "Identify the country that is represented by this flag:",
+         "Whose national flag is displayed below?",
+         "Identify this flag:",
+      ],
+      explanations: [
+         "The flag shown belongs to {label}.",
+         "This is the official national flag of {label}.",
+      ],
+      weight: 15,
+   },
+   {
+      id: "flag_capital",
+      category: "flag_bearer",
+      requiredKeys: ["capital", "flag_code"],
+      prompts: [
+         "What is the capital city of the country whose flag is shown?",
+         "For the country represented by this flag, what is its capital city?",
+      ],
+      explanations: [
+         "The flag belongs to {label}, whose capital is {capital}.",
+      ],
+      answerKey: "capital",
+      weight: 5,
+   },
+   {
+      id: "flag_continent",
+      category: "flag_bearer",
+      requiredKeys: ["continent", "flag_code"],
+      prompts: [
+         "In which continent is the country located that uses this flag?",
+         "For the national flag shown, which continent does its country belong to?",
+      ],
+      explanations: [
+         "The country represented by this flag ({label}) is located in {continent}.",
+      ],
+      answerKey: "continent",
+      weight: 3,
+   },
+   {
+      id: "flag_subregion",
+      category: "flag_bearer",
+      requiredKeys: ["subregion", "flag_code"],
+      prompts: [
+         "For the national flag shown, which subregion does its country belong to?",
+         "Identify the subregion of the country represented by this flag:",
+      ],
+      explanations: [
+         "The country represented by this flag ({label}) is located in the {subregion} subregion.",
+      ],
+      answerKey: "subregion",
+      weight: 2,
+   },
+   {
+      id: "flag_language",
+      category: "flag_bearer",
+      requiredKeys: ["primary_language", "flag_code"],
+      prompts: [
+         "What is the primary language spoken in the country whose flag is shown?",
+         "For the country represented by this flag, what is the primary language?",
+      ],
+      explanations: [
+         "The country represented by this flag ({label}) has {primary_language} as its primary language.",
+      ],
+      answerKey: "primary_language",
+      weight: 2,
+   },
+   {
+      id: "flag_currency",
+      category: "flag_bearer",
+      requiredKeys: ["currency", "flag_code"],
+      prompts: [
+         "What is the official currency of the country whose flag is shown?",
+         "Identify the currency used by the country represented by this flag:",
+      ],
+      explanations: [
+         "The country represented by this flag ({label}) uses the {currency} as its official currency.",
+      ],
+      answerKey: "currency",
+      weight: 2,
+   },
+   {
+      id: "flag_independence",
+      category: "flag_bearer",
+      requiredKeys: ["independence_year", "flag_code"],
+      prompts: [
+         "In which year did the country represented by this flag gain independence?",
+         "What is the independence year of the country whose flag is shown?",
+      ],
+      explanations: [
+         "{label} gained independence in the year {independence_year}.",
+      ],
+      answerKey: "independence_year",
+      weight: 1,
+   },
+   {
+      id: "flag_demonym",
+      category: "flag_bearer",
+      requiredKeys: ["demonym", "flag_code"],
+      prompts: [
+         "What are people from the country represented by this flag commonly called (demonym)?",
+         "Identify the demonym for citizens of the country whose flag is shown:",
+      ],
+      explanations: [
+         "A person from the country represented by this flag ({label}) is called a {demonym}.",
+      ],
+      answerKey: "demonym",
+      weight: 1,
+   },
 
-    // ═══════════════════════════════════════════════════════════
-    // BIBLE (5 templates — book facts)
-    // ═══════════════════════════════════════════════════════════
+   // ═══════════════════════════════════════════════════════════
+   // BIBLE (5 templates — book facts)
+   // ═══════════════════════════════════════════════════════════
 
-    // ── TYPE 1: "Which book comes before X?" ──
-    {
-       id: "bible_book_before",
-       category: "bible",
-       requiredKeys: ["previous_book", "canonical_order"],
-       prompts: [
-          "Which book of the Bible comes immediately before {label}?",
-          "Name the book that precedes {label} in the Bible:",
-          "What is the book right before {label} in the canon?",
-          "Identify the book that comes just before {label}:",
-       ],
-       explanations: [
-          "The book before {label} is {previous_book}.",
-          "{previous_book} comes immediately before {label}.",
-       ],
-       answerKey: "previous_book",
-    },
+   // ── TYPE 1: "Which book comes before X?" ──
+   {
+      id: "bible_book_before",
+      category: "bible",
+      requiredKeys: ["previous_book", "canonical_order"],
+      prompts: [
+         "Which book of the Bible comes immediately before {label}?",
+         "Name the book that precedes {label} in the Bible:",
+         "What is the book right before {label} in the canon?",
+         "Identify the book that comes just before {label}:",
+      ],
+      explanations: [
+         "The book before {label} is {previous_book}.",
+         "{previous_book} comes immediately before {label}.",
+      ],
+      answerKey: "previous_book",
+   },
 
-    // ── TYPE 2: "Which book comes after X?" ──
-    {
-       id: "bible_book_after",
-       category: "bible",
-       requiredKeys: ["next_book", "canonical_order"],
-       prompts: [
-          "Which book of the Bible comes immediately after {label}?",
-          "Name the book that follows {label} in the Bible:",
-          "What is the book right after {label} in the canon?",
-          "Identify the book that comes just after {label}:",
-       ],
-       explanations: [
-          "The book after {label} is {next_book}.",
-          "{next_book} comes immediately after {label}.",
-       ],
-       answerKey: "next_book",
-    },
+   // ── TYPE 2: "Which book comes after X?" ──
+   {
+      id: "bible_book_after",
+      category: "bible",
+      requiredKeys: ["next_book", "canonical_order"],
+      prompts: [
+         "Which book of the Bible comes immediately after {label}?",
+         "Name the book that follows {label} in the Bible:",
+         "What is the book right after {label} in the canon?",
+         "Identify the book that comes just after {label}:",
+      ],
+      explanations: [
+         "The book after {label} is {next_book}.",
+         "{next_book} comes immediately after {label}.",
+      ],
+      answerKey: "next_book",
+   },
 
-    // ── TYPE 3: "How many chapters?" ──
-    {
-       id: "bible_chapters",
-       category: "bible",
-       requiredKeys: ["chapter_count"],
-       prompts: [
-          "How many chapters does the book of {label} have?",
-          "What is the chapter count of the book of {label}?",
-          "The book of {label} contains how many chapters?",
-          "How many chapters are in the book of {label}?",
-       ],
-       explanations: [
-          "The book of {label} has {chapter_count} chapters.",
-          "There are {chapter_count} chapters in the book of {label}.",
-       ],
-       answerKey: "chapter_count",
-    },
+   // ── TYPE 3: "How many chapters?" ──
+   {
+      id: "bible_chapters",
+      category: "bible",
+      requiredKeys: ["chapter_count"],
+      prompts: [
+         "How many chapters does the book of {label} have?",
+         "What is the chapter count of the book of {label}?",
+         "The book of {label} contains how many chapters?",
+         "How many chapters are in the book of {label}?",
+      ],
+      explanations: [
+         "The book of {label} has {chapter_count} chapters.",
+         "There are {chapter_count} chapters in the book of {label}.",
+      ],
+      answerKey: "chapter_count",
+   },
 
-    // ── TYPE 4: "Which book is in the Old/New Testament?" ──
-    {
-       id: "bible_testament",
-       category: "bible",
-       requiredKeys: ["testament"],
-       prompts: [
-          "Which of the following books is in the {testament} Testament?",
-          "Identify the book that belongs to the {testament} Testament:",
-          "Which book is part of the {testament} Testament?",
-       ],
-       explanations: [
-          "{label} is in the {testament} Testament.",
-          "The book of {label} belongs to the {testament} Testament.",
-       ],
-    },
+   // ── TYPE 4: "Which book is in the Old/New Testament?" ──
+   {
+      id: "bible_testament",
+      category: "bible",
+      requiredKeys: ["testament"],
+      prompts: [
+         "Which of the following books is in the {testament} Testament?",
+         "Identify the book that belongs to the {testament} Testament:",
+         "Which book is part of the {testament} Testament?",
+      ],
+      explanations: [
+         "{label} is in the {testament} Testament.",
+         "The book of {label} belongs to the {testament} Testament.",
+      ],
+   },
 
-    // ── TYPE 5: "Which is a real book of the Bible?" ──
-    {
-       id: "bible_real_book",
-       category: "bible",
-       requiredKeys: ["testament"],
-       prompts: [
-          "Which of the following is a real book of the Bible?",
-          "Identify the actual book of the Bible from the list below:",
-          "Which one is a genuine book of the Bible?",
-       ],
-       explanations: [
-          "{label} is indeed a real book of the Bible.",
-          "The book of {label} is one of the 66 books in the Bible.",
-       ],
-    },
+   // ── TYPE 5: "Which is a real book of the Bible?" ──
+   {
+      id: "bible_real_book",
+      category: "bible",
+      requiredKeys: ["testament"],
+      prompts: [
+         "Which of the following is a real book of the Bible?",
+         "Identify the actual book of the Bible from the list below:",
+         "Which one is a genuine book of the Bible?",
+      ],
+      explanations: [
+         "{label} is indeed a real book of the Bible.",
+         "The book of {label} is one of the 66 books in the Bible.",
+      ],
+   },
 ];
 
 export const FAKE_BIBLE_BOOKS = [
    "Gospel of Thomas",
-   "Book of Enoch",
-   "Gospel of Judas",
+   "Enoch",
+   "Judas",
    "Book of Jasher",
    "Acts of Paul",
    "Apocalypse of Peter",
-   "Gospel of Mary",
-   "Shepherd of Hermas",
+   "Mary",
+   "SHermas",
    "Didache",
-   "Epistle of Barnabas",
+   "Barnabas",
    "Testament of Solomon",
-   "Book of Jubilees",
+   "Jubilees",
    "Gospel of the Hebrews",
-   "Apocalypse of Abraham",
-   "Assumption of Moses",
+   "Abraham",
+   "Moses",
 ];
 
 export function getRandomMatchingTemplate(
@@ -1036,7 +1036,7 @@ export function getRandomMatchingTemplate(
    const totalWeight = matches.reduce((acc, t) => acc + (t.weight ?? 1), 0);
    let roll = rng() * totalWeight;
    for (const template of matches) {
-      roll -= (template.weight ?? 1);
+      roll -= template.weight ?? 1;
       if (roll <= 0) {
          return template;
       }

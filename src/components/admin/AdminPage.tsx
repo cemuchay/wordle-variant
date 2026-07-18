@@ -1,34 +1,36 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    RefreshCw,
+    ArrowUpDown,
+    Bell,
+    BookOpen,
+    Check,
     ChevronLeft,
     ChevronRight,
-    Search,
-    ArrowUpDown,
-    Check,
     Copy,
-    Flag,
-    Trash2,
-    LogOut,
-    User,
-    BookOpen,
     Edit2,
-    Home,
-    X,
+    EyeOff,
     FileCode,
-    Bell,
-    Trophy,
+    Flag,
+    Home,
     Image,
+    LogOut,
+    RefreshCw,
+    Search,
     Sparkles,
-    EyeOff
+    Trash2,
+    Trophy,
+    User,
+    X
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../../hooks/useAuth';
-import { useAdminStatus } from '../../hooks/useAdminStatus';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getWORDS_3, getWORDS_4, OFFICIAL_WORDS } from '../../data/words';
+import { useAdminStatus } from '../../hooks/useAdminStatus';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
-import { CATEGORIES } from '../../wordup/shared/constants';
+import TopicHub from './TopicHub';
+import GameStats from './GameStats';
+import { BarChart2 } from 'lucide-react';
 
 interface FlaggedWordData {
     id: string;
@@ -1008,234 +1010,7 @@ const BotMarathonManagement = ({ triggerToast }: { triggerToast: (text: string, 
     );
 };
 
-const LOCAL_CATEGORY_CONFIGS: Record<string, {
-    proceduralWeight: number;
-    handcraftedWeaveProbability: number;
-    variantWeights: number[];
-}> = {
-    maths: { proceduralWeight: 1.0, handcraftedWeaveProbability: 0.4, variantWeights: [3, 1, 0, 2, 0, 0, 0, 1, 0] },
-    english_language: { proceduralWeight: 1.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1, 1, 2.5, 0, 1, 0, 1, 0] },
-    english_fundamentals: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1, 2, 1, 1, 1, 1, 0] },
-    physics: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 0.5] },
-    chemistry: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 0.5] },
-    biology: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2, 0.5] },
-    football: { proceduralWeight: 0.0, handcraftedWeaveProbability: 1.0, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 1] },
-    sports: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 1] },
-    flag_bearer: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [3, 3, 1, 3, 0, 1, 1.5, 0, 0] },
-    capitals_clash: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 0, 1, 0] },
-    element_arena: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 3, 1] },
-    animal_kingdom: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1, 1.5, 1, 2, 1, 1] },
-    cosmic_frontier: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 1.5, 1, 1.5, 2, 1, 1, 1, 1] },
-    history_milestones: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [1.5, 1.5, 1, 1.5, 2.5, 1, 1, 1.5, 3] },
-    cinephile_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 2, 2.5] },
-    currency_exchange: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 0.5, 0] },
-    naija_celebs: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1.5, 1.5] },
-    elon_musk: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1.5, 1.5] },
-    naija_music: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1, 1.5] },
-    unn_lions: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 1, 1] },
-    nysc_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 1, 1] },
-    us_tech_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 1.5, 1, 1.5, 2, 1, 1, 1.5, 2] },
-};
 
-const VARIANT_NAMES = [
-    "Forward (Q -> A)",
-    "Reverse (A -> Q)",
-    "Odd One Out",
-    "True/False",
-    "Multi-Clue",
-    "Correct Error",
-    "Tag Match",
-    "Compare",
-    "Timeline",
-];
-
-const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
-    const [counts, setCounts] = useState<Record<string, number>>({});
-    const [loading, setLoading] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [modeFilter, setModeFilter] = useState<'all' | 'procedural' | 'handcrafted' | 'hybrid'>('all');
-
-    const fetchCounts = useCallback(async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('wordup_handcrafted_questions')
-                .select('category');
-
-            if (error) throw error;
-            const temp: Record<string, number> = {};
-            data?.forEach((q: any) => {
-                temp[q.category] = (temp[q.category] || 0) + 1;
-            });
-            setCounts(temp);
-        } catch (err: any) {
-            triggerToast(err.message || 'Error fetching question counts', 'error');
-        } finally {
-            setLoading(false);
-        }
-    }, [triggerToast]);
-
-    useEffect(() => {
-        Promise.resolve().then(() => {
-            fetchCounts();
-        });
-    }, [fetchCounts]);
-
-    const activeTopics = useMemo(() => {
-        const filtered = CATEGORIES.filter(c => c.id !== 'mixed');
-
-        return filtered.map(c => {
-            const config = LOCAL_CATEGORY_CONFIGS[c.id] || {
-                proceduralWeight: 0.5,
-                handcraftedWeaveProbability: 0.4,
-                variantWeights: [1, 1, 1, 1, 1, 1, 1, 1, 1]
-            };
-
-            const poolCount = counts[c.id] || 0;
-
-            let model: 'procedural' | 'handcrafted' | 'hybrid' = 'hybrid';
-            if (config.proceduralWeight === 1.0) {
-                model = 'procedural';
-            } else if (config.proceduralWeight === 0.0) {
-                model = 'handcrafted';
-            }
-
-            return {
-                ...c,
-                config,
-                poolCount,
-                model,
-            };
-        });
-    }, [counts]);
-
-    const filteredTopics = useMemo(() => {
-        return activeTopics.filter(t => {
-            if (modeFilter !== 'all' && t.model !== modeFilter) return false;
-
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase();
-                return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q);
-            }
-
-            return true;
-        });
-    }, [activeTopics, modeFilter, searchQuery]);
-
-    const getModelBadgeColor = (model: string) => {
-        if (model === 'procedural') return 'bg-blue-500/10 border-blue-500/30 text-blue-400';
-        if (model === 'handcrafted') return 'bg-green-500/10 border-green-500/30 text-green-400';
-        return 'bg-purple-500/10 border-purple-500/30 text-purple-400';
-    };
-
-    return (
-        <div className="flex flex-col gap-6">
-            <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
-                <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-                    <div>
-                        <h3 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                            <BookOpen className="text-correct" size={22} /> Topic Stats & Configurations
-                        </h3>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">
-                            Inspect how each Arena category generates its gameplay questions
-                        </p>
-                    </div>
-                    <button
-                        onClick={fetchCounts}
-                        disabled={loading}
-                        className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer"
-                        title="Refresh database counts"
-                    >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="relative sm:col-span-2">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-                        <input
-                            type="text"
-                            placeholder="Filter by name, ID or description..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-xs focus:outline-none focus:border-correct/50 transition-all text-white placeholder-gray-600"
-                        />
-                    </div>
-
-                    <select
-                        value={modeFilter}
-                        onChange={e => setModeFilter(e.target.value as any)}
-                        className="bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:outline-none focus:border-correct/50 text-white"
-                    >
-                        <option value="all" className="bg-gray-900 text-white">All Generation Models</option>
-                        <option value="procedural" className="bg-gray-900 text-white">Procedural-Only</option>
-                        <option value="handcrafted" className="bg-gray-900 text-white">Handcrafted-Only</option>
-                        <option value="hybrid" className="bg-gray-900 text-white">Hybrid (Procedural + Pool)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredTopics.map(t => {
-                    const weightSum = t.config.variantWeights.reduce((a, b) => a + b, 0);
-
-                    return (
-                        <div key={t.id} className="bg-gray-900 border border-white/10 rounded-2xl p-5 flex flex-col justify-between gap-5">
-                            <div>
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h4 className="text-base font-black text-white leading-tight">{t.name}</h4>
-                                        <span className="font-mono text-[9px] text-gray-500 block mt-0.5">ID: {t.id}</span>
-                                    </div>
-                                    <span className={`px-2 py-0.5 border rounded-md text-[9px] font-black uppercase tracking-wider ${getModelBadgeColor(t.model)}`}>
-                                        {t.model === 'procedural' ? 'Procedural' : t.model === 'handcrafted' ? 'Handcrafted' : 'Hybrid'}
-                                    </span>
-                                </div>
-
-                                <p className="text-xs text-gray-400 mt-3 font-medium leading-relaxed">{t.desc}</p>
-
-                                <div className="mt-4 bg-black/20 border border-white/5 rounded-xl p-3.5 space-y-2">
-                                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                                        <span>Procedural Ratio:</span>
-                                        <span className="text-white">{Math.round(t.config.proceduralWeight * 100)}%</span>
-                                    </div>
-                                    {t.model !== 'procedural' && (
-                                        <>
-                                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                                                <span>Weave Pool Probability:</span>
-                                                <span className="text-indigo-400">{Math.round(t.config.handcraftedWeaveProbability * 100)}%</span>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                                                <span>Handcrafted Pool Size:</span>
-                                                <span className="text-correct font-black">{t.poolCount} questions</span>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <h5 className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-2.5">Enabled Templates & Variant Weights</h5>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {t.config.variantWeights.map((w, idx) => {
-                                        if (w === 0) return null;
-                                        const pct = weightSum > 0 ? Math.round((w / weightSum) * 100) : 0;
-                                        return (
-                                            <div key={idx} className="bg-black/35 border border-white/5 rounded-lg p-2 text-center" title={VARIANT_NAMES[idx]}>
-                                                <span className="text-[8px] text-gray-500 font-bold uppercase block truncate">{VARIANT_NAMES[idx]}</span>
-                                                <span className="text-[10px] font-black text-white mt-0.5 block">{pct}%</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
 
 export const AdminPage: React.FC = () => {
     const [WORDS_3, setWORDS_3] = useState<string[]>([]);
@@ -1248,7 +1023,7 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'stats'>('words');
 
     // Authentication States
     const [loginEmail, setLoginEmail] = useState('');
@@ -1694,6 +1469,15 @@ SELECT create_admin_user(
                     >
                         <BookOpen size={14} /> Topic Hub
                     </button>
+                    <button
+                        onClick={() => setActiveTab('stats')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'stats'
+                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <BarChart2 size={14} /> Game Stats
+                    </button>
                 </div>
 
                 {activeTab === 'words' ? (
@@ -2105,8 +1889,10 @@ SELECT create_admin_user(
                     <BotMarathonManagement triggerToast={triggerToast} />
                 ) : activeTab === 'wordup' ? (
                     <WordUpCurator triggerToast={triggerToast} />
-                ) : (
+                ) : activeTab === 'topics' ? (
                     <TopicHub triggerToast={triggerToast} />
+                ) : (
+                    <GameStats triggerToast={triggerToast} />
                 )}
             </main>
 

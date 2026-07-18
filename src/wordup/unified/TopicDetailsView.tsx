@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
@@ -8,6 +8,9 @@ import { type ProfileStats } from "../shared/types";
 import { RankingView } from "../shared/RankingView";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { supabase } from "../../lib/supabaseClient";
+import { useApp } from "../../context/AppContext";
+import { useAsyncMatchmaking } from "../async/hooks/useMatchmaking";
+import { PlayNowLaterPopup } from "../async/components/PlayNowLaterPopup";
 
 interface TopicDetailsViewProps {
    categoryId: string;
@@ -36,6 +39,51 @@ export const TopicDetailsView = ({
    const [playerSearch, setPlayerSearch] = useState("");
    const [showInviteOverlay, setShowInviteOverlay] = useState(false);
    const [categoryStats, setCategoryStats] = useState<ProfileStats | null>(null);
+   const inviteSectionRef = useRef<HTMLDivElement | null>(null);
+
+   const { triggerToast } = useApp();
+   const { createMatch } = useAsyncMatchmaking(currentUser, categoryId, triggerToast);
+   const [isCreatingMatch, setIsCreatingMatch] = useState<string | null>(null);
+   const [pendingChallengeMatch, setPendingChallengeMatch] = useState<any | null>(null);
+   const [creationTimeout, setCreationTimeout] = useState(false);
+
+   const handleChallenge = async (profile: any) => {
+      if (isCreatingMatch) return;
+      setIsCreatingMatch(profile.id);
+      setCreationTimeout(false);
+
+      const timer = setTimeout(() => {
+         setCreationTimeout(true);
+      }, 10000);
+
+      try {
+         const mId = await createMatch(profile);
+         clearTimeout(timer);
+         if (mId) {
+            const { data: match } = await supabase
+               .from("wordup_async_matches")
+               .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
+               .eq("id", mId)
+               .single();
+            if (match) {
+               setPendingChallengeMatch({ match, profile });
+            }
+         }
+      } catch (err) {
+         console.error("Failed to challenge player:", err);
+         clearTimeout(timer);
+      } finally {
+         setIsCreatingMatch(null);
+      }
+   };
+
+   useEffect(() => {
+      if (showInviteOverlay) {
+         setTimeout(() => {
+            inviteSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+         }, 150);
+      }
+   }, [showInviteOverlay]);
 
    useEffect(() => {
       if (!currentUser || !categoryId) return;
@@ -122,8 +170,8 @@ export const TopicDetailsView = ({
             <button
                onClick={() => setActiveSection("play")}
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeSection === "play"
-                     ? "text-[#E85151] border-b-2 border-[#E85151]"
-                     : "text-white/70 hover:text-white"
+                  ? "text-[#E85151] border-b-2 border-[#E85151]"
+                  : "text-white/70 hover:text-white"
                   }`}
             >
                <Play size={14} />
@@ -132,8 +180,8 @@ export const TopicDetailsView = ({
             <button
                onClick={() => setActiveSection("rankings")}
                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeSection === "rankings"
-                     ? "text-[#E85151] border-b-2 border-[#E85151]"
-                     : "text-white/70 hover:text-white"
+                  ? "text-[#E85151] border-b-2 border-[#E85151]"
+                  : "text-white/70 hover:text-white"
                   }`}
             >
                <Trophy size={14} />
@@ -215,6 +263,7 @@ export const TopicDetailsView = ({
                      <AnimatePresence>
                         {showInviteOverlay && (
                            <motion.div
+                              ref={inviteSectionRef}
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                               exit={{ opacity: 0, height: 0 }}
@@ -255,10 +304,11 @@ export const TopicDetailsView = ({
                                              </div>
                                           </div>
                                           <button
-                                             onClick={() => onChallengePlayer(profile)}
-                                             className="flex items-center gap-1 bg-[#E85151]/10 hover:bg-[#E85151]/20 border border-[#E85151]/25 text-[#E85151] text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                                             onClick={() => handleChallenge(profile)}
+                                             disabled={isCreatingMatch !== null}
+                                             className="flex items-center gap-1 bg-[#E85151]/10 hover:bg-[#E85151]/20 border border-[#E85151]/25 text-[#E85151] text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer disabled:opacity-50"
                                           >
-                                             Challenge
+                                             {isCreatingMatch === profile.id ? "..." : "Challenge"}
                                           </button>
                                        </div>
                                     ))
@@ -285,6 +335,45 @@ export const TopicDetailsView = ({
                )}
             </AnimatePresence>
          </div>
+
+         {pendingChallengeMatch && (
+            <PlayNowLaterPopup
+               opponentName={pendingChallengeMatch.profile.username || "Opponent"}
+               category={categoryId}
+               onPlayNow={() => {
+                  const pcm = pendingChallengeMatch;
+                  setPendingChallengeMatch(null);
+                  onChallengePlayer(pcm.match);
+               }}
+               onLater={() => {
+                  setPendingChallengeMatch(null);
+                  setShowInviteOverlay(false);
+                  triggerToast("Challenge saved! Play when you're ready.", 3000);
+               }}
+            />
+         )}
+
+         {isCreatingMatch && (
+            <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-xs p-6 text-center space-y-5 animate-in fade-in duration-200">
+               <div className="w-12 h-12 border-4 border-[#E85151]/30 border-t-[#E85151] rounded-full animate-spin" />
+               <div className="space-y-1">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-white">Creating 1v1 Game</h3>
+                  <p className="text-[10px] text-white/60 font-bold uppercase tracking-wider">Generating questions and preparing match...</p>
+               </div>
+               {creationTimeout && (
+                  <button
+                     onClick={() => {
+                        setIsCreatingMatch(null);
+                        setCreationTimeout(false);
+                        triggerToast("Matchmaking creation cancelled.", 3000);
+                     }}
+                     className="mt-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-white transition-all cursor-pointer hover:scale-102 active:scale-98"
+                  >
+                     Cancel & Return
+                  </button>
+               )}
+            </div>
+         )}
       </div>
    );
 };

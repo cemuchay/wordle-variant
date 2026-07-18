@@ -68,6 +68,7 @@ export const UnifiedLobby = ({
    onBackToClassic,
    onTutorial,
    restoreCategory,
+   onRefreshPending,
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
@@ -196,7 +197,7 @@ export const UnifiedLobby = ({
             getRankColor={getRankColor}
             allProfiles={allProfiles}
             onPlayLive={() => onPlayLive(selectedCategoryId, false)}
-            onChallengePlayer={(targetUser) => onPlayAsync(targetUser, selectedCategoryId)}
+            onChallengePlayer={onPlayAsyncTurn}
             onPlayBot={() => onPlayLive(selectedCategoryId, true)}
          />
       );
@@ -433,6 +434,10 @@ export const UnifiedLobby = ({
                         CATEGORY_STYLE_MAP={CATEGORY_STYLE_MAP}
                         onPlayAsyncTurn={onPlayAsyncTurn}
                         onSelectHistoryMatch={onSelectHistoryMatch}
+                        onRefresh={() => {
+                           fetchHistory();
+                           onRefreshPending();
+                        }}
                      />
 
                      {/* All Topics */}

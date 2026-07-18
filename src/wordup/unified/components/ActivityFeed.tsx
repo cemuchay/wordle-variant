@@ -1,13 +1,25 @@
-import { Radio, Shield } from "lucide-react";
+import { Radio, Shield, RefreshCw } from "lucide-react";
 import type { ActivityFeedObj } from "@/wordup/shared/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGORY_STYLE_MAP, onPlayAsyncTurn, onSelectHistoryMatch }: any) => {
+const ActivityFeed = ({ isLoadingHistory, buildActivityFeed, CATEGORIES, CATEGORY_STYLE_MAP, onPlayAsyncTurn, onSelectHistoryMatch, onRefresh }: any) => {
     return (
         <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-white/80">
-                <Radio size={14} className="text-[#E85151] animate-pulse" />
-                <span className="text-[12px] font-black uppercase tracking-wider">Latest Activity</span>
+            <div className="flex items-center justify-between text-white/80">
+                <div className="flex items-center gap-1.5">
+                    <Radio size={14} className="text-[#E85151] animate-pulse" />
+                    <span className="text-[12px] font-black uppercase tracking-wider">Latest Activity</span>
+                </div>
+                {onRefresh && (
+                    <button
+                        onClick={onRefresh}
+                        disabled={isLoadingHistory}
+                        className="text-white/60 hover:text-white transition-all cursor-pointer p-1 rounded-md hover:bg-white/5 disabled:opacity-50"
+                        title="Refresh Activity"
+                    >
+                        <RefreshCw size={12} className={isLoadingHistory ? "animate-spin" : ""} />
+                    </button>
+                )}
             </div>
             <div className="space-y-2 bg-white/5 border border-white/10 p-3 rounded-2xl shadow-inner min-h-[80px]">
                 {isLoadingHistory ? (

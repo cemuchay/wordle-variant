@@ -590,6 +590,7 @@ export function useGameEngine(props: EngineProps) {
 
    const loadMatch = useCallback(
       async (mId: string, activeRole: "player1" | "player2") => {
+         const loadStart = Date.now();
          dispatch({ type: "SET_PHASE", phase: "loading" });
 
          try {
@@ -640,23 +641,7 @@ export function useGameEngine(props: EngineProps) {
 
             dispatch({ type: "SET_MATCH_DATA", data: match });
 
-            if (!match.questions && !match.encrypted_questions) {
-               await generateMatchQuestions(match.id, match.category);
-               const { data: ref } = await supabase
-                  .from("wordup_async_matches")
-                  .select("*")
-                  .eq("id", match.id)
-                  .single();
-               if (ref) {
-                  match = ref;
-                  dispatch({ type: "SET_MATCH_DATA", data: match });
-               }
-            }
-
-            const dec = await decryptMatchQuestions(match);
-            await preloadMatchImages(dec);
-            dispatch({ type: "SET_QUESTIONS", questions: dec });
-
+            // Load opponent profile details early so the VS Screen renders name/avatar immediately
             const oppId =
                activeRole === "player1" ? match.player2_id : match.player1_id;
             if (oppId) {
@@ -682,21 +667,38 @@ export function useGameEngine(props: EngineProps) {
                      return data;
                   })
                   .catch(() => null);
-               if (op) {
-                  dispatch({
-                     type: "SET_OPPONENT_STATS",
-                     stats: {
-                        ...op,
-                        username: mp?.username || "Opponent",
-                        avatar_url: mp?.avatar_url || null,
-                     },
-                  });
+               
+               dispatch({
+                  type: "SET_OPPONENT_STATS",
+                  stats: {
+                     ...(op || {}),
+                     id: oppId,
+                     username: mp?.username || "Opponent",
+                     avatar_url: mp?.avatar_url || null,
+                  },
+               });
+            }
+
+            if (!match.questions && !match.encrypted_questions) {
+               await generateMatchQuestions(match.id, match.category);
+               const { data: ref } = await supabase
+                  .from("wordup_async_matches")
+                  .select("*")
+                  .eq("id", match.id)
+                  .single();
+               if (ref) {
+                  match = ref;
+                  dispatch({ type: "SET_MATCH_DATA", data: match });
                }
             }
 
+            const dec = await decryptMatchQuestions(match);
+            await preloadMatchImages(dec);
+            dispatch({ type: "SET_QUESTIONS", questions: dec });
+
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase
-               .channel(`async-match-${mId}`)
+               .channel(`async-match-${mId}-${Date.now()}`)
                .on(
                   "postgres_changes",
                   {
@@ -724,6 +726,13 @@ export function useGameEngine(props: EngineProps) {
                )
                .subscribe();
             channel.current = ch;
+
+            // Enforce visual buffer of at least 3 seconds so the user can see their opponent
+            const elapsed = Date.now() - loadStart;
+            const remainingDelay = Math.max(0, 3000 - elapsed);
+            if (remainingDelay > 0) {
+               await new Promise((resolve) => setTimeout(resolve, remainingDelay));
+            }
 
             if (match.current_question_index > 0) {
                dispatch({ type: "SET_PHASE", phase: "playing" });
@@ -855,12 +864,6 @@ export function useGameEngine(props: EngineProps) {
    useEffect(() => {
       return () => {
          cleanup();
-         const store = useAsyncStore.getState();
-         if (
-            !(store.view === "battle" || store.view === "gameover") ||
-            !store.matchId
-         )
-            store.resetGame();
       };
    }, [cleanup]);
 

@@ -172,6 +172,15 @@ export async function preloadMatchImages(
  }
 
  function decodeQuestion(q: WordUpQuestion): WordUpQuestion {
+    const resolveWiki = (url: string | undefined | null): string | undefined => {
+       if (!url) return undefined;
+       if (url.startsWith("wikimedia:")) {
+          const fileName = url.replace(/^wikimedia:File:/, "");
+          return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}`;
+       }
+       return url;
+    };
+
     return {
        ...q,
        prompt: decodeEntities(q.prompt),
@@ -179,6 +188,8 @@ export async function preloadMatchImages(
        answer: decodeEntities(q.answer),
        choices: q.choices.map(decodeEntities),
        explanation: q.explanation ? decodeEntities(q.explanation) : undefined,
+       imageUrl: q.imageUrl ? resolveWiki(q.imageUrl) : undefined,
+       imageUrls: q.imageUrls ? q.imageUrls.map(resolveWiki) as string[] : undefined,
     };
  }
  

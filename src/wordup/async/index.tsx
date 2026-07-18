@@ -289,22 +289,31 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
    const pendingChallengePlayer = useAsyncStore((s) => s.pendingChallengePlayer);
    const setPendingChallengePlayer = useAsyncStore((s) => s.setPendingChallengePlayer);
+   const processingPlayerRef = useRef<string | null>(null);
+   const [isProcessingChallenge, setIsProcessingChallenge] = useState(false);
 
     useEffect(() => {
        if (pendingChallengePlayer && effectiveUser && view === "menu") {
           const player = pendingChallengePlayer;
+          if (processingPlayerRef.current === player.id) return;
+          processingPlayerRef.current = player.id;
+          
+          setIsProcessingChallenge(true);
           setTimeout(() => {
              setPendingChallengePlayer(null);
-             handleChallengePlayer(player);
+             processingPlayerRef.current = null;
+             handleChallengePlayer(player).finally(() => {
+                setIsProcessingChallenge(false);
+             });
           }, 0);
        }
     }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
 
    useEffect(() => {
-      if (view === "menu" && !pendingChallengePlayer) {
+      if (view === "menu" && !pendingChallengePlayer && !pendingChallenge && !isProcessingChallenge) {
          onBack?.();
       }
-   }, [view, pendingChallengePlayer, onBack]);
+   }, [view, pendingChallengePlayer, pendingChallenge, isProcessingChallenge, onBack]);
 
    // Load pending and history matches
    const refreshPending = useCallback(async () => {
