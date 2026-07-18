@@ -564,6 +564,23 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
             setLength(editingChallenge.word_length);
             setMaxTime(editingChallenge.max_time);
 
+            if (editingChallenge.max_attempts !== undefined && editingChallenge.max_attempts !== null) {
+                setMaxAttempts(editingChallenge.max_attempts);
+            }
+
+            if (editingChallenge.difficulty) {
+                setGlobalDifficulty(editingChallenge.difficulty);
+            }
+
+            if (editingChallenge.expires_at && editingChallenge.created_at) {
+                const diffMs = new Date(editingChallenge.expires_at).getTime() - new Date(editingChallenge.created_at).getTime();
+                const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                setLifespanHours(diffHours);
+            }
+
+            setNotifyCreator(!!editingChallenge.notify_creator);
+            setIsBotMarathon(!!editingChallenge.is_bot_marathon);
+
             const invites = editingChallenge.participants
                 ?.filter((p: any) => p.user_id !== editingChallenge.creator_id)
                 .map((p: any) => p.user_id || p.guest_id || '')
@@ -619,9 +636,38 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
                     setMarathonTimersArray(timers);
                     setMarathonTimersInput(timers.map(String));
                 }
+
+                if (Array.isArray(editingChallenge.marathon_difficulties) && editingChallenge.marathon_difficulties.length > 0) {
+                    setMarathonDifficulties(editingChallenge.marathon_difficulties);
+                    setMarathonDifficultyMode('custom');
+                } else {
+                    setMarathonDifficultyMode('uniform');
+                }
+            }
+
+            if (editingChallenge.word_length === 2) {
+                setIsCustomWord(!!editingChallenge.is_custom_word);
+                if (editingChallenge.is_custom_word) {
+                    try {
+                        const parsed = JSON.parse(editingChallenge.target_word);
+                        if (Array.isArray(parsed)) {
+                            setCustomSentence(parsed.join(' '));
+                            setSentenceWordCount(parsed.length);
+                        }
+                    } catch (e) {
+                        setCustomSentence(editingChallenge.target_word || '');
+                    }
+                } else {
+                    try {
+                        const parsed = JSON.parse(editingChallenge.target_word);
+                        if (Array.isArray(parsed)) {
+                            setSentenceWordCount(parsed.length);
+                        }
+                    } catch {}
+                }
             }
         }
-    }, [editingChallenge, setMode, setLength, setMaxTime, setInvitedIds]);
+    }, [editingChallenge, setMode, setLength, setMaxTime, setInvitedIds, setMaxAttempts]);
 
     const handleSavePreset = useCallback((name: string) => {
         const config = {
