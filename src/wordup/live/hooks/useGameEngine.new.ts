@@ -798,6 +798,7 @@ export function useGameEngine(props: EngineProps) {
 
     const startMatch = useCallback(
         async (mId: string, activeRole: "player1" | "player2") => {
+            const loadStart = Date.now();
             let questions: WordUpQuestion[];
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
@@ -981,6 +982,13 @@ export function useGameEngine(props: EngineProps) {
             setMyChoice(null);
             setOpponentChoice(null);
             setLastRoundPopup(false);
+
+            // Enforce visual buffer of at least 3 seconds so the user can see their opponent
+            const elapsed = Date.now() - loadStart;
+            const remainingDelay = Math.max(0, 3000 - elapsed);
+            if (remainingDelay > 0) {
+                await new Promise((resolve) => setTimeout(resolve, remainingDelay));
+            }
 
             // Start the countdown
             setPhase("countdown");

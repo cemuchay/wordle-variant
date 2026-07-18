@@ -6,6 +6,7 @@ import {
    Loader2,
    Play,
    Search,
+   Shield,
    Swords,
    Trophy,
    UserPlus,
@@ -48,7 +49,7 @@ interface UnifiedLobbyProps {
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
    { id: "home", label: "Home", icon: <Play size={13} /> },
    // { id: "live", label: "Live", icon: <Radio size={13} /> },
-   // { id: "async", label: "1v1", icon: <Shield size={13} /> },
+   { id: "async", label: "1v1", icon: <Shield size={13} /> },
    { id: "rankings", label: "Rankings", icon: <Trophy size={13} /> },
    { id: "history", label: "History", icon: <Clock size={13} /> },
 ];
