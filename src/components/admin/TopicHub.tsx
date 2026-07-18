@@ -3,35 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES } from "@/wordup/shared/constants";
 import { BookOpen, RefreshCw, Search } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo } from "react";
-
-const LOCAL_CATEGORY_CONFIGS: Record<string, {
-    proceduralWeight: number;
-    handcraftedWeaveProbability: number;
-    variantWeights: number[];
-}> = {
-    maths: { proceduralWeight: 1.0, handcraftedWeaveProbability: 0.4, variantWeights: [3, 1, 0, 2, 0, 0, 0, 1, 0] },
-    english_language: { proceduralWeight: 1.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1, 1, 2.5, 0, 1, 0, 1, 0] },
-    english_fundamentals: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1, 2, 1, 1, 1, 1, 0] },
-    physics: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 0.5] },
-    chemistry: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 0.5] },
-    biology: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2, 0.5] },
-    football: { proceduralWeight: 0.0, handcraftedWeaveProbability: 1.0, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 1] },
-    sports: { proceduralWeight: 0.0, handcraftedWeaveProbability: 0.4, variantWeights: [2.5, 1.5, 1.5, 1.5, 2, 1, 1.5, 2.5, 1] },
-    flag_bearer: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [3, 3, 1, 3, 0, 1, 1.5, 0, 0] },
-    capitals_clash: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 0, 1, 0] },
-    element_arena: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 3, 1] },
-    animal_kingdom: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1, 1.5, 1, 2, 1, 1] },
-    cosmic_frontier: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 1.5, 1, 1.5, 2, 1, 1, 1, 1] },
-    history_milestones: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [1.5, 1.5, 1, 1.5, 2.5, 1, 1, 1.5, 3] },
-    cinephile_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 2, 2.5] },
-    currency_exchange: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 0.5, 0] },
-    naija_celebs: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1.5, 1.5] },
-    elon_musk: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1.5, 1.5] },
-    naija_music: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1, 1.5, 2, 1, 1, 1, 1.5] },
-    unn_lions: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 1, 1] },
-    nysc_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 2, 1.5, 1.5, 1, 1, 1, 1, 1] },
-    us_tech_trivia: { proceduralWeight: 0.5, handcraftedWeaveProbability: 0.4, variantWeights: [2, 1.5, 1, 1.5, 2, 1, 1, 1.5, 2] },
-};
+import { getQuestionConfig } from "../../../supabase/functions/generate-match-questions/questionConfig";
 
 const VARIANT_NAMES = [
     "Forward (Q -> A)",
@@ -44,9 +16,17 @@ const VARIANT_NAMES = [
     "Compare",
     "Timeline",
 ];
+const LEVEL_COLORS: Record<number, string> = {
+    1: 'text-blue-400',
+    2: 'text-teal-400',
+    3: 'text-yellow-400',
+    4: 'text-orange-400',
+    5: 'text-red-400',
+};
 
 const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
-    const [counts, setCounts] = useState<Record<string, number>>({});
+    // Structure: { [category]: { total: number, levels: Record<number, number> } }
+    const [counts, setCounts] = useState<Record<string, { total: number; levels: Record<number, number> }>>({});
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [modeFilter, setModeFilter] = useState<'all' | 'procedural' | 'handcrafted' | 'hybrid'>('all');
@@ -54,16 +34,32 @@ const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'succe
     const fetchCounts = useCallback(async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('wordup_handcrafted_questions')
-                .select('category');
+            const categories = CATEGORIES.filter(c => c.id !== 'mixed');
+            const newCounts: Record<string, { total: number; levels: Record<number, number> }> = {};
+            
+            await Promise.all(categories.map(async (cat) => {
+                const [totalRes, l1, l2, l3, l4, l5] = await Promise.all([
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id),
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id).eq('difficulty', 1),
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id).eq('difficulty', 2),
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id).eq('difficulty', 3),
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id).eq('difficulty', 4),
+                    supabase.from('wordup_handcrafted_questions').select('*', { count: 'exact', head: true }).eq('category', cat.id).eq('difficulty', 5),
+                ]);
 
-            if (error) throw error;
-            const temp: Record<string, number> = {};
-            data?.forEach((q: any) => {
-                temp[q.category] = (temp[q.category] || 0) + 1;
-            });
-            setCounts(temp);
+                newCounts[cat.id] = {
+                    total: totalRes.count || 0,
+                    levels: {
+                        1: l1.count || 0,
+                        2: l2.count || 0,
+                        3: l3.count || 0,
+                        4: l4.count || 0,
+                        5: l5.count || 0,
+                    }
+                };
+            }));
+
+            setCounts(newCounts);
         } catch (err: any) {
             triggerToast(err.message || 'Error fetching question counts', 'error');
         } finally {
@@ -81,13 +77,9 @@ const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'succe
         const filtered = CATEGORIES.filter(c => c.id !== 'mixed');
 
         return filtered.map(c => {
-            const config = LOCAL_CATEGORY_CONFIGS[c.id] || {
-                proceduralWeight: 0.5,
-                handcraftedWeaveProbability: 0.4,
-                variantWeights: [1, 1, 1, 1, 1, 1, 1, 1, 1]
-            };
-
-            const poolCount = counts[c.id] || 0;
+            const config = getQuestionConfig(c.id);
+            const poolData = counts[c.id] || { total: 0, levels: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+            const poolCount = poolData.total;
 
             let model: 'procedural' | 'handcrafted' | 'hybrid' = 'hybrid';
             if (config.proceduralWeight === 1.0) {
@@ -100,6 +92,7 @@ const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'succe
                 ...c,
                 config,
                 poolCount,
+                poolData,
                 model,
             };
         });
@@ -205,6 +198,20 @@ const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'succe
                                                 <span>Handcrafted Pool Size:</span>
                                                 <span className="text-correct font-black">{t.poolCount} questions</span>
                                             </div>
+                                            {t.poolCount > 0 && (
+                                                <div className="mt-2.5 grid grid-cols-5 gap-1 bg-black/45 border border-white/5 rounded-xl p-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                                                    {[1, 2, 3, 4, 5].map((lvl) => {
+                                                        const lvlCount = t.poolData.levels[lvl] || 0;
+                                                        const pct = t.poolCount > 0 ? Math.round((lvlCount / t.poolCount) * 100) : 0;
+                                                        return (
+                                                            <div key={lvl}>
+                                                                <span className={LEVEL_COLORS[lvl]}>L{lvl}</span>
+                                                                <span className="block text-white font-black mt-0.5">{lvlCount} ({pct}%)</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -233,4 +240,4 @@ const TopicHub = ({ triggerToast }: { triggerToast: (text: string, type?: 'succe
     );
 };
 
-export default TopicHub
+export default TopicHub;
