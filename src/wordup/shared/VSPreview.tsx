@@ -72,7 +72,7 @@ export const VSPreview = ({
                   const { data: globalOpp } = await supabase
                      .from("wordup_profiles")
                      .select("rating, rank_name")
-                     .eq("user_id", opponentStats.id)
+                     .eq("id", opponentStats.id)
                      .maybeSingle();
                   if (globalOpp && active) setOppCategoryStats(globalOpp);
                } else {

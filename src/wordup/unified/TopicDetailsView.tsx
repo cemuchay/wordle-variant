@@ -62,7 +62,7 @@ export const TopicDetailsView = ({
          if (mId) {
             const { data: match } = await supabase
                .from("wordup_async_matches")
-               .select("*")
+               .select("*, player1:player1_id(username, avatar_url), player2:player2_id(username, avatar_url)")
                .eq("id", mId)
                .single();
             if (match) {
