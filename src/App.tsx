@@ -598,6 +598,11 @@ export default function App() {
         setIsStatsOpen(true);
       } else if (open === "notifications") {
         setIsNotificationsOpen(true);
+      } else if (open === "profile") {
+        const targetUserId = params.get("user_id");
+        if (targetUserId) {
+          setViewedProfileId(targetUserId);
+        }
       }
     };
 

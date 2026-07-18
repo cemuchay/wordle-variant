@@ -637,8 +637,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
                breakdown={breakdown}
                canSeeDetails={canSeeDetails}
                targetWordLength={targetWordToUse.length}
-               targetUserId={entry.user_id || entry.user?.id || entry.profiles?.id || ""}
-               gameDate={targetDate || ""}
+               targetUserId={isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "")}
+               gameDate={isChallenge ? "" : (targetDate || "")}
                commentsDisabledByTarget={commentsDisabledByTarget}
              />
 
