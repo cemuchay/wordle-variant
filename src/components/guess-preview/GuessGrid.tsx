@@ -1,12 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo } from 'react';
 import { getTileSizeClass } from './types';
+import { GuessReactionsComments } from './GuessReactionsComments';
 
 interface GuessGridProps {
     guesses: any[];
     breakdown: any;
     canSeeDetails: boolean;
     targetWordLength: number;
+    targetUserId: string;
+    gameDate: string;
+    commentsDisabledByTarget: boolean;
 }
 
 export const GuessGrid = memo(({
@@ -14,9 +18,12 @@ export const GuessGrid = memo(({
     breakdown,
     canSeeDetails,
     targetWordLength,
+    targetUserId,
+    gameDate,
+    commentsDisabledByTarget,
 }: GuessGridProps) => {
     return (
-        <div className="grid gap-4 mb-6 justify-center">
+        <div className="grid gap-4 mb-6 justify-center w-full">
             {guesses.map((row: any[], i: number) => {
                 const rowScore = breakdown.rows[i];
                 const rowDecisions = breakdown?.decisions?.[i]?.decisions;
@@ -34,7 +41,7 @@ export const GuessGrid = memo(({
                 return (
                     <div
                         key={i}
-                        className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10"
+                        className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/10 w-full max-w-xs mx-auto"
                     >
                         <div className="flex items-center gap-3 justify-between">
                             <div className="flex gap-1">
@@ -90,9 +97,22 @@ export const GuessGrid = memo(({
                                 ))}
                             </div>
                         )}
+
+                        {/* Guess reactions and comments section */}
+                        {targetUserId && gameDate && (
+                            <div className="pt-2 border-t border-white/5 w-full">
+                                <GuessReactionsComments
+                                    targetUserId={targetUserId}
+                                    gameDate={gameDate}
+                                    guessIndex={i}
+                                    commentsDisabledByTarget={commentsDisabledByTarget}
+                                />
+                            </div>
+                        )}
                     </div>
                 );
             })}
         </div>
     );
 });
+
