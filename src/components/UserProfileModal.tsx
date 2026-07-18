@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays, MessageCircle } from 'lucide-react';
+import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays, MessageCircle, UserPlus, UserMinus, MessageSquare, MessageSquareOff } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -81,6 +81,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'daily' | 'challenge'>('daily');
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [commentsDisabled, setCommentsDisabled] = useState(false);
 
     // Stats states
     const [dailyScores, setDailyScores] = useState<DailyScore[]>([]);
@@ -89,6 +91,51 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
     const [awards, setAwards] = useState<UserAward[]>([]);
     const [visibleAwardsCount, setVisibleAwardsCount] = useState(20);
+
+    const handleFollowToggle = async () => {
+        if (!currentUser || !profile) return;
+        if (isFollowing) {
+            const { error } = await supabase
+                .from('follows')
+                .delete()
+                .eq('follower_id', currentUser.id)
+                .eq('following_id', profile.id);
+            if (!error) {
+                setIsFollowing(false);
+                triggerToast(`Unfollowed @${profile.username}`, 3000);
+            } else {
+                triggerToast("Failed to unfollow user.", 3000);
+            }
+        } else {
+            const { error } = await supabase
+                .from('follows')
+                .insert({
+                    follower_id: currentUser.id,
+                    following_id: profile.id
+                });
+            if (!error) {
+                setIsFollowing(true);
+                triggerToast(`Following @${profile.username}`, 3000);
+            } else {
+                triggerToast("Failed to follow user.", 3000);
+            }
+        }
+    };
+
+    const handleToggleComments = async () => {
+        if (!currentUser) return;
+        const newValue = !commentsDisabled;
+        const { error } = await supabase
+            .from('profiles')
+            .update({ comments_disabled: newValue })
+            .eq('id', currentUser.id);
+        if (!error) {
+            setCommentsDisabled(newValue);
+            triggerToast(newValue ? "Comments disabled on your guesses" : "Comments enabled on your guesses", 3000);
+        } else {
+            triggerToast("Failed to update comment settings.", 3000);
+        }
+    };
 
     useEffect(() => {
         let isMounted = true;
@@ -123,12 +170,30 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     .eq('user_id', userId)
                     .order('awarded_at', { ascending: false });
 
+                // 5. Fetch profile comments preference and follow status
+                const profilePromise = supabase
+                    .from('profiles')
+                    .select('comments_disabled')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                const followPromise = (currentUser && currentUser.id !== userId)
+                    ? supabase
+                        .from('follows')
+                        .select('follower_id')
+                        .eq('follower_id', currentUser.id)
+                        .eq('following_id', userId)
+                        .maybeSingle()
+                    : Promise.resolve({ data: null, error: null });
+
                 // Fire all requests in parallel
-                const [edgeResult, viewResult, h2hResult, awardsResult] = await Promise.all([
+                const [edgeResult, viewResult, h2hResult, awardsResult, profilePrefResult, followResult] = await Promise.all([
                     edgePromise,
                     viewPromise,
                     h2hPromise,
-                    awardsPromise
+                    awardsPromise,
+                    profilePromise,
+                    followPromise
                 ]);
 
                 // Error Handling
@@ -154,6 +219,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
                     if (awardsResult.data) {
                         setAwards(awardsResult.data as UserAward[]);
+                    }
+
+                    if (profilePrefResult.data) {
+                        setCommentsDisabled(profilePrefResult.data.comments_disabled || false);
+                    }
+
+                    if (followResult.data) {
+                        setIsFollowing(true);
+                    } else {
+                        setIsFollowing(false);
                     }
                 }
 
@@ -351,8 +426,36 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                     </div>
                                 </div>
 
+                                 {currentUser && currentUser.id === userId && (
+                                    <div className="flex items-center gap-2 mr-6 shrink-0">
+                                        <button
+                                            onClick={handleToggleComments}
+                                            className={`flex items-center justify-center p-2.5 sm:p-3 rounded-full shadow-lg hover:scale-105 transition-all ${
+                                                commentsDisabled 
+                                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                                    : 'bg-white/10 text-white border border-white/5 hover:bg-white/20'
+                                            }`}
+                                            title={commentsDisabled ? "Enable Comments on Guesses" : "Disable Comments on Guesses"}
+                                        >
+                                            {commentsDisabled ? <MessageSquareOff size={14} className="sm:w-4 sm:h-4" /> : <MessageSquare size={14} className="sm:w-4 sm:h-4" />}
+                                        </button>
+                                    </div>
+                                )}
+
                                 {currentUser && currentUser.id !== userId && (
                                     <div className="flex items-center gap-2 mr-6 shrink-0">
+                                        <button
+                                            onClick={handleFollowToggle}
+                                            className={`flex items-center justify-center p-2.5 sm:p-3 rounded-full shadow-lg hover:scale-105 transition-all ${
+                                                isFollowing 
+                                                    ? 'bg-correct text-black hover:bg-correct/90 shadow-correct/20' 
+                                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'
+                                            }`}
+                                            title={isFollowing ? `Unfollow @${profile.username}` : `Follow @${profile.username}`}
+                                        >
+                                            {isFollowing ? <UserMinus size={14} className="sm:w-4 sm:h-4" /> : <UserPlus size={14} className="sm:w-4 sm:h-4" />}
+                                        </button>
+
                                         <button
                                             onClick={() => {
                                                 setPendingDMUserId(profile.id);

@@ -38,7 +38,6 @@ export const DynamicIslandStatus = () => {
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [mascot, setMascot] = useState<{ expression: MascotExpression; label: string } | null>(null);
-    const [showOnlineNotification, setShowOnlineNotification] = useState(false);
     const [showRainbowBorder, setShowRainbowBorder] = useState(false);
     const [scaleMultiplier, setScaleMultiplier] = useState(1);
     const toastTimerRef = useRef<number>(null);
@@ -50,7 +49,6 @@ export const DynamicIslandStatus = () => {
     // Filter out the current user from the online count, cross-referencing with
     // freshly fetched profile last_seen_at to catch stale presence entries
     const [otherOnlineUsers, setOtherOnlineUsers] = useState<Array<{ id: string; username: string; avatar_url: string; activeVoiceRoomId?: string | null }>>([]);
-    const [lastOnlineCount, setLastOnlineCount] = useState(0);
 
     useEffect(() => {
         const filtered = onlineUsers.filter(u => {
@@ -185,23 +183,7 @@ export const DynamicIslandStatus = () => {
         }
     }, [mascot]);
 
-    // Trigger brief online notification when user count increases
-    useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            setLastOnlineCount(otherOnlineUsers.length);
-            return;
-        }
-        if (otherOnlineUsers.length > lastOnlineCount) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setShowOnlineNotification(true);
-            const timer = setTimeout(() => {
-                setShowOnlineNotification(false);
-            }, 8000); // 8 seconds
-            return () => clearTimeout(timer);
-        }
-        setLastOnlineCount(otherOnlineUsers.length);
-    }, [otherOnlineUsers.length, lastOnlineCount]);
+
 
     // Get the first active voice room to show in the island
     const currentVoiceSession = activeVoiceRooms[0];
@@ -281,23 +263,23 @@ export const DynamicIslandStatus = () => {
             const len = toast.message?.length || 0;
             // Expand dynamically if text is long
             const multiplier = len > 40 ? 6.5 : 5.5;
-            const dynamicWidth = Math.max(280, Math.min(440, 160 + len * multiplier));
+            const dynamicWidth = Math.max(290, Math.min(450, 180 + len * multiplier));
             return `min(95vw, ${dynamicWidth}px)`;
         }
         if (user && activeCall) {
-            if (activeCall.status === 'ringing') return '240px';
-            if (activeCall.status === 'calling') return '180px';
-            return '140px'; // connecting / connected
+            if (activeCall.status === 'ringing') return '250px';
+            if (activeCall.status === 'calling') return '195px';
+            return '155px'; // connecting / connected
         }
-        if (user && currentVoiceSession) return '180px';
-        if (mascot && (!showOnlineNotification || !user || otherOnlineUsers.length === 0)) {
-            return '195px';
+        if (user && currentVoiceSession) return '195px';
+        if (mascot) {
+            return otherOnlineUsers.length > 0 ? '225px' : '195px';
         }
-        if (user && otherOnlineUsers.length === 1) return '160px';
-        if (user && otherOnlineUsers.length > 1) return '145px';
+        if (user && otherOnlineUsers.length === 1) return '180px';
+        if (user && otherOnlineUsers.length > 1) return '195px';
 
         // Persistent default state (Smiley + Time)
-        return '160px';
+        return '150px';
     };
 
     const isLongText = toast.show && (toast.message?.length > 25 || toast.isLarge);
@@ -390,103 +372,22 @@ export const DynamicIslandStatus = () => {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.15 }}
-                            className="flex items-center gap-1.5 px-3 h-full w-full justify-center"
+                            className="flex items-center gap-1.5 px-3 h-full w-full justify-between"
                         >
-                            <AnimatePresence mode="wait">
-                                {toast.show ? (
-                                    <motion.div
-                                        key="toast"
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        className={`flex items-center gap-2 w-full px-1 ${toast.isLarge ? 'flex-col sm:flex-row text-center sm:text-left' : ''}`}
-                                    >
-                                        <BellRing size={toast.isLarge ? 12 : 10} className="text-emerald-400 shrink-0 animate-bounce" />
-                                        <span className={`text-[8.5px] font-bold text-white flex-1 leading-relaxed ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
-                                            {toast.message}
-                                        </span>
-                                    </motion.div>
-                                ) : activeCall ? (
-                                    activeCall.status === 'ringing' ? (
-                                        <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <ProtectedAvatar
-                                                    userId={activeCall.targetUser?.id}
-                                                    src={activeCall.targetUser?.avatar_url}
-                                                    username={activeCall.targetUser?.username || ''}
-                                                    className="w-4 h-4 rounded-full border border-white/20 shrink-0"
-                                                />
-                                                <span className="text-[8px] font-bold text-white truncate max-w-[80px]">
-                                                    {activeCall.targetUser?.username} calls
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    onClick={acceptCall}
-                                                    className="p-1 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full transition-transform active:scale-95"
-                                                >
-                                                    <Check size={10} strokeWidth={3} />
-                                                </button>
-                                                <button
-                                                    onClick={rejectCall}
-                                                    className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
-                                                >
-                                                    <X size={10} strokeWidth={3} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : activeCall.status === 'calling' ? (
-                                        <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                                                <span className="text-[8px] font-bold text-zinc-400 truncate max-w-[90px]">
-                                                    Calling {activeCall.targetUser?.username}...
-                                                </span>
-                                            </div>
-                                            <button
-                                                onClick={hangUpCall}
-                                                className="p-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all"
-                                            >
-                                                <PhoneOff size={10} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
-                                            <Phone size={10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
-                                            <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
-                                                {isConnected ? 'On Call' : 'Connecting...'}
-                                            </span>
-                                        </div>
-                                    )
-                                ) : currentVoiceSession ? (
-                                    <div className="flex items-center gap-1.5">
-                                        <ProtectedAvatar
-                                            userId={currentVoiceSession.user.id}
-                                            src={currentVoiceSession.user.avatar_url}
-                                            username={currentVoiceSession.user.username}
-                                            className="w-4 h-4 rounded-full border border-white/20 shrink-0"
-                                        />
-                                        <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
-                                            {currentVoiceSession.user.username} in Voice
-                                        </span>
-                                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                    </div>
-                                ) : (user && otherOnlineUsers.length > 0 && (showOnlineNotification || !mascot)) ? (
-                                    otherOnlineUsers.length === 1 ? (
-                                        <>
+                            {/* Persistent Left Section (Online user avatars or mascot fallback) */}
+                            {user && otherOnlineUsers.length > 0 ? (
+                                <div className="flex items-center shrink-0">
+                                    {otherOnlineUsers.length === 1 ? (
+                                        <div title={`${otherOnlineUsers[0].username} online`} className="shrink-0">
                                             <ProtectedAvatar
                                                 userId={otherOnlineUsers[0].id}
                                                 src={otherOnlineUsers[0].avatar_url}
                                                 username={otherOnlineUsers[0].username}
                                                 className="w-4 h-4 rounded-full border border-white/20 shrink-0"
                                             />
-                                            <span className="text-[8px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis uppercase tracking-wider">
-                                                {otherOnlineUsers[0].username} online
-                                            </span>
-                                        </>
+                                        </div>
                                     ) : (
-                                        <>
+                                        <div className="flex items-center gap-0.5 shrink-0">
                                             <div className="flex -space-x-1 shrink-0">
                                                 {otherOnlineUsers.slice(0, 2).map((u) => (
                                                     <ProtectedAvatar
@@ -494,27 +395,117 @@ export const DynamicIslandStatus = () => {
                                                         userId={u.id}
                                                         src={u.avatar_url}
                                                         username={u.username}
-                                                        className="w-4 h-4 rounded-full border border-black shrink-0"
+                                                        className="w-3.5 h-3.5 rounded-full border border-black shrink-0"
                                                     />
                                                 ))}
                                             </div>
-                                            <span className="text-[8px] font-black text-emerald-400 uppercase tracking-wider whitespace-nowrap">
-                                                {otherOnlineUsers.length} ONLINE
+                                            <span className="text-[7px] font-black text-emerald-400">
+                                                +{otherOnlineUsers.length}
                                             </span>
-                                        </>
-                                    )
-                                ) : mascot ? (
-                                    <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                        <WordUpMascot expression={mascot.expression} size={18} />
-                                        <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-[110px] select-none">{mascot.label}</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
-                                        <WordUpMascot expression="idle" size={15} />
-                                        <span className="text-[8.5px] font-black tracking-[0.08em] text-white/85 tabular-nums select-none">{localTime}</span>
-                                    </div>
-                                )}
-                            </AnimatePresence>
+                                        </div>
+                                    )}
+                                    <div className="w-1 h-3 border-r border-white/10 mx-1.5 shrink-0" />
+                                </div>
+                            ) : (
+                                <div className="flex items-center shrink-0">
+                                    <WordUpMascot expression={mascot?.expression || "idle"} size={13} />
+                                    <div className="w-1 h-3 border-r border-white/10 mx-1.5 shrink-0" />
+                                </div>
+                            )}
+
+                            {/* Middle/Right Section (Dynamic Content) */}
+                            <div className="flex-1 flex items-center justify-center min-w-0">
+                                <AnimatePresence mode="wait">
+                                    {toast.show ? (
+                                        <motion.div
+                                            key="toast"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className={`flex items-center gap-2 w-full px-1 ${toast.isLarge ? 'flex-col sm:flex-row text-center sm:text-left' : ''}`}
+                                        >
+                                            <BellRing size={toast.isLarge ? 12 : 10} className="text-emerald-400 shrink-0 animate-bounce" />
+                                            <span className={`text-[8.5px] font-bold text-white flex-1 leading-relaxed ${toast.isLarge ? 'leading-tight' : 'truncate'}`}>
+                                                {toast.message}
+                                            </span>
+                                        </motion.div>
+                                    ) : activeCall ? (
+                                        activeCall.status === 'ringing' ? (
+                                            <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <ProtectedAvatar
+                                                        userId={activeCall.targetUser?.id}
+                                                        src={activeCall.targetUser?.avatar_url}
+                                                        username={activeCall.targetUser?.username || ''}
+                                                        className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                                    />
+                                                    <span className="text-[8px] font-bold text-white truncate max-w-[80px]">
+                                                        {activeCall.targetUser?.username} calls
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        onClick={acceptCall}
+                                                        className="p-1 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full transition-transform active:scale-95"
+                                                    >
+                                                        <Check size={10} strokeWidth={3} />
+                                                    </button>
+                                                    <button
+                                                        onClick={rejectCall}
+                                                        className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-transform active:scale-95 cursor-pointer"
+                                                    >
+                                                        <X size={10} strokeWidth={3} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : activeCall.status === 'calling' ? (
+                                            <div className="flex items-center justify-between w-full" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                                                    <span className="text-[8px] font-bold text-zinc-400 truncate max-w-[90px]">
+                                                        Calling {activeCall.targetUser?.username}...
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={hangUpCall}
+                                                    className="p-1 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all"
+                                                >
+                                                    <PhoneOff size={10} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                                                <Phone size={10} className={`${isConnected ? 'text-emerald-500' : 'text-yellow-500'} animate-bounce`} />
+                                                <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
+                                                    {isConnected ? 'On Call' : 'Connecting...'}
+                                                </span>
+                                            </div>
+                                        )
+                                    ) : currentVoiceSession ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <ProtectedAvatar
+                                                userId={currentVoiceSession.user.id}
+                                                src={currentVoiceSession.user.avatar_url}
+                                                username={currentVoiceSession.user.username}
+                                                className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                                            />
+                                            <span className="text-[8.5px] font-black text-white uppercase tracking-tighter">
+                                                {currentVoiceSession.user.username} in Voice
+                                            </span>
+                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                        </div>
+                                    ) : mascot ? (
+                                        <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                            <span className="text-[8px] uppercase font-black tracking-[0.08em] text-white/90 truncate max-w-[110px] select-none">{mascot.label}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 px-2.5 h-full w-full justify-center">
+                                            <span className="text-[8.5px] font-black tracking-[0.08em] text-white/85 tabular-nums select-none">{localTime}</span>
+                                        </div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </motion.div>
                     ) : (
 

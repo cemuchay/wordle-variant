@@ -130,6 +130,24 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
   };
 
   const targetDate = getTargetDate();
+  const [commentsDisabledByTarget, setCommentsDisabledByTarget] = useState(false);
+
+  useEffect(() => {
+    const fetchTargetPrivacy = async () => {
+      const tId = entry.user_id || entry.user?.id || entry.profiles?.id;
+      if (tId) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('comments_disabled')
+          .eq('id', tId)
+          .maybeSingle();
+        if (data) {
+          setCommentsDisabledByTarget(data.comments_disabled || false);
+        }
+      }
+    };
+    fetchTargetPrivacy();
+  }, [entry.user_id, entry.user?.id, entry.profiles?.id]);
 
   // Check if viewer has finished
   useEffect(() => {
@@ -614,12 +632,15 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               onOpenScoringInfo={() => setShowScoringInfo(true)}
             />
 
-            <GuessGrid
-              guesses={gameData.guesses}
-              breakdown={breakdown}
-              canSeeDetails={canSeeDetails}
-              targetWordLength={targetWordToUse.length}
-            />
+             <GuessGrid
+               guesses={gameData.guesses}
+               breakdown={breakdown}
+               canSeeDetails={canSeeDetails}
+               targetWordLength={targetWordToUse.length}
+               targetUserId={isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "")}
+               gameDate={isChallenge ? "" : (targetDate || "")}
+               commentsDisabledByTarget={commentsDisabledByTarget}
+             />
 
             {isChallenge && isOwnEntry && shareText && (
               <div className="mb-4">

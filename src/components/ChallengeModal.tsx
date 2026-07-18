@@ -418,7 +418,7 @@ const AuthenticatedChallengeContent = memo(
                           <MarathonBanner
                             challenges={dailyMarathonChallenges}
                             onClick={(challenge) => {
-                              handleViewChallenge(initialChallengeId ? initialChallengeId : (challenge.challenge_id || challenge.challenge?.id))
+                              handleViewChallenge(challenge.challenge_id || challenge.challenge?.id)
                             }}
                           />
                         )}

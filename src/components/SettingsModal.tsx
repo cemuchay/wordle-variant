@@ -61,18 +61,19 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const usernameInputRef = useRef<HTMLInputElement>(null);
     const [editUsername, setEditUsername] = useState(profile?.username || '');
     const [isUsernameEditable, setIsUsernameEditable] = useState(false);
-    const [prevProfile, setPrevProfile] = useState(profile);
+    const [showConfirmSummary, setShowConfirmSummary] = useState(false);
+    const [initialReceiveEmails, setInitialReceiveEmails] = useState(false);
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    const [commentsDisabled, setCommentsDisabled] = useState(profile?.comments_disabled || false);
 
+    const [prevProfile, setPrevProfile] = useState(profile);
     if (profile !== prevProfile) {
         setPrevProfile(profile);
         if (profile) {
             setEditUsername(profile.username || '');
+            setCommentsDisabled(profile.comments_disabled || false);
         }
     }
-
-    const [showConfirmSummary, setShowConfirmSummary] = useState(false);
-    const [initialReceiveEmails, setInitialReceiveEmails] = useState(false);
-    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
     const handleReset = () => {
         setAllowRoasts(preferences.allowRoasts);
@@ -81,6 +82,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
         setEditUsername(profile?.username || '');
         setIsUsernameEditable(false);
         setReceiveEmails(initialReceiveEmails);
+        setCommentsDisabled(profile?.comments_disabled || false);
         triggerToast('Changes Discarded');
     };
 
@@ -260,7 +262,13 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             });
         }
 
-
+        if (commentsDisabled !== (profile?.comments_disabled || false)) {
+            changes.push({
+                name: 'Disable Comments',
+                from: (profile?.comments_disabled || false) ? 'Enabled' : 'Disabled',
+                to: commentsDisabled ? 'Enabled' : 'Disabled'
+            });
+        }
 
         return changes;
     };
@@ -314,7 +322,8 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                 .from('profiles')
                 .update({
                     preferences: newPreferences,
-                    username: usernameClean || profile.username
+                    username: usernameClean || profile.username,
+                    comments_disabled: commentsDisabled
                 })
                 .eq('id', profile.id);
 
@@ -513,6 +522,22 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                             <p className="text-[9px] text-gray-600 px-1">
                                                 3-15 characters. Letters, numbers, and underscores only.
                                             </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-4 bg-gray-900/40 border border-gray-800 rounded-xl transition-colors hover:border-gray-700">
+                                            <div className="flex-1 pr-4">
+                                                <p className="text-sm font-bold text-gray-100">Disable Comments</p>
+                                                <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                    Prevent other users from commenting on your guesses.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCommentsDisabled(!commentsDisabled)}
+                                                className={`w-12 h-6 rounded-full transition-all duration-300 relative ${commentsDisabled ? 'bg-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.3)]' : 'bg-gray-800'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${commentsDisabled ? 'left-7' : 'left-1'}`} />
+                                            </button>
                                         </div>
                                     </div>
                                 </section>

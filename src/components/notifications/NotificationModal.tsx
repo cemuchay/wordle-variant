@@ -142,6 +142,15 @@ export const NotificationModal = memo(() => {
         } else if (n.type === 'LEADERBOARD_OVERTAKEN') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
+        } else if (n.type === 'NEW_FOLLOWER') {
+            const followerId = n.data?.follower_id;
+            if (followerId) {
+                window.dispatchEvent(new CustomEvent('open-user-profile', { detail: { userId: followerId } }));
+                setIsNotificationsOpen(false);
+            }
+        } else if (n.type === 'NEW_COMMENT' || n.type === 'FOLLOWEE_STARTED_PLAYING' || n.type === 'FOLLOWEE_FINISHED_PLAYING') {
+            window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
+            setIsNotificationsOpen(false);
         } else if (n.type === 'DM_MESSAGE' || n.type === 'CHAT_MENTION') {
             const groupId = n.data?.group_id;
             const groupType = n.data?.group_type;
@@ -241,7 +250,11 @@ export const NotificationModal = memo(() => {
                                     n.type === 'MARATHON_GAME_COMPLETED' ||
                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
                                     n.type === 'DM_MESSAGE' ||
-                                    n.type === 'CHAT_MENTION';
+                                    n.type === 'CHAT_MENTION' ||
+                                    n.type === 'NEW_FOLLOWER' ||
+                                    n.type === 'NEW_COMMENT' ||
+                                    n.type === 'FOLLOWEE_STARTED_PLAYING' ||
+                                    n.type === 'FOLLOWEE_FINISHED_PLAYING';
                                 const isSessionNew = sessionNewIds.has(n.id);
                                 return (
                                     <NotificationItem

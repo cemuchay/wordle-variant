@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Eye, Loader2, Trophy, User, X, RotateCw } from 'lucide-react';
+import { Eye, Loader2, Trophy, User, X, RotateCw, MessageCircle } from 'lucide-react';
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
 import { Z_INDEX } from '../constants/ui';
@@ -447,6 +447,14 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                     const tieCount = arr.filter(e => e.total_score === entry.total_score).length;
                     const tieIndex = arr.slice(0, i + 1).filter(e => e.total_score === entry.total_score).length - 1;
 
+                    const lbDate = timeframe === 'yesterday' && currentDate
+                      ? (() => {
+                          const d = new Date(currentDate);
+                          d.setDate(d.getDate() - 1);
+                          return d.toISOString().split("T")[0];
+                        })()
+                      : currentDate;
+
                     return (
                       <LeaderboardRow
                         key={`${entry.username}-${i}`}
@@ -457,6 +465,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                         isCurrentUser={entry.user_id === user?.id}
                         canViewGuesses={canViewGuess}
                         onShowGuesses={(e) => setSelectedEntry(e)}
+                        gameDate={lbDate}
                       />
                     );
                   });
@@ -488,7 +497,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
         <div className="w-full max-w-md mx-auto flex flex-col h-full relative overflow-hidden">
-          <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100 shrink-0">Statistics</h2>
+          <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100 shrink-0">Leaderboard</h2>
           {renderContent()}
         </div>
       </div>
@@ -503,7 +512,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
           <X size={20} />
         </button>
 
-        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-white">Statistics</h2>
+        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-white">Leaderboard</h2>
 
         {/* Tab Switcher */}
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6 shrink-0">
@@ -664,6 +673,14 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                       const tieCount = arr.filter(e => e.total_score === entry.total_score).length;
                       const tieIndex = arr.slice(0, i + 1).filter(e => e.total_score === entry.total_score).length - 1;
 
+                      const lbDate = timeframe === 'yesterday' && currentDate
+                        ? (() => {
+                            const d = new Date(currentDate);
+                            d.setDate(d.getDate() - 1);
+                            return d.toISOString().split("T")[0];
+                          })()
+                        : currentDate;
+
                       return (
                         <LeaderboardRow
                           key={`${entry.username}-${i}`}
@@ -674,6 +691,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                           isCurrentUser={entry.user_id === user?.id}
                           canViewGuesses={canViewGuess}
                           onShowGuesses={(e) => setSelectedEntry(e)}
+                          gameDate={lbDate}
                         />
                       );
                     });
@@ -715,7 +733,7 @@ const pluralCheck = (num: number) => {
   return num > 1 ? "s" : ""
 }
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex: number; tieCount: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; }> = ({ entry, rank, tieIndex, tieCount, isCurrentUser, canViewGuesses, onShowGuesses }) => {
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex: number; tieCount: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; gameDate?: string | null; }> = ({ entry, rank, tieIndex, tieCount, isCurrentUser, canViewGuesses, onShowGuesses, gameDate }) => {
   let attempts = entry.attempts
   const wordLength = entry.word_length
   const status = entry.status
@@ -726,6 +744,46 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
   const isFirst = rank === 1;
   const isTopThree = rank <= 3;
   const pieceWidth = 100 / tieCount;
+
+  const [reactions, setReactions] = useState<{ reaction: string }[]>([]);
+  const [commentsCount, setCommentsCount] = useState(0);
+
+  useEffect(() => {
+    if (!entry.user_id || !gameDate) return;
+    const fetchData = async () => {
+      // Fetch distinct reactions
+      const { data: rxData } = await supabase
+        .from('guess_reactions')
+        .select('reaction')
+        .eq('target_user_id', entry.user_id)
+        .eq('game_date', gameDate);
+      if (rxData) setReactions(rxData);
+
+      // Fetch comments count
+      const { count } = await supabase
+        .from('guess_comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_user_id', entry.user_id)
+        .eq('game_date', gameDate);
+      if (count !== null) setCommentsCount(count);
+    };
+    fetchData();
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel(`lb_row_${entry.user_id}_${gameDate}_${Math.random().toString(36).slice(2, 9)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_reactions', filter: `target_user_id=eq.${entry.user_id}` }, () => {
+         fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_comments', filter: `target_user_id=eq.${entry.user_id}` }, () => {
+         fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [entry.user_id, gameDate]);
 
   return (
     <div
@@ -810,6 +868,24 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
         <div className={`text-[8px] uppercase font-bold tracking-tighter ${isFirst ? 'text-yellow-600/80' : (status === 'playing' ? 'text-amber-400 animate-pulse' : 'text-gray-500')}`}>
           {status === 'playing' ? 'Playing' : 'Skill PTS'}
         </div>
+        {/* Reactions & Comments summary */}
+        {(reactions.length > 0 || commentsCount > 0) && (
+          <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[9px] text-gray-400">
+            {reactions.length > 0 && (
+              <div className="flex -space-x-1 shrink-0">
+                {Array.from(new Set(reactions.map(r => r.reaction))).slice(0, 3).map((emoji, idx) => (
+                  <span key={idx} className="scale-90">{emoji}</span>
+                ))}
+              </div>
+            )}
+            {commentsCount > 0 && (
+              <div className="flex items-center gap-0.5 text-gray-500 shrink-0">
+                <MessageCircle size={10} />
+                <span className="font-bold text-[8px]">{commentsCount}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
