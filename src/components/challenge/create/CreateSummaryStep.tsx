@@ -65,8 +65,14 @@ export const CreateSummaryStep = memo(({ settings, onBack, onConfirm, loading }:
                 />
                 <SummaryRow
                     icon={<Puzzle size={14} />}
-                    label={s.isMarathon ? 'Format' : 'Word Length'}
-                    value={s.isMarathon ? `${s.marathonGames.length}-Game Marathon (${s.marathonGames.join('→')}L)` : `${s.length} Letters`}
+                    label={s.isMarathon ? 'Format' : s.length === 2 ? 'Format' : 'Word Length'}
+                    value={
+                        s.isMarathon 
+                            ? `${s.marathonGames.length}-Game Marathon (${s.marathonGames.join('→')}L)` 
+                            : s.length === 2 
+                                ? 'Coherent Sentence' 
+                                : `${s.length} Letters`
+                    }
                 />
                 <SummaryRow
                     icon={<span className="text-[10px] font-black">#</span>}
