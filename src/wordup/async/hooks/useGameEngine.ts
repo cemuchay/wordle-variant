@@ -698,7 +698,7 @@ export function useGameEngine(props: EngineProps) {
 
             if (channel.current) supabase.removeChannel(channel.current);
             const ch = supabase
-               .channel(`async-match-${mId}`)
+               .channel(`async-match-${mId}-${Date.now()}`)
                .on(
                   "postgres_changes",
                   {
@@ -864,12 +864,6 @@ export function useGameEngine(props: EngineProps) {
    useEffect(() => {
       return () => {
          cleanup();
-         const store = useAsyncStore.getState();
-         if (
-            !(store.view === "battle" || store.view === "gameover") ||
-            !store.matchId
-         )
-            store.resetGame();
       };
    }, [cleanup]);
 
