@@ -29,6 +29,8 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import TopicHub from './TopicHub';
+import GameStats from './GameStats';
+import { BarChart2 } from 'lucide-react';
 
 interface FlaggedWordData {
     id: string;
@@ -1021,7 +1023,7 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'stats'>('words');
 
     // Authentication States
     const [loginEmail, setLoginEmail] = useState('');
@@ -1467,6 +1469,15 @@ SELECT create_admin_user(
                     >
                         <BookOpen size={14} /> Topic Hub
                     </button>
+                    <button
+                        onClick={() => setActiveTab('stats')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'stats'
+                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <BarChart2 size={14} /> Game Stats
+                    </button>
                 </div>
 
                 {activeTab === 'words' ? (
@@ -1878,8 +1889,10 @@ SELECT create_admin_user(
                     <BotMarathonManagement triggerToast={triggerToast} />
                 ) : activeTab === 'wordup' ? (
                     <WordUpCurator triggerToast={triggerToast} />
-                ) : (
+                ) : activeTab === 'topics' ? (
                     <TopicHub triggerToast={triggerToast} />
+                ) : (
+                    <GameStats triggerToast={triggerToast} />
                 )}
             </main>
 
