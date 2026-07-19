@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { networkGate } from '../../lib/networkGate';
 import { syncWithRetry, getLetterStatuses } from '../../lib/game-logic';
 import { logger } from '../../lib/logger';
 import { TOAST_DURATION } from '../../constants/ui';
@@ -23,12 +24,20 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
 
          // Lightweight pre-sync check: only push if local is ahead of cloud
          try {
-            const { data: cloudData } = await supabase
-               .from("scores")
-               .select("guesses, hints_used, hint_record")
-               .eq("user_id", user.id)
-               .eq("game_date", date)
-               .maybeSingle();
+            const cloudData = await networkGate.enqueue(
+               'pre_sync_check',
+               {
+                  type: 'supabase',
+                  table: 'scores',
+                  operation: 'select',
+                  payload: { select: 'guesses, hints_used, hint_record' },
+                  query: {
+                     eq: { user_id: user.id, game_date: date },
+                     maybeSingle: true
+                  }
+               },
+               true // blocking
+            );
 
             if (cloudData?.guesses && gamePayload.guesses) {
                const cloudCount = cloudData.guesses.length;
@@ -159,14 +168,22 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
    const loadFromCloud = useCallback(async () => {
       if (!user || !date) return null;
       try {
-         const { data, error } = await supabase
-            .from("scores")
-            .select("guesses, status, hints_used, hint_record, game_message")
-            .eq("user_id", user.id)
-            .eq("game_date", date)
-            .maybeSingle();
+         const data = await networkGate.enqueue(
+            'load_from_cloud',
+            {
+               type: 'supabase',
+               table: 'scores',
+               operation: 'select',
+               payload: { select: 'guesses, status, hints_used, hint_record, game_message' },
+               query: {
+                  eq: { user_id: user.id, game_date: date },
+                  maybeSingle: true
+               }
+            },
+            true // blocking
+         );
 
-         if (!error && data) {
+         if (data) {
             return {
                guesses: data.guesses,
                letterStatuses: getLetterStatuses(data.guesses),
