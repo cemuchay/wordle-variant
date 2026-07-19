@@ -449,10 +449,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
                     const lbDate = timeframe === 'yesterday' && currentDate
                       ? (() => {
-                          const d = new Date(currentDate);
-                          d.setDate(d.getDate() - 1);
-                          return d.toISOString().split("T")[0];
-                        })()
+                        const d = new Date(currentDate);
+                        d.setDate(d.getDate() - 1);
+                        return d.toISOString().split("T")[0];
+                      })()
                       : currentDate;
 
                     return (
@@ -466,6 +466,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                         canViewGuesses={canViewGuess}
                         onShowGuesses={(e) => setSelectedEntry(e)}
                         gameDate={lbDate}
+                        timeframe={timeframe}
                       />
                     );
                   });
@@ -675,10 +676,10 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
                       const lbDate = timeframe === 'yesterday' && currentDate
                         ? (() => {
-                            const d = new Date(currentDate);
-                            d.setDate(d.getDate() - 1);
-                            return d.toISOString().split("T")[0];
-                          })()
+                          const d = new Date(currentDate);
+                          d.setDate(d.getDate() - 1);
+                          return d.toISOString().split("T")[0];
+                        })()
                         : currentDate;
 
                       return (
@@ -692,6 +693,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
                           canViewGuesses={canViewGuess}
                           onShowGuesses={(e) => setSelectedEntry(e)}
                           gameDate={lbDate}
+                          timeframe={timeframe}
                         />
                       );
                     });
@@ -733,7 +735,7 @@ const pluralCheck = (num: number) => {
   return num > 1 ? "s" : ""
 }
 
-const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex: number; tieCount: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; gameDate?: string | null; }> = ({ entry, rank, tieIndex, tieCount, isCurrentUser, canViewGuesses, onShowGuesses, gameDate }) => {
+const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex: number; tieCount: number; isCurrentUser: boolean, canViewGuesses: boolean; onShowGuesses: (entry: LeaderboardEntry) => void; gameDate?: string | null; timeframe: Timeframe; }> = ({ entry, rank, tieIndex, tieCount, isCurrentUser, canViewGuesses, onShowGuesses, gameDate, timeframe }) => {
   let attempts = entry.attempts
   const wordLength = entry.word_length
   const status = entry.status
@@ -745,45 +747,78 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
   const isTopThree = rank <= 3;
   const pieceWidth = 100 / tieCount;
 
-  const [reactions, setReactions] = useState<{ reaction: string }[]>([]);
+  const [reactions, setReactions] = useState<{ reaction: string; user_id: string }[]>([]);
+  const [reactionUsernames, setReactionUsernames] = useState<{ reaction: string; username: string }[]>([]);
   const [commentsCount, setCommentsCount] = useState(0);
+  const [showReactionsViewer, setShowReactionsViewer] = useState(false);
+
+  const fetchData = async () => {
+    if (!entry.user_id || !gameDate || (timeframe !== 'today' && timeframe !== 'yesterday')) {
+      setReactions([]);
+      setReactionUsernames([]);
+      setCommentsCount(0);
+      return;
+    }
+
+    // Fetch distinct reactions and who made them
+    const { data: rxData } = await supabase
+      .from('guess_reactions')
+      .select('reaction, user_id')
+      .eq('target_user_id', entry.user_id)
+      .eq('game_date', gameDate);
+    if (rxData) {
+      setReactions(rxData);
+      const uIds = Array.from(new Set(rxData.map(r => r.user_id)));
+      if (uIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', uIds);
+        const pMap = new Map(profiles?.map(p => [p.id, p.username]));
+        setReactionUsernames(
+          rxData.map(r => ({
+            reaction: r.reaction,
+            username: pMap.get(r.user_id) || 'Someone'
+          }))
+        );
+      } else {
+        setReactionUsernames([]);
+      }
+    }
+
+    // Fetch comments count
+    const { count } = await supabase
+      .from('guess_comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('target_user_id', entry.user_id)
+      .eq('game_date', gameDate);
+    if (count !== null) setCommentsCount(count);
+  };
 
   useEffect(() => {
-    if (!entry.user_id || !gameDate) return;
-    const fetchData = async () => {
-      // Fetch distinct reactions
-      const { data: rxData } = await supabase
-        .from('guess_reactions')
-        .select('reaction')
-        .eq('target_user_id', entry.user_id)
-        .eq('game_date', gameDate);
-      if (rxData) setReactions(rxData);
-
-      // Fetch comments count
-      const { count } = await supabase
-        .from('guess_comments')
-        .select('id', { count: 'exact', head: true })
-        .eq('target_user_id', entry.user_id)
-        .eq('game_date', gameDate);
-      if (count !== null) setCommentsCount(count);
-    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
+
+    if (!entry.user_id || !gameDate || (timeframe !== 'today' && timeframe !== 'yesterday')) {
+      return;
+    }
 
     // Subscribe to realtime updates
     const channel = supabase
       .channel(`lb_row_${entry.user_id}_${gameDate}_${Math.random().toString(36).slice(2, 9)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_reactions', filter: `target_user_id=eq.${entry.user_id}` }, () => {
-         fetchData();
+        fetchData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'guess_comments', filter: `target_user_id=eq.${entry.user_id}` }, () => {
-         fetchData();
+        fetchData();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [entry.user_id, gameDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.user_id, gameDate, timeframe]);
 
   return (
     <div
@@ -872,11 +907,18 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
         {(reactions.length > 0 || commentsCount > 0) && (
           <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[9px] text-gray-400">
             {reactions.length > 0 && (
-              <div className="flex -space-x-1 shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactionsViewer(true);
+                }}
+                className="flex -space-x-1 shrink-0 hover:brightness-110 p-0.5 rounded bg-white/5 border border-white/5 transition-all"
+                title="View reactions"
+              >
                 {Array.from(new Set(reactions.map(r => r.reaction))).slice(0, 3).map((emoji, idx) => (
                   <span key={idx} className="scale-90">{emoji}</span>
                 ))}
-              </div>
+              </button>
             )}
             {commentsCount > 0 && (
               <div className="flex items-center gap-0.5 text-gray-500 shrink-0">
@@ -887,6 +929,40 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
           </div>
         )}
       </div>
+
+      {showReactionsViewer && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowReactionsViewer(false);
+          }}
+          className="fixed inset-0 bg-black/60 z-300 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-default"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gray-950 border border-gray-800 rounded-2xl p-4 w-full max-w-xs shadow-2xl relative flex flex-col animate-in zoom-in-95 duration-150"
+          >
+            <div className="flex items-center justify-between border-b border-gray-900 pb-2 mb-3">
+              <span className="text-[10px] uppercase font-black tracking-widest text-indigo-400">Reactions</span>
+              <button onClick={() => setShowReactionsViewer(false)} className="text-gray-500 hover:text-white">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-hide py-1">
+              {reactionUsernames.length === 0 ? (
+                <p className="text-[10px] text-gray-600 uppercase text-center py-4">No reactions yet</p>
+              ) : (
+                reactionUsernames.map((ru, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs bg-white/5 py-1.5 px-2.5 rounded-lg">
+                    <span className="font-bold text-gray-200">@{formatUsername(ru.username)}</span>
+                    <span className="text-sm">{ru.reaction}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 };
