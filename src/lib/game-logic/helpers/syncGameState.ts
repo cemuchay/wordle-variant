@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { networkGate } from '../../networkGate';
 import { calculateSkillIndex } from "..";
 
 export const syncGameStateSub = async (
@@ -10,12 +10,20 @@ export const syncGameStateSub = async (
    if (!date) return;
 
    // DB-side guard: don't overwrite if server already has equal or better data
-   const { data: existing } = await supabase
-      .from("scores")
-      .select("guesses, hints_used, hint_record")
-      .eq("user_id", userId)
-      .eq("game_date", date)
-      .maybeSingle();
+   const existing = await networkGate.enqueue(
+      'sync_check_guard',
+      {
+         type: 'supabase',
+         table: 'scores',
+         operation: 'select',
+         payload: { select: 'guesses, hints_used, hint_record' },
+         query: {
+            eq: { user_id: userId, game_date: date },
+            maybeSingle: true
+         }
+      },
+      true // blocking
+   );
 
    if (existing) {
       const existingCount = existing.guesses?.length ?? 0;
@@ -51,23 +59,32 @@ export const syncGameStateSub = async (
         }).finalScore
       : 0;
 
-   const { error } = await supabase.from("scores").upsert(
-      {
-         user_id: userId,
-         game_date: date,
-         guesses: payload.guesses,
-         status: payload.status,
-         hints_used: payload.usedHint,
-         hint_record: payload.hintRecord,
-         word_length: payload.config.length,
-         skill_score: skillScore,
-         attempts: payload.guesses.length,
-         game_message: payload.gameMessage,
-      },
-      { onConflict: "user_id, game_date" },
-   );
-
-   if (error) {
+   try {
+      await networkGate.enqueue(
+         'upsert_game_score',
+         {
+            type: 'supabase',
+            table: 'scores',
+            operation: 'upsert',
+            payload: {
+               user_id: userId,
+               game_date: date,
+               guesses: payload.guesses,
+               status: payload.status,
+               hints_used: payload.usedHint,
+               hint_record: payload.hintRecord,
+               word_length: payload.config.length,
+               skill_score: skillScore,
+               attempts: payload.guesses.length,
+               game_message: payload.gameMessage,
+            },
+            query: {
+               options: { onConflict: "user_id, game_date" }
+            }
+         },
+         true // blocking
+      );
+   } catch (error: any) {
       console.error("Cloud sync failed:", error.message);
       throw error;
    }

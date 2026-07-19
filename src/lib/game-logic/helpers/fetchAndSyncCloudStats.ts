@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { networkGate } from '../../networkGate';
 import type { GameStats } from "@/types/game";
 import { safeLocalStorage } from "@/utils/storage";
 import { calculateStreak } from "@/utils/streak";
@@ -7,13 +7,21 @@ export const fetchAndSyncCloudStatsSub = async (
    userId: string,
 ): Promise<void> => {
    try {
-      const { data: scores, error } = await supabase
-         .from("scores")
-         .select("status, attempts, game_date")
-         .eq("user_id", userId)
-         .order("game_date", { ascending: true });
+      const rawScores = await networkGate.enqueue(
+         'fetch_scores_for_stats',
+         {
+            type: 'supabase',
+            table: 'scores',
+            operation: 'select',
+            payload: { select: 'status, attempts, game_date' },
+            query: {
+               eq: { user_id: userId }
+            }
+         },
+         true // blocking
+      );
 
-      if (error) throw error;
+      const scores = [...(rawScores || [])].sort((a, b) => a.game_date.localeCompare(b.game_date));
 
       const { currentStreak, maxStreak } = calculateStreak(scores || []);
 

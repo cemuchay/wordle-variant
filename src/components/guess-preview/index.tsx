@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef, memo, useContext } from "react";
 import { MAX_ATTEMPTS } from "../../constants/game";
 import { Z_INDEX } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
+import formatUsername from "../../utils/formatUsername";
 import {
   calculateSkillIndex,
   deobfuscateWord,
@@ -509,6 +510,62 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     };
   }, [revealTargetWord]);
 
+  const [latestComments, setLatestComments] = useState<any[]>([]);
+
+  useEffect(() => {
+    const tId = isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "");
+    if (!tId || !targetDate || commentsDisabledByTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLatestComments([]);
+      return;
+    }
+
+    const fetchLatestComments = async () => {
+      const { data: cmData } = await supabase
+        .from('guess_comments')
+        .select('id, content, created_at, guess_index, author_id')
+        .eq('target_user_id', tId)
+        .eq('game_date', targetDate)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (cmData) {
+        const authorIds = Array.from(new Set(cmData.map(c => c.author_id)));
+        if (authorIds.length > 0) {
+          const { data: authors } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', authorIds);
+          const authorMap = new Map(authors?.map(a => [a.id, a.username]));
+          setLatestComments(cmData.map(c => ({
+            ...c,
+            author_username: authorMap.get(c.author_id) || 'Someone'
+          })));
+        } else {
+          setLatestComments([]);
+        }
+      }
+    };
+
+    fetchLatestComments();
+
+    const channel = supabase
+      .channel(`preview_comments_${tId}_${targetDate}_${Math.random().toString(36).slice(2, 9)}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'guess_comments',
+        filter: `target_user_id=eq.${tId}`
+      }, () => {
+        fetchLatestComments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [entry.user_id, entry.user?.id, entry.profiles?.id, targetDate, isChallenge, commentsDisabledByTarget]);
+
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))]"
@@ -622,6 +679,24 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               </div>
             )}
 
+            {/* Latest 3 Comments Preview */}
+            {latestComments.length > 0 && (
+              <div className="mb-4 p-3.5 bg-white/5 border border-white/5 rounded-2xl text-left space-y-2">
+                <p className="text-[9px] uppercase font-black tracking-widest text-indigo-400">Latest Comments</p>
+                <div className="space-y-2.5">
+                  {latestComments.map(c => (
+                    <div key={c.id} className="text-xs leading-relaxed border-b border-white/3 pb-1.5 last:border-b-0 last:pb-0">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <span className="font-black text-[10px] text-indigo-300">@{formatUsername(c.author_username || '')}</span>
+                        <span className="text-[8px] text-gray-500 font-mono">Row {c.guess_index + 1}</span>
+                      </div>
+                      <p className="text-white text-xs pl-1.5 font-medium wrap-break-word">{c.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <ScoreBreakdown
               breakdown={breakdown}
               gameData={gameData}
@@ -632,15 +707,15 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               onOpenScoringInfo={() => setShowScoringInfo(true)}
             />
 
-             <GuessGrid
-               guesses={gameData.guesses}
-               breakdown={breakdown}
-               canSeeDetails={canSeeDetails}
-               targetWordLength={targetWordToUse.length}
-               targetUserId={isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "")}
-               gameDate={isChallenge ? "" : (targetDate || "")}
-               commentsDisabledByTarget={commentsDisabledByTarget}
-             />
+            <GuessGrid
+              guesses={gameData.guesses}
+              breakdown={breakdown}
+              canSeeDetails={canSeeDetails}
+              targetWordLength={targetWordToUse.length}
+              targetUserId={isChallenge ? "" : (entry.user_id || entry.user?.id || entry.profiles?.id || "")}
+              gameDate={isChallenge ? "" : (targetDate || "")}
+              commentsDisabledByTarget={commentsDisabledByTarget}
+            />
 
             {isChallenge && isOwnEntry && shareText && (
               <div className="mb-4">

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Heart, Send, X, Edit2, Trash2, Smile } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -43,6 +44,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     const { user: currentUser } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [reactions, setReactions] = useState<Reaction[]>([]);
+    const [reactionUsernames, setReactionUsernames] = useState<{ reaction: string; username: string }[]>([]);
     const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
     const [showCommentDrawer, setShowCommentDrawer] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -54,6 +56,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState('');
     const [activeCommentReactionPicker, setActiveCommentReactionPicker] = useState<string | null>(null);
+    const [selectedEmojiFilter, setSelectedEmojiFilter] = useState<string | null>(null);
 
     const fetchData = async () => {
         // Fetch reactions
@@ -63,8 +66,26 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
             .eq('target_user_id', targetUserId)
             .eq('game_date', gameDate)
             .eq('guess_index', guessIndex);
-        
-        if (rxData) setReactions(rxData);
+
+        if (rxData) {
+            setReactions(rxData);
+            const rxUserIds = Array.from(new Set(rxData.map(r => r.user_id)));
+            if (rxUserIds.length > 0) {
+                const { data: rxProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, username')
+                    .in('id', rxUserIds);
+                const rxProfileMap = new Map(rxProfiles?.map(p => [p.id, p.username]));
+                setReactionUsernames(
+                    rxData.map(r => ({
+                        reaction: r.reaction,
+                        username: rxProfileMap.get(r.user_id) || 'Someone'
+                    }))
+                );
+            } else {
+                setReactionUsernames([]);
+            }
+        }
 
         // Fetch comments if not disabled
         if (!commentsDisabledByTarget) {
@@ -84,7 +105,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                         .from('profiles')
                         .select('id, username')
                         .in('id', authorIds);
-                    
+
                     const authorMap = new Map(authors?.map(a => [a.id, a.username]));
                     const commentsWithUsernames = cmData.map(c => ({
                         ...c,
@@ -113,6 +134,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
 
     // Fetch comments and reactions
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData();
 
         // Set up Realtime subscriptions
@@ -168,6 +190,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
             supabase.removeChannel(cmChannel);
             supabase.removeChannel(cRxChannel);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetUserId, gameDate, guessIndex, commentsDisabledByTarget]);
 
     const handleReact = async (emoji: string) => {
@@ -319,7 +342,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     };
 
     return (
-        <div 
+        <div
             className="flex flex-col w-full relative mt-1 select-none"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -330,12 +353,11 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                     {reactionCounts.map(({ emoji, count, hasReacted }) => (
                         <button
                             key={emoji}
-                            onClick={() => handleReact(emoji)}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
-                                hasReacted 
-                                    ? 'bg-correct/20 border border-correct/30 text-correct' 
+                            onClick={() => setSelectedEmojiFilter(emoji)}
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${hasReacted
+                                    ? 'bg-correct/20 border border-correct/30 text-correct'
                                     : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
-                            }`}
+                                }`}
                         >
                             <span>{emoji}</span>
                             <span className="font-bold">{count}</span>
@@ -369,14 +391,13 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                         <button
                             key={emoji}
                             onClick={() => handleReact(emoji)}
-                            className={`text-lg p-1.5 hover:bg-white/10 rounded-lg transition-colors ${
-                                myActiveReaction === emoji ? 'bg-white/5 ring-1 ring-indigo-500' : ''
-                            }`}
+                            className={`text-lg p-1.5 hover:bg-white/10 rounded-lg transition-colors ${myActiveReaction === emoji ? 'bg-white/5 ring-1 ring-indigo-500' : ''
+                                }`}
                         >
                             {emoji}
                         </button>
                     ))}
-                    <button 
+                    <button
                         onClick={() => setShowEmojiPicker(false)}
                         className="text-gray-500 hover:text-white p-1.5"
                     >
@@ -387,7 +408,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
 
             {/* Comments Modal (Centered) */}
             {showCommentDrawer && !commentsDisabledByTarget && (
-                <div className="fixed inset-0 bg-black/60 z-[250] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 bg-black/60 z-250 flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="absolute inset-0" onClick={() => setShowCommentDrawer(false)} />
                     <div className="relative w-full max-w-sm bg-gray-950 border border-gray-800 rounded-2xl p-4 flex flex-col max-h-[75vh] z-10 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between border-b border-gray-900 pb-2 mb-3">
@@ -435,13 +456,13 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                                         className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
                                                     />
                                                     <div className="flex gap-2 justify-end">
-                                                        <button 
+                                                        <button
                                                             onClick={() => setEditingCommentId(null)}
                                                             className="text-[9px] uppercase font-black text-gray-400 hover:text-white px-2 py-1 bg-white/5 rounded-md"
                                                         >
                                                             Cancel
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleSaveEdit(c.id)}
                                                             className="text-[9px] uppercase font-black text-white px-2 py-1 bg-indigo-600 rounded-md"
                                                         >
@@ -451,8 +472,8 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <p className={`text-xs break-words ${c.is_deleted ? 'text-gray-500 italic' : 'text-white'}`}>{c.content}</p>
-                                                    
+                                                    <p className={`text-xs wrap-break-word ${c.is_deleted ? 'text-gray-500 italic' : 'text-white'}`}>{c.content}</p>
+
                                                     {/* Reactions on Comment */}
                                                     {cReactionCounts.length > 0 && (
                                                         <div className="flex flex-wrap items-center gap-1 mt-1.5">
@@ -460,11 +481,10 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                                                 <button
                                                                     key={emoji}
                                                                     onClick={() => handleCommentReact(c.id, emoji)}
-                                                                    className={`flex items-center gap-0.5 px-1 py-0.2 rounded-full text-[8px] ${
-                                                                        hasReacted 
-                                                                            ? 'bg-correct/20 border border-correct/30 text-correct' 
+                                                                    className={`flex items-center gap-0.5 px-1 py-0.2 rounded-full text-[8px] ${hasReacted
+                                                                            ? 'bg-correct/20 border border-correct/30 text-correct'
                                                                             : 'bg-white/5 border border-white/5 text-gray-400'
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <span>{emoji}</span>
                                                                     <span className="font-bold">{count}</span>
@@ -475,7 +495,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
 
                                                     {/* Hover / Actions bar */}
                                                     {currentUser && !c.is_deleted && (
-                                                        <div className="flex items-center justify-end gap-2 mt-1.5 pt-1 border-t border-white/[0.02]">
+                                                        <div className="flex items-center justify-end gap-2 mt-1.5 pt-1 border-t border-white/2">
                                                             {/* React button */}
                                                             <div className="relative">
                                                                 <button
@@ -552,6 +572,33 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                                 </button>
                             </form>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Reactions Detail Viewer Modal */}
+            {selectedEmojiFilter && (
+                <div
+                    onClick={() => setSelectedEmojiFilter(null)}
+                    className="fixed inset-0 bg-black/60 z-300 flex items-center justify-center p-4 animate-in fade-in duration-150"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-gray-950 border border-gray-800 rounded-2xl p-4 w-full max-w-xs shadow-2xl relative flex flex-col animate-in zoom-in-95 duration-150"
+                    >
+                        <div className="flex items-center justify-between border-b border-gray-900 pb-2 mb-3">
+                            <span className="text-[10px] uppercase font-black tracking-widest text-indigo-400">Reacted with {selectedEmojiFilter}</span>
+                            <button onClick={() => setSelectedEmojiFilter(null)} className="text-gray-500 hover:text-white">
+                                <X size={14} />
+                            </button>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-2 pr-1 scrollbar-hide py-1">
+                            {reactionUsernames.filter(ru => ru.reaction === selectedEmojiFilter).map((ru, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs bg-white/5 py-1.5 px-2.5 rounded-lg">
+                                    <span className="font-bold text-gray-200">@{formatUsername(ru.username)}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}

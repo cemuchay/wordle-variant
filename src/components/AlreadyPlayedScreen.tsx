@@ -3,8 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Eye, Swords, HelpCircle, X, } from "lucide-react";
 import { MarathonBanner } from "./common/MarathonBanner";
-
-const logoUrl = "/pwa_192x192.png";
+import CountDown from "./common/CountDown"
 
 interface AlreadyPlayedScreenProps {
   onNavigate: (item: "play" | "chat" | "leaderboard" | "challenges" | "wordup") => void;
@@ -33,7 +32,6 @@ export const AlreadyPlayedScreen = ({
   setIsChallengeOpen,
 }: AlreadyPlayedScreenProps) => {
   const [selectedDetail, setSelectedDetail] = useState<OptionDetail | null>(null);
-  const [logoLoaded, setLogoLoaded] = useState(false);
 
   const options: OptionDetail[] = [
     {
@@ -57,7 +55,7 @@ export const AlreadyPlayedScreen = ({
   ];
 
   return (
-    <div className="h-full w-full overflow-y-auto px-4 pt-12 sm:px-6 flex flex-col justify-center items-center select-none text-white overflow-hidden">
+    <div className="h-full w-full overflow-y-auto px-4 py-2 sm:px-6 flex flex-col justify-center items-center select-none text-white overflow-hidden">
       <div className="w-full max-w-md mx-auto flex flex-col justify-center items-center space-y-6 overflow-hidden">
         {/* Title block */}
         <motion.div
@@ -67,16 +65,8 @@ export const AlreadyPlayedScreen = ({
           className="text-center space-y-4"
         >
           <div className="flex justify-center">
-            {!logoLoaded && (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-800 rounded-2xl animate-pulse" />
-            )}
-            <img
-              src={logoUrl}
-              alt="Variant"
-              onLoad={() => setLogoLoaded(true)}
-              className={`w-14 h-14 sm:w-18 sm:h-18 object-contain ${logoLoaded ? 'block' : 'hidden'} rounded-[20px]`}
-            />
           </div>
+          <CountDown isOpen={true} />
           <p className="text-sm sm:text-base text-white font-medium max-w-xs mx-auto">
             You have completed today's puzzle!.
           </p>
