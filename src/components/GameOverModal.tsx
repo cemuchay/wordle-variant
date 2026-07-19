@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { generateShareText } from "../lib/share";
-import { getServerDate } from "../lib/time";
-import type { GameConfig, GameStats, GuessResult } from "../types/game";
-import { ShareButton } from "./ShareButton";
 import { Eye, Trophy, X } from "lucide-react";
+import React, { useState } from "react";
+import { generateShareText } from "../lib/share";
+import type { GameConfig, GameStats, GuessResult } from "../types/game";
+import CountDown from "./common/CountDown";
+import { ShareButton } from "./ShareButton";
 
 interface Props {
   isOpen: boolean;
@@ -30,52 +30,6 @@ export const GameOverModal: React.FC<Props> = ({
 }) => {
   const won =
     guesses[guesses.length - 1]?.every((r) => r.status === "correct") ?? false;
-
-  const [countdown, setCountdown] = useState("");
-
-  useEffect(() => {
-    if (!isOpen) return;
-    // This works in both browser (returns a number) and Node (returns a Timeout object)
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    const initCountdown = async () => {
-      try {
-        const { raw } = await getServerDate();
-        const serverOffset = raw.getTime() - Date.now();
-
-        timer = setInterval(() => {
-          const now = new Date(Date.now() + serverOffset);
-          const nigeriaTimeStr = now.toLocaleString("en-US", {
-            timeZone: "Africa/Lagos",
-          });
-          const tomorrow = new Date(nigeriaTimeStr);
-          tomorrow.setHours(24, 0, 0, 0);
-
-          const diff = tomorrow.getTime() - new Date(nigeriaTimeStr).getTime();
-
-          if (diff <= 0) {
-            setCountdown("0:00:00");
-            return;
-          }
-
-          const h = Math.floor(diff / (1000 * 60 * 60));
-          const m = Math.floor((diff / (1000 * 60)) % 60);
-          const s = Math.floor((diff / 1000) % 60);
-
-          setCountdown(
-            `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`,
-          );
-        }, 1000);
-      } catch (e) {
-        console.error("Countdown init failed", e);
-      }
-    };
-
-    initCountdown();
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isOpen]);
 
   const [showWord, setShowWord] = useState(false);
 
@@ -202,14 +156,7 @@ export const GameOverModal: React.FC<Props> = ({
 
         {/* Footer: Countdown & Share */}
         <div className="flex items-center justify-between gap-6">
-          <div className="text-left">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Next Game
-            </p>
-            <p className="text-2xl font-mono font-medium text-white tracking-tighter">
-              {countdown || "--:--:--"}
-            </p>
-          </div>
+          <CountDown isOpen={isOpen} />
           <div className="flex-1">
             <ShareButton
               text={generateShareText({
