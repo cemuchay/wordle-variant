@@ -53,7 +53,7 @@ const getTypeByWeight = (
       { type: "missing_letter", weight: 1.0 },
       { type: "reverse_wordle", weight: 0.2 },
       { type: "definition", weight: 1.0 },
-      { type: "math", weight: 0.7 },
+      { type: "math", weight: 0 },
       { type: "odd_one_out", weight: 0.8 },
       { type: "vowel_drop", weight: 0.8 },
       { type: "rhyme_match", weight: 0.8 },

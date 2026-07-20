@@ -130,7 +130,7 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
       },
    }),
    define("physics", {
-      proceduralWeight: 0.0,
+      proceduralWeight: 0.6,
       weights: {
          forward: 2.5,
          reverse: 1.5,

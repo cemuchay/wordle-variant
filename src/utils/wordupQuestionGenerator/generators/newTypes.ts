@@ -116,43 +116,62 @@ export const generateReverseWordle = async (
    const randomWord = () => official[rand(0, official.length - 1)];
 
    let target = randomWord();
-   let guess = randomWord();
-   let pattern = calculateWordlePattern(target, guess);
 
-   let minColored;
-   if (target.length <= 3) minColored = 1;
-   else if (target.length <= 5) minColored = 2;
-   else minColored = 3;
-
+   // Generate 3 unique guesses with non-empty/some colored patterns
+   const clues: { guess: string; pattern: string }[] = [];
    let attempts = 0;
-   while (attempts < 150) {
-      const coloredCount = (pattern.match(/🟩|🟨/g) || []).length;
-      const allGreen = (pattern.match(/🟩/g) || []).length === target.length;
-      if (coloredCount >= minColored && !allGreen) break;
-      if (attempts > 50 && attempts % 30 === 0) {
-         if (minColored > 1) minColored--;
-         else target = randomWord();
-      }
-      guess = randomWord();
-      pattern = calculateWordlePattern(target, guess);
+   while (clues.length < 3 && attempts < 200) {
       attempts++;
+      const g = randomWord();
+      if (g === target || clues.some((c) => c.guess === g)) continue;
+      const pat = calculateWordlePattern(target, g);
+      const coloredCount = (pat.match(/🟩|🟨/g) || []).length;
+      if (coloredCount > 0 || attempts > 100) {
+         clues.push({ guess: g, pattern: pat });
+      }
    }
 
+   while (clues.length < 3) {
+      const g = randomWord();
+      if (g !== target && !clues.some((c) => c.guess === g)) {
+         clues.push({ guess: g, pattern: calculateWordlePattern(target, g) });
+      }
+   }
+
+   const promptText = `Wordle Clues:\n` + 
+      clues.map((c, i) => `${i + 1}. ${c.guess} ➔ ${c.pattern}`).join("\n") + 
+      `\n\nIdentify the target word:`;
+
    const choices = new Set<string>();
-   choices.add(guess);
-   while (choices.size < 4) {
+   choices.add(target);
+
+   let distractorAttempts = 0;
+   while (choices.size < 4 && distractorAttempts < 300) {
+      distractorAttempts++;
       const dummy = randomWord();
-      if (calculateWordlePattern(target, dummy) !== pattern) {
+      if (dummy === target) continue;
+
+      const matchesAllPatterns = clues.every(
+         (c) => calculateWordlePattern(dummy, c.guess) === c.pattern,
+      );
+      if (!matchesAllPatterns) {
          choices.add(dummy);
       }
    }
+
+   while (choices.size < 4) {
+      const dummy = randomWord();
+      choices.add(dummy);
+   }
+
    return {
       type: "reverse_wordle",
-      prompt: pattern,
-      subPrompt: `Target: ${target}`,
+      prompt: promptText,
+      subPrompt: `Word Length: ${target.length}`,
       choices: shuffle(Array.from(choices)),
-      answer: guess,
-      explanation: `The guess "${guess}" produces this pattern for the target "${target}".`,
+      answer: target,
+      explanation: `The target word is "${target}". Checking the clues:\n` + 
+         clues.map((c) => `• "${c.guess}" yields ${c.pattern}`).join("\n"),
    };
 };
 

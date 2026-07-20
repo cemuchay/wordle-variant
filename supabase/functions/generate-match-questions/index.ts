@@ -14,6 +14,7 @@ import {
 import { formatQuestionPrompt, cleanVal } from "./promptFormatter.ts";
 import { generateMathsQuestion } from "./maths.ts";
 import { generateEnglishQuestion } from "./english.ts";
+import { generatePhysicsQuestion } from "./physics.ts";
 import { getRandomMatchingTemplate, FAKE_BIBLE_BOOKS } from "./templates.ts";
 
 // ── Crypto ───────────────────────────────────────────────────
@@ -1408,9 +1409,39 @@ serve(async (req) => {
                      );
                   }
                   hqChosen = null;
+               } else if (category === "physics") {
+                  chosenEntity = matchSeenCount < MATCH_SEEN_CAP
+                     ? (entityList.length > 0 ? getNextUnseenEntity() || getNextEntity() : null)
+                     : (entityList.length > 0 ? getNextEntity() : null);
+                  q = generatePhysicsQuestion(
+                     roundSeed,
+                     chosenEntity,
+                     entityList,
+                     roundRng,
+                     variant,
+                     config.proceduralWeight,
+                  );
+                  if (!q && chosenEntity) {
+                     q = generateQuestion(
+                        roundSeed,
+                        chosenEntity,
+                        entityList,
+                        variant,
+                        category,
+                        config.variantWeights,
+                        dbTemplatesList,
+                     );
+                  }
+                  hqChosen = null;
                } else {
                    // Standard entity-based procedural category logic
                    if (entityList.length === 0) {
+                      const isWordCategory = category === "english_language" ||
+                                             category === "english_fundamentals" ||
+                                             category === "mixed" ||
+                                             (typeof CATEGORY_SUPER_MAP !== 'undefined' && CATEGORY_SUPER_MAP[category] === "language_arts");
+                      const isPhysicsCategory = category === "physics";
+
                       if (shuffledHandcrafted.length > 0) {
                          const isValidHq = (s: any) =>
                             s && s.prompt && s.choices && s.choices.length >= 2;
@@ -1430,25 +1461,23 @@ serve(async (req) => {
                             }
                             hqChosen = fallbackHq;
                          } else {
-                            q = generateMathsQuestion(
-                               roundSeed,
-                               null,
-                               [],
-                               roundRng,
-                               variant,
-                               config.proceduralWeight,
-                            );
+                            if (isPhysicsCategory) {
+                               q = generatePhysicsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                            } else if (isWordCategory) {
+                               q = generateEnglishQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                            } else {
+                               q = generateMathsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                            }
                             hqChosen = null;
                          }
                       } else {
-                         q = generateMathsQuestion(
-                            roundSeed,
-                            null,
-                            [],
-                            roundRng,
-                            variant,
-                            config.proceduralWeight,
-                         );
+                          if (isPhysicsCategory) {
+                             q = generatePhysicsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                          } else if (isWordCategory) {
+                             q = generateEnglishQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                          } else {
+                             q = generateMathsQuestion(roundSeed, null, [], roundRng, variant, config.proceduralWeight);
+                          }
                          hqChosen = null;
                       }
                       chosenEntity = null;
