@@ -159,6 +159,17 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       }
 
       if (isMarathon) {
+        const overallFinished =
+          myParticipation?.status === "completed" ||
+          myParticipation?.status === "timed_out" ||
+          myParticipation?.status === "won" ||
+          myParticipation?.status === "lost";
+
+        if (overallFinished) {
+          setViewerHasFinished(true);
+          return;
+        }
+
         const myProg = myParticipation?.marathon_progress?.find(
           (p: any) => p.game_index === marathonGameIndex,
         );
