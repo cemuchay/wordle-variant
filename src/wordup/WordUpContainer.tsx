@@ -11,6 +11,7 @@ import { useLiveStore } from "./live/store/useLiveStore";
 import { useAsyncStore } from "./async/store/useAsyncStore";
 import { decryptMatchQuestions } from "../utils/wordupQuestionGenerator";
 import { wordupAudio } from "../utils/wordupAudio";
+import { useWordUpStore } from "../store/useWordUpStore";
 
 interface WordUpContainerProps {
    wordupMode: "live" | "async" | null;
@@ -237,6 +238,37 @@ export const WordUpContainer = ({
             </div>
          )}
       </>
+   );
+};
+
+export const WordUpView = () => {
+   const s = useWordUpStore();
+
+   // Sync useWordUpStore → useLiveStore synchronously during render,
+   // before LiveView reads useLiveStore
+   const live = useLiveStore.getState();
+   live.setView(s.view as any);
+   live.setMatchId(s.matchId);
+   live.setRole(s.role);
+   live.setQuestions(s.questions);
+   live.setCurrentIdx(s.currentIdx);
+   live.setMatchData(s.matchData);
+   live.setOpponentStats(s.opponentStats);
+   live.setCountdownSecs(s.countdownSecs);
+   live.setMaxTime(s.maxTime);
+   live.setSelectedAnswer(s.selectedAnswer);
+   live.setRevealAnswers(s.revealAnswers);
+
+   const [wordupMode, setWordupMode] = useState<"live" | "async" | null>(
+      s.view === "menu" ? null : "live"
+   );
+
+   return (
+      <WordUpContainer
+         wordupMode={wordupMode}
+         setWordupMode={setWordupMode}
+         onTutorial={() => {}}
+      />
    );
 };
 
