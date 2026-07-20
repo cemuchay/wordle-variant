@@ -57,12 +57,19 @@ vi.mock('../../wordup/live/hooks/useGameEngine.new', () => ({
       loadAndSubscribeMatch: () => Promise.resolve(),
       startQuestionRound: () => {},
       cleanUpIntervals: () => {},
-      rematchState: 'idle' as const,
-      rematchCountdown: 0,
-      showRematchButton: false,
+      state: {
+        lastRoundPopup: false,
+        phase: 'playing',
+        rematchState: 'idle' as const,
+        rematchCountdown: 0,
+        showRematchButton: false,
+      },
       sendRematch: () => {},
       acceptRematch: () => {},
       sendQuickChat: () => {},
+      sendSignalUpdate: () => {},
+      cleanup: () => {},
+      startMatch: () => {},
       matchChannelRef: { current: null },
     };
   },
@@ -128,6 +135,6 @@ describe('Async game flow', () => {
       questions: [],
     });
     renderWordUp();
-    expect(screen.getByText(/preparing arena/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading arena/i)).toBeInTheDocument();
   });
 });
