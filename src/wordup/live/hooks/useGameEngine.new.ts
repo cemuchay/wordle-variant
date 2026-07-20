@@ -188,6 +188,50 @@ export function useGameEngine(props: EngineProps) {
     });
 
     // ══════════════════════════════════════════════════════════════════
+    // Process pending e2e actions (queued before engine mount)
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        const pending = (window as any).__pendingEngineActions;
+        if (!pending || pending.length === 0) return;
+
+        for (const action of [...pending]) {
+            switch (action.type) {
+                case "SET_INITIAL": {
+                    const { gameType, role, questions, matchData, opponentStats } = action.payload;
+                    gameTypeRef.current = gameType || "live";
+                    roleRef.current = role;
+                    questionsRef.current = questions || [];
+                    matchDataRef.current = matchData || null;
+                    opponentStatsRef.current = opponentStats || null;
+                    break;
+                }
+                case "COUNTDOWN_DONE": {
+                    setCurrentRound(0);
+                    setPhase("playing");
+                    const q = questionsRef.current[0];
+                    const dur = q ? getQuestionDuration(q.type) : 10;
+                    setTimeRemaining(dur);
+                    setMaxTime(dur);
+                    roundStartedAtRef.current = Date.now();
+                    break;
+                }
+                case "START_ROUND": {
+                    const r = action.round ?? 0;
+                    const q = questionsRef.current[r];
+                    const dur = q ? getQuestionDuration(q.type) : 10;
+                    setCurrentRound(r);
+                    setTimeRemaining(dur);
+                    setMaxTime(dur);
+                    roundStartedAtRef.current = action.startedAt || Date.now();
+                    setPhase("playing");
+                    break;
+                }
+            }
+        }
+        pending.length = 0;
+    }, []);
+
+    // ══════════════════════════════════════════════════════════════════
     // Timer helpers
     // ══════════════════════════════════════════════════════════════════
 
