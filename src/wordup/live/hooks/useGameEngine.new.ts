@@ -35,10 +35,11 @@ import {
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
-import { BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import type { WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import type { ProfileStats } from "../../shared/types";
+import { getPrefetchedBotMatch } from "../../../utils/wordupPrefetchCache";
+import { BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -377,7 +378,7 @@ export function useGameEngine(props: EngineProps) {
         stopBotTimer();
 
         const isLast = currentRoundRef.current >= 6;
-        const delay = isLast ? 3200 : 1800;
+        const delay = 1800;
 
         setPhase("reveal");
 
@@ -385,18 +386,12 @@ export function useGameEngine(props: EngineProps) {
             revealRef.current = null;
             if (isLast) {
                 endGame();
-            } else if (currentRoundRef.current === 5) {
-                wordupAudio.playFinalRoundAnticipationStart();
-                triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
-                setLastRoundPopup(true);
-
-                revealRef.current = window.setTimeout(() => {
-                    revealRef.current = null;
-                    setLastRoundPopup(false);
-                    advanceRound();
-                    wordupAudio.startFinalRoundBeat();
-                }, 3000);
             } else {
+                if (currentRoundRef.current === 5) {
+                    wordupAudio.playFinalRoundAnticipationStart();
+                    triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+                    wordupAudio.startFinalRoundBeat();
+                }
                 advanceRound();
             }
         }, delay);
@@ -709,20 +704,27 @@ export function useGameEngine(props: EngineProps) {
         });
 
         const nextRole = roleRef.current === "player1" ? "player2" : "player1";
+        const category = useLiveStore.getState().category || "mixed";
+        const prefetched = getPrefetchedBotMatch(category);
 
         try {
-            const category = useLiveStore.getState().category || "mixed";
             const p1 = roleRef.current === "player1" ? matchDataRef.current.player2_id : matchDataRef.current.player1_id;
             const p2 = roleRef.current === "player1" ? matchDataRef.current.player1_id : matchDataRef.current.player2_id;
 
-            await supabase.from("wordup_matches").upsert({
+            const upsertData = {
                 id: newMatchId,
                 category,
                 player1_id: p1,
                 player2_id: p2,
-                status: "waiting",
-                game_type: "live"
-            });
+                status: prefetched ? "countdown" : "waiting",
+                game_type: "live",
+                ...(prefetched ? {
+                    questions: prefetched.encryptedQuestions,
+                    encryption_key: prefetched.encryptionKey
+                } : {})
+            };
+
+            await supabase.from("wordup_matches").upsert(upsertData);
         } catch (e) {
             console.error("Failed to register rematch matching:", e);
         }
@@ -798,16 +800,18 @@ export function useGameEngine(props: EngineProps) {
 
     const startMatch = useCallback(
         async (mId: string, activeRole: "player1" | "player2") => {
+            setPhase("idle");
             const loadStart = Date.now();
             let questions: WordUpQuestion[];
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
             if (mId.startsWith("bot-match-")) {
-                // ── Local bot match — generate questions on the fly ──
                 const category = useLiveStore.getState().category || "mixed";
+                const prefetched = getPrefetchedBotMatch(category);
+
                 matchData = {
-                    id: mId,
+                    id: prefetched ? prefetched.matchId : mId,
                     category,
                     status: "active",
                     is_bot_match: true,
@@ -820,32 +824,40 @@ export function useGameEngine(props: EngineProps) {
                     p1_score: 0,
                     p2_score: 0,
                 };
-                if (isProceduralCategory(category)) {
-                    const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
-                    cleanIdRef.current = cleanId;
-                    const seed = `${cleanId}-${category}`;
-                    const { data: edgeData } = await supabase.functions.invoke(
-                        "generate-match-questions",
-                        { body: { matchId: cleanId, category, seed } },
-                    );
-                    if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
-                        encryptedQuestionsRef.current = edgeData.encryptedQuestions;
-                        encryptionKeyRef.current = edgeData.encryptionKey;
-                        questions = await decryptMatchQuestions({
-                            questions: edgeData.encryptedQuestions,
-                            encryption_key: edgeData.encryptionKey,
-                        } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
+                if (prefetched) {
+                    mId = prefetched.matchId;
+                    questions = prefetched.questions;
+                    encryptedQuestionsRef.current = prefetched.encryptedQuestions;
+                    encryptionKeyRef.current = prefetched.encryptionKey;
+                } else {
+                    // fall back to generate on the fly
+                    if (isProceduralCategory(category)) {
+                        const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                        cleanIdRef.current = cleanId;
+                        const seed = `${cleanId}-${category}`;
+                        const { data: edgeData } = await supabase.functions.invoke(
+                            "generate-match-questions",
+                            { body: { matchId: cleanId, category, seed } },
+                        );
+                        if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
+                            encryptedQuestionsRef.current = edgeData.encryptedQuestions;
+                            encryptionKeyRef.current = edgeData.encryptionKey;
+                            questions = await decryptMatchQuestions({
+                                questions: edgeData.encryptedQuestions,
+                                encryption_key: edgeData.encryptionKey,
+                            } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
+                        } else {
+                            questions = await generateWordUpQuestions(category);
+                            const fKey = generateSecretKey();
+                            encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
+                            encryptionKeyRef.current = fKey;
+                        }
                     } else {
                         questions = await generateWordUpQuestions(category);
                         const fKey = generateSecretKey();
                         encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
                         encryptionKeyRef.current = fKey;
                     }
-                } else {
-                    questions = await generateWordUpQuestions(category);
-                    const fKey = generateSecretKey();
-                    encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
-                    encryptionKeyRef.current = fKey;
                 }
                 let userRating = 600;
                 if (props.userId) {
@@ -986,9 +998,10 @@ export function useGameEngine(props: EngineProps) {
             setOpponentChoice(null);
             setLastRoundPopup(false);
 
-            // Enforce visual buffer of at least 3 seconds so the user can see their opponent
+            // Enforce visual buffer so the user can see their opponent
             const elapsed = Date.now() - loadStart;
-            const remainingDelay = Math.max(0, 3000 - elapsed);
+            const bufferDuration = mId.startsWith("bot-match-") ? 300 : 800;
+            const remainingDelay = Math.max(0, bufferDuration - elapsed);
             if (remainingDelay > 0) {
                 await new Promise((resolve) => setTimeout(resolve, remainingDelay));
             }
@@ -1056,7 +1069,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = ch;
             }
         },
-        [handleOpponentAnswer, onRematchAccepted, props.userId, abortMatch, triggerToast, stopAllTimers],
+        [handleOpponentAnswer, onRematchAccepted, props.userId, triggerToast, stopAllTimers],
     );
 
     // ── Derive computed state shape for LiveView ─────────────────
