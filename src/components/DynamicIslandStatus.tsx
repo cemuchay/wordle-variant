@@ -285,7 +285,7 @@ export const DynamicIslandStatus = () => {
     const isLongText = toast.show && (toast.message?.length > 25 || toast.isLarge);
 
     return (
-        <div key={resumeKey} className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 z-100 pointer-events-none">
+        <div key={resumeKey} className="fixed left-1/2 -translate-x-1/2 z-100 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}>
             <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}
