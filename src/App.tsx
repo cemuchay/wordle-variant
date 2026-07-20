@@ -42,6 +42,7 @@ const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
 const ChallengeModal = safeLazy(() => import("./components/ChallengeModal").then(m => ({ default: m.ChallengeModal })));
 const WordUpContainer = safeLazy(() => import("./wordup/WordUpContainer").then(m => ({ default: m.WordUpContainer })));
+const WordGridContainer = safeLazy(() => import("./wordgrid/WordGridContainer").then(m => ({ default: m.WordGridContainer })));
 const AdminPage = safeLazy(() => import("./components/admin/AdminPage").then(m => ({ default: m.AdminPage })));
 const UnsubscribePage = safeLazy(() => import("./components/UnsubscribePage").then(m => ({ default: m.UnsubscribePage })));
 const WeeklyWrappedModal = safeLazy(() => import("./components/WeeklyWrappedModal").then(m => ({ default: m.WeeklyWrappedModal })));
@@ -234,6 +235,7 @@ export default function App() {
   const setShowNotifications = useAppStore(s => s.setShowNotifications);
 
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [moreGameMode, setMoreGameMode] = useState<'select' | 'wordup' | 'wordgrid'>('select');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [viewedProfileId, setViewedProfileId] = useState<string | null>(null);
 
@@ -882,6 +884,11 @@ export default function App() {
     setIsStatsOpen(item === "leaderboard");
     setIsWordUpOpen(item === "wordup" || item === "more");
     setIsMoreOpen(item === "more");
+    if (item === "more") {
+      setMoreGameMode("select");
+    } else if (item === "wordup") {
+      setMoreGameMode("wordup");
+    }
     if (item !== "wordup" && item !== "more") {
       setWordupMode(null);
     }
@@ -1167,33 +1174,96 @@ export default function App() {
             )}
 
             {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
-                <Suspense fallback={null}>
-                  <WordUpContainer
-                    wordupMode={wordupMode}
-                    setWordupMode={setWordupMode}
-                    onTutorial={() => setIsWordupTutorialOpen(true)}
-                    onBack={() => {
-                      setIsWordUpOpen(false);
-                      setIsMoreOpen(false);
-                    }}
-                    onBackToClassic={() => handleNavigation('play')}
-                  />
-                </Suspense>
+              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark w-full">
+                {activeNavigationItem === "more" && moreGameMode === "select" ? (
+                  <div className="flex flex-col p-6 bg-slate-900/80 border border-white/10 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
+                    <div className="space-y-1">
+                      <span className="text-3xl">🎮</span>
+                      <h2 className="text-lg font-black uppercase tracking-wider text-white">More Games</h2>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Choose a challenge below</p>
+                    </div>
 
-                {isWordupTutorialOpen && (
-                  <WordupTutorialModal
-                    onComplete={() => {
-                      safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
-                      setHasSeenWordupTutorial(true);
-                      setIsWordupTutorialOpen(false);
-                    }}
-                    onSkip={() => {
-                      safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
-                      setHasSeenWordupTutorial(true);
-                      setIsWordupTutorialOpen(false);
-                    }}
-                  />
+                    <div className="space-y-4">
+                      {/* WordUp game card */}
+                      <button
+                        onClick={() => setMoreGameMode("wordup")}
+                        className="w-full flex items-center gap-4 p-4 bg-linear-to-br from-rose-500/10 to-rose-600/5 hover:from-rose-500/20 hover:to-rose-600/10 border border-rose-500/20 rounded-2xl cursor-pointer text-left transition-all active:scale-98 group"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center shrink-0 text-2xl group-hover:scale-105 transition-transform">
+                          ⚔️
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black uppercase text-rose-300 tracking-wide">WordUp Battles</p>
+                          <p className="text-[10px] text-gray-400 font-medium leading-normal mt-0.5">Rapid multiplayer definition matching game. Climb the rankings and defeat players in real-time!</p>
+                        </div>
+                      </button>
+
+                      {/* WordGrid game card */}
+                      <button
+                        onClick={() => setMoreGameMode("wordgrid")}
+                        className="w-full flex items-center gap-4 p-4 bg-linear-to-br from-indigo-500/10 to-indigo-600/5 hover:from-indigo-500/20 hover:to-indigo-600/10 border border-indigo-500/20 rounded-2xl cursor-pointer text-left transition-all active:scale-98 group"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0 text-2xl group-hover:scale-105 transition-transform">
+                          🔠
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black uppercase text-indigo-300 tracking-wide">WordGrid Arena</p>
+                          <p className="text-[10px] text-gray-400 font-medium leading-normal mt-0.5">Asynchronous 11x11 Scrabble board game. Place words, use multipliers, and score bonuses.</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => handleNavigation('play')}
+                      className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase tracking-wider text-white/60 hover:text-white transition-all cursor-pointer"
+                    >
+                      Back to Classic Wordle
+                    </button>
+                  </div>
+                ) : moreGameMode === "wordgrid" ? (
+                  <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
+                    <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />
+                  </Suspense>
+                ) : (
+                  <>
+                    <Suspense fallback={null}>
+                      <WordUpContainer
+                        wordupMode={wordupMode}
+                        setWordupMode={setWordupMode}
+                        onTutorial={() => setIsWordupTutorialOpen(true)}
+                        onBack={() => {
+                          if (activeNavigationItem === "more") {
+                            setMoreGameMode("select");
+                          } else {
+                            setIsWordUpOpen(false);
+                            setIsMoreOpen(false);
+                          }
+                        }}
+                        onBackToClassic={() => {
+                          if (activeNavigationItem === "more") {
+                            setMoreGameMode("select");
+                          } else {
+                            handleNavigation('play');
+                          }
+                        }}
+                      />
+                    </Suspense>
+
+                    {isWordupTutorialOpen && (
+                      <WordupTutorialModal
+                        onComplete={() => {
+                          safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
+                          setHasSeenWordupTutorial(true);
+                          setIsWordupTutorialOpen(false);
+                        }}
+                        onSkip={() => {
+                          safeLocalStorage.setItem('wordup_tutorial_completed', 'true');
+                          setHasSeenWordupTutorial(true);
+                          setIsWordupTutorialOpen(false);
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
