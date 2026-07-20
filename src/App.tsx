@@ -443,6 +443,8 @@ export default function App() {
     }
   }, []);
 
+
+
   // Auto-trigger weekly wrapped on Monday logins
   useEffect(() => {
     if (!user || !date) return;
@@ -454,17 +456,33 @@ export default function App() {
     const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday
 
     if (currentDay === 1) {
-      // Current Monday's date string is the universal app/server date
       const mondayStr = date as string;
-
       const seenKey = `wrapped-seen-${mondayStr}-${user.id}`;
+
+      // Cleanup keys for previous weeks
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach(k => {
+          if (k.startsWith('wrapped-seen-')) {
+            const match = k.match(/^wrapped-seen-(\d{4}-\d{2}-\d{2})-(.+)$/);
+            if (match) {
+              const keyDateStr = match[1];
+              if (keyDateStr !== mondayStr) {
+                safeLocalStorage.removeItem(k);
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Error clearing old wrapped keys:", e);
+      }
+
       const alreadySeen = safeLocalStorage.getItem(seenKey);
 
       if (!alreadySeen) {
         const timer = setTimeout(() => {
           setIsWeeklyWrappedOpen(true);
-        }, 0);
-        safeLocalStorage.setItem(seenKey, "true");
+        }, 750); // 750ms delay to ensure app is ready
         return () => clearTimeout(timer);
       }
     }
@@ -1242,7 +1260,18 @@ export default function App() {
       {isWeeklyWrappedOpen && user && (
         <WeeklyWrappedModal
           isOpen={isWeeklyWrappedOpen}
-          onClose={() => setIsWeeklyWrappedOpen(false)}
+          onClose={() => {
+            setIsWeeklyWrappedOpen(false);
+            if (date) {
+              const parts = (date as string).split("-").map(Number);
+              const now = new Date(parts[0], parts[1] - 1, parts[2]);
+              const currentDay = now.getDay();
+              if (currentDay === 1) {
+                const mondayStr = date as string;
+                safeLocalStorage.setItem(`wrapped-seen-${mondayStr}-${user.id}`, "true");
+              }
+            }
+          }}
           userId={user.id}
           isEasterEgg={false}
           gameDate={date as string}
