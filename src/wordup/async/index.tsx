@@ -157,7 +157,6 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
    });
 
    const { handleAnswerSelect, startMatch } = engine;
-   const lastRoundPopup = engine.state.lastRoundPopup;
    const countdownText = engine.state.countdownText;
 
    const { loadPendingMatches, loadHistoryMatches, createMatch } = useAsyncMatchmaking(effectiveUser, category, triggerToast);
@@ -535,7 +534,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                  role={role} playerProfile={profile} lastRoundPopup={lastRoundPopup}
+                  role={role} playerProfile={profile}
                />
             )}
             {view === "turn_submitted" && (

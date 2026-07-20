@@ -197,7 +197,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
          }
       }
-   }, [effectiveUser, updateStats, triggerToast, role, userStats, setView, setMatchId, setRole]);
+    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
    const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
       launchedMatchRef.current = newMId;
@@ -288,7 +288,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          engine.sendSignalUpdate(playerSignalLevel);
       }, 15000);
       return () => clearInterval(interval);
-   }, [view, playerSignalLevel, engine.sendSignalUpdate]);
+    }, [view, playerSignalLevel, engine]);
 
    const handlePurgeAndReset = useCallback(async () => {
       await enginePurgeAndReset();
@@ -334,6 +334,15 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
            startMatchmaking(false);
         }
      }, [autoStartMatchmaking, vsBotOnly, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking, setVsBotOnly]);
+
+   // Prefetch cache for the active category in the background
+   useEffect(() => {
+      if (category) {
+         import("../../utils/wordupPrefetchCache").then(({ prefetchBotMatchInBackground }) => {
+            prefetchBotMatchInBackground(category);
+         });
+      }
+   }, [category]);
 
    // Retry pending bot match saves on mount
    useEffect(() => {

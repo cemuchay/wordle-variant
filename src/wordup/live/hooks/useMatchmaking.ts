@@ -7,6 +7,7 @@ import { wordupNetworkGate } from "../../shared/wordupNetworkGate";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import { WORDUP_TIMEOUT } from "../../../constants/wordup";
 import { wordupAudio } from "../../../utils/wordupAudio";
+import { getPrefetchedBotMatch } from "../../../utils/wordupPrefetchCache";
 
 export const useWordUpMatchmaking = (
    user: any,
@@ -70,7 +71,7 @@ export const useWordUpMatchmaking = (
       setMatchId(localMatchId);
       setRole("player1");
       onMatchFound(localMatchId, "player1");
-   }, [user, cleanUpMatchmaking, onMatchFound]);
+   }, [user, cleanUpMatchmaking, onMatchFound, setMatchId, setRole]);
 
    const subscribeToMatchmaking = useCallback(() => {
       if (matchmakingChannelRef.current) {
@@ -143,7 +144,7 @@ export const useWordUpMatchmaking = (
          });
 
       matchmakingChannelRef.current = channel;
-   }, [user, cleanUpMatchmaking, onMatchFound]);
+   }, [user, cleanUpMatchmaking, onMatchFound, setMatchId, setRole]);
 
    const startMatchmaking = useCallback(async (vsBotOnly = false) => {
       if (isStartingRef.current) {
@@ -223,22 +224,34 @@ export const useWordUpMatchmaking = (
             }, 1000);
 
             subscribeToMatchmaking();
-         } else {
-            // Player2: matched immediately — generate questions via edge function
-            const newMatchId = result.match_id;
-            const matchCategory = useLiveStore.getState().category || "mixed";
-            await generateMatchQuestions(
-               newMatchId,
-               matchCategory,
-            );
-            await supabase
-                .from("wordup_matches")
-                .update({ status: "countdown" })
-                .eq("id", newMatchId);
-            setRole("player2");
-            setMatchId(newMatchId);
-            onMatchFound(newMatchId, "player2");
-         }
+          } else {
+             // Player2: matched immediately — generate questions via edge function or prefetch
+             const newMatchId = result.match_id;
+             const matchCategory = useLiveStore.getState().category || "mixed";
+             const prefetched = getPrefetchedBotMatch(matchCategory);
+             if (prefetched) {
+                await supabase
+                    .from("wordup_matches")
+                    .update({
+                       questions: prefetched.encryptedQuestions,
+                       encryption_key: prefetched.encryptionKey,
+                       status: "countdown"
+                    })
+                    .eq("id", newMatchId);
+             } else {
+                await generateMatchQuestions(
+                   newMatchId,
+                   matchCategory,
+                );
+                await supabase
+                    .from("wordup_matches")
+                    .update({ status: "countdown" })
+                    .eq("id", newMatchId);
+             }
+             setRole("player2");
+             setMatchId(newMatchId);
+             onMatchFound(newMatchId, "player2");
+          }
       } catch (err: any) {
          console.error("[WordUp Category] Matchmaking startup failed:", err);
          useLiveStore.getState().setView("menu");
@@ -263,6 +276,10 @@ export const useWordUpMatchmaking = (
       subscribeToMatchmaking,
       onMatchFound,
       cleanUpMatchmaking,
+      onlineUserCount,
+      setCountdownSecs,
+      setMatchId,
+      setRole,
    ]);
 
    const cancelMatchmaking = useCallback(async () => {
