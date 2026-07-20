@@ -235,25 +235,29 @@ function _generateQuestion(
             const rxType = new RegExp(`{${entityTypeName.toLowerCase()}}`, "g");
             result = result.replace(rxType, label);
          }
-         template.requiredKeys.forEach((key) => {
-            let val = cleanVal(String(meta[key] ?? ""));
-            if (
-               key === "definition" ||
-               key === "meaning" ||
-               key === "example" ||
-               key === "example_template" ||
-               key === "idiom_meaning"
-            ) {
-               val = censorWord(val, label);
-            }
-            const rx = new RegExp(`{${key}}`, "g");
-            result = result.replace(rx, val);
-         });
+          template.requiredKeys.forEach((key) => {
+             let val = cleanVal(String(meta[key] ?? ""));
+             // Flip testament for NOT-in-testament questions
+             if (template.id === "bible_not_in_testament" && key === "testament") {
+                val = val === "Old" ? "New" : "Old";
+             }
+             if (
+                key === "definition" ||
+                key === "meaning" ||
+                key === "example" ||
+                key === "example_template" ||
+                key === "idiom_meaning"
+             ) {
+                val = censorWord(val, label);
+             }
+             const rx = new RegExp(`{${key}}`, "g");
+             result = result.replace(rx, val);
+          });
          return result;
       };
 
       const promptText = interpolate(promptPattern);
-      const explanationText = interpolate(explanationPattern);
+       let explanationText = interpolate(explanationPattern);
       const answerKey = template.answerKey;
       let answerVal = label;
       let distValues: string[] = [];
@@ -284,10 +288,21 @@ function _generateQuestion(
          rng,
       ).slice(0, 3);
 
-      // bible_real_book: use fake book names as distractors
-      if (template.id === "bible_real_book") {
-         distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 2);
-      }
+       // bible_real_book: use fake book names as distractors
+       if (template.id === "bible_real_book") {
+          distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 2);
+       }
+
+       // bible_fake_book: answer is a fake book, distractors are real books
+       if (template.id === "bible_fake_book") {
+          const fakeBook = seededShuffle(FAKE_BIBLE_BOOKS, rng)[0];
+          answerVal = fakeBook;
+          distractors = seededShuffle(
+             allEntities.filter((e) => e.label !== label).map((e) => e.label),
+             rng,
+          ).slice(0, 3);
+          explanationText = `"${fakeBook}" is not a real book of the Bible.`;
+       }
 
       return {
          type: "definition",

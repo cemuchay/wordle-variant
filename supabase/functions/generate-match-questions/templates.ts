@@ -899,14 +899,15 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
    },
 
    // ═══════════════════════════════════════════════════════════
-   // BIBLE (5 templates — book facts)
+    // BIBLE (7 templates — book facts)
    // ═══════════════════════════════════════════════════════════
 
-   // ── TYPE 1: "Which book comes before X?" ──
-   {
-      id: "bible_book_before",
-      category: "bible",
-      requiredKeys: ["previous_book", "canonical_order"],
+    // ── TYPE 1: "Which book comes before X?" ──
+    {
+       id: "bible_book_before",
+       category: "bible",
+       requiredKeys: ["previous_book", "canonical_order"],
+       weight: 2.5,
       prompts: [
          "Which book of the Bible comes immediately before {label}?",
          "Name the book that precedes {label} in the Bible:",
@@ -920,11 +921,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "previous_book",
    },
 
-   // ── TYPE 2: "Which book comes after X?" ──
-   {
-      id: "bible_book_after",
-      category: "bible",
-      requiredKeys: ["next_book", "canonical_order"],
+    // ── TYPE 2: "Which book comes after X?" ──
+    {
+       id: "bible_book_after",
+       category: "bible",
+       requiredKeys: ["next_book", "canonical_order"],
+       weight: 1.5,
       prompts: [
          "Which book of the Bible comes immediately after {label}?",
          "Name the book that follows {label} in the Bible:",
@@ -938,11 +940,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "next_book",
    },
 
-   // ── TYPE 3: "How many chapters?" ──
-   {
-      id: "bible_chapters",
-      category: "bible",
-      requiredKeys: ["chapter_count"],
+    // ── TYPE 3: "How many chapters?" ──
+    {
+       id: "bible_chapters",
+       category: "bible",
+       requiredKeys: ["chapter_count"],
+       weight: 0.3,
       prompts: [
          "How many chapters does the book of {label} have?",
          "What is the chapter count of the book of {label}?",
@@ -956,11 +959,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "chapter_count",
    },
 
-   // ── TYPE 4: "Which book is in the Old/New Testament?" ──
-   {
-      id: "bible_testament",
-      category: "bible",
-      requiredKeys: ["testament"],
+    // ── TYPE 4: "Which book is in the Old/New Testament?" ──
+    {
+       id: "bible_testament",
+       category: "bible",
+       requiredKeys: ["testament"],
+       weight: 1.5,
       prompts: [
          "Which of the following books is in the {testament} Testament?",
          "Identify the book that belongs to the {testament} Testament:",
@@ -972,21 +976,56 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       ],
    },
 
-   // ── TYPE 5: "Which is a real book of the Bible?" ──
-   {
-      id: "bible_real_book",
-      category: "bible",
-      requiredKeys: ["testament"],
-      prompts: [
-         "Which of the following is a real book of the Bible?",
-         "Identify the actual book of the Bible from the list below:",
-         "Which one is a genuine book of the Bible?",
-      ],
-      explanations: [
-         "{label} is indeed a real book of the Bible.",
-         "The book of {label} is one of the 66 books in the Bible.",
-      ],
-   },
+     // ── TYPE 5: "Which is a real book of the Bible?" ──
+     {
+        id: "bible_real_book",
+        category: "bible",
+        requiredKeys: ["testament"],
+        weight: 1.5,
+       prompts: [
+          "Which of the following is a real book of the Bible?",
+          "Identify the actual book of the Bible from the list below:",
+          "Which one is a genuine book of the Bible?",
+       ],
+       explanations: [
+          "{label} is indeed a real book of the Bible.",
+          "The book of {label} is one of the 66 books in the Bible.",
+       ],
+    },
+
+     // ── TYPE 6: "Which is NOT in the Old/New Testament?" ──
+     {
+        id: "bible_not_in_testament",
+        category: "bible",
+        requiredKeys: ["testament"],
+        weight: 2.5,
+       prompts: [
+          "Which of the following books is NOT in the {testament} Testament?",
+          "Identify the book that does NOT belong to the {testament} Testament:",
+          "Which book is NOT part of the {testament} Testament?",
+       ],
+       explanations: [
+          "{label} is not in the {testament} Testament.",
+          "The book of {label} does not belong to the {testament} Testament.",
+       ],
+    },
+
+     // ── TYPE 7: "All are real books EXCEPT" ──
+     {
+        id: "bible_fake_book",
+        category: "bible",
+        requiredKeys: ["testament"],
+        weight: 1.5,
+       prompts: [
+          "All of the following are real books of the Bible EXCEPT:",
+          "Which of these is NOT a real book of the Bible?",
+          "One of these books is not in the Bible. Which one?",
+       ],
+       explanations: [
+          "{fake_book} is not a real book of the Bible.",
+          "The book of {fake_book} does not exist in the Bible.",
+       ],
+    },
 ];
 
 export const FAKE_BIBLE_BOOKS = [
