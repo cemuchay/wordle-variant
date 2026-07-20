@@ -57,12 +57,19 @@ vi.mock('../../wordup/live/hooks/useGameEngine.new', () => ({
       loadAndSubscribeMatch: () => Promise.resolve(),
       startQuestionRound: () => {},
       cleanUpIntervals: () => {},
-      rematchState: 'idle' as const,
-      rematchCountdown: 0,
-      showRematchButton: false,
+      state: {
+        lastRoundPopup: false,
+        phase: 'playing',
+        rematchState: 'idle' as const,
+        rematchCountdown: 0,
+        showRematchButton: false,
+      },
       sendRematch: () => {},
       acceptRematch: () => {},
       sendQuickChat: () => {},
+      sendSignalUpdate: () => {},
+      cleanup: () => {},
+      startMatch: () => {},
       matchChannelRef: { current: null },
     };
   },
@@ -94,7 +101,7 @@ describe('Regression: C1-C4 (Critical fixes)', () => {
       questions: makeQuestionSet(2),
     });
     renderWordUp();
-    expect(screen.getByText(/preparing arena/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading arena/i)).toBeInTheDocument();
   });
 
   it('C2: live merge uses > not >= (renders battle)', () => {
@@ -137,7 +144,7 @@ describe('Regression: C1-C4 (Critical fixes)', () => {
       questions: makeQuestionSet(7),
     });
     renderWordUp();
-    expect(screen.getByText(/preparing arena/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading arena/i)).toBeInTheDocument();
   });
 });
 

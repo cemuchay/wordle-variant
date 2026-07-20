@@ -57,12 +57,19 @@ vi.mock('../../wordup/live/hooks/useGameEngine.new', () => ({
       loadAndSubscribeMatch: () => Promise.resolve(),
       startQuestionRound: () => {},
       cleanUpIntervals: () => {},
-      rematchState: 'idle' as const,
-      rematchCountdown: 0,
-      showRematchButton: false,
+      state: {
+        lastRoundPopup: false,
+        phase: 'playing',
+        rematchState: 'idle' as const,
+        rematchCountdown: 0,
+        showRematchButton: false,
+      },
       sendRematch: () => {},
       acceptRematch: () => {},
       sendQuickChat: () => {},
+      sendSignalUpdate: () => {},
+      cleanup: () => {},
+      startMatch: () => {},
       matchChannelRef: { current: null },
     };
   },
@@ -87,7 +94,7 @@ function renderWordUp() {
 describe('Recovery flow', () => {
   it('renders menu when no active game in localStorage', () => {
     renderWordUp();
-    expect(screen.getByText('Play')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
   });
 
   it('stores active game state to localStorage during battle', () => {
@@ -138,6 +145,6 @@ describe('Recovery flow', () => {
     });
 
     renderWordUp();
-    expect(screen.getByText(/preparing arena/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading arena/i)).toBeInTheDocument();
   });
 });

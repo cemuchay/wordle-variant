@@ -57,12 +57,19 @@ vi.mock('../../wordup/live/hooks/useGameEngine.new', () => ({
       loadAndSubscribeMatch: () => Promise.resolve(),
       startQuestionRound: () => {},
       cleanUpIntervals: () => {},
-      rematchState: 'idle' as const,
-      rematchCountdown: 0,
-      showRematchButton: false,
+      state: {
+        lastRoundPopup: false,
+        phase: 'playing',
+        rematchState: 'idle' as const,
+        rematchCountdown: 0,
+        showRematchButton: false,
+      },
       sendRematch: () => {},
       acceptRematch: () => {},
       sendQuickChat: () => {},
+      sendSignalUpdate: () => {},
+      cleanup: () => {},
+      startMatch: () => {},
       matchChannelRef: { current: null },
     };
   },
@@ -85,14 +92,14 @@ function renderWordUp() {
 describe('WordUpView state machine rendering', () => {
   it('renders lobby/menu by default', () => {
     renderWordUp();
-    expect(screen.getByText('Play')).toBeInTheDocument();
-    expect(screen.getByText('WordUp Battles (Beta)')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getByText('WordUp')).toBeInTheDocument();
   });
 
   it('renders LoadingView when view is loading', () => {
     useWordUpStore.setState({ view: 'loading' });
     renderWordUp();
-    expect(screen.getByText(/preparing arena/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading arena/i)).toBeInTheDocument();
   });
 
   it('renders BattleView when view is battle', () => {
