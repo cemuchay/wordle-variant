@@ -6,6 +6,7 @@ import { MatchmakingLobby } from './components/MatchmakingLobby';
 import { BoardGrid } from './components/BoardGrid';
 import { TileRack } from './components/TileRack';
 import { MoveHistory } from './components/MoveHistory';
+import { WordGridTutorialModal } from './components/WordGridTutorialModal';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
@@ -48,9 +49,23 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [exchangeSelections, setExchangeSelections] = useState<boolean[]>([]);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const userId = user?.id || '';
   const isMyTurn = currentTurn === userId && status === 'active';
+
+  // Check first-time guide on load
+  useEffect(() => {
+    const isCompleted = localStorage.getItem('wordgrid_tutorial_completed');
+    if (!isCompleted) {
+      setShowTutorial(true);
+    }
+  }, []);
+
+  const handleTutorialComplete = () => {
+    localStorage.setItem('wordgrid_tutorial_completed', 'true');
+    setShowTutorial(false);
+  };
 
   // Resubscribe to match updates when matchId changes
   useEffect(() => {
@@ -81,11 +96,12 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     setSelectedRackIdx(idx);
   };
 
-  const handlePlaceTile = (x: number, y: number) => {
-    if (selectedRackIdx === null) return;
-    const letter = rack[selectedRackIdx];
+  const handlePlaceTile = (x: number, y: number, rackIdx: number) => {
+    const letter = rack[rackIdx];
     placeTile(x, y, letter);
-    setSelectedRackIdx(null);
+    if (selectedRackIdx === rackIdx) {
+      setSelectedRackIdx(null);
+    }
   };
 
   const handleRecallTile = (x: number, y: number) => {
@@ -153,11 +169,18 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   return (
     <div className="h-full w-full flex flex-col bg-dark overflow-y-auto pb-8 scrollbar-none px-2 space-y-4">
+      {showTutorial && (
+        <WordGridTutorialModal
+          onComplete={handleTutorialComplete}
+          onSkip={handleTutorialComplete}
+        />
+      )}
+
       {/* Gameplay Header */}
-      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl">
+      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl animate-in fade-in duration-300">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
-          <span className="text-xs text-white/50 font-bold">
+          <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
+          <span className="text-xs text-white font-black">
             {status === 'completed' ? 'Match Finished' : isMyTurn ? 'Your Turn' : 'Waiting for Opponent'}
           </span>
         </div>
@@ -172,7 +195,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
           ) : (
             <button
               onClick={handleResign}
-              className="px-3.5 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/20 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
               Resign
             </button>
@@ -181,15 +204,15 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       </div>
 
       {/* Scores panel */}
-      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 grid grid-cols-2 gap-4 text-center shadow-xl divide-x divide-white/5">
+      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 grid grid-cols-2 gap-4 text-center shadow-xl divide-x divide-white/5 animate-in fade-in duration-300">
         <div className="flex flex-col items-center">
-          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest truncate max-w-full">
+          <span className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-full">
             {p1Username} {role === 'player1' && '(You)'}
           </span>
           <span className="text-2xl font-black text-white">{p1Score}</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest truncate max-w-full">
+          <span className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-full">
             {p2Username} {role === 'player2' && '(You)'}
           </span>
           <span className="text-2xl font-black text-white">{p2Score}</span>
@@ -200,33 +223,33 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       <BoardGrid
         board={board}
         placedTiles={placedTiles}
-        selectedLetter={selectedRackIdx !== null ? rack[selectedRackIdx] : null}
+        selectedIdx={selectedRackIdx}
         onPlaceTile={handlePlaceTile}
         onRecallTile={handleRecallTile}
       />
 
       {/* Action panel */}
       {isMyTurn && (
-        <div className="w-full max-w-[420px] mx-auto grid grid-cols-3 gap-2">
+        <div className="w-full max-w-[420px] mx-auto grid grid-cols-3 gap-2 animate-in fade-in duration-300">
           <button
             onClick={handleSubmit}
             disabled={placedTiles.length === 0}
             className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${placedTiles.length > 0
                 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 active:scale-95'
-                : 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
+                : 'bg-slate-800 text-black border border-slate-700/50 cursor-not-allowed opacity-50'
               }`}
           >
             Submit Move
           </button>
           <button
             onClick={handleOpenExchange}
-            className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+            className="py-3 bg-white hover:bg-gray-100 text-black rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
           >
             Exchange
           </button>
           <button
             onClick={handlePass}
-            className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+            className="py-3 bg-white hover:bg-gray-100 text-black rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
           >
             Pass
           </button>
@@ -248,11 +271,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
       {/* Exchange Selection Modal */}
       {showExchangeModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-white/10 rounded-2xl p-5 max-w-xs w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-center">
             <div>
               <h4 className="text-sm font-black uppercase text-white tracking-wider">Exchange Tiles</h4>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">Select tiles to trade back to bag</p>
+              <p className="text-[10px] text-white font-black uppercase tracking-wider mt-1">Select tiles to trade back to bag</p>
             </div>
 
             <div className="flex justify-center gap-1.5 flex-wrap">
@@ -262,7 +285,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   onClick={() => handleToggleExchangeSelection(idx)}
                   className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black cursor-pointer transition-all ${exchangeSelections[idx]
                       ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
+                      : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
                     }`}
                 >
                   {letter.toUpperCase()}
@@ -273,7 +296,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setShowExchangeModal(false)}
-                className="py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase text-white/60 transition-all cursor-pointer"
+                className="py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase text-white transition-all cursor-pointer"
               >
                 Cancel
               </button>
