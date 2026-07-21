@@ -278,7 +278,7 @@ const AuthenticatedChallengeContent = memo(
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
           id="challenge-modal-header"
-          className="border-b border-white/5 flex items-center justify-between shrink-0 p-3 sm:p-4"
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 px-3 pb-3 sm:px-4 sm:pb-4 ${isDynamicIslandVisible ? 'pt-10 sm:pt-11' : 'pt-3 sm:pt-4'}`}
         >
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {!isPlaying && selectedChallenge && (

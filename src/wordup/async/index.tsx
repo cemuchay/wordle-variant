@@ -495,7 +495,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-linear-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-[calc(0.75rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-linear-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-[calc(2.5rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView

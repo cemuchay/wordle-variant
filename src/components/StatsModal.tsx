@@ -506,7 +506,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.STATS_MODAL }}>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.STATS_MODAL }}>
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl px-2 py-3 shadow-2xl relative flex flex-col h-full max-h-full sm:h-[75vh]">
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer">

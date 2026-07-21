@@ -12,6 +12,7 @@ import { useAppStore } from '../store/useAppStore';
 import { WordUpMascot } from '../wordup/shared/WordUpMascot';
 import type { MascotExpression } from '../wordup/shared/WordUpMascot';
 import formatUsername from '../utils/formatUsername';
+import { Z_INDEX } from '../constants/ui';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -285,7 +286,7 @@ export const DynamicIslandStatus = () => {
     const isLongText = toast.show && (toast.message?.length > 25 || toast.isLarge);
 
     return (
-        <div key={resumeKey} className="fixed left-1/2 -translate-x-1/2 z-100 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}>
+        <div key={resumeKey} className="fixed left-1/2 -translate-x-1/2 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)', zIndex: Z_INDEX.DYNAMIC_ISLAND }}>
             <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9, y: -20 }}

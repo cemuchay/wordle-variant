@@ -26,8 +26,10 @@ export const Z_INDEX = {
    ANNOUNCEMENT_MODAL: 150,
    /** Auth modal layer. */
    AUTH_MODAL: 200,
-   /** Toast notifications (highest). */
+   /** Toast notifications. */
    TOAST: 300,
+   /** Dynamic Island status overlay (highest priority). */
+   DYNAMIC_ISLAND: 999,
 } as const;
 
 /** Duration (ms) for various animations. */
