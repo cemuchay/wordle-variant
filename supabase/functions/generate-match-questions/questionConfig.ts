@@ -370,8 +370,8 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
       },
    }),
    define("bible", {
-      proceduralWeight: 0.6,
-      handcraftedWeaveProbability: 0.3,
+      proceduralWeight: 0.4,
+      handcraftedWeaveProbability: 0.6,
       weights: {
          forward: 3,
          reverse: 2,

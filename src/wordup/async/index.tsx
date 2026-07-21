@@ -118,11 +118,11 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          const oppRating = storeOppStats?.rating || RATING.DEFAULT_OPPONENT;
          const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
          const actual = won ? 1 : tied ? 0.5 : 0;
-         const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected));
+         const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected)) * gameMultiplier;
          const accuracyBonus = won ? correctCount : 0;
          let eloGain = baseEloChange + accuracyBonus;
-         if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
-         if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
+         if (won && eloGain < RATING.MIN_GAIN_ON_WIN * gameMultiplier) eloGain = RATING.MIN_GAIN_ON_WIN * gameMultiplier;
+         if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS * gameMultiplier) eloGain = RATING.MAX_LOSS_ON_LOSS * gameMultiplier;
           try { await updateStats(eloGain, xpReward, won, tied, match.category); }
           catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
 
