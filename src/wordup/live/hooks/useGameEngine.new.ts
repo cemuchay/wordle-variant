@@ -433,9 +433,9 @@ export function useGameEngine(props: EngineProps) {
             if (isLast) {
                 endGame();
             } else {
-                if (currentRoundRef.current === totalRounds - 2) {
+                if ((currentRoundRef.current + 2) % 7 === 0 || currentRoundRef.current === totalRounds - 2) {
                     wordupAudio.playFinalRoundAnticipationStart();
-                    triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+                    triggerToast("DOUBLE POINTS ROUND!", 3000);
                     wordupAudio.startFinalRoundBeat();
                 }
                 advanceRound();
@@ -531,7 +531,7 @@ export function useGameEngine(props: EngineProps) {
                             const bDur = getQuestionDuration(bq.type);
                             const br = simulateBotResponse(bq, botProfileRef.current, bDur);
                             const botChoice = pickBotChoice(bq, br.correct);
-                            const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                            const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
                             setOpponentChoice(botChoice);
                             setOpponentCurrentPoints(pts);
                         } else {
@@ -566,7 +566,7 @@ export function useGameEngine(props: EngineProps) {
                     botTimerRef.current = null;
                     if (opponentChoiceRef.current !== null) return;
                     const botChoice = pickBotChoice(bq, br.correct);
-                    const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                    const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
                     setOpponentChoice(botChoice);
                     setOpponentCurrentPoints(pts);
                 }, botMs);
@@ -665,7 +665,7 @@ export function useGameEngine(props: EngineProps) {
         const elapsed = (Date.now() - roundStartedAtRef.current) / 1000;
         const timeTaken = parseFloat(elapsed.toFixed(2));
         const correct = choice !== "" && choice === q.answer;
-        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+        const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         myTimeTakenRef.current = timeTaken;
         setMyChoice(choice);
@@ -701,7 +701,7 @@ export function useGameEngine(props: EngineProps) {
                 br.correct,
                 br.time_taken,
                 duration,
-                currentRoundRef.current === 6,
+                (currentRoundRef.current + 1) % 7 === 0,
             );
             opponentTimeTakenRef.current = br.time_taken;
             setOpponentChoice(botChoice);
@@ -719,7 +719,7 @@ export function useGameEngine(props: EngineProps) {
         const q = questionsRef.current[currentRoundRef.current];
         const duration = q ? getQuestionDuration(q.type) : 10;
         const correct = choice === q?.answer;
-        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+        const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         opponentTimeTakenRef.current = timeTaken;
         setOpponentChoice(choice);
@@ -852,11 +852,14 @@ export function useGameEngine(props: EngineProps) {
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
-            if (mId.startsWith("bot-match-")) {
+            if (mId.startsWith("bot-match-") || mId.startsWith("bot-marathon-")) {
                 const category = useLiveStore.getState().category || "mixed";
-                const prefetched = getPrefetchedBotMatch(category);
+                const storeQuestions = useLiveStore.getState().questions;
+                const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
+                const targetRounds = storeQuestions?.length || (storeMatchData?.total_rounds as number | undefined) || 7;
+                const prefetched = getPrefetchedBotMatch(category, targetRounds);
 
-                matchData = {
+                matchData = storeMatchData || {
                     id: prefetched ? prefetched.matchId : mId,
                     category,
                     status: "active",
@@ -870,7 +873,10 @@ export function useGameEngine(props: EngineProps) {
                     p1_score: 0,
                     p2_score: 0,
                 };
-                if (prefetched) {
+
+                if (storeQuestions && storeQuestions.length > 0) {
+                    questions = storeQuestions;
+                } else if (prefetched) {
                     mId = prefetched.matchId;
                     questions = prefetched.questions;
                     encryptedQuestionsRef.current = prefetched.encryptedQuestions;

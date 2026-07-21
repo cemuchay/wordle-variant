@@ -57,17 +57,45 @@ export const WordUpContainer = ({
    }) => {
       if (!effectiveUser) return;
       try {
-         const { generateWordUpQuestions, generateSecretKey, encryptQuestions } = await import("../utils/wordupQuestionGenerator");
+         const { generateWordUpQuestions, generateSecretKey, encryptQuestions, decryptMatchQuestions } = await import("../utils/wordupQuestionGenerator");
+         const { isProceduralCategory } = await import("../services/wordup/generatorRegistry");
          const { supabase } = await import("../lib/supabaseClient");
          const cat = marathonConfigCategory || "mixed";
          const totalRounds = config.totalGames * 7;
+         const rawMatchId = crypto.randomUUID();
 
-         const rawQuestions = await generateWordUpQuestions(cat, totalRounds);
-         const secretKey = generateSecretKey();
-         const encryptedQ = await encryptQuestions(rawQuestions, secretKey);
+         let rawQuestions: any[] = [];
+         let secretKey = generateSecretKey();
+         let encryptedQ = "";
+
+         if (isProceduralCategory(cat)) {
+            const seed = `${rawMatchId}-${cat}`;
+            try {
+               const { data: edgeData } = await supabase.functions.invoke(
+                  "generate-match-questions",
+                  { body: { matchId: rawMatchId, category: cat, seed, count: totalRounds } }
+               );
+               if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
+                  secretKey = edgeData.encryptionKey;
+                  encryptedQ = edgeData.encryptedQuestions;
+                  rawQuestions = await decryptMatchQuestions({
+                     questions: edgeData.encryptedQuestions,
+                     encryption_key: edgeData.encryptionKey,
+                  });
+               }
+            } catch (err) {
+               console.warn("[WordUpContainer] Edge question generation failed for category:", cat, err);
+            }
+         }
+
+         if (!rawQuestions || rawQuestions.length === 0) {
+            rawQuestions = await generateWordUpQuestions(cat, totalRounds);
+            secretKey = generateSecretKey();
+            encryptedQ = await encryptQuestions(rawQuestions, secretKey);
+         }
 
          if (config.mode === "live_bot") {
-            const localMatchId = crypto.randomUUID();
+            const localMatchId = `bot-marathon-${rawMatchId}`;
             const matchData = {
                id: localMatchId,
                category: cat,
@@ -75,10 +103,8 @@ export const WordUpContainer = ({
                player2_id: "00000000-0000-0000-0000-000000000b0b",
                is_bot_match: true,
                bot_profile: "average",
-               status: "countdown",
+               status: "active",
                game_type: "live-bot",
-               questions: encryptedQ,
-               encryption_key: secretKey,
                current_question_index: 0,
                p1_score: 0,
                p2_score: 0,
@@ -89,7 +115,28 @@ export const WordUpContainer = ({
                allow_pause: config.allowPause,
             };
 
-            await supabase.from("wordup_matches").insert(matchData);
+            // Non-blocking optional insert to database (safe against missing schema columns)
+            const dbInsertData = {
+               id: localMatchId,
+               category: cat,
+               player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
+               player2_id: "00000000-0000-0000-0000-000000000b0b",
+               is_bot_match: true,
+               bot_profile: "average",
+               status: "active",
+               game_type: "live-bot",
+               questions: encryptedQ,
+               encryption_key: secretKey,
+               current_question_index: 0,
+               p1_score: 0,
+               p2_score: 0,
+               p1_answers: [],
+               p2_answers: [],
+               is_marathon: true,
+            };
+            supabase.from("wordup_matches").insert(dbInsertData).then(({ error }) => {
+               if (error) console.warn("[WordUpContainer] Optional DB insert:", error.message);
+            });
 
             const liveStore = useLiveStore.getState();
             liveStore.resetGame();
@@ -102,38 +149,45 @@ export const WordUpContainer = ({
             setWordupMode("live");
          } else {
             if (!config.targetUser?.id) return;
+            const dbAsyncData = {
+               category: cat,
+               player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
+               player2_id: config.targetUser.id,
+               status: "p1_turn",
+               questions: encryptedQ,
+               encryption_key: secretKey,
+               current_question_index: 0,
+               p1_score: 0,
+               p2_score: 0,
+               p1_answers: [],
+               p2_answers: [],
+               is_marathon: true,
+            };
+
             const { data: asyncMatch, error } = await supabase
                .from("wordup_async_matches")
-               .insert({
-                  category: cat,
-                  player1_id: effectiveUser.id,
-                  player2_id: config.targetUser.id,
-                  status: "p1_turn",
-                  questions: encryptedQ,
-                  encryption_key: secretKey,
-                  current_question_index: 0,
-                  p1_score: 0,
-                  p2_score: 0,
-                  p1_answers: [],
-                  p2_answers: [],
-                  is_marathon: true,
-                  total_rounds: totalRounds,
-                  allow_pause: config.allowPause,
-               })
+               .insert(dbAsyncData)
                .select()
                .single();
 
-            if (error || !asyncMatch) {
-               triggerToast("Failed to create async marathon match", 3000);
-               return;
+            if (error && !asyncMatch) {
+               console.warn("Async marathon DB insert:", error.message);
             }
+
+            const storeAsyncMatch = {
+               ...(asyncMatch || dbAsyncData),
+               id: asyncMatch?.id || crypto.randomUUID(),
+               total_rounds: totalRounds,
+               allow_pause: config.allowPause,
+               is_marathon: true,
+            };
 
             const asyncStore = useAsyncStore.getState();
             asyncStore.resetGame();
             asyncStore.setCategory(cat);
-            asyncStore.setMatchId(asyncMatch.id);
+            asyncStore.setMatchId(storeAsyncMatch.id);
             asyncStore.setRole("player1");
-            asyncStore.setMatchData(asyncMatch);
+            asyncStore.setMatchData(storeAsyncMatch);
             asyncStore.setQuestions(rawQuestions);
             asyncStore.setView("loading");
             setWordupMode("async");

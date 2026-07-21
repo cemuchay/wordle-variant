@@ -15,6 +15,7 @@ export interface PrefetchedBotMatch {
    encryptedQuestions: string;
    encryptionKey: string;
    timestamp: number;
+   totalRounds?: number;
 }
 
 const CACHE_KEY = "wordup_bot_prefetches";
@@ -122,6 +123,7 @@ async function generateBotMatchData(
       encryptedQuestions,
       encryptionKey,
       timestamp: Date.now(),
+      totalRounds: questions.length,
    };
 }
 
@@ -131,23 +133,30 @@ async function generateBotMatchData(
  */
 export function getPrefetchedBotMatch(
    category: string,
+   requiredRounds = 7,
 ): PrefetchedBotMatch | null {
    cleanExpiredPrefetches();
    const cache = getCache();
    const list = cache[category] || [];
 
-   if (list.length === 0) {
-      // Cache miss: Trigger background prefetch for next time
-      prefetchBotMatchInBackground(category);
+   const matchIdx = list.findIndex(
+      (item) => (item.totalRounds || item.questions.length) === requiredRounds
+   );
+
+   if (matchIdx === -1) {
+      if (requiredRounds === 7) {
+         prefetchBotMatchInBackground(category);
+      }
       return null;
    }
 
-   const item = list.shift()!;
+   const item = list.splice(matchIdx, 1)[0];
    cache[category] = list;
    saveCache(cache);
 
-   // Replenish the cache in the background
-   prefetchBotMatchInBackground(category);
+   if (requiredRounds === 7) {
+      prefetchBotMatchInBackground(category);
+   }
 
    return item;
 }

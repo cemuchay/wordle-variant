@@ -866,7 +866,8 @@ serve(async (req) => {
    }
 
    try {
-      const { matchId, category, seed: clientSeed } = await req.json();
+      const { matchId, category, seed: clientSeed, count: clientCount } = await req.json();
+      const targetQuestionCount = typeof clientCount === "number" && clientCount > 0 ? Math.min(clientCount, 70) : 7;
 
       if (!matchId || !category) {
          return new Response(
@@ -1253,7 +1254,7 @@ serve(async (req) => {
       const config = getQuestionConfig(category);
 
       // Weighted variant selection from config
-      const variantSequence = pickVariants(config.variantWeights, matchRng, 7);
+      const variantSequence = pickVariants(config.variantWeights, matchRng, targetQuestionCount);
 
       // Shuffle comfort entities first (priority), then stretch for variety
       const comfortPool = entityList.filter((e: any) => e._bucket === "comfort");
@@ -1310,7 +1311,7 @@ serve(async (req) => {
       const generatedPrompts = new Set<string>();
       const chosenHandcraftedIds: string[] = [];
 
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < targetQuestionCount; i++) {
          const attempts = 5;
          let q: any = null;
          let chosenEntity: any = null;
