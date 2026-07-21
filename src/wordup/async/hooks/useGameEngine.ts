@@ -368,7 +368,7 @@ export function useGameEngine(props: EngineProps) {
                Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
             );
          }
-         if (S.current.currentRound === 6) points *= 2;
+         if ((S.current.currentRound + 1) % 7 === 0) points *= 2;
          if (choice !== "") {
             if (correct) wordupAudio.playCorrect();
             else wordupAudio.playIncorrect();

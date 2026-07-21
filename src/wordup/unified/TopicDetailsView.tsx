@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users } from "lucide-react";
+import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Flame } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
@@ -22,6 +22,7 @@ interface TopicDetailsViewProps {
    onPlayLive: () => void;
    onChallengePlayer: (targetUser: any) => void;
    onPlayBot: () => void;
+   onPlayMarathon?: () => void;
 }
 
 export const TopicDetailsView = ({
@@ -34,6 +35,7 @@ export const TopicDetailsView = ({
    onPlayLive,
    onChallengePlayer,
    onPlayBot,
+   onPlayMarathon,
 }: TopicDetailsViewProps) => {
    const [activeSection, setActiveSection] = useState<"play" | "rankings">("play");
    const [playerSearch, setPlayerSearch] = useState("");
@@ -249,6 +251,16 @@ export const TopicDetailsView = ({
 
                            <span>Play vs Bot</span>
                         </button>
+
+                        {onPlayMarathon && (
+                           <button
+                              onClick={onPlayMarathon}
+                              className="w-full bg-linear-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-[0_4px_20px_rgba(245,158,11,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                           >
+                              <Flame size={18} className="fill-white" />
+                              <span>Play Marathon (Extended)</span>
+                           </button>
+                        )}
 
                         <button
                            onClick={() => setShowInviteOverlay(!showInviteOverlay)}

@@ -112,6 +112,7 @@ const shuffleChoices = (q: WordUpQuestion): WordUpQuestion => ({
 
 export const generateWordUpQuestions = async (
    category: string,
+   count: number = 7,
 ): Promise<WordUpQuestion[]> => {
    const specificTypes: WordUpQuestion["type"][] = [
       "real_fake", "length", "missing_letter", "reverse_wordle",
@@ -127,7 +128,7 @@ export const generateWordUpQuestions = async (
 
    const questions: WordUpQuestion[] = [];
 
-   for (let i = 0; i < 7; i++) {
+   for (let i = 0; i < count; i++) {
       let type: WordUpQuestion["type"];
       let attempts = 0;
       do {
