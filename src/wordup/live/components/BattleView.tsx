@@ -31,6 +31,8 @@ interface MatchData {
    player1_id?: string;
    player2_id?: string;
    category?: string;
+   allow_pause?: boolean;
+   is_marathon?: boolean;
 }
 
 interface PlayerProfile {
@@ -55,6 +57,7 @@ interface BattleViewProps {
    waitingForOpponent: boolean;
    playerSignalLevel?: number;
    opponentSignalLevel?: number;
+   onPause?: () => void;
 }
 
 interface Particle {
@@ -84,6 +87,7 @@ export const BattleView = ({
    waitingForOpponent,
    playerSignalLevel,
    opponentSignalLevel,
+   onPause,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const { ask } = useConfirmation();
@@ -298,24 +302,34 @@ export const BattleView = ({
             </div>
          </div>
 
-         {/* Floating Abort Button */}
-         <button
-            onClick={async () => {
-               const confirmed = await ask({
-                  title: "Forfeit Match",
-                  message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
-                  confirmLabel: "Forfeit",
-                  type: "danger"
-               });
-               if (confirmed) {
-                  onAbort();
-               }
-            }}
-            className="absolute bottom-3 right-3 z-40 flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-         >
-            <AlertTriangle size={12} />
-            <span>Abort</span>
-         </button>
+         {/* Floating Actions: Pause & Abort */}
+         <div className="absolute bottom-3 right-3 z-40 flex items-center gap-2">
+            {matchData?.allow_pause && onPause && (
+               <button
+                  onClick={onPause}
+                  className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+               >
+                  <span>Pause</span>
+               </button>
+            )}
+            <button
+               onClick={async () => {
+                  const confirmed = await ask({
+                     title: "Forfeit Match",
+                     message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                     confirmLabel: "Forfeit",
+                     type: "danger"
+                  });
+                  if (confirmed) {
+                     onAbort();
+                  }
+               }}
+               className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+            >
+               <AlertTriangle size={12} />
+               <span>Abort</span>
+            </button>
+         </div>
 
          {/* Question Container */}
          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
@@ -326,7 +340,11 @@ export const BattleView = ({
                   </span>
                   <span className="text-white/20">•</span>
                   <span className="text-[12px] font-black uppercase text-correct tracking-widest">
-                     Round {currentIdx + 1}/7
+                     {questions.length > 7 ? (
+                        `Game ${Math.floor(currentIdx / 7) + 1}/${Math.ceil(questions.length / 7)} • Q${(currentIdx % 7) + 1}/7 (Round ${currentIdx + 1}/${questions.length})`
+                     ) : (
+                        `Round ${currentIdx + 1}/7`
+                     )}
                   </span>
                </div>
                <p className="text-[12px] sm:text-[12px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">

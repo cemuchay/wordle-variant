@@ -493,13 +493,17 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                   role={role} playerProfile={profile}
+                  role={role} playerProfile={profile}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
-                   waitingForOpponent={waitingForOpponent}
-                   playerSignalLevel={playerSignalLevel}
-                    opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
-                 />
-              )}
+                  waitingForOpponent={waitingForOpponent}
+                  playerSignalLevel={playerSignalLevel}
+                  opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
+                  onPause={() => {
+                     resetGame();
+                     onBack?.();
+                  }}
+               />
+            )}
               {view === "gameover" && (
                 <GameOverView
                    matchData={matchData}

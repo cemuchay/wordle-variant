@@ -294,7 +294,8 @@ export function useGameEngine(props: EngineProps) {
     /** Advance to the next round — accumulates points, resets choices. */
     const advanceRound = useCallback(() => {
         const next = currentRoundRef.current + 1;
-        if (next > 6) return;
+        const maxRound = Math.max(6, (questionsRef.current?.length || 7) - 1);
+        if (next > maxRound) return;
 
         transitioningRef.current = false;
 
@@ -421,7 +422,8 @@ export function useGameEngine(props: EngineProps) {
         stopRoundTick();
         stopBotTimer();
 
-        const isLast = currentRoundRef.current >= 6;
+        const totalRounds = Math.max(7, questionsRef.current.length || 7);
+        const isLast = currentRoundRef.current >= totalRounds - 1;
         const delay = 1800;
 
         setPhase("reveal");
@@ -431,7 +433,7 @@ export function useGameEngine(props: EngineProps) {
             if (isLast) {
                 endGame();
             } else {
-                if (currentRoundRef.current === 5) {
+                if (currentRoundRef.current === totalRounds - 2) {
                     wordupAudio.playFinalRoundAnticipationStart();
                     triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
                     wordupAudio.startFinalRoundBeat();

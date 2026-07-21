@@ -43,6 +43,7 @@ interface UnifiedLobbyProps {
    onBackToClassic?: () => void;
    onTutorial?: () => void;
    restoreCategory?: string | null;
+   onPlayMarathon?: (catId: string) => void;
 }
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -69,6 +70,7 @@ export const UnifiedLobby = ({
    onTutorial,
    restoreCategory,
    onRefreshPending,
+   onPlayMarathon,
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
@@ -199,6 +201,7 @@ export const UnifiedLobby = ({
             onPlayLive={() => onPlayLive(selectedCategoryId, false)}
             onChallengePlayer={onPlayAsyncTurn}
             onPlayBot={() => onPlayLive(selectedCategoryId, true)}
+            onPlayMarathon={() => onPlayMarathon?.(selectedCategoryId)}
          />
       );
    }
