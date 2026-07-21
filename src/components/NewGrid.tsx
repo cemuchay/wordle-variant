@@ -149,10 +149,11 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
       cellSizePx = Math.floor(Math.max(10, Math.min(cellWidthLimit, cellHeightLimit)));
     }
 
-    // On desktop in challenge mode, apply the 85% resize scale
+    // On desktop in challenge mode, apply the resize scale
     const isChallenge = gameplayType === 'challenge' || compact;
     if (isDesktop && isChallenge) {
-      cellSizePx = Math.floor(cellSizePx * 0.85);
+      const resizeScale = maxAttempts > 6 ? 0.35 : 0.85;
+      cellSizePx = Math.floor(cellSizePx * resizeScale);
     }
   }
 
@@ -392,7 +393,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
       <div
         ref={scrollContainerRef}
         className={maxAttempts > 6 ? "overflow-y-auto overflow-hidden scrollbar-thin pr-1.5" : ""}
-        style={maxAttempts > 6 ? { maxHeight: 'min(360px, 60vh)', overflowY: 'auto' } : undefined}
+        style={maxAttempts > 6 ? { maxHeight: isDesktop ? 'min(280px, 35vh)' : 'min(360px, 60vh)', overflowY: 'auto' } : undefined}
       >
         <div
           className={`flex flex-col mx-auto h-fit max-h-full items-center justify-center rounded-2xl ${isChallengeMode ? 'bg-correct/5 shadow-[0_0_30px_rgba(0,255,0,0.08)] border border-correct/20' : ''} ${compact ? 'gap-1 sm:gap-1.5 p-2' : 'gap-1.5 sm:gap-2 p-2 sm:p-4'}`}
