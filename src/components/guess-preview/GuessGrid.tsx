@@ -27,7 +27,7 @@ export const GuessGrid = memo(({
             {guesses.map((row: any[], i: number) => {
                 const rowScore = breakdown.rows[i];
                 const rowDecisions = breakdown?.decisions?.[i]?.decisions;
-                
+
                 if (!rowDecisions) {
                     return (
                         <div key={i}>
@@ -52,7 +52,7 @@ export const GuessGrid = memo(({
                                             ? "bg-correct text-white"
                                             : cell.status === "present"
                                                 ? "bg-present text-white"
-                                                : "bg-gray-800 text-gray-400 border border-gray-700"
+                                                : "bg-gray-800 text-white border border-gray-700"
                                             }`}
                                     >
                                         {canSeeDetails ? cell.letter : ""}
@@ -60,7 +60,7 @@ export const GuessGrid = memo(({
                                 ))}
                             </div>
                             <div
-                                className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
+                                className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
                             >
                                 {rowScore > 0 ? `+${rowScore}` : rowScore}
                             </div>
@@ -71,11 +71,11 @@ export const GuessGrid = memo(({
                                 {rowDecisions.map((dec: any, idx: number) => (
                                     <div
                                         key={idx}
-                                        className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tighter"
+                                        className="flex justify-between items-center text-[7px] sm:text-[8px] font-bold uppercase tracking-tighter italic"
                                     >
-                                        <span className="text-gray-500">
+                                        <span className="text-slate-200">
                                             Letter{" "}
-                                            <span className="text-gray-300">
+                                            <span className="text-slate-200">
                                                 {canSeeDetails ? dec.letter : "?"}
                                             </span>
                                             : {dec.status}
@@ -115,4 +115,3 @@ export const GuessGrid = memo(({
         </div>
     );
 });
-

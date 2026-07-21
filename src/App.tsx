@@ -852,6 +852,23 @@ export default function App() {
     return () => window.removeEventListener("wordup-invite-later", handleInviteLater);
   }, []);
 
+  // Dynamic theme-color meta tag for PWA status bar & viewport uniformity
+  useEffect(() => {
+    let color = "#121213"; // default dark
+    if (isChallengeOpen || activeNavigationItem === "challenges" || isPlayingChallenge) {
+      color = "#111827"; // gray-900 for Challenge Lobby & Gameplay
+    } else if (activeNavigationItem === "wordup" || isWordUpOpen) {
+      color = "#18181b"; // zinc-900 for WordUp
+    } else if (moreGameMode === "wordgrid") {
+      color = "#0f172a"; // slate-900 for WordGrid
+    }
+
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", color);
+    }
+  }, [isChallengeOpen, activeNavigationItem, isPlayingChallenge, isWordUpOpen, moreGameMode]);
+
   const isPageAdmin = window.location.pathname === "/admin";
 
   if (isPageAdmin) {
@@ -1157,7 +1174,7 @@ export default function App() {
             )}
 
             {activeNavigationItem === "challenges" && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+              <div className="h-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
                 <Suspense fallback={null}>
                   <ChallengeModal
                     isOpen={true}
