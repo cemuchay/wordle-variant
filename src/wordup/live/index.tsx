@@ -200,11 +200,13 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       }
    }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
+   const launchedMatchRef = useRef<string | null>(null);
+   const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
+   const engineCleanupRef = useRef<(() => void) | null>(null);
+
    const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
-      launchedMatchRef.current = newMId;
       setMatchId(newMId);
       setRole(newRole);
-      startMatchRef.current?.(newMId, newRole);
    }, [setMatchId, setRole]);
 
    const engine = useGameEngine({
@@ -218,17 +220,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
       userId: effectiveUser?.id,
    });
 
-   const launchedMatchRef = useRef<string | null>(null);
-   const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
-   const engineCleanupRef = useRef<(() => void) | null>(null);
-   startMatchRef.current = engine.startMatch;
-   engineCleanupRef.current = engine.cleanup;
-
    const onMatchFound = useCallback((mId: string, mRole: "player1" | "player2") => {
-      launchedMatchRef.current = mId;
       setMatchId(mId);
       setRole(mRole);
-      startMatchRef.current?.(mId, mRole);
    }, [setMatchId, setRole]);
 
    useEffect(() => {
