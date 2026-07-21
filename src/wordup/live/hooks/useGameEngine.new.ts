@@ -35,10 +35,11 @@ import {
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
-import { BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import type { WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import type { ProfileStats } from "../../shared/types";
+import { getPrefetchedBotMatch } from "../../../utils/wordupPrefetchCache";
+import { BOT_PROFILES_RATINGS } from "../../../constants/wordup";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -187,6 +188,50 @@ export function useGameEngine(props: EngineProps) {
     });
 
     // ══════════════════════════════════════════════════════════════════
+    // Process pending e2e actions (queued before engine mount)
+    // ══════════════════════════════════════════════════════════════════
+    useEffect(() => {
+        const pending = (window as any).__pendingEngineActions;
+        if (!pending || pending.length === 0) return;
+
+        for (const action of [...pending]) {
+            switch (action.type) {
+                case "SET_INITIAL": {
+                    const { gameType, role, questions, matchData, opponentStats } = action.payload;
+                    gameTypeRef.current = gameType || "live";
+                    roleRef.current = role;
+                    questionsRef.current = questions || [];
+                    matchDataRef.current = matchData || null;
+                    opponentStatsRef.current = opponentStats || null;
+                    break;
+                }
+                case "COUNTDOWN_DONE": {
+                    setCurrentRound(0);
+                    setPhase("playing");
+                    const q = questionsRef.current[0];
+                    const dur = q ? getQuestionDuration(q.type) : 10;
+                    setTimeRemaining(dur);
+                    setMaxTime(dur);
+                    roundStartedAtRef.current = Date.now();
+                    break;
+                }
+                case "START_ROUND": {
+                    const r = action.round ?? 0;
+                    const q = questionsRef.current[r];
+                    const dur = q ? getQuestionDuration(q.type) : 10;
+                    setCurrentRound(r);
+                    setTimeRemaining(dur);
+                    setMaxTime(dur);
+                    roundStartedAtRef.current = action.startedAt || Date.now();
+                    setPhase("playing");
+                    break;
+                }
+            }
+        }
+        pending.length = 0;
+    }, []);
+
+    // ══════════════════════════════════════════════════════════════════
     // Timer helpers
     // ══════════════════════════════════════════════════════════════════
 
@@ -249,7 +294,8 @@ export function useGameEngine(props: EngineProps) {
     /** Advance to the next round — accumulates points, resets choices. */
     const advanceRound = useCallback(() => {
         const next = currentRoundRef.current + 1;
-        if (next > 6) return;
+        const maxRound = Math.max(6, (questionsRef.current?.length || 7) - 1);
+        if (next > maxRound) return;
 
         transitioningRef.current = false;
 
@@ -376,8 +422,9 @@ export function useGameEngine(props: EngineProps) {
         stopRoundTick();
         stopBotTimer();
 
-        const isLast = currentRoundRef.current >= 6;
-        const delay = isLast ? 3200 : 1800;
+        const totalRounds = Math.max(7, questionsRef.current.length || 7);
+        const isLast = currentRoundRef.current >= totalRounds - 1;
+        const delay = 1800;
 
         setPhase("reveal");
 
@@ -385,18 +432,12 @@ export function useGameEngine(props: EngineProps) {
             revealRef.current = null;
             if (isLast) {
                 endGame();
-            } else if (currentRoundRef.current === 5) {
-                wordupAudio.playFinalRoundAnticipationStart();
-                triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
-                setLastRoundPopup(true);
-
-                revealRef.current = window.setTimeout(() => {
-                    revealRef.current = null;
-                    setLastRoundPopup(false);
-                    advanceRound();
-                    wordupAudio.startFinalRoundBeat();
-                }, 3000);
             } else {
+                if ((currentRoundRef.current + 2) % 7 === 0 || currentRoundRef.current === totalRounds - 2) {
+                    wordupAudio.playFinalRoundAnticipationStart();
+                    triggerToast("DOUBLE POINTS ROUND!", 3000);
+                    wordupAudio.startFinalRoundBeat();
+                }
                 advanceRound();
             }
         }, delay);
@@ -490,7 +531,7 @@ export function useGameEngine(props: EngineProps) {
                             const bDur = getQuestionDuration(bq.type);
                             const br = simulateBotResponse(bq, botProfileRef.current, bDur);
                             const botChoice = pickBotChoice(bq, br.correct);
-                            const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                            const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
                             setOpponentChoice(botChoice);
                             setOpponentCurrentPoints(pts);
                         } else {
@@ -525,7 +566,7 @@ export function useGameEngine(props: EngineProps) {
                     botTimerRef.current = null;
                     if (opponentChoiceRef.current !== null) return;
                     const botChoice = pickBotChoice(bq, br.correct);
-                    const pts = calcPoints(br.correct, br.time_taken, bDur, currentRoundRef.current === 6);
+                    const pts = calcPoints(br.correct, br.time_taken, bDur, (currentRoundRef.current + 1) % 7 === 0);
                     setOpponentChoice(botChoice);
                     setOpponentCurrentPoints(pts);
                 }, botMs);
@@ -624,7 +665,7 @@ export function useGameEngine(props: EngineProps) {
         const elapsed = (Date.now() - roundStartedAtRef.current) / 1000;
         const timeTaken = parseFloat(elapsed.toFixed(2));
         const correct = choice !== "" && choice === q.answer;
-        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+        const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         myTimeTakenRef.current = timeTaken;
         setMyChoice(choice);
@@ -660,7 +701,7 @@ export function useGameEngine(props: EngineProps) {
                 br.correct,
                 br.time_taken,
                 duration,
-                currentRoundRef.current === 6,
+                (currentRoundRef.current + 1) % 7 === 0,
             );
             opponentTimeTakenRef.current = br.time_taken;
             setOpponentChoice(botChoice);
@@ -678,7 +719,7 @@ export function useGameEngine(props: EngineProps) {
         const q = questionsRef.current[currentRoundRef.current];
         const duration = q ? getQuestionDuration(q.type) : 10;
         const correct = choice === q?.answer;
-        const pts = calcPoints(correct, timeTaken, duration, currentRoundRef.current === 6);
+        const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         opponentTimeTakenRef.current = timeTaken;
         setOpponentChoice(choice);
@@ -709,20 +750,27 @@ export function useGameEngine(props: EngineProps) {
         });
 
         const nextRole = roleRef.current === "player1" ? "player2" : "player1";
+        const category = useLiveStore.getState().category || "mixed";
+        const prefetched = getPrefetchedBotMatch(category);
 
         try {
-            const category = useLiveStore.getState().category || "mixed";
             const p1 = roleRef.current === "player1" ? matchDataRef.current.player2_id : matchDataRef.current.player1_id;
             const p2 = roleRef.current === "player1" ? matchDataRef.current.player1_id : matchDataRef.current.player2_id;
 
-            await supabase.from("wordup_matches").upsert({
+            const upsertData = {
                 id: newMatchId,
                 category,
                 player1_id: p1,
                 player2_id: p2,
-                status: "waiting",
-                game_type: "live"
-            });
+                status: prefetched ? "countdown" : "waiting",
+                game_type: "live",
+                ...(prefetched ? {
+                    questions: prefetched.encryptedQuestions,
+                    encryption_key: prefetched.encryptionKey
+                } : {})
+            };
+
+            await supabase.from("wordup_matches").upsert(upsertData);
         } catch (e) {
             console.error("Failed to register rematch matching:", e);
         }
@@ -798,16 +846,21 @@ export function useGameEngine(props: EngineProps) {
 
     const startMatch = useCallback(
         async (mId: string, activeRole: "player1" | "player2") => {
+            setPhase("idle");
             const loadStart = Date.now();
             let questions: WordUpQuestion[];
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
-            if (mId.startsWith("bot-match-")) {
-                // ── Local bot match — generate questions on the fly ──
+            if (mId.startsWith("bot-match-") || mId.startsWith("bot-marathon-")) {
                 const category = useLiveStore.getState().category || "mixed";
-                matchData = {
-                    id: mId,
+                const storeQuestions = useLiveStore.getState().questions;
+                const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
+                const targetRounds = storeQuestions?.length || (storeMatchData?.total_rounds as number | undefined) || 7;
+                const prefetched = getPrefetchedBotMatch(category, targetRounds);
+
+                matchData = storeMatchData || {
+                    id: prefetched ? prefetched.matchId : mId,
                     category,
                     status: "active",
                     is_bot_match: true,
@@ -820,32 +873,43 @@ export function useGameEngine(props: EngineProps) {
                     p1_score: 0,
                     p2_score: 0,
                 };
-                if (isProceduralCategory(category)) {
-                    const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
-                    cleanIdRef.current = cleanId;
-                    const seed = `${cleanId}-${category}`;
-                    const { data: edgeData } = await supabase.functions.invoke(
-                        "generate-match-questions",
-                        { body: { matchId: cleanId, category, seed } },
-                    );
-                    if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
-                        encryptedQuestionsRef.current = edgeData.encryptedQuestions;
-                        encryptionKeyRef.current = edgeData.encryptionKey;
-                        questions = await decryptMatchQuestions({
-                            questions: edgeData.encryptedQuestions,
-                            encryption_key: edgeData.encryptionKey,
-                        } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
+
+                if (storeQuestions && storeQuestions.length > 0) {
+                    questions = storeQuestions;
+                } else if (prefetched) {
+                    mId = prefetched.matchId;
+                    questions = prefetched.questions;
+                    encryptedQuestionsRef.current = prefetched.encryptedQuestions;
+                    encryptionKeyRef.current = prefetched.encryptionKey;
+                } else {
+                    // fall back to generate on the fly
+                    if (isProceduralCategory(category)) {
+                        const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                        cleanIdRef.current = cleanId;
+                        const seed = `${cleanId}-${category}`;
+                        const { data: edgeData } = await supabase.functions.invoke(
+                            "generate-match-questions",
+                            { body: { matchId: cleanId, category, seed } },
+                        );
+                        if (edgeData?.encryptedQuestions && edgeData?.encryptionKey) {
+                            encryptedQuestionsRef.current = edgeData.encryptedQuestions;
+                            encryptionKeyRef.current = edgeData.encryptionKey;
+                            questions = await decryptMatchQuestions({
+                                questions: edgeData.encryptedQuestions,
+                                encryption_key: edgeData.encryptionKey,
+                            } as unknown as Parameters<typeof decryptMatchQuestions>[0]);
+                        } else {
+                            questions = await generateWordUpQuestions(category);
+                            const fKey = generateSecretKey();
+                            encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
+                            encryptionKeyRef.current = fKey;
+                        }
                     } else {
                         questions = await generateWordUpQuestions(category);
                         const fKey = generateSecretKey();
                         encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
                         encryptionKeyRef.current = fKey;
                     }
-                } else {
-                    questions = await generateWordUpQuestions(category);
-                    const fKey = generateSecretKey();
-                    encryptedQuestionsRef.current = encryptQuestions(questions, fKey);
-                    encryptionKeyRef.current = fKey;
                 }
                 let userRating = 600;
                 if (props.userId) {
@@ -986,9 +1050,10 @@ export function useGameEngine(props: EngineProps) {
             setOpponentChoice(null);
             setLastRoundPopup(false);
 
-            // Enforce visual buffer of at least 3 seconds so the user can see their opponent
+            // Enforce visual buffer so the user can see their opponent
             const elapsed = Date.now() - loadStart;
-            const remainingDelay = Math.max(0, 3000 - elapsed);
+            const bufferDuration = mId.startsWith("bot-match-") ? 300 : 800;
+            const remainingDelay = Math.max(0, bufferDuration - elapsed);
             if (remainingDelay > 0) {
                 await new Promise((resolve) => setTimeout(resolve, remainingDelay));
             }
@@ -1056,7 +1121,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = ch;
             }
         },
-        [handleOpponentAnswer, onRematchAccepted, props.userId, abortMatch, triggerToast, stopAllTimers],
+        [handleOpponentAnswer, onRematchAccepted, props.userId, triggerToast, stopAllTimers],
     );
 
     // ── Derive computed state shape for LiveView ─────────────────

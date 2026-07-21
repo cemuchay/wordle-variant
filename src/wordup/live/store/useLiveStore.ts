@@ -130,4 +130,21 @@ export const useLiveStore = create<LiveState>((set) => ({
 // Expose for E2E tests (dev only)
 if (import.meta.env.DEV) {
    (window as any).__liveStore = useLiveStore;
+
+   // E2E game dispatch — queues actions for the engine to process on mount
+   (window as any).__pendingEngineActions = [];
+   (window as any).__gameDispatch = (action: any) => {
+      (window as any).__pendingEngineActions.push(action);
+      // Also immediately apply store-level side effects
+      if (action.type === "SET_INITIAL") {
+         const { matchId, role, questions, matchData, opponentStats } = action.payload;
+         useLiveStore.getState().setView("battle");
+         useLiveStore.getState().setMatchId(matchId);
+         useLiveStore.getState().setRole(role);
+         useLiveStore.getState().setQuestions(questions || []);
+         useLiveStore.getState().setCurrentIdx(0);
+         useLiveStore.getState().setMatchData(matchData || null);
+         useLiveStore.getState().setOpponentStats(opponentStats || null);
+      }
+   };
 }

@@ -109,8 +109,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
       const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
+      const gameMultiplier = Math.max(1, Math.round((match.total_rounds || match.questions?.length || 7) / 7));
 
-      const xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
+      const xpReward = (XP.BASE_REWARD * gameMultiplier) + (won ? XP.WIN_BONUS * gameMultiplier : 0) + (correctCount * XP.PER_CORRECT);
 
       const myRating = userStats?.rating || RATING.DEFAULT;
       let oppRating: number = RATING.DEFAULT_OPPONENT;
@@ -124,12 +125,12 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
       const actual = won ? 1 : tied ? 0.5 : 0;
-      const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected));
+      const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected)) * gameMultiplier;
       const accuracyBonus = won ? correctCount : 0;
 
       let eloGain = baseEloChange + accuracyBonus;
-      if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
-      if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
+      if (won && eloGain < RATING.MIN_GAIN_ON_WIN * gameMultiplier) eloGain = RATING.MIN_GAIN_ON_WIN * gameMultiplier;
+      if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS * gameMultiplier) eloGain = RATING.MAX_LOSS_ON_LOSS * gameMultiplier;
 
       try { await updateStats(eloGain, xpReward, won, tied, match.category); }
       catch { triggerToast("Rating update delayed. Syncing in background...", WORDUP_TIMEOUT.TOAST_DURATION); }
@@ -165,78 +166,68 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       // Save bot match record to DB with retry queue
       if (match.is_bot_match) {
-          const record = {
-             id: match.id,
-             category: match.category,
-             player1_id: effectiveUser.id,
-             player2_id: "00000000-0000-0000-0000-000000000b0b",
-             is_bot_match: true,
-             bot_profile: match.bot_profile,
-             status: "completed",
-             game_type: "live-bot",
-             p1_score: match.p1_score,
-             p2_score: match.p2_score,
-             p1_answers: match.p1_answers || [],
-             p2_answers: match.p2_answers || [],
-             questions: match.questions || null,
-             encryption_key: match.encryption_key || null,
-             p1_answered: true,
-             p2_answered: true,
+         const record = {
+            id: match.id,
+            category: match.category,
+            player1_id: effectiveUser.id,
+            player2_id: "00000000-0000-0000-0000-000000000b0b",
+            is_bot_match: true,
+            bot_profile: match.bot_profile,
+            status: "completed",
+            game_type: "live-bot",
+            p1_score: match.p1_score,
+            p2_score: match.p2_score,
+            p1_answers: match.p1_answers || [],
+            p2_answers: match.p2_answers || [],
+            questions: match.questions || null,
+            encryption_key: match.encryption_key || null,
+            p1_answered: true,
+            p2_answered: true,
             completed_at: match.completed_at || new Date().toISOString(),
          };
          const PENDING_KEY = "wordup_pending_bot_matches";
          const getPending = () => { try { return JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]"); } catch { return []; } };
          const setPending = (list: any[]) => safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(list));
-          const pending = getPending();
-          pending.push(record);
-          setPending(pending);
-          try {
+         const pending = getPending();
+         pending.push(record);
+         setPending(pending);
+         try {
             await supabase.from("wordup_matches").upsert(record);
             setPending(getPending().filter((m: any) => m.id !== record.id));
          } catch (e) {
             console.warn("[LiveView] Bot match DB save failed, queued for retry:", e);
          }
       }
-   }, [effectiveUser, updateStats, triggerToast, role, userStats, setView, setMatchId, setRole]);
-
-   const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
-      launchedMatchRef.current = newMId;
-      setMatchId(newMId);
-      setRole(newRole);
-      startMatchRef.current?.(newMId, newRole);
-   }, [setMatchId, setRole]);
-
-    const engine = useGameEngine({
-       gameType: gameType as any || "live-bot",
-       matchId,
-       role,
-       getSyncedNow,
-       triggerToast,
-       onGameOver,
-       onRematchAccepted,
-       userId: effectiveUser?.id,
-    });
+   }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]);
 
    const launchedMatchRef = useRef<string | null>(null);
    const startMatchRef = useRef<((mId: string, role: "player1" | "player2") => void) | null>(null);
    const engineCleanupRef = useRef<(() => void) | null>(null);
-   // eslint-disable-next-line react-hooks/immutability, react-hooks/refs
-   startMatchRef.current = engine.startMatch;
-   // eslint-disable-next-line react-hooks/refs
-   engineCleanupRef.current = engine.cleanup;
+
+   const onRematchAccepted = useCallback((newMId: string, newRole: "player1" | "player2") => {
+      setMatchId(newMId);
+      setRole(newRole);
+   }, [setMatchId, setRole]);
+
+   const engine = useGameEngine({
+      gameType: gameType as any || "live-bot",
+      matchId,
+      role,
+      getSyncedNow,
+      triggerToast,
+      onGameOver,
+      onRematchAccepted,
+      userId: effectiveUser?.id,
+   });
 
    const onMatchFound = useCallback((mId: string, mRole: "player1" | "player2") => {
-      // eslint-disable-next-line react-hooks/immutability
-      launchedMatchRef.current = mId;
       setMatchId(mId);
       setRole(mRole);
-      startMatchRef.current?.(mId, mRole);
    }, [setMatchId, setRole]);
 
    useEffect(() => {
       if (matchDataFromStore?.status === "completed") return;
       if (matchId && role && matchId !== launchedMatchRef.current && (view === "menu" || view === "matchmaking" || view === "gameover" || view === "loading" || view === "connecting")) {
-         // eslint-disable-next-line react-hooks/immutability
          launchedMatchRef.current = matchId;
          startMatchRef.current?.(matchId, role);
       }
@@ -288,7 +279,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
          engine.sendSignalUpdate(playerSignalLevel);
       }, 15000);
       return () => clearInterval(interval);
-   }, [view, playerSignalLevel, engine.sendSignalUpdate]);
+   }, [view, playerSignalLevel, engine]);
 
    const handlePurgeAndReset = useCallback(async () => {
       await enginePurgeAndReset();
@@ -299,41 +290,49 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    useEffect(() => { cancelMatchmakingRef.current = cancelMatchmaking; }, [cancelMatchmaking]);
 
    useEffect(() => { engineCleanupRef.current = engine.cleanup; }, [engine.cleanup]);
-   // eslint-disable-next-line react-hooks/immutability
    useEffect(() => { startMatchRef.current = engine.startMatch; }, [engine.startMatch]);
 
-    useEffect(() => {
-       return () => {
-          const state = useLiveStore.getState();
-          if (state.view === "connecting" || state.view === "matchmaking") return;
-          cancelMatchmakingRef.current();
-          engineCleanupRef.current?.();
-          if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
-       };
-    }, [resetGame]);
+   useEffect(() => {
+      return () => {
+         const state = useLiveStore.getState();
+         if (state.view === "connecting" || state.view === "matchmaking") return;
+         cancelMatchmakingRef.current();
+         engineCleanupRef.current?.();
+         if (!(state.view === "battle" || state.view === "countdown" || state.view === "gameover" || state.view === "loading") || !state.matchId) resetGame();
+      };
+   }, [resetGame]);
 
-     const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
-     const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
-     const vsBotOnly = useLiveStore((s) => s.vsBotOnly);
-     const setVsBotOnly = useLiveStore((s) => s.setVsBotOnly);
+   const autoStartMatchmaking = useLiveStore((s) => s.autoStartMatchmaking);
+   const setAutoStartMatchmaking = useLiveStore((s) => s.setAutoStartMatchmaking);
+   const vsBotOnly = useLiveStore((s) => s.vsBotOnly);
+   const setVsBotOnly = useLiveStore((s) => s.setVsBotOnly);
 
-     useEffect(() => {
-        if (vsBotOnly && effectiveUser && (view === "menu" || view === "connecting")) {
-           setVsBotOnly(false);
-           if (view === "menu") {
-              resetGame();
-              setView("connecting");
-           }
-           startMatchmaking(true);
-        } else if (autoStartMatchmaking && effectiveUser && (view === "menu" || view === "connecting")) {
-           setAutoStartMatchmaking(false);
-           if (view === "menu") {
-              resetGame();
-              setView("connecting");
-           }
-           startMatchmaking(false);
-        }
-     }, [autoStartMatchmaking, vsBotOnly, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking, setVsBotOnly]);
+   useEffect(() => {
+      if (vsBotOnly && effectiveUser && (view === "menu" || view === "connecting")) {
+         setVsBotOnly(false);
+         if (view === "menu") {
+            resetGame();
+            setView("connecting");
+         }
+         startMatchmaking(true);
+      } else if (autoStartMatchmaking && effectiveUser && (view === "menu" || view === "connecting")) {
+         setAutoStartMatchmaking(false);
+         if (view === "menu") {
+            resetGame();
+            setView("connecting");
+         }
+         startMatchmaking(false);
+      }
+   }, [autoStartMatchmaking, vsBotOnly, effectiveUser, view, resetGame, setView, startMatchmaking, setAutoStartMatchmaking, setVsBotOnly]);
+
+   // Prefetch cache for the active category in the background
+   useEffect(() => {
+      if (category) {
+         import("../../utils/wordupPrefetchCache").then(({ prefetchBotMatchInBackground }) => {
+            prefetchBotMatchInBackground(category);
+         });
+      }
+   }, [category]);
 
    // Retry pending bot match saves on mount
    useEffect(() => {
@@ -349,30 +348,30 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   const remaining = JSON.parse(safeLocalStorage.getItem(PENDING_KEY) || "[]");
                   safeLocalStorage.setItem(PENDING_KEY, JSON.stringify(remaining.filter((m: any) => m.id !== record.id)));
                }
-             } catch {
-                // ignore
-             }
+            } catch {
+               // ignore
+            }
          }
       })();
       return () => { cancelled = true; };
    }, []);
 
-    const handleSelectHistoryMatch = useCallback(async (match: any) => {
-       if (!effectiveUser) return;
-       try {
-          const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
-          const seen = seenStr ? JSON.parse(seenStr) : [];
-          if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
-       } catch (e) { console.error("Failed to mark history match as seen:", e); }
- 
-       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-       setMatchId(match.id);
-       setRole(myRole as any);
-       setMatchData(match);
-       try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
-       catch (e) { console.error("Failed to decrypt history match questions:", e); }
-       setView("gameover");
-    }, [effectiveUser, setMatchId, setRole, setMatchData, setQuestions, setView]);
+   const handleSelectHistoryMatch = useCallback(async (match: any) => {
+      if (!effectiveUser) return;
+      try {
+         const seenStr = safeLocalStorage.getItem("wordup_seen_matches");
+         const seen = seenStr ? JSON.parse(seenStr) : [];
+         if (!seen.includes(match.id)) { seen.push(match.id); safeLocalStorage.setItem("wordup_seen_matches", JSON.stringify(seen)); }
+      } catch (e) { console.error("Failed to mark history match as seen:", e); }
+
+      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+      setMatchId(match.id);
+      setRole(myRole as any);
+      setMatchData(match);
+      try { const dec = await decryptMatchQuestions(match); setQuestions(dec); }
+      catch (e) { console.error("Failed to decrypt history match questions:", e); }
+      setView("gameover");
+   }, [effectiveUser, setMatchId, setRole, setMatchData, setQuestions, setView]);
 
    if (authLoading) {
       return (
@@ -385,7 +384,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark p-6 text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))] text-center space-y-6">
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -432,7 +431,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    }
 
    return (
-      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
+      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide pt-[calc(2.5rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative`} style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
@@ -442,30 +441,30 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   currentUser={effectiveUser} onSelectHistoryMatch={handleSelectHistoryMatch}
                   soundEnabled={soundEnabled} onToggleSound={handleToggleSound}
                   onPurgeAndReset={handlePurgeAndReset}
-                   onSwitchMode={() => onSwitchMode?.("async")}
-                    onBack={() => onBack?.()}
-                    onTutorial={onTutorial}
-                    onBackToClassic={onBackToClassic}
+                  onSwitchMode={() => onSwitchMode?.("async")}
+                  onBack={() => onBack?.()}
+                  onTutorial={onTutorial}
+                  onBackToClassic={onBackToClassic}
                />
             )}
             {view === "matchmaking" && (
                <MatchmakingView category={category} cancelMatchmaking={handleCancelMatchmaking} countdownSecs={countdownSecs} />
             )}
-             {view === "connecting" && (
-                matchId ? (
-                   <VSPreview
-                      currentUser={effectiveUser}
-                      opponentStats={opponentStats}
-                      matchData={matchData}
-                      categoryId={category}
-                      getRankColor={getRankColor}
-                      onCancel={abortMatch}
-                      message="Connecting to opponent..."
-                   />
-                ) : (
-                   <ConnectingView />
-                )
-             )}
+            {view === "connecting" && (
+               matchId ? (
+                  <VSPreview
+                     currentUser={effectiveUser}
+                     opponentStats={opponentStats}
+                     matchData={matchData}
+                     categoryId={category}
+                     getRankColor={getRankColor}
+                     onCancel={abortMatch}
+                     message="Connecting to opponent..."
+                  />
+               ) : (
+                  <ConnectingView />
+               )
+            )}
             {view === "countdown" && (
                <CountdownView countdownText={String(engine.state.countdownText || "3")} />
             )}
@@ -484,45 +483,49 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                   role={role} playerProfile={profile}
+                  role={role} playerProfile={profile}
                   onAbort={abortMatch} lastRoundPopup={lastRoundPopup}
-                   waitingForOpponent={waitingForOpponent}
-                   playerSignalLevel={playerSignalLevel}
-                    opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
-                 />
-              )}
-              {view === "gameover" && (
-                <GameOverView
-                   matchData={matchData}
-                   setView={(newView) => {
-                       if (newView === "menu") { resetGame(); onBack?.(); }
-                       else if (newView === "matchmaking" || newView === "playbot") {
-                         engineCleanupRef.current?.();
-                         if (matchData?.category) {
-                            setCategory(matchData.category);
-                         }
-                         resetGame();
-                         setView("connecting");
-                         startMatchmaking(newView === "playbot");
-                      }
-                   }}
+                  waitingForOpponent={waitingForOpponent}
+                  playerSignalLevel={playerSignalLevel}
+                  opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
+                  onPause={() => {
+                     resetGame();
+                     onBack?.();
+                  }}
+               />
+            )}
+            {view === "gameover" && (
+               <GameOverView
+                  matchData={matchData}
+                  setView={(newView) => {
+                     if (newView === "menu") { resetGame(); onBack?.(); }
+                     else if (newView === "matchmaking" || newView === "playbot") {
+                        engineCleanupRef.current?.();
+                        if (matchData?.category) {
+                           setCategory(matchData.category);
+                        }
+                        resetGame();
+                        setView("connecting");
+                        startMatchmaking(newView === "playbot");
+                     }
+                  }}
                   role={role} rematchState={rematchState} rematchCountdown={rematchCountdown}
                   showRematchButton={showRematchButton} sendRematch={sendRematch}
                   acceptRematch={() => acceptRematch(onMatchFound)}
                />
             )}
          </AnimatePresence>
-          <ConnectionOverlay realtimeStatus={realtimeStatus} view={view} />
-          {view !== "menu" && (
-             <button
-                onClick={handleToggleSound}
-                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-                title="Toggle Sound"
-             >
-                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-             </button>
-          )}
-       </div>
+         <ConnectionOverlay realtimeStatus={realtimeStatus} view={view} />
+         {view !== "menu" && (
+            <button
+               onClick={handleToggleSound}
+               className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+               title="Toggle Sound"
+            >
+               {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            </button>
+         )}
+      </div>
    );
 };
 

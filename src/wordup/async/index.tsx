@@ -111,17 +111,18 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
          const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
          const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
-         const xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
+         const gameMultiplier = Math.max(1, Math.round((match.total_rounds || match.questions?.length || 7) / 7));
+         const xpReward = (XP.BASE_REWARD * gameMultiplier) + (won ? XP.WIN_BONUS * gameMultiplier : 0) + (correctCount * XP.PER_CORRECT);
          const myRating = userStats?.rating || RATING.DEFAULT;
          const storeOppStats = useAsyncStore.getState().opponentStats;
          const oppRating = storeOppStats?.rating || RATING.DEFAULT_OPPONENT;
          const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
          const actual = won ? 1 : tied ? 0.5 : 0;
-         const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected));
+         const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected)) * gameMultiplier;
          const accuracyBonus = won ? correctCount : 0;
          let eloGain = baseEloChange + accuracyBonus;
-         if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
-         if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
+         if (won && eloGain < RATING.MIN_GAIN_ON_WIN * gameMultiplier) eloGain = RATING.MIN_GAIN_ON_WIN * gameMultiplier;
+         if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS * gameMultiplier) eloGain = RATING.MAX_LOSS_ON_LOSS * gameMultiplier;
           try { await updateStats(eloGain, xpReward, won, tied, match.category); }
           catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
 
@@ -157,7 +158,6 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
    });
 
    const { handleAnswerSelect, startMatch } = engine;
-   const lastRoundPopup = engine.state.lastRoundPopup;
    const countdownText = engine.state.countdownText;
 
    const { loadPendingMatches, loadHistoryMatches, createMatch } = useAsyncMatchmaking(effectiveUser, category, triggerToast);
@@ -441,7 +441,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark p-6 text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))] text-center space-y-6">
             <div className="inline-flex p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -496,7 +496,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
    }
 
    return (
-      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-linear-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative" style={{ minHeight: "100%" }}>
+      <div className="w-full max-w-lg mx-auto h-full flex flex-col bg-linear-to-b from-indigo-950/40 to-dark overflow-y-auto scrollbar-hide pt-[calc(2.5rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative" style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
@@ -535,7 +535,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                   questions={questions} currentIdx={currentIdx} matchData={matchData}
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
-                  role={role} playerProfile={profile} lastRoundPopup={lastRoundPopup}
+                  role={role} playerProfile={profile}
                />
             )}
             {view === "turn_submitted" && (

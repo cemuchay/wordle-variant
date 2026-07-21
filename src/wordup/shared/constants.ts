@@ -51,6 +51,11 @@ export const CATEGORIES = [
       featured: true,
    },
    {
+      id: "physics",
+      name: "Physics",
+      desc: "simple Physics Calculations",
+   },
+   {
       id: "global-politics",
       name: "Politics",
       desc: "Global Politics trivia. Test your knowledge of political events and timelines",

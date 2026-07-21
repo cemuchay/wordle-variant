@@ -31,6 +31,8 @@ interface MatchData {
    player1_id?: string;
    player2_id?: string;
    category?: string;
+   allow_pause?: boolean;
+   is_marathon?: boolean;
 }
 
 interface PlayerProfile {
@@ -55,6 +57,7 @@ interface BattleViewProps {
    waitingForOpponent: boolean;
    playerSignalLevel?: number;
    opponentSignalLevel?: number;
+   onPause?: () => void;
 }
 
 interface Particle {
@@ -84,6 +87,7 @@ export const BattleView = ({
    waitingForOpponent,
    playerSignalLevel,
    opponentSignalLevel,
+   onPause,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const { ask } = useConfirmation();
@@ -170,18 +174,18 @@ export const BattleView = ({
       }
    };
 
-   const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
+    const promptLen = activeQuestion.prompt.length;
+    const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-2xl" : "text-3xl sm:text-3xl";
 
-   const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-   const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
-   const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
-   const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
-   const choiceLUT: Record<string, Record<string, string>> = {
-      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
-      c: { "2": "text-lg sm:text-xl", "4": "text-base sm:text-lg" },
-   };
+    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
+    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
+    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
+    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
+    const choiceLUT: Record<string, Record<string, string>> = {
+       a: { "2": "text-sm sm:text-sm", "4": "text-xs sm:text-xs" },
+       b: { "2": "text-base sm:text-base", "4": "text-sm sm:text-sm" },
+       c: { "2": "text-lg sm:text-lg", "4": "text-base sm:text-base" },
+    };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
 
@@ -298,24 +302,34 @@ export const BattleView = ({
             </div>
          </div>
 
-         {/* Floating Abort Button */}
-         <button
-            onClick={async () => {
-               const confirmed = await ask({
-                  title: "Forfeit Match",
-                  message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
-                  confirmLabel: "Forfeit",
-                  type: "danger"
-               });
-               if (confirmed) {
-                  onAbort();
-               }
-            }}
-            className="absolute bottom-3 right-3 z-40 flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-         >
-            <AlertTriangle size={12} />
-            <span>Abort</span>
-         </button>
+         {/* Floating Actions: Pause & Abort */}
+         <div className="absolute bottom-3 right-3 z-40 flex items-center gap-2">
+            {matchData?.allow_pause && onPause && (
+               <button
+                  onClick={onPause}
+                  className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+               >
+                  <span>Pause</span>
+               </button>
+            )}
+            <button
+               onClick={async () => {
+                  const confirmed = await ask({
+                     title: "Forfeit Match",
+                     message: "Are you sure you want to forfeit and abort this match? This will count as a loss.",
+                     confirmLabel: "Forfeit",
+                     type: "danger"
+                  });
+                  if (confirmed) {
+                     onAbort();
+                  }
+               }}
+               className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 text-red-400 hover:bg-red-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+            >
+               <AlertTriangle size={12} />
+               <span>Abort</span>
+            </button>
+         </div>
 
          {/* Question Container */}
          <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
@@ -326,7 +340,11 @@ export const BattleView = ({
                   </span>
                   <span className="text-white/20">•</span>
                   <span className="text-[12px] font-black uppercase text-correct tracking-widest">
-                     Round {currentIdx + 1}/7
+                     {questions.length > 7 ? (
+                        `Game ${Math.floor(currentIdx / 7) + 1}/${Math.ceil(questions.length / 7)} • Q${(currentIdx % 7) + 1}/7 (Round ${currentIdx + 1}/${questions.length})`
+                     ) : (
+                        `Round ${currentIdx + 1}/7`
+                     )}
                   </span>
                </div>
                <p className="text-[12px] sm:text-[12px] font-black uppercase text-correct tracking-widest flex items-center justify-center gap-1">
@@ -377,7 +395,7 @@ export const BattleView = ({
                      const imageUrl = getCachedFlagUrl(flagCode);
                      const optionLetter = String.fromCharCode(65 + index);
 
-                     let cardClass = "relative w-full aspect-[2.4/1] xs:aspect-[2.2/1] sm:aspect-[1.8/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
+                     let cardClass = "relative w-full aspect-[2.4/1] xs:aspect-[2.2/1] sm:aspect-[2.2/1] rounded-xl sm:rounded-xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
                      if (selectedAnswer === null) {
                         cardClass += " cursor-pointer bg-white border-gray-200 hover:border-cyan-400 hover:bg-gray-50";
                      } else {
@@ -461,7 +479,7 @@ export const BattleView = ({
                      const isOppSelected = revealAnswers && oppChoice === choice;
                      const hasImage = !!activeQuestion.imageUrl;
 
-                     let btnClass = `${hasImage ? "p-3.5 sm:p-5 min-h-[38px] sm:min-h-[50px]" : "p-4 sm:p-6 min-h-[48px] sm:min-h-[64px]"} rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center relative overflow-hidden`;
+                     let btnClass = `${hasImage ? "p-3.5 sm:p-3.5 min-h-[38px] sm:min-h-[44px]" : "p-4 sm:p-4 min-h-[48px] sm:min-h-[52px]"} rounded-xl sm:rounded-xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center relative overflow-hidden`;
                      if (selectedAnswer === null) {
                         btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {

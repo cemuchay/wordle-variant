@@ -41,7 +41,6 @@ interface BattleViewProps {
    role: "player1" | "player2" | null;
    playerProfile: PlayerProfile | null;
    onAbort?: () => void;
-   lastRoundPopup: boolean;
 }
 
 interface Particle {
@@ -66,7 +65,6 @@ export const BattleView = ({
    handleAnswerSelect,
    role,
    playerProfile,
-   lastRoundPopup
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
@@ -195,32 +193,7 @@ export const BattleView = ({
          animate={{ opacity: 1 }}
          className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden"
       >
-         {lastRoundPopup && (
-            <motion.div
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               transition={{ duration: 0.4 }}
-               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-dark pointer-events-none select-none"
-            >
-               <motion.p
-                  initial={{ scale: 2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="text-3xl sm:text-4xl font-black text-white tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]"
-               >
-                  ⚡ LAST ROUND ⚡
-               </motion.p>
-               <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.4 }}
-                  className="text-sm sm:text-base font-black text-[#E85151] mt-2 animate-pulse tracking-wider"
-               >
-                  DOUBLE POINTS
-               </motion.p>
-            </motion.div>
-         )}
+
 
          {/* Top Bar: Player | Round/Category | Opponent */}
          <div className="flex items-center justify-between gap-1 sm:gap-2 px-1 shrink-0 z-40">

@@ -183,7 +183,7 @@ export function useGameEngine(props: EngineProps) {
       } else {
          clearT("safetyTimeout");
       }
-   }, [state.phase, triggerToast]);
+   }, [state.phase, triggerToast, clearAllT, clearT]);
 
    // ══════════════════════════════════════════════════════════════════════
    // CORE GAME FLOW
@@ -243,24 +243,18 @@ export function useGameEngine(props: EngineProps) {
                   clearT("revealTimeout");
                   if (nextIdx >= WORDUP_GAME.TOTAL_ROUNDS) {
                      // End of match
-                  } else if (nextIdx === 6) {
-                     dispatch({ type: "SET_LAST_ROUND_POPUP", show: true });
-                     clearT("lastRoundPopupTimeout");
-                     T.current.lastRoundPopupTimeout = window.setTimeout(() => {
-                        dispatch({ type: "SET_LAST_ROUND_POPUP", show: false });
-                        clearT("lastRoundPopupTimeout");
-                        cb.current.advanceRound?.(merged.id, nextIdx);
-                        wordupAudio.startFinalRoundBeat();
-                     }, 1500);
                   } else {
                      cb.current.advanceRound?.(merged.id, nextIdx);
+                     if (nextIdx === 6) {
+                        wordupAudio.startFinalRoundBeat();
+                     }
                   }
                },
-               nextIdx === 6 ? 3200 : 1800,
+               1800,
             );
          }
       },
-      [triggerToast],
+      [triggerToast, clearT],
    );
 
    const persistTurn = useCallback(
@@ -374,7 +368,7 @@ export function useGameEngine(props: EngineProps) {
                Math.round(20 * (1 - eff / (denom > 0 ? denom : duration))),
             );
          }
-         if (S.current.currentRound === 6) points *= 2;
+         if ((S.current.currentRound + 1) % 7 === 0) points *= 2;
          if (choice !== "") {
             if (correct) wordupAudio.playCorrect();
             else wordupAudio.playIncorrect();
@@ -412,7 +406,7 @@ export function useGameEngine(props: EngineProps) {
          }
          G.current.isSubmitting = false;
       },
-      [matchId, state.selectedAnswer, state.revealAnswers, persistTurn],
+      [matchId, state.selectedAnswer, state.revealAnswers, persistTurn, clearT],
    );
 
    const endGame = useCallback(
@@ -546,7 +540,7 @@ export function useGameEngine(props: EngineProps) {
             }
          }, 50);
       },
-      [getSyncedNow, matchId],
+      [getSyncedNow, matchId, clearT],
    );
 
    const startCountdown = useCallback(
@@ -768,7 +762,7 @@ export function useGameEngine(props: EngineProps) {
             useAsyncStore.getState().resetGame();
          }
       },
-      [triggerToast, onGameOver, getSyncedNow, startCountdown],
+      [triggerToast, onGameOver, startCountdown, clearAllT],
    );
 
    // ── Persist active game state ─────────────────────────────────────────
