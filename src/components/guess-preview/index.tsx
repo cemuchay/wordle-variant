@@ -579,12 +579,12 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))]"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
       style={{ zIndex: Z_INDEX.GUESS_PREVIEW }}
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 w-full max-sm:w-full sm:max-w-sm rounded-2xl p-6 pb-[calc(2rem+env(safe-area-inset-bottom,0))] shadow-2xl relative flex flex-col overflow-y-auto max-h-[calc(100dvh-4rem-env(safe-area-inset-top,0)-env(safe-area-inset-bottom,0))]"
+        className="bg-gray-900 border border-gray-700 w-full sm:max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto h-full max-h-full"
         onClick={(e) => e.stopPropagation()}
       >
         <button

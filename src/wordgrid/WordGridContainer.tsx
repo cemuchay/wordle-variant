@@ -152,7 +152,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const p2Username = player2?.username || 'Player 2';
 
   return (
-    <div className="h-full w-full flex flex-col bg-dark overflow-y-auto pb-8 scrollbar-none px-2 space-y-4">
+    <div className="h-full w-full flex flex-col bg-dark overflow-y-auto pt-[calc(0.75rem+env(safe-area-inset-top,0))] pb-[calc(2rem+env(safe-area-inset-bottom,0))] scrollbar-none px-2 space-y-4">
       {/* Gameplay Header */}
       <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl">
         <div className="flex flex-col">

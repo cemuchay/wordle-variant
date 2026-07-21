@@ -278,8 +278,7 @@ const AuthenticatedChallengeContent = memo(
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
           id="challenge-modal-header"
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 transition-all ${isPlaying && isDynamicIslandVisible ? "p-3 sm:p-4 pt-10 sm:pt-4" : "p-2 sm:p-2 mt-7 sm:mt-9"
-            }`}
+          className={`border-b border-white/5 flex items-center justify-between shrink-0 px-3 pb-3 sm:px-4 sm:pb-4 ${isDynamicIslandVisible ? 'pt-10 sm:pt-11' : 'pt-3 sm:pt-4'}`}
         >
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {!isPlaying && selectedChallenge && (
@@ -1004,14 +1003,14 @@ export const ChallengeModal = ({
     >
       <div
         className={`fixed inset-0 flex items-center justify-center bg-black/85 md:backdrop-blur-xs transition-[padding,background-color] duration-300 ${isPlaying
-          ? "p-0 sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
-          : "p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
+          ? "p-0 pt-[env(safe-area-inset-top,0)] pb-[env(safe-area-inset-bottom,0)] sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
+          : "p-4 pt-[calc(1rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
           }`}
         style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
         <div
           className={`bg-gray-900 border border-white/10 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
-            ? "h-svh max-h-svh rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
+            ? "h-full max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
             : "max-w-xl rounded-3xl h-full max-h-full sm:h-[85vh] sm:max-h-[85vh]"
             }`}
         >

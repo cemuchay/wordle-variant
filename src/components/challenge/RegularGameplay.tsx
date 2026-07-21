@@ -337,7 +337,7 @@ export const RegularGameplay = memo(function RegularGameplay({
                     </div>
                 )}
 
-                <div className="relative grid-wrapper-parent">
+                <div className={`relative grid-wrapper-parent ${maxAttempts > 6 ? 'py-2 px-4 sm:py-4 sm:px-6' : ''}`}>
                     <NewGrid
                         wordLength={wordLength}
                         maxAttempts={maxAttempts}

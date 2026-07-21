@@ -394,7 +394,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark p-6 text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-correct/15 to-dark px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))] text-center space-y-6">
             <div className="inline-flex p-4 bg-correct/10 rounded-3xl border border-correct/20 text-correct shadow-[0_0_20px_rgba(46,204,113,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -441,7 +441,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    }
 
    return (
-      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide pt-4 px-4 pb-4 relative`} style={{ minHeight: "100%" }}>
+      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide pt-[calc(2.5rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative`} style={{ minHeight: "100%" }}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
