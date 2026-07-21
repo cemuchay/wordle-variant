@@ -56,12 +56,31 @@ export const WordUpContainer = ({
       targetUser?: any;
    }) => {
       if (!effectiveUser) return;
+      setMarathonConfigModalOpen(false);
+
+      const cat = marathonConfigCategory || "mixed";
+      const totalRounds = config.totalGames * 7;
+
+      // Instantly switch view to connecting/loading VS preview transition screen
+      if (config.mode === "live_bot") {
+         const liveStore = useLiveStore.getState();
+         liveStore.resetGame();
+         liveStore.setCategory(cat);
+         liveStore.setView("connecting");
+         setWordupMode("live");
+      } else {
+         if (!config.targetUser?.id) return;
+         const asyncStore = useAsyncStore.getState();
+         asyncStore.resetGame();
+         asyncStore.setCategory(cat);
+         asyncStore.setView("loading");
+         setWordupMode("async");
+      }
+
       try {
          const { generateWordUpQuestions, generateSecretKey, encryptQuestions, decryptMatchQuestions } = await import("../utils/wordupQuestionGenerator");
          const { isProceduralCategory } = await import("../services/wordup/generatorRegistry");
          const { supabase } = await import("../lib/supabaseClient");
-         const cat = marathonConfigCategory || "mixed";
-         const totalRounds = config.totalGames * 7;
          const rawMatchId = crypto.randomUUID();
 
          let rawQuestions: any[] = [];

@@ -109,8 +109,9 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
       const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
+      const gameMultiplier = Math.max(1, Math.round((match.total_rounds || match.questions?.length || 7) / 7));
 
-      const xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
+      const xpReward = (XP.BASE_REWARD * gameMultiplier) + (won ? XP.WIN_BONUS * gameMultiplier : 0) + (correctCount * XP.PER_CORRECT);
 
       const myRating = userStats?.rating || RATING.DEFAULT;
       let oppRating: number = RATING.DEFAULT_OPPONENT;

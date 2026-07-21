@@ -101,14 +101,20 @@ export const GameOverView = ({
          </div>
 
          {/* Rewards and Elo changes */}
-         <div className={`border rounded-2xl p-4 text-center space-y-1 ${statusColor}`}>
-            <p className="text-xs font-bold uppercase tracking-wider">
-               Rating Change: {isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}
-            </p>
-            <p className="text-[10px] text-white/60 uppercase font-black">
-               Earned: +{50 + (isWinner ? 100 : 0) + ((myAnswers || []).filter((a: any) => a.correct).length * 10)} XP
-            </p>
-         </div>
+         {(() => {
+            const gameMultiplier = Math.max(1, Math.round((questions?.length || matchData.total_rounds || 7) / 7));
+            const xpEarned = (50 * gameMultiplier) + (isWinner ? 100 * gameMultiplier : 0) + (((myAnswers || []).filter((a: any) => a.correct).length) * 10);
+            return (
+               <div className={`border rounded-2xl p-4 text-center space-y-1 ${statusColor}`}>
+                  <p className="text-xs font-bold uppercase tracking-wider">
+                     Rating Change: {isWinner ? "+18 Elo Rating" : isDraw ? "+2 Elo" : "-12 Elo Rating"}
+                  </p>
+                  <p className="text-[10px] text-white/60 uppercase font-black">
+                     Earned: +{xpEarned} XP
+                  </p>
+               </div>
+            );
+         })()}
 
          {/* Rematch Actions */}
          {!matchData.is_bot_match && showRematchButton && (
