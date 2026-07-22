@@ -72,7 +72,7 @@ export const AppLayout = ({
 
     return (
         <div
-            className={`w-full h-dvh max-h-dvh flex flex-col overflow-hidden bg-dark text-white relative select-none ${className}`}
+            className={`w-full h-full min-h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-dark text-white relative select-none ${className}`}
             style={{
                 backgroundColor: theme && theme.startsWith('#') ? theme : undefined,
                 paddingTop: 'env(safe-area-inset-top, 0px)',
