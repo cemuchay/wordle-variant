@@ -17,74 +17,308 @@ import {
    drawBalancedRack,
 } from "../utils/wordgrid/bagBalancing";
 
+import { safeLocalStorage } from "../utils/storage";
+
 export type WordGridViewType = "lobby" | "matchmaking" | "active" | "completed";
 
 // Helper to validate UUID string
 function isUuid(val: any): boolean {
    return (
       typeof val === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+         val,
+      )
    );
 }
 
-// Helper to update wordgrid_matches safely even if schema cache lacks newer columns
+// 1. Retry wrapper for network requests (2 retries max)
+async function withRetry<T>(
+   fn: () => Promise<T>,
+   maxRetries = 2,
+   delayMs = 600,
+): Promise<T> {
+   let lastErr: any;
+   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+         return await fn();
+      } catch (err: any) {
+         lastErr = err;
+         if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+         }
+      }
+   }
+   throw lastErr;
+}
+
+// 7 days expiration in milliseconds
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+// 2. Local Storage Draft Persistence (Debounce 300ms)
+let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function saveDraftToLocalStorage(
+   matchId: string | null,
+   placedTiles: PlacedTile[],
+   rack: string[],
+) {
+   if (!matchId) return;
+   if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+   draftDebounceTimer = setTimeout(() => {
+      try {
+         const key = `wordgrid_draft_${matchId}`;
+         if (placedTiles.length === 0) {
+            safeLocalStorage.removeItem(key);
+         } else {
+            safeLocalStorage.setItem(
+               key,
+               JSON.stringify({ placedTiles, rack, timestamp: Date.now() }),
+            );
+         }
+      } catch (e) {
+         console.warn("[WordGrid] Failed to save draft:", e);
+      }
+   }, 300);
+}
+
+export function clearDraftFromLocalStorage(matchId: string | null) {
+   if (!matchId) return;
+   if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+   try {
+      safeLocalStorage.removeItem(`wordgrid_draft_${matchId}`);
+   } catch (e) {
+      console.warn("[WordGrid] Failed to clear draft:", e);
+   }
+}
+
+export function loadDraftFromLocalStorage(
+   matchId: string | null,
+): { placedTiles: PlacedTile[]; rack: string[] } | null {
+   if (!matchId) return null;
+   try {
+      const dataStr = safeLocalStorage.getItem(`wordgrid_draft_${matchId}`);
+      if (!dataStr) return null;
+      const parsed = JSON.parse(dataStr);
+
+      // Auto-clear draft if older than 7 days
+      if (parsed.timestamp && Date.now() - parsed.timestamp > SEVEN_DAYS_MS) {
+         clearDraftFromLocalStorage(matchId);
+         return null;
+      }
+
+      if (Array.isArray(parsed.placedTiles) && Array.isArray(parsed.rack)) {
+         return { placedTiles: parsed.placedTiles, rack: parsed.rack };
+      }
+   } catch (e) {
+      console.warn("[WordGrid] Failed to load draft:", e);
+   }
+   return null;
+}
+
+// 3. Pending Uploads Queue in Local Storage
+const PENDING_UPLOADS_KEY = "wordgrid_pending_uploads";
+
+function enqueuePendingUpload(
+   id: string,
+   matchId: string,
+   type: "update" | "insert",
+   payload: any,
+) {
+   try {
+      const existingStr = safeLocalStorage.getItem(PENDING_UPLOADS_KEY);
+      const list = existingStr ? JSON.parse(existingStr) : [];
+      list.push({
+         id,
+         matchId,
+         type,
+         payload,
+         timestamp: Date.now(),
+         status: "pending_upload",
+      });
+      safeLocalStorage.setItem(PENDING_UPLOADS_KEY, JSON.stringify(list));
+   } catch (e) {
+      console.warn("[WordGrid] Failed to enqueue pending upload:", e);
+   }
+}
+
+function dequeuePendingUpload(id: string) {
+   try {
+      const existingStr = safeLocalStorage.getItem(PENDING_UPLOADS_KEY);
+      if (!existingStr) return;
+      let list = JSON.parse(existingStr);
+      list = list.filter((item: any) => item.id !== id);
+      if (list.length === 0) {
+         safeLocalStorage.removeItem(PENDING_UPLOADS_KEY);
+      } else {
+         safeLocalStorage.setItem(PENDING_UPLOADS_KEY, JSON.stringify(list));
+      }
+   } catch (e) {
+      console.warn("[WordGrid] Failed to dequeue pending upload:", e);
+   }
+}
+
+// Prune any WordGrid local storage drafts older than 7 days
+export function pruneExpiredStorageData() {
+   try {
+      const keys = safeLocalStorage.getAllKeys();
+      const now = Date.now();
+      for (const key of keys) {
+         if (key.startsWith("wordgrid_draft_")) {
+            const raw = safeLocalStorage.getItem(key);
+            if (raw) {
+               try {
+                  const data = JSON.parse(raw);
+                  if (data.timestamp && now - data.timestamp > SEVEN_DAYS_MS) {
+                     safeLocalStorage.removeItem(key);
+                  }
+               } catch {
+                  /* no empty blocks */
+               }
+            }
+         }
+      }
+   } catch (e) {
+      console.warn("[WordGrid] Prune expired storage failed:", e);
+   }
+}
+
+export async function flushPendingUploads() {
+   try {
+      pruneExpiredStorageData();
+
+      const existingStr = safeLocalStorage.getItem(PENDING_UPLOADS_KEY);
+      if (!existingStr) return;
+      const list: any[] = JSON.parse(existingStr);
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      const now = Date.now();
+      const validUploads = list.filter(
+         (item: any) =>
+            !item.timestamp || now - item.timestamp <= SEVEN_DAYS_MS,
+      );
+
+      if (validUploads.length !== list.length) {
+         if (validUploads.length === 0) {
+            safeLocalStorage.removeItem(PENDING_UPLOADS_KEY);
+         } else {
+            safeLocalStorage.setItem(
+               PENDING_UPLOADS_KEY,
+               JSON.stringify(validUploads),
+            );
+         }
+      }
+
+      for (const item of validUploads) {
+         try {
+            if (item.type === "update" && item.matchId) {
+               await safeWordGridUpdate(item.matchId, item.payload);
+            } else if (item.type === "insert") {
+               await safeWordGridInsert(item.payload);
+            }
+            dequeuePendingUpload(item.id);
+            clearDraftFromLocalStorage(item.matchId);
+         } catch (err) {
+            console.warn("[WordGrid] Flush upload item failed:", item.id, err);
+         }
+      }
+   } catch (e) {
+      console.warn("[WordGrid] Failed to flush pending uploads:", e);
+   }
+}
+
+// Helper to update wordgrid_matches safely with 2 retries and offline queueing
 async function safeWordGridUpdate(
    matchId: string,
    payload: Record<string, any>,
 ) {
-   let { error } = await supabase
-      .from("wordgrid_matches")
-      .update(payload)
-      .eq("id", matchId);
+   const uploadId = `upd_${matchId}_${Date.now()}`;
+   enqueuePendingUpload(uploadId, matchId, "update", payload);
 
-   if (
-      error &&
-      (error.code === "PGRST204" ||
-         error.message?.includes("schema cache") ||
-         error.message?.includes("column"))
-   ) {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.players_data;
-      delete fallbackPayload.current_turn_index;
-      delete fallbackPayload.grid_size;
-      delete fallbackPayload.max_players;
+   try {
+      const res = await withRetry(async () => {
+         let { error } = await supabase
+            .from("wordgrid_matches")
+            .update(payload)
+            .eq("id", matchId);
 
-      const fallbackRes = await supabase
-         .from("wordgrid_matches")
-         .update(fallbackPayload)
-         .eq("id", matchId);
-      error = fallbackRes.error;
+         if (
+            error &&
+            (error.code === "PGRST204" ||
+               error.message?.includes("schema cache") ||
+               error.message?.includes("column"))
+         ) {
+            const fallbackPayload = { ...payload };
+            delete fallbackPayload.players_data;
+            delete fallbackPayload.current_turn_index;
+            delete fallbackPayload.grid_size;
+            delete fallbackPayload.max_players;
+
+            const fallbackRes = await supabase
+               .from("wordgrid_matches")
+               .update(fallbackPayload)
+               .eq("id", matchId);
+            error = fallbackRes.error;
+         }
+         if (error) throw error;
+         return { error: null };
+      }, 2);
+
+      dequeuePendingUpload(uploadId);
+      clearDraftFromLocalStorage(matchId);
+      return res;
+   } catch (error: any) {
+      console.warn(
+         "[WordGrid] Network update failed after 2 retries, payload queued in safeLocalStorage.",
+         error,
+      );
+      return { error };
    }
-   return { error };
 }
 
-// Helper to insert into wordgrid_matches safely even if schema cache lacks newer columns
+// Helper to insert into wordgrid_matches safely with 2 retries and offline queueing
 async function safeWordGridInsert(payload: Record<string, any>) {
-   let res = await supabase
-      .from("wordgrid_matches")
-      .insert(payload)
-      .select()
-      .single();
+   const uploadId = `ins_${Date.now()}`;
+   enqueuePendingUpload(uploadId, payload.id || "", "insert", payload);
 
-   if (
-      res.error &&
-      (res.error.code === "PGRST204" ||
-         res.error.message?.includes("schema cache") ||
-         res.error.message?.includes("column"))
-   ) {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.players_data;
-      delete fallbackPayload.current_turn_index;
-      delete fallbackPayload.grid_size;
-      delete fallbackPayload.max_players;
+   try {
+      const res = await withRetry(async () => {
+         let r = await supabase
+            .from("wordgrid_matches")
+            .insert(payload)
+            .select()
+            .single();
 
-      res = await supabase
-         .from("wordgrid_matches")
-         .insert(fallbackPayload)
-         .select()
-         .single();
+         if (
+            r.error &&
+            (r.error.code === "PGRST204" ||
+               r.error.message?.includes("schema cache") ||
+               r.error.message?.includes("column"))
+         ) {
+            const fallbackPayload = { ...payload };
+            delete fallbackPayload.players_data;
+            delete fallbackPayload.current_turn_index;
+            delete fallbackPayload.grid_size;
+            delete fallbackPayload.max_players;
+
+            r = await supabase
+               .from("wordgrid_matches")
+               .insert(fallbackPayload)
+               .select()
+               .single();
+         }
+         if (r.error) throw r.error;
+         return r;
+      }, 2);
+
+      dequeuePendingUpload(uploadId);
+      return res;
+   } catch (err: any) {
+      console.warn(
+         "[WordGrid] Network insert failed after 2 retries, payload queued in safeLocalStorage.",
+         err,
+      );
+      return { data: null, error: err };
    }
-   return res;
 }
 
 interface WordGridState {
@@ -199,7 +433,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
    setView: (view) => set({ view }),
 
-   resetGame: () =>
+   resetGame: () => {
+      clearDraftFromLocalStorage(get().matchId);
       set({
          matchId: null,
          gridSize: DEFAULT_GRID_SIZE,
@@ -222,46 +457,52 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          rack: [],
          error: null,
          matchesList: [],
-      }),
+      });
+   },
 
    setMatchId: (matchId) => set({ matchId }),
 
    placeTile: (x, y, letter) => {
-      const { rack, placedTiles } = get();
+      const { rack, placedTiles, matchId } = get();
       const idx = rack.findIndex((l) => l === letter);
       if (idx === -1) return;
 
       const newRack = [...rack];
       newRack.splice(idx, 1);
+      const newPlaced = [...placedTiles, { x, y, letter }];
 
       set({
-         placedTiles: [...placedTiles, { x, y, letter }],
+         placedTiles: newPlaced,
          rack: newRack,
       });
+      saveDraftToLocalStorage(matchId, newPlaced, newRack);
    },
 
    recallTile: (x, y) => {
-      const { rack, placedTiles } = get();
+      const { rack, placedTiles, matchId } = get();
       const tileIdx = placedTiles.findIndex((t) => t.x === x && t.y === y);
       if (tileIdx === -1) return;
 
       const tile = placedTiles[tileIdx];
       const newPlaced = [...placedTiles];
       newPlaced.splice(tileIdx, 1);
+      const newRack = [...rack, tile.letter];
 
       set({
          placedTiles: newPlaced,
-         rack: [...rack, tile.letter],
+         rack: newRack,
       });
+      saveDraftToLocalStorage(matchId, newPlaced, newRack);
    },
 
    recallAllTiles: () => {
-      const { rack, placedTiles } = get();
+      const { rack, placedTiles, matchId } = get();
       const recalledLetters = placedTiles.map((t) => t.letter);
       set({
          placedTiles: [],
          rack: [...rack, ...recalledLetters],
       });
+      clearDraftFromLocalStorage(matchId);
    },
 
    shuffleRack: () => {
@@ -345,7 +586,23 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
               );
 
       const resolvedCurrentTurn =
-         record.current_turn || (playersList[turnIndex]?.id || "bot");
+         record.current_turn || playersList[turnIndex]?.id || "bot";
+
+      // Check if a local storage draft exists for this matchId and restore uncommitted placed tiles
+      let activePlaced = get().placedTiles;
+      let activeWorkingRack =
+         get().placedTiles.length > 0 ? get().rack : activeRack || [];
+      if (record.id) {
+         const draft = loadDraftFromLocalStorage(record.id);
+         if (
+            draft &&
+            Array.isArray(draft.placedTiles) &&
+            draft.placedTiles.length > 0
+         ) {
+            activePlaced = draft.placedTiles;
+            activeWorkingRack = draft.rack;
+         }
+      }
 
       set({
          matchId: record.id,
@@ -373,7 +630,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             username: playersList[1]?.username,
          },
          view: record.status === "completed" ? "completed" : "active",
-         rack: get().placedTiles.length > 0 ? get().rack : activeRack || [],
+         placedTiles: activePlaced,
+         rack: activeWorkingRack,
       });
    },
 

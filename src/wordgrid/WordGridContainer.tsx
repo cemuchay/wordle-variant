@@ -1,7 +1,5 @@
-// src/wordgrid/WordGridContainer.tsx
-
 import { useState, useEffect } from 'react';
-import { useWordGridStore } from '../store/useWordGridStore';
+import { useWordGridStore, flushPendingUploads } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
 import { BoardGrid } from './components/BoardGrid';
 import { TileRack } from './components/TileRack';
@@ -60,6 +58,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
     setShowTutorial(false);
   };
+
+  // Flush any un-synced offline uploads on mount
+  useEffect(() => {
+    flushPendingUploads();
+  }, []);
 
   // Resubscribe to match updates when matchId changes
   useEffect(() => {
@@ -169,7 +172,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       onCut={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
       style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
-      className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 space-y-4 mx-auto select-none"
+      className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 pt-12 sm:pt-14 md:pt-6 space-y-4 mx-auto select-none"
     >
       {showTutorial && (
         <WordGridTutorialModal
@@ -178,102 +181,110 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         />
       )}
 
-      {/* Gameplay Header */}
-      <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 flex items-center justify-between shadow-2xl animate-in fade-in duration-300">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
-            <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
-              {gridSize}×{gridSize}
-            </span>
-          </div>
-          <span className="text-xs text-white font-black mt-0.5">
-            {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting for Opponent...'}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          {status === 'completed' ? (
-            <button
-              onClick={handleBackToLobby}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-            >
-              Lobby
-            </button>
-          ) : (
-            <button
-              onClick={handleResign}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-            >
-              Resign
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Scores panel */}
-      <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 flex items-center justify-around shadow-2xl divide-x divide-slate-800 animate-in fade-in duration-300">
-        {activePlayersList.map((p) => {
-          const isCurrent = currentTurn === p.id && status === 'active';
-          const isYou = p.id === userId;
-
-          return (
-            <div key={p.id} className="flex flex-col items-center px-3 flex-1 text-center min-w-0">
-              <span className={`text-[10px] font-black uppercase tracking-wider truncate max-w-full ${
-                isCurrent ? 'text-emerald-400' : 'text-slate-300'
-              }`}>
-                {p.username} {isYou && '(You)'}
-              </span>
-              <span className="text-2xl font-black text-white drop-shadow mt-0.5">{p.score}</span>
+      {/* Responsive Grid Container: Mobile 1 column, Tablet/Desktop 12-column Side-by-Side layout */}
+      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+        
+        {/* Left Column (Controls, Merged Header, Rack, Timeline on Desktop) */}
+        <div className="md:col-span-5 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
+          {/* Merged Header with Back Button, Turn Info & Live Scores */}
+          <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-2 animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={handleBackToLobby}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md active:scale-95 shrink-0"
+              >
+                ← Back
+              </button>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
+                  <span className="text-[9px] font-black px-1.5 py-0.2 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
+                    {gridSize}×{gridSize}
+                  </span>
+                </div>
+                <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-300'}`}>
+                  {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting...'}
+                </span>
+              </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Centered Board */}
-      <BoardGrid
-        gridSize={gridSize}
-        board={board}
-        placedTiles={placedTiles}
-        selectedIdx={selectedRackIdx}
-        onPlaceTile={handlePlaceTile}
-        onRecallTile={handleRecallTile}
-      />
+            {/* Merged Player Scores Pill */}
+            <div className="flex items-center gap-2 bg-slate-950/80 px-2.5 py-1.5 border border-slate-800 rounded-2xl shrink-0">
+              {activePlayersList.map((p, i) => {
+                const isYou = p.id === userId;
+                const isCurrent = currentTurn === p.id && status === 'active';
+                return (
+                  <div key={p.id} className="flex items-center gap-1 text-[10px] font-black">
+                    {i > 0 && <span className="text-slate-700">•</span>}
+                    <span className={isCurrent ? 'text-emerald-400' : 'text-slate-400'}>
+                      {isYou ? 'You' : p.username}:
+                    </span>
+                    <span className="text-white text-xs font-black">{p.score}</span>
+                  </div>
+                );
+              })}
+            </div>
 
-      {/* Action panel: Play Word vs Swap Tiles (No pass button) */}
-      {isMyTurn && (
-        <div className="w-full max-w-[480px] grid grid-cols-2 gap-3 animate-in fade-in duration-300">
-          <button
-            onClick={handleSubmit}
-            disabled={placedTiles.length === 0}
-            className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
-              placedTiles.length > 0
-                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
-                : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
-            }`}
-          >
-            Play Word ({placedTiles.length})
-          </button>
-          <button
-            onClick={handleOpenExchange}
-            className="py-3.5 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg shadow-amber-600/20"
-          >
-            🔄 Swap Tiles
-          </button>
+            {status !== 'completed' && (
+              <button
+                onClick={handleResign}
+                className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
+              >
+                Resign
+              </button>
+            )}
+          </div>
+
+          {/* Action panel: Play Word vs Swap Tiles */}
+          {isMyTurn && (
+            <div className="w-full grid grid-cols-2 gap-3 animate-in fade-in duration-300">
+              <button
+                onClick={handleSubmit}
+                disabled={placedTiles.length === 0}
+                className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
+                  placedTiles.length > 0
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
+                    : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
+                }`}
+              >
+                Play Word ({placedTiles.length})
+              </button>
+              <button
+                onClick={handleOpenExchange}
+                className="py-3.5 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg shadow-amber-600/20"
+              >
+                🔄 Swap Tiles
+              </button>
+            </div>
+          )}
+
+          {/* Tile Rack */}
+          <TileRack
+            rack={rack}
+            selectedIdx={selectedRackIdx}
+            onSelectTile={handleSelectTile}
+            onShuffle={shuffleRack}
+            onRecallAll={recallAllTiles}
+            isMyTurn={isMyTurn}
+          />
+
+          {/* Move History */}
+          <MoveHistory moves={moves} player1={player1} player2={player2} />
         </div>
-      )}
 
-      {/* Tile Rack */}
-      <TileRack
-        rack={rack}
-        selectedIdx={selectedRackIdx}
-        onSelectTile={handleSelectTile}
-        onShuffle={shuffleRack}
-        onRecallAll={recallAllTiles}
-        isMyTurn={isMyTurn}
-      />
+        {/* Right Column: Centered Game Board Grid */}
+        <div className="md:col-span-7 flex flex-col items-center justify-center w-full">
+          <BoardGrid
+            gridSize={gridSize}
+            board={board}
+            placedTiles={placedTiles}
+            selectedIdx={selectedRackIdx}
+            onPlaceTile={handlePlaceTile}
+            onRecallTile={handleRecallTile}
+          />
+        </div>
 
-      {/* Move History */}
-      <MoveHistory moves={moves} player1={player1} player2={player2} />
+      </div>
 
       {/* Exchange Selection Modal */}
       {showExchangeModal && (
@@ -324,4 +335,5 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 };
 
 export default WordGridContainer;
+
 

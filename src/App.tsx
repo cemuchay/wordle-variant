@@ -1043,7 +1043,7 @@ export default function App() {
       )}
 
       {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && (
+      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && !(activeNavigationItem === "more" && moreGameMode === "wordgrid") && (
         <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
           <AppHeader
             hideGameplayActions={activeNavigationItem !== "play"}
