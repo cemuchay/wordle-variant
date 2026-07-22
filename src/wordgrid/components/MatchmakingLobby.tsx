@@ -59,7 +59,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   const targetPlayers = Math.min(selectedPlayers, maxPlayersAllowed);
 
   useEffect(() => {
-    if (!userId || view !== 'lobby') return;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (!userId || !isUuid || view !== 'lobby') return;
     loadMatchesList(userId);
 
     const channel = supabase
@@ -107,27 +108,52 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     };
   };
 
+  // Self-abort 10s timeout during matchmaking or game creation
+  useEffect(() => {
+    if (loading || view === 'matchmaking') {
+      const timer = setTimeout(() => {
+        const store = useWordGridStore.getState();
+        if (store.loading || store.view === 'matchmaking') {
+          useWordGridStore.setState({ loading: false, view: 'lobby' });
+          triggerToast('Game creation timed out (10s limit). Returning to lobby.', 4000);
+        }
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, view, triggerToast]);
+
   const filteredPlayers = (allProfiles || []).filter(
     (p: PlayerProfile) =>
       p.id !== userId &&
       (p.username || '').toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  if (view === 'matchmaking') {
+  if (loading || view === 'matchmaking') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
-        <div className="w-16 h-16 rounded-full bg-indigo-500/20 border border-indigo-400 flex items-center justify-center animate-pulse text-2xl shadow-lg">
-          🔍
+      <div className="flex flex-col items-center justify-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
+        <div className="relative flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+          <span className="absolute text-2xl animate-bounce">🔠</span>
         </div>
         <div className="space-y-2">
-          <h3 className="text-lg font-black uppercase tracking-wider text-white">Finding Opponent</h3>
-          <p className="text-xs text-slate-300 font-medium">Searching for {targetPlayers} players ({selectedGridSize}×{selectedGridSize} board)...</p>
+          <h3 className="text-lg font-black uppercase tracking-wider text-white">
+            {view === 'matchmaking' ? 'Finding Opponent' : 'Creating Game'}
+          </h3>
+          <p className="text-xs text-indigo-300 font-bold">
+            Initializing {selectedGridSize}×{selectedGridSize} Scrabble board...
+          </p>
+          <p className="text-[10px] text-slate-400 font-medium">
+            Shuffling balanced tile bag & preparing racks. Self-aborting in 10s if delayed.
+          </p>
         </div>
         <button
-          onClick={() => cancelQueue(userId)}
-          className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-black uppercase tracking-wider text-white transition-all cursor-pointer shadow-md"
+          onClick={() => {
+            useWordGridStore.setState({ loading: false, view: 'lobby' });
+            cancelQueue(userId);
+          }}
+          className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-black uppercase tracking-wider text-white transition-all cursor-pointer shadow-md active:scale-95"
         >
-          Cancel Search
+          Cancel & Abort
         </button>
       </div>
     );

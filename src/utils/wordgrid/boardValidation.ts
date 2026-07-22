@@ -1,6 +1,7 @@
 // src/utils/wordgrid/boardValidation.ts
 
 import type { GridCell, PlacedTile } from './constants';
+import { DEFAULT_GRID_SIZE } from './constants';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -15,7 +16,7 @@ export interface ValidationResult {
 export function validateBoardPlacement(
   placedTiles: PlacedTile[],
   existingBoard: GridCell[],
-  gridSize = 11
+  gridSize = DEFAULT_GRID_SIZE
 ): ValidationResult {
   if (placedTiles.length === 0) {
     return { isValid: false, error: 'No tiles placed.' };
