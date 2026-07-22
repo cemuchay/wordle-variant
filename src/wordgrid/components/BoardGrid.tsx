@@ -39,7 +39,7 @@ export const BoardGrid = ({
       return (
         <div
           key={key}
-          className="aspect-square bg-gradient-to-br from-amber-200 via-amber-300 to-amber-400 border-2 border-amber-200 rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-transform hover:scale-[1.02] select-none"
+          className="aspect-square bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border-2 border-amber-200 rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-transform hover:scale-[1.02] select-none"
         >
           <span className="text-sm sm:text-base md:text-lg font-black text-slate-950 select-none leading-none">{letter}</span>
           <span className="text-[9px] font-black text-slate-900 absolute bottom-0.5 right-1 select-none">{val}</span>
@@ -56,7 +56,7 @@ export const BoardGrid = ({
           key={key}
           type="button"
           onClick={() => onRecallTile(x, y)}
-          className="aspect-square bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-pointer transform active:scale-95 transition-all hover:brightness-110 select-none"
+          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-pointer transform active:scale-95 transition-all hover:brightness-110 select-none"
         >
           <span className="text-sm sm:text-base md:text-lg font-black text-white drop-shadow-md select-none leading-none">{letter}</span>
           <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>

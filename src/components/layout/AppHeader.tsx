@@ -50,7 +50,7 @@ export const AppHeader = ({
 }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
-    const { triggerToast, isDynamicIslandVisible } = useApp();
+    const { triggerToast, } = useApp();
     const [isShaking, setIsShaking] = useState(false);
 
     const handleLockedHintClick = () => {
@@ -80,7 +80,7 @@ export const AppHeader = ({
     };
 
     return (
-        <header className={`w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 shrink-0 ${isDynamicIslandVisible ? 'pt-7.5 sm:pt-10' : 'pt-2'}`}>
+        <header className="w-full max-w-lg mx-auto flex flex-col gap-2 mb-2 shrink-0 pt-2">
             <div className="w-full flex items-center justify-between gap-1 h-10 py-1 px-2 bg-white/5 rounded-2xl border border-white/10">
                 {/* Left Side: Logo & Sync Status */}
                 <div className="flex items-center gap-1.5 min-w-0">

@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Eye, Loader2, Trophy, User, X, RotateCw, MessageCircle } from 'lucide-react';
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Eye, Loader2, MessageCircle, RotateCw, Trophy, User, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
-import { Z_INDEX } from '../constants/ui';
+import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
-import GuessPreviewModal from './guess-preview';
-import { ProtectedAvatar } from './chat/ProtectedAvatar';
-import { useApp } from '../context/AppContext';
-import { safeSessionStorage } from '../utils/storage';
-import { LeaderboardSkeleton } from './common/Skeletons';
 import formatUsername from '../utils/formatUsername';
+import { safeSessionStorage } from '../utils/storage';
+import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { ReigningBadge } from './common/ReigningBadge';
+import { LeaderboardSkeleton } from './common/Skeletons';
+import GuessPreviewModal from './guess-preview';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'
@@ -480,243 +479,38 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         )}
       </div>
 
-      {/* The Modal */}
+      {/* The Modal / Full Height Preview Overlay */}
       {(selectedEntry && (timeframe === "today" || timeframe === "yesterday" || activeTab === 'stats')) && (
-        <GuessPreviewModal
-          entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
-          yesterday={timeframe === "yesterday"}
-        />
-      )}
-    </>
-  );
-
-  if (inline) {
-    return (
-      <div
-        className="flex flex-col h-[92vh] w-full max-w-lg mx-auto bg-[#0b141a] border border-white/10 rounded-[40px] overflow-hidden px-2 py-3  relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]"
-        style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
-      >
-        <div className="w-full max-w-md mx-auto flex flex-col h-full relative overflow-hidden">
-          <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-gray-100 shrink-0">Leaderboard</h2>
-          {renderContent()}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.STATS_MODAL }}>
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl px-2 py-3 shadow-2xl relative flex flex-col h-full max-h-full sm:h-[75vh]">
-
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer">
-          <X size={20} />
-        </button>
-
-        <h2 className="text-xl uppercase tracking-tighter mb-6 text-center text-white">Leaderboard</h2>
-
-        {/* Tab Switcher */}
-        <div className="flex bg-gray-800 rounded-lg p-1 mb-6 shrink-0">
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'stats' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400'}`}
-          >
-            <User size={14} /> Personal
-          </button>
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${activeTab === 'leaderboard' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400'}`}
-          >
-            <Trophy size={14} /> Global
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 pr-1 scrollbar-hide">
-          {activeTab === 'stats' ? (
-            loading ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-2">
-                <Loader2 className="animate-spin text-gray-600" size={24} />
-                <span className="text-[10px] text-gray-600 uppercase font-bold">Fetching your history...</span>
-              </div>
-            ) : (
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex justify-around mb-4 text-center">
-                  <StatItem value={stats.gamesPlayed} label="Played" />
-                  <StatItem
-                    value={`${stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0}%`}
-                    label="Win %"
-                  />
-                  <StatItem value={stats.currentStreak} label="Streak" />
-                </div>
-
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] mb-3 text-gray-500">Guess Distribution</h3>
-                <div className="space-y-2">
-                  {Object.entries(stats.guesses).map(([attempt, count]) => (
-                    <div key={attempt} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-2">{attempt}</span>
-                      <div className="flex-1 bg-gray-800 rounded-sm overflow-hidden">
-                        <div
-                          className={`${attempt === "X" ? `bg-red-400` : `bg-correct`} py-0.5 px-1 text-right transition-all duration-1000 min-w-fit font-bold`}
-                          style={{ width: `${Math.max((count / maxGuesses) * 100, 8)}%` }}
-                        >
-                          {count}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {isGameOver && user && (
-                  <button
-                    onClick={() => setSelectedEntry({
-                      username: user.user_metadata?.username || formatUsername(user.user_metadata?.full_name) || 'You',
-                      avatar_url: user.user_metadata?.avatar_url || '',
-                      user_id: user.id,
-                      total_score: 0,
-                      days_active: 0
-                    })}
-                    className="mt-8 w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-300 transition-all border border-white/5"
-                  >
-                    <Eye size={14} /> View Today's Game
-                  </button>
-                )}
-              </div>)
-          ) : (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              {/* Timeframe Toggles */}
-              <div className="flex gap-1 mb-2">
-                {(['today', 'yesterday', 'weekly', 'monthly'] as Timeframe[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTimeframe(t)}
-                    className={`flex-1 py-1 rounded text-[9px] font-bold uppercase border transition-all ${timeframe === t ? 'bg-white text-black border-white' : 'border-gray-700 text-gray-500'}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-
-
-              </div>
-
-              <div className="flex items-center justify-between py-1.5 px-3 mb-3 bg-correct/5 border border-correct/20 rounded-xl">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-correct animate-pulse" />
-                  <span className="text-[8px] text-correct font-bold uppercase tracking-wider">Live Updates Enabled</span>
-                </div>
-                <button
-                  onClick={handleManualRefresh}
-                  disabled={loading}
-                  className="text-correct hover:text-white transition-colors disabled:opacity-50 p-1 rounded hover:bg-correct/10"
-                  title="Force Refresh Leaderboard"
-                  id="force-refresh-leaderboard"
-                >
-                  <RotateCw size={12} className={loading ? "animate-spin" : ""} />
-                </button>
-              </div>
-
-              {
-                canViewGuess && (
-                  <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Click on user to see their guesses...</p>
-                )
-              }
-              {
-                timeframe === "weekly" && (
-                  <p className="text-[10px] text-gray-100 uppercase font-bold mb-4">Weekly leaderboard runs from mon - sun</p>
-                )
-              }
-
-              {
-                timeframe === "monthly" && (
-                  <p className="text-[9px] text-gray-100 uppercase font-bold mb-4">Monthly leaderboard runs from 1st to last day of the month</p>
-                )
-              }
-
-
-
-              {leaderboardError && leaderboard.length === 0 ? (
-                <div className="py-12 px-4 text-center bg-red-950/20 border border-red-500/30 rounded-2xl space-y-4">
-                  <div className="bg-red-500/10 text-red-400 p-4 rounded-xl border border-red-500/20">
-                    <p className="text-xs font-black uppercase mb-1">Failed to Rank Players</p>
-                    <p className="text-[10px] leading-relaxed text-red-300/90">{leaderboardError}</p>
-                  </div>
-                  <button
-                    onClick={() => fetchLeaderboard(true)}
-                    className="bg-white text-black px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-colors"
-                  >
-                    Retry Connection
-                  </button>
-                </div>
-              ) : loading ? (
-                <LeaderboardSkeleton />
-              ) : (
-                <div className="space-y-2">
-                  {leaderboardError && leaderboard.length > 0 && (
-                    <div className="mb-4 bg-amber-500/15 border border-amber-500/30 px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 text-left">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-amber-500">Connection Interrupted</p>
-                        <p className="text-[9px] text-white/80 font-semibold leading-tight">Leaderboard details might be stale.</p>
-                      </div>
-                      <button
-                        onClick={() => fetchLeaderboard(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-black px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors shrink-0"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  {(() => {
-                    let currentRank = 1;
-                    return leaderboard.map((entry, i, arr) => {
-                      if (i > 0 && entry.total_score < arr[i - 1].total_score) {
-                        currentRank = i + 1;
-                      }
-
-                      const tieCount = arr.filter(e => e.total_score === entry.total_score).length;
-                      const tieIndex = arr.slice(0, i + 1).filter(e => e.total_score === entry.total_score).length - 1;
-
-                      const lbDate = timeframe === 'yesterday' && currentDate
-                        ? (() => {
-                          const d = new Date(currentDate);
-                          d.setDate(d.getDate() - 1);
-                          return d.toISOString().split("T")[0];
-                        })()
-                        : currentDate;
-
-                      return (
-                        <LeaderboardRow
-                          key={`${entry.username}-${i}`}
-                          entry={entry}
-                          rank={currentRank}
-                          tieIndex={tieIndex}
-                          tieCount={tieCount}
-                          isCurrentUser={entry.user_id === user?.id}
-                          canViewGuesses={canViewGuess}
-                          onShowGuesses={(e) => setSelectedEntry(e)}
-                          gameDate={lbDate}
-                          timeframe={timeframe}
-                        />
-                      );
-                    });
-                  })()}
-                  {leaderboard.length === 0 && (
-                    <p className="text-center text-[10px] text-gray-500 uppercase py-8 tracking-widest">No scores found for this period</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* The Modal */}
-        {(selectedEntry && (timeframe === "today" || timeframe === "yesterday" || activeTab === 'stats')) && (
+        <div className="absolute inset-0 z-30 bg-gray-900 flex flex-col h-full w-full min-h-0">
           <GuessPreviewModal
             entry={selectedEntry}
             onClose={() => setSelectedEntry(null)}
             yesterday={timeframe === "yesterday"}
           />
-        )}
+        </div>
+      )}
+    </>
+  );
 
-
+  return (
+    <div
+      className="flex flex-col h-full min-h-0 flex-1 w-full max-w-xl mx-auto bg-gray-900 overflow-hidden px-2 py-3 relative"
+      style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
+    >
+      <div className="w-full max-w-xl mx-auto flex flex-col h-full min-h-0 flex-1 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-4 shrink-0 px-2 relative">
+          <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">Leaderboard</h2>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
+        {renderContent()}
       </div>
     </div>
   );

@@ -2,7 +2,6 @@
 import { Loader2, Search, X } from "lucide-react";
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_ATTEMPTS } from "../../constants/game";
-import { Z_INDEX } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
 import { ChallengeContext } from "../../context/ChallengeContext";
 import {
@@ -18,12 +17,12 @@ import { parseMarathonGames } from "../../utils/marathon";
 import { safeLocalStorage } from "../../utils/storage";
 import { ShareButton } from "../ShareButton";
 import FakeGrid from "./components/FakeGrid";
+import ShowScoringInfo from "./components/ShowScoringInfo";
 import { GuessGrid } from "./GuessGrid";
 import { MarathonGameList } from "./MarathonGameList";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { TargetWordSection } from "./TargetWordSection";
 import type { GuessPreviewData } from "./types";
-import ShowScoringInfo from "./components/ShowScoringInfo";
 
 interface GuessPreviewModalProps {
   entry: any; // More flexible for challenge participants
@@ -565,35 +564,33 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(2rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]"
-      style={{ zIndex: Z_INDEX.GUESS_PREVIEW }}
-      onClick={onClose}
+      className="bg-gray-900 border border-gray-700 w-full max-w-xl mx-auto rounded-2xl p-4 sm:p-6 shadow-2xl relative flex flex-col flex-1 min-h-0 h-full overflow-hidden"
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="bg-gray-900 border border-gray-700 w-full sm:max-w-sm rounded-2xl p-6 shadow-2xl relative flex flex-col overflow-y-auto h-full max-h-full"
-        onClick={(e) => e.stopPropagation()}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer p-1 hover:bg-white/5 rounded-full"
+        title="Close"
       >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-white z-20 cursor-pointer"
-        >
-          <X size={20} />
-        </button>
+        <X size={20} />
+      </button>
 
-        <div className="flex items-center justify-center gap-2 mb-2 relative">
-          <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold">
-            {username}'s Guesses
-          </p>
-          {isMarathon && (
-            <button
-              onClick={() => marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
-              title="Scroll to game list"
-            >
-              <Search size={14} />
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-center gap-2 mb-2 relative shrink-0">
+        <p className="text-sm uppercase tracking-tighter text-gray-100 font-bold">
+          {username}'s Guesses
+        </p>
+        {isMarathon && (
+          <button
+            onClick={() => marathonGamesRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
+            title="Scroll to game list"
+          >
+            <Search size={14} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-hide">
 
 
         {loading ? (
@@ -724,7 +721,6 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         )}
 
         <ShowScoringInfo showScoringInfo={showScoringInfo} setShowScoringInfo={setShowScoringInfo} />
-
       </div>
     </div>
   );

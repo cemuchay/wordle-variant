@@ -23,7 +23,6 @@ import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
 import { useAppStore } from "../store/useAppStore";
-import { useApp } from "../context/AppContext";
 
 // Sub-components
 import { ChallengeCreate } from "./challenge/ChallengeCreate";
@@ -150,7 +149,6 @@ const AuthenticatedChallengeContent = memo(
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-    const { isDynamicIslandVisible } = useApp();
     const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -271,6 +269,7 @@ const AuthenticatedChallengeContent = memo(
 
     // Reset played page when navigating tabs or changing filters
     useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayedPage(1);
     }, [listColumn, modeFilter, lengthFilter, searchQuery]);
 
@@ -278,7 +277,7 @@ const AuthenticatedChallengeContent = memo(
       <div className="flex flex-col h-full overflow-hidden relative">
         <div
           id="challenge-modal-header"
-          className={`border-b border-white/5 flex items-center justify-between shrink-0 px-3 pb-3 sm:px-4 sm:pb-4 ${isDynamicIslandVisible ? 'pt-10 sm:pt-11' : 'pt-3 sm:pt-4'}`}
+          className="border-b border-white/5 flex items-center justify-between shrink-0 px-3 pb-3 sm:px-4 sm:pb-4 pt-3 sm:pt-4"
         >
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             {!isPlaying && selectedChallenge && (
@@ -855,33 +854,35 @@ const AuthenticatedChallengeContent = memo(
         </AnimatePresence>
 
         {previewParticipant && (
-          <GuessPreviewModal
-            entry={previewParticipant}
-            onClose={() => {
-              setPreviewParticipant(null);
-              setPreviewMarathonLength(null);
-              setPreviewMarathonGameIndex(null);
-            }}
-            myParticipation={myParticipation}
-            initialMarathonGameIndex={previewMarathonGameIndex ?? undefined}
-            initialData={{
-              guesses: previewParticipant.guesses,
-              skill_score: previewParticipant.score,
-              hints_used: previewParticipant.hints_used,
-              hint_record: previewParticipant.hint_record,
-              time_taken: previewParticipant.time_taken,
-              target_words: previewParticipant.target_words || undefined,
-            }}
-            targetWord={selectedChallenge?.target_word}
-            salt={selectedChallenge?.salt}
-            challenge={selectedChallenge}
-            lengthOfWord={selectedChallenge?.word_length}
-            isCreator={
-              selectedChallenge?.creator_id === user?.id &&
-              !!selectedChallenge?.is_custom_word
-            }
-            isShapeshifter={selectedChallenge?.is_shapeshifter}
-          />
+          <div className="absolute inset-0 z-30 bg-gray-900 flex flex-col h-full w-full min-h-0">
+            <GuessPreviewModal
+              entry={previewParticipant}
+              onClose={() => {
+                setPreviewParticipant(null);
+                setPreviewMarathonLength(null);
+                setPreviewMarathonGameIndex(null);
+              }}
+              myParticipation={myParticipation}
+              initialMarathonGameIndex={previewMarathonGameIndex ?? undefined}
+              initialData={{
+                guesses: previewParticipant.guesses,
+                skill_score: previewParticipant.score,
+                hints_used: previewParticipant.hints_used,
+                hint_record: previewParticipant.hint_record,
+                time_taken: previewParticipant.time_taken,
+                target_words: previewParticipant.target_words || undefined,
+              }}
+              targetWord={selectedChallenge?.target_word}
+              salt={selectedChallenge?.salt}
+              challenge={selectedChallenge}
+              lengthOfWord={selectedChallenge?.word_length}
+              isCreator={
+                selectedChallenge?.creator_id === user?.id &&
+                !!selectedChallenge?.is_custom_word
+              }
+              isShapeshifter={selectedChallenge?.is_shapeshifter}
+            />
+          </div>
         )}
 
         {/* Bootstrapping Overlay Loader */}
@@ -985,10 +986,10 @@ export const ChallengeModal = ({
   if (inline) {
     return (
       <div
-        className={`flex flex-col h-full w-full mx-auto bg-gray-900 overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] transition-all duration-300 ${isPlaying ? 'max-w-none rounded-none border-none' : 'max-w-lg sm:rounded-[40px] sm:border sm:border-white/10'}`}
+        className={`flex flex-col h-full flex-1 min-h-0 w-full mx-auto bg-gray-900 overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] transition-all duration-300 ${isPlaying ? 'max-w-none rounded-none border-none' : 'max-w-lg sm:rounded-[40px] sm:border sm:border-white/10'}`}
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
-        <div className="w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300">
+        <div className="w-full max-w-xl mx-auto flex flex-col h-full min-h-0 flex-1 relative overflow-hidden">
           {renderContent()}
         </div>
       </div>
@@ -1002,20 +1003,12 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className={`fixed inset-0 flex items-center justify-center bg-gray-900/90 md:backdrop-blur-xs transition-[padding,background-color] duration-300 ${isPlaying
-          ? "p-0 pt-[env(safe-area-inset-top,0)] pb-[env(safe-area-inset-bottom,0)] sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
-          : "p-0 pt-[env(safe-area-inset-top,0)] pb-[env(safe-area-inset-bottom,0)] sm:p-4 sm:pt-[calc(1rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
+        className={`bg-gray-900 w-full h-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
+          ? "max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
+          : "max-h-full rounded-none border-none sm:max-w-xl sm:rounded-3xl sm:border sm:border-white/10 sm:h-[85vh] sm:max-h-[85vh]"
           }`}
-        style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
-        <div
-          className={`bg-gray-900 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
-            ? "h-full max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
-            : "h-full max-h-full rounded-none border-none sm:max-w-xl sm:rounded-3xl sm:border sm:border-white/10 sm:h-[85vh] sm:max-h-[85vh]"
-            }`}
-        >
-          <ChallengeModalContent onClose={onClose} user={user} />
-        </div>
+        <ChallengeModalContent onClose={onClose} user={user} />
       </div>
     </ChallengeProvider>
   );
