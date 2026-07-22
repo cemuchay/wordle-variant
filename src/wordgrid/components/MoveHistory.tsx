@@ -40,24 +40,28 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
     }
   };
 
+  const [selectedBreakdown, setSelectedBreakdown] = useState<{ word: string; breakdown: string; score: number } | null>(null);
+
   return (
     <div className="w-full max-w-[420px] bg-slate-900/60 border border-white/10 rounded-2xl p-4 shadow-xl flex flex-col space-y-3 select-none mx-auto">
       <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Play Timeline</span>
 
       <div className="max-h-[140px] overflow-y-auto space-y-2 pr-1 scrollbar-hide">
         {moves.slice().reverse().map((move, idx) => {
-          const isPass = move.word === 'PASS';
+          const isPass = move.word === 'PASS' || move.word?.startsWith('SWAP');
+          const hasBreakdown = !!move.breakdown;
+
           return (
             <div
               key={idx}
-              className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded-xl text-xs"
+              className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded-xl text-xs gap-2"
             >
-              <div className="flex flex-col min-w-0">
+              <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-[9px] text-gray-400 font-bold uppercase truncate">
                   {getUsername(move.player_id)}
                 </span>
                 {isPass ? (
-                  <span className="text-gray-500 font-black italic">PASSED</span>
+                  <span className="text-gray-500 font-black italic truncate">{move.word || 'PASSED'}</span>
                 ) : (
                   <button
                     onClick={() => handleWordClick(move.word)}
@@ -71,6 +75,15 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
                 <span className={`text-[10px] ${isPass ? 'text-gray-500' : 'text-emerald-400'}`}>
                   {isPass ? '0' : `+${move.score}`} pts
                 </span>
+                {hasBreakdown && (
+                  <button
+                    onClick={() => setSelectedBreakdown({ word: move.word, breakdown: move.breakdown, score: move.score })}
+                    className="w-4 h-4 rounded-full bg-indigo-950 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 flex items-center justify-center text-[9px] font-black cursor-pointer transition-colors"
+                    title="View score decision breakdown"
+                  >
+                    i
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -121,6 +134,41 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
             >
               Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Score Decision Breakdown Modal */}
+      {selectedBreakdown && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-[#18181b] border border-emerald-500/30 rounded-2xl p-5 max-w-xs w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex flex-col">
+                <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider">
+                  Score Breakdown
+                </h4>
+                <span className="text-[10px] font-black text-white/70">
+                  {selectedBreakdown.word} (+{selectedBreakdown.score} pts)
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedBreakdown(null)}
+                className="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[10px] text-white/60 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-white/5 border border-white/5 rounded-xl space-y-1.5 font-mono text-[11px] text-emerald-300 leading-relaxed break-words">
+              {selectedBreakdown.breakdown}
+            </div>
+
+            <button
+              onClick={() => setSelectedBreakdown(null)}
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Done
             </button>
           </div>
         </div>

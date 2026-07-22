@@ -358,6 +358,7 @@ interface WordGridState {
    setMatchId: (matchId: string | null) => void;
 
    // Board & Rack play actions
+   moveTileInGrid: (fromX: number, fromY: number, toX: number, toY: number) => void;
    placeTile: (x: number, y: number, letter: string) => void;
    recallTile: (x: number, y: number) => void;
    recallAllTiles: () => void;
@@ -366,12 +367,12 @@ interface WordGridState {
    // Game turn submissions (No Pass option - Swap or Play only)
    submitMove: (
       userId: string,
-      triggerToast: (msg: string, duration?: number) => void,
+      triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<boolean>;
    exchangeTiles: (
       userId: string,
       lettersToExchange: string[],
-      triggerToast?: (msg: string, duration?: number) => void,
+      triggerToast?: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<void>;
    resignMatch: (userId: string) => Promise<void>;
 
@@ -463,6 +464,23 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
    setMatchId: (matchId) => set({ matchId }),
 
+   moveTileInGrid: (fromX: number, fromY: number, toX: number, toY: number) => {
+      const { placedTiles, board, matchId } = get();
+      // Cannot move to an already occupied cell (either on existing board or placed tiles)
+      const isBoardOccupied = board.some((c) => c.x === toX && c.y === toY);
+      const isPlacedOccupied = placedTiles.some((t) => t.x === toX && t.y === toY);
+      if (isBoardOccupied || isPlacedOccupied) return;
+
+      const tileIdx = placedTiles.findIndex((t) => t.x === fromX && t.y === fromY);
+      if (tileIdx === -1) return;
+
+      const newPlaced = [...placedTiles];
+      newPlaced[tileIdx] = { ...newPlaced[tileIdx], x: toX, y: toY };
+
+      set({ placedTiles: newPlaced });
+      saveDraftToLocalStorage(matchId, newPlaced, get().rack);
+   },
+
    placeTile: (x, y, letter) => {
       const { rack, placedTiles, matchId } = get();
       const idx = rack.findIndex((l) => l === letter);
@@ -517,6 +535,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    loadMatch: async (matchId, currentUserId) => {
+      get().resetGame();
       set({ loading: true, error: null });
       try {
          const { data, error } = await supabase
@@ -543,8 +562,10 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    updateFromMatchRecord: (record, currentUserId) => {
-      const isP1 = record.player1_id === currentUserId;
-      const isP2 = record.player2_id === currentUserId;
+      // In bot matches or guest matches where player1_id was inserted as null in DB, treat current user as player1
+      const isBotMatch = record.is_bot_match || get().isBotMatch;
+      const isP1 = record.player1_id === currentUserId || isBotMatch || !record.player1_id;
+      const isP2 = !isP1 && record.player2_id === currentUserId;
       const role = isP1 ? "player1" : isP2 ? "player2" : null;
 
       // Extract player list (support new multi-player structure or legacy 2p schema)
@@ -570,12 +591,12 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          ];
       }
 
-      const activePlayerObj = playersList.find((p) => p.id === currentUserId);
+      const activePlayerObj = playersList.find((p) => p.id === currentUserId || (isP1 && p.id !== 'bot'));
       const activeRack = activePlayerObj
          ? activePlayerObj.rack
          : isP1
-           ? record.p1_rack
-           : record.p2_rack;
+           ? (record.p1_rack || playersList[0]?.rack)
+           : (record.p2_rack || playersList[1]?.rack);
 
       const turnIndex =
          record.current_turn_index !== undefined &&
@@ -587,7 +608,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
               );
 
       const resolvedCurrentTurn =
-         record.current_turn || playersList[turnIndex]?.id || "bot";
+         record.current_turn || playersList[turnIndex]?.id || currentUserId || (isP1 ? record.player1_id : record.player2_id);
 
       // Check if a local storage draft exists for this matchId and restore uncommitted placed tiles
       let activePlaced = get().placedTiles;
@@ -667,7 +688,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       }
 
       // 3. Score calculation
-      const scoreResult = calculateTurnScore(words, placedTiles.length, board);
+      const scoreResult = calculateTurnScore(words, placedTiles.length, board, gridSize);
 
       // Update board state
       const newBoard = [...board];
@@ -713,6 +734,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          player_id: userId,
          word: words.map((w) => w.word).join(", "),
          score: scoreResult.totalScore,
+         breakdown: scoreResult.words.map((w) => w.breakdown).join(" | ") + (scoreResult.bingoApplied ? " + 50 (1st Move Bingo Bonus)" : ""),
          tiles_placed: placedTiles,
          timestamp: new Date().toISOString(),
       };
@@ -753,13 +775,13 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             currentTurnIndex: nextTurnIdx,
             currentTurn: nextPlayerTurnId,
          });
-         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`);
+         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, 4000, true);
 
          // Handle Bot Turn if applicable
-         if (get().isBotMatch && !isCompleted && nextPlayerTurnId === "bot") {
+         if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
             setTimeout(
                () => get().playBotTurn(newBoard, newBag, nextTurnIdx),
-               1200,
+               600,
             );
          }
 
@@ -775,10 +797,16 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       const { matchId, players, tileBag, currentTurnIndex, moves } = get();
       if (!matchId || lettersToExchange.length === 0) return;
 
-      const activeIdx = players.findIndex((p) => p.id === userId);
-      if (activeIdx === -1) return;
+      // 1. Locate active player index in players array
+      let activeIdx = players.findIndex((p) => p.id === userId);
+      if (activeIdx === -1) {
+         if (userId === get().player1?.id) activeIdx = 0;
+         else if (userId === get().player2?.id) activeIdx = 1;
+         else activeIdx = currentTurnIndex;
+      }
 
-      const currentRack = [...players[activeIdx].rack];
+      const activePlayer = players[activeIdx] || { id: userId, rack: get().rack };
+      const currentRack = [...activePlayer.rack];
 
       // Remove letters to exchange
       lettersToExchange.forEach((l) => {
@@ -849,11 +877,11 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          triggerToast(`Swapped ${lettersToExchange.length} tiles. Turn ended.`);
       }
 
-      // Trigger bot turn if next player is bot
-      if (get().isBotMatch && nextPlayerTurnId === "bot") {
+      // Handle Bot Turn if applicable after swapping tiles
+      if (get().isBotMatch && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
          setTimeout(
             () => get().playBotTurn(get().board, nextBag, nextTurnIdx),
-            1200,
+            600,
          );
       }
    },
@@ -924,7 +952,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
     startBotMatch: async (userId, difficulty, gridSize = DEFAULT_GRID_SIZE) => {
-       set({ loading: true, error: null });
+       get().resetGame();
+       set({ loading: true, error: null, isBotMatch: true, botDifficulty: difficulty });
        preloadBotWordPools();
        const initialBag = generateInitialTileBag();
 
@@ -960,7 +989,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       ];
 
       try {
-         const { data, error } = await safeWordGridInsert({
+         const insertRes = await safeWordGridInsert({
             player1_id: dbPlayer1Id,
             player2_id: null,
             is_bot_match: true,
@@ -974,36 +1003,36 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             p1_rack: p1Rack,
             p2_rack: botRack,
             current_turn_index: 0,
-            current_turn: isUuid(userId) ? userId : null,
+            current_turn: userId,
             p1_score: 0,
             p2_score: 0,
             moves: [],
          });
 
-         if (error) throw error;
-         if (data) {
-            set({
-               matchId: data.id,
-               gridSize,
-               role: "player1",
-               view: "active",
-               rack: p1Rack,
-               board: [],
-               players: initialPlayers,
-               tileBag: finalBag,
-               p1Score: 0,
-               p2Score: 0,
-               currentTurnIndex: 0,
-               currentTurn: userId,
-               isBotMatch: true,
-               botDifficulty: difficulty,
-               player1: { id: userId, username: "Player (You)" },
-               player2: {
-                  id: "bot",
-                  username: `AI (${difficulty.toUpperCase()})`,
-               },
-            });
-         }
+         const matchIdToUse = insertRes?.data?.id || `bot_match_${Date.now()}`;
+
+         set({
+            matchId: matchIdToUse,
+            gridSize,
+            role: "player1",
+            view: "active",
+            rack: p1Rack,
+            board: [],
+            players: initialPlayers,
+            tileBag: finalBag,
+            p1Score: 0,
+            p2Score: 0,
+            currentTurnIndex: 0,
+            currentTurn: userId,
+            isBotMatch: true,
+            botDifficulty: difficulty,
+            status: "active",
+            player1: { id: userId, username: "Player (You)" },
+            player2: {
+               id: "bot",
+               username: `AI (${difficulty.toUpperCase()})`,
+            },
+         });
       } catch (e: any) {
          console.error("startBotMatch error:", e);
          set({ error: e?.message || "Failed to start bot match" });
@@ -1117,6 +1146,9 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
        const { matchId, moves, players, gridSize, botDifficulty } = get();
        if (!matchId) return;
 
+       // Preload bot word pools if not preloaded yet
+       await preloadBotWordPools();
+
        const updatedPlayers = [...players];
        const botPlayer = updatedPlayers[botPlayerIdx] || {
           id: "bot",
@@ -1187,7 +1219,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          player_id: "bot",
          word: wordPlaced,
          score: addedScore,
-         tiles_placed: [],
+         breakdown: botMove?.score ? `${botMove.word} = ${botMove.score} pts` : undefined,
+         tiles_placed: botMove?.placedTiles || [],
          timestamp: new Date().toISOString(),
       };
 

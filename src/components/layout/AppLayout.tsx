@@ -4,6 +4,7 @@ import { AppNavigation } from './AppNavigation';
 import { DynamicIslandStatus } from '../DynamicIslandStatus';
 import { useAppStore } from '../../store/useAppStore';
 import { useApp } from '../../context/AppContext';
+import { applyTheme } from '../../utils/theme';
 import type { SyncStatus } from '../../types/game';
 
 export interface AppLayoutHeaderProps {
@@ -59,7 +60,7 @@ export const AppLayout = ({
     // Dynamic theme updates when prop is provided
     useEffect(() => {
         if (theme) {
-            document.documentElement.setAttribute('data-theme', theme);
+            applyTheme(theme);
             if (theme === 'dark' || theme === 'light') {
                 if (preferences.theme !== theme) {
                     setPreferences({ ...preferences, theme });

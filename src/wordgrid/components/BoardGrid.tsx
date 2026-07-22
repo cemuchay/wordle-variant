@@ -8,6 +8,7 @@ interface BoardGridProps {
   board: GridCell[];
   placedTiles: PlacedTile[];
   selectedIdx: number | null;
+  onMoveTileInGrid?: (fromX: number, fromY: number, toX: number, toY: number) => void;
   onPlaceTile: (x: number, y: number, rackIdx: number) => void;
   onRecallTile: (x: number, y: number) => void;
 }
@@ -17,6 +18,7 @@ export const BoardGrid = ({
   board,
   placedTiles,
   selectedIdx,
+  onMoveTileInGrid,
   onPlaceTile,
   onRecallTile,
 }: BoardGridProps) => {
@@ -47,7 +49,7 @@ export const BoardGrid = ({
       );
     }
 
-    // 2. Newly placed tiles in current turn (vibrant purple/indigo with click to recall)
+    // 2. Newly placed tiles in current turn (vibrant purple/indigo with click to recall & draggable to adjust)
     if (placedTile) {
       const letter = placedTile.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
@@ -55,8 +57,40 @@ export const BoardGrid = ({
         <button
           key={key}
           type="button"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData('application/json', JSON.stringify({ fromX: x, fromY: y }));
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              const gridDataStr = e.dataTransfer.getData('application/json');
+              if (gridDataStr) {
+                const { fromX, fromY } = JSON.parse(gridDataStr);
+                if (fromX !== undefined && fromY !== undefined && (fromX !== x || fromY !== y) && onMoveTileInGrid) {
+                  onMoveTileInGrid(fromX, fromY, x, y);
+                  return;
+                }
+              }
+            } catch {
+              /* ignore parse errors */
+            }
+            const rackIdxStr = e.dataTransfer.getData('text/plain');
+            if (rackIdxStr !== '') {
+              const rackIdx = parseInt(rackIdxStr, 10);
+              if (!isNaN(rackIdx)) {
+                onPlaceTile(x, y, rackIdx);
+              }
+            }
+          }}
           onClick={() => onRecallTile(x, y)}
-          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-pointer transform active:scale-95 transition-all hover:brightness-110 select-none"
+          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-grab active:cursor-grabbing transform active:scale-95 transition-all hover:brightness-110 select-none"
         >
           <span className="text-sm sm:text-base md:text-lg font-black text-white drop-shadow-md select-none leading-none">{letter}</span>
           <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>
@@ -99,6 +133,20 @@ export const BoardGrid = ({
         }}
         onDrop={(e) => {
           e.preventDefault();
+          // Check if dragging an already placed tile on the grid
+          try {
+            const gridDataStr = e.dataTransfer.getData('application/json');
+            if (gridDataStr) {
+              const { fromX, fromY } = JSON.parse(gridDataStr);
+              if (fromX !== undefined && fromY !== undefined && onMoveTileInGrid) {
+                onMoveTileInGrid(fromX, fromY, x, y);
+                return;
+              }
+            }
+          } catch {
+            /* ignore JSON parse errors */
+          }
+          // Otherwise check if dragging from rack
           const rackIdxStr = e.dataTransfer.getData('text/plain');
           if (rackIdxStr !== '') {
             const rackIdx = parseInt(rackIdxStr, 10);
