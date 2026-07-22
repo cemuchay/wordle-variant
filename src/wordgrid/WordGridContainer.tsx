@@ -21,15 +21,14 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   const {
     matchId,
-    role,
+    gridSize,
     status,
     board,
     rack,
     placedTiles,
     currentTurn,
-    p1Score,
-    p2Score,
     moves,
+    players,
     player1,
     player2,
     view,
@@ -40,7 +39,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     recallAllTiles,
     shuffleRack,
     submitMove,
-    passTurn,
     exchangeTiles,
     resignMatch,
     updateFromMatchRecord,
@@ -49,23 +47,18 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [exchangeSelections, setExchangeSelections] = useState<boolean[]>([]);
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(() => {
+    return !localStorage.getItem('wordgrid_tutorial_completed');
+  });
 
   const userId = user?.id || '';
   const isMyTurn = currentTurn === userId && status === 'active';
-
-  // Check first-time guide on load
-  useEffect(() => {
-    const isCompleted = localStorage.getItem('wordgrid_tutorial_completed');
-    if (!isCompleted) {
-      setShowTutorial(true);
-    }
-  }, []);
 
   const handleTutorialComplete = () => {
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
     setShowTutorial(false);
   };
+
 
   // Resubscribe to match updates when matchId changes
   useEffect(() => {
@@ -115,13 +108,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     }
   };
 
-  const handlePass = async () => {
-    if (window.confirm('Are you sure you want to pass your turn?')) {
-      await passTurn(userId);
-      triggerToast('You passed your turn.');
-    }
-  };
-
   const handleOpenExchange = () => {
     setExchangeSelections(Array(rack.length).fill(false));
     setShowExchangeModal(true);
@@ -139,9 +125,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       setShowExchangeModal(false);
       return;
     }
-    await exchangeTiles(userId, selectedLetters);
+    await exchangeTiles(userId, selectedLetters, triggerToast);
     setShowExchangeModal(false);
-    triggerToast(`Exchanged ${selectedLetters.length} tiles.`);
   };
 
   const handleResign = async () => {
@@ -158,17 +143,22 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   if (view === 'lobby' || view === 'matchmaking') {
     return (
-      <div className="h-full flex items-center justify-center p-4 bg-dark">
+      <div className="h-full w-full flex items-center justify-center p-4 bg-slate-950">
         <MatchmakingLobby userId={userId} allProfiles={allProfiles} onBack={onBackToClassic} />
       </div>
     );
   }
 
-  const p1Username = player1?.username || 'Player 1';
-  const p2Username = player2?.username || 'Player 2';
+  // Active players list for scores header
+  const activePlayersList = players.length > 0
+    ? players
+    : [
+        { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: useWordGridStore.getState().p1Score, rack: [] },
+        { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: useWordGridStore.getState().p2Score, rack: [] },
+      ];
 
   return (
-    <div className="h-full w-full flex flex-col bg-dark overflow-y-auto pb-8 scrollbar-none px-2 space-y-4">
+    <div className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 space-y-4 mx-auto">
       {showTutorial && (
         <WordGridTutorialModal
           onComplete={handleTutorialComplete}
@@ -177,25 +167,30 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       )}
 
       {/* Gameplay Header */}
-      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-xl animate-in fade-in duration-300">
+      <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 flex items-center justify-between shadow-2xl animate-in fade-in duration-300">
         <div className="flex flex-col">
-          <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
-          <span className="text-xs text-white font-black">
-            {status === 'completed' ? 'Match Finished' : isMyTurn ? 'Your Turn' : 'Waiting for Opponent'}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
+            <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
+              {gridSize}×{gridSize}
+            </span>
+          </div>
+          <span className="text-xs text-white font-black mt-0.5">
+            {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting for Opponent...'}
           </span>
         </div>
         <div className="flex gap-2">
           {status === 'completed' ? (
             <button
               onClick={handleBackToLobby}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
             >
-              Exit to Lobby
+              Lobby
             </button>
           ) : (
             <button
               onClick={handleResign}
-              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
             >
               Resign
             </button>
@@ -204,23 +199,27 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       </div>
 
       {/* Scores panel */}
-      <div className="w-full max-w-[420px] mx-auto bg-slate-900/60 border border-white/10 rounded-2xl p-4 grid grid-cols-2 gap-4 text-center shadow-xl divide-x divide-white/5 animate-in fade-in duration-300">
-        <div className="flex flex-col items-center">
-          <span className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-full">
-            {p1Username} {role === 'player1' && '(You)'}
-          </span>
-          <span className="text-2xl font-black text-white">{p1Score}</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-[9px] font-black text-white uppercase tracking-widest truncate max-w-full">
-            {p2Username} {role === 'player2' && '(You)'}
-          </span>
-          <span className="text-2xl font-black text-white">{p2Score}</span>
-        </div>
+      <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 flex items-center justify-around shadow-2xl divide-x divide-slate-800 animate-in fade-in duration-300">
+        {activePlayersList.map((p) => {
+          const isCurrent = currentTurn === p.id && status === 'active';
+          const isYou = p.id === userId;
+
+          return (
+            <div key={p.id} className="flex flex-col items-center px-3 flex-1 text-center min-w-0">
+              <span className={`text-[10px] font-black uppercase tracking-wider truncate max-w-full ${
+                isCurrent ? 'text-emerald-400' : 'text-slate-300'
+              }`}>
+                {p.username} {isYou && '(You)'}
+              </span>
+              <span className="text-2xl font-black text-white drop-shadow mt-0.5">{p.score}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Board */}
+      {/* Centered Board */}
       <BoardGrid
+        gridSize={gridSize}
         board={board}
         placedTiles={placedTiles}
         selectedIdx={selectedRackIdx}
@@ -228,30 +227,25 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         onRecallTile={handleRecallTile}
       />
 
-      {/* Action panel */}
+      {/* Action panel: Play Word vs Swap Tiles (No pass button) */}
       {isMyTurn && (
-        <div className="w-full max-w-[420px] mx-auto grid grid-cols-3 gap-2 animate-in fade-in duration-300">
+        <div className="w-full max-w-[480px] grid grid-cols-2 gap-3 animate-in fade-in duration-300">
           <button
             onClick={handleSubmit}
             disabled={placedTiles.length === 0}
-            className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${placedTiles.length > 0
-                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 active:scale-95'
-                : 'bg-slate-800 text-black border border-slate-700/50 cursor-not-allowed opacity-50'
-              }`}
+            className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
+              placedTiles.length > 0
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
+                : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
+            }`}
           >
-            Submit Move
+            Play Word ({placedTiles.length})
           </button>
           <button
             onClick={handleOpenExchange}
-            className="py-3 bg-white hover:bg-gray-100 text-black rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+            className="py-3.5 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider border border-amber-400 transition-all active:scale-95 cursor-pointer shadow-lg shadow-amber-600/20"
           >
-            Exchange
-          </button>
-          <button
-            onClick={handlePass}
-            className="py-3 bg-white hover:bg-gray-100 text-black rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
-          >
-            Pass
+            🔄 Swap Tiles
           </button>
         </div>
       )}
@@ -271,40 +265,43 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
       {/* Exchange Selection Modal */}
       {showExchangeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#18181b] border border-white/10 rounded-2xl p-5 max-w-xs w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-center">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-center">
             <div>
-              <h4 className="text-sm font-black uppercase text-white tracking-wider">Exchange Tiles</h4>
-              <p className="text-[10px] text-white font-black uppercase tracking-wider mt-1">Select tiles to trade back to bag</p>
+              <h4 className="text-base font-black uppercase text-white tracking-wider">Swap Tiles</h4>
+              <p className="text-[11px] text-slate-300 font-bold uppercase tracking-wider mt-1">
+                Select tiles to trade back. <span className="text-rose-400">Swapping ends your turn!</span>
+              </p>
             </div>
 
-            <div className="flex justify-center gap-1.5 flex-wrap">
+            <div className="flex justify-center gap-2 flex-wrap">
               {rack.map((letter, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleToggleExchangeSelection(idx)}
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black cursor-pointer transition-all ${exchangeSelections[idx]
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
-                    }`}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black cursor-pointer transition-all ${
+                    exchangeSelections[idx]
+                      ? 'bg-rose-600 text-white ring-2 ring-rose-400 shadow-lg scale-105'
+                      : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'
+                  }`}
                 >
                   {letter.toUpperCase()}
                 </button>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setShowExchangeModal(false)}
-                className="py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase text-white transition-all cursor-pointer"
+                className="py-3 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase text-white transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmExchange}
-                className="py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                className="py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg"
               >
-                Exchange
+                Confirm Swap
               </button>
             </div>
           </div>
@@ -313,4 +310,6 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     </div>
   );
 };
+
 export default WordGridContainer;
+

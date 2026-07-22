@@ -1,7 +1,23 @@
 // src/utils/wordgrid/constants.ts
 
-export const BOARD_SIZE = 11;
-export const CENTER_CELL = 5; // (5, 5) is the 0-indexed center of an 11x11 board
+// src/utils/wordgrid/constants.ts
+
+export const DEFAULT_GRID_SIZE = 7;
+export const ALLOWED_GRID_SIZES = [7, 8, 9, 10, 11] as const;
+export type GridSize = typeof ALLOWED_GRID_SIZES[number];
+
+// Recommended Max Players per Grid Size
+// 7x7: 2 (3 at most)
+// 8x8: 3
+// 9x9: 4
+// 10x10 & 11x11: 4–6
+export const RECOMMENDED_MAX_PLAYERS: Record<number, number> = {
+  7: 3,
+  8: 3,
+  9: 4,
+  10: 6,
+  11: 6,
+};
 
 // Standard English Scrabble letter values
 export const TILE_VALUES: Record<string, number> = {
@@ -10,7 +26,7 @@ export const TILE_VALUES: Record<string, number> = {
   '_': 0 // Blank tile
 };
 
-// Standard English Scrabble letter distribution (modified slightly for faster/smaller games if necessary)
+// Standard English Scrabble letter distribution
 export const TILE_BAG_DISTRIBUTION: Record<string, number> = {
   A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, J: 1, K: 1, L: 4, M: 2,
   N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6, U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1,
@@ -19,33 +35,63 @@ export const TILE_BAG_DISTRIBUTION: Record<string, number> = {
 
 export type MultiplierType = 'TW' | 'DW' | 'TL' | 'DL' | 'NONE';
 
-// 11x11 Premium Multiplier coordinates (symmetric distribution)
-export const PREMIUM_CELLS: Record<string, MultiplierType> = {
-  // Triple Word (TW) - corners and mid-edges
-  '0,0': 'TW', '0,5': 'TW', '0,10': 'TW',
-  '5,0': 'TW',              '5,10': 'TW',
-  '10,0': 'TW', '10,5': 'TW', '10,10': 'TW',
+// Generates dynamic premium cells symmetrically based on board size (7x7 to 11x11)
+export function getPremiumCellsForGrid(size: number): Record<string, MultiplierType> {
+  const premium: Record<string, MultiplierType> = {};
+  const max = size - 1;
+  const center = Math.floor(size / 2);
 
-  // Double Word (DW) - diagonal rings
-  '1,1': 'DW', '1,9': 'DW',
-  '2,2': 'DW', '2,8': 'DW',
-  '3,3': 'DW', '3,7': 'DW',
-  '4,4': 'DW', '4,6': 'DW',
-  '6,4': 'DW', '6,6': 'DW',
-  '7,3': 'DW', '7,7': 'DW',
-  '8,2': 'DW', '8,8': 'DW',
-  '9,1': 'DW', '9,9': 'DW',
+  // Corners are Triple Word (TW)
+  premium[`0,0`] = 'TW';
+  premium[`0,${max}`] = 'TW';
+  premium[`${max},0`] = 'TW';
+  premium[`${max},${max}`] = 'TW';
 
-  // Triple Letter (TL)
-  '1,5': 'TL', '5,1': 'TL', '5,9': 'TL', '9,5': 'TL',
-  '5,5': 'TL', // Center tile is a TL in our simplified distribution
+  // Mid edges: TW for larger boards (>= 9)
+  if (size >= 9) {
+    premium[`0,${center}`] = 'TW';
+    premium[`${max},${center}`] = 'TW';
+    premium[`${center},0`] = 'TW';
+    premium[`${center},${max}`] = 'TW';
+  }
 
-  // Double Letter (DL)
-  '2,4': 'DL', '2,6': 'DL',
-  '4,2': 'DL', '4,8': 'DL',
-  '6,2': 'DL', '6,8': 'DL',
-  '8,4': 'DL', '8,6': 'DL',
-};
+  // Diagonals: Double Word (DW)
+  for (let i = 1; i < max; i++) {
+    if (i !== center) {
+      premium[`${i},${i}`] = 'DW';
+      premium[`${i},${max - i}`] = 'DW';
+    }
+  }
+
+  // Triple Letter (TL) cross around center
+  const offset = size >= 9 ? 2 : 1;
+  if (center - offset >= 0) {
+    premium[`${center - offset},${center}`] = 'TL';
+    premium[`${center + offset},${center}`] = 'TL';
+    premium[`${center},${center - offset}`] = 'TL';
+    premium[`${center},${center + offset}`] = 'TL';
+  }
+
+  // Center cell gets special Double Word or Star rating
+  premium[`${center},${center}`] = 'DW';
+
+  // Double Letter (DL) accents
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      const key = `${x},${y}`;
+      if (!premium[key]) {
+        if ((x + y) % 4 === 0 && Math.abs(x - center) + Math.abs(y - center) <= center) {
+          premium[key] = 'DL';
+        }
+      }
+    }
+  }
+
+  return premium;
+}
+
+// Default 11x11 fallback backward compatibility map
+export const PREMIUM_CELLS = getPremiumCellsForGrid(11);
 
 export interface GridCell {
   x: number;
@@ -60,3 +106,12 @@ export interface PlacedTile {
   y: number;
   letter: string;
 }
+
+export interface WordGridPlayer {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  score: number;
+  rack: string[];
+}
+
