@@ -70,13 +70,19 @@ export const AppLayout = ({
 
     const { isDynamicIslandVisible } = useApp();
 
+    const isStandalone = typeof window !== 'undefined' && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window.navigator as any).standalone === true
+    );
+
     return (
         <div
-            className={`w-full h-full min-h-[100dvh] max-h-dvh flex flex-col flex-1 overflow-hidden bg-dark text-white relative select-none ${className}`}
+            className={`w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden bg-dark text-white relative select-none ${className}`}
             style={{
                 backgroundColor: theme && theme.startsWith('#') ? theme : undefined,
                 paddingTop: 'env(safe-area-inset-top, 0px)',
-                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                paddingBottom: isStandalone ? '0px' : 'env(safe-area-inset-bottom, 0px)',
                 paddingLeft: 'env(safe-area-inset-left, 0px)',
                 paddingRight: 'env(safe-area-inset-right, 0px)',
             }}
