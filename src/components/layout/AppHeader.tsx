@@ -50,7 +50,7 @@ export const AppHeader = ({
 }: AppHeaderProps) => {
     const { user, signOut } = useAuth();
     const { ask } = useConfirmation();
-    const { triggerToast, isDynamicIslandVisible } = useApp();
+    const { triggerToast, } = useApp();
     const [isShaking, setIsShaking] = useState(false);
 
     const handleLockedHintClick = () => {

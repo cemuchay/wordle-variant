@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Eye, Loader2, Trophy, User, X, RotateCw, MessageCircle } from 'lucide-react';
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Eye, Loader2, MessageCircle, RotateCw, Trophy, User, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_ATTEMPTS } from '../constants/game';
-import { Z_INDEX } from '../constants/ui';
+import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
-import GuessPreviewModal from './guess-preview';
-import { ProtectedAvatar } from './chat/ProtectedAvatar';
-import { useApp } from '../context/AppContext';
-import { safeSessionStorage } from '../utils/storage';
-import { LeaderboardSkeleton } from './common/Skeletons';
 import formatUsername from '../utils/formatUsername';
+import { safeSessionStorage } from '../utils/storage';
+import { ProtectedAvatar } from './chat/ProtectedAvatar';
 import { ReigningBadge } from './common/ReigningBadge';
+import { LeaderboardSkeleton } from './common/Skeletons';
+import GuessPreviewModal from './guess-preview';
 
 // type Timeframe = 'today' | 'weekly' | 'monthly' | 'all';
 type Timeframe = 'today' | 'yesterday' | 'weekly' | 'monthly'

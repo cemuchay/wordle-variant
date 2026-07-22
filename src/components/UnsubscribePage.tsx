@@ -29,6 +29,7 @@ export const UnsubscribePage = () => {
 
                 setStatus('success');
                 setMessage('You have been successfully unsubscribed from all email notifications.');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (err: any) {
                 console.error('Unsubscribe failed:', err);
                 setStatus('error');
@@ -47,7 +48,7 @@ export const UnsubscribePage = () => {
             {/* Main Content Box */}
             <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-3xl shadow-2xl p-8 text-center space-y-6 overflow-hidden animate-in fade-in zoom-in duration-500">
                 {/* Header Accent */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-indigo-600" />
+                <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-indigo-500 to-indigo-600" />
 
                 {/* Icons based on status */}
                 <div className="flex justify-center">

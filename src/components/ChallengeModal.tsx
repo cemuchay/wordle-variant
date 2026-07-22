@@ -23,7 +23,6 @@ import { safeLocalStorage, safeSessionStorage } from "../utils/storage";
 
 import { useChallengeStore } from "../store/useChallengeStore";
 import { useAppStore } from "../store/useAppStore";
-import { useApp } from "../context/AppContext";
 
 // Sub-components
 import { ChallengeCreate } from "./challenge/ChallengeCreate";
@@ -150,7 +149,6 @@ const AuthenticatedChallengeContent = memo(
     const [isCreatingChallenge, setIsCreatingChallenge] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-    const { isDynamicIslandVisible } = useApp();
     const pendingChallengeUserId = useAppStore(s => s.pendingChallengeUserId);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);

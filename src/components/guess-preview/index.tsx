@@ -2,7 +2,6 @@
 import { Loader2, Search, X } from "lucide-react";
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_ATTEMPTS } from "../../constants/game";
-import { Z_INDEX } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
 import { ChallengeContext } from "../../context/ChallengeContext";
 import {
@@ -18,12 +17,12 @@ import { parseMarathonGames } from "../../utils/marathon";
 import { safeLocalStorage } from "../../utils/storage";
 import { ShareButton } from "../ShareButton";
 import FakeGrid from "./components/FakeGrid";
+import ShowScoringInfo from "./components/ShowScoringInfo";
 import { GuessGrid } from "./GuessGrid";
 import { MarathonGameList } from "./MarathonGameList";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { TargetWordSection } from "./TargetWordSection";
 import type { GuessPreviewData } from "./types";
-import ShowScoringInfo from "./components/ShowScoringInfo";
 
 interface GuessPreviewModalProps {
   entry: any; // More flexible for challenge participants
