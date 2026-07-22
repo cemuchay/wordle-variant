@@ -3,6 +3,7 @@ import { AppHeader } from './AppHeader';
 import { AppNavigation } from './AppNavigation';
 import { DynamicIslandStatus } from '../DynamicIslandStatus';
 import { useAppStore } from '../../store/useAppStore';
+import { useApp } from '../../context/AppContext';
 import type { SyncStatus } from '../../types/game';
 
 export interface AppLayoutHeaderProps {
@@ -67,9 +68,11 @@ export const AppLayout = ({
         }
     }, [theme, preferences, setPreferences]);
 
+    const { isDynamicIslandVisible } = useApp();
+
     return (
         <div
-            className={`w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden bg-dark text-white relative select-none ${className}`}
+            className={`w-full h-dvh max-h-dvh flex flex-col overflow-hidden bg-dark text-white relative select-none ${className}`}
             style={{
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -80,15 +83,18 @@ export const AppLayout = ({
             {/* Built-in Dynamic Island (Always present across the app) */}
             <DynamicIslandStatus />
 
-            {/* Built-in App Header */}
-            {!hideHeader && headerProps && (
-                <AppHeader {...headerProps} />
-            )}
+            {/* Central Top Clearance Spacer for Dynamic Island */}
+            <div className={`flex flex-col flex-1 min-h-0 w-full relative transition-[padding] duration-200 ${isDynamicIslandVisible ? 'pt-10 sm:pt-14' : 'pt-0'}`}>
+                {/* Built-in App Header */}
+                {!hideHeader && headerProps && (
+                    <AppHeader {...headerProps} />
+                )}
 
-            {/* Main Content Area Slot */}
-            <main className="flex-1 flex flex-col min-h-0 w-full relative overflow-hidden">
-                {children}
-            </main>
+                {/* Main Content Area Slot */}
+                <main className="flex-1 flex flex-col min-h-0 w-full relative overflow-hidden">
+                    {children}
+                </main>
+            </div>
 
             {/* Built-in App Navigation */}
             {!hideNavigation && navigationProps && (

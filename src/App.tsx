@@ -4,7 +4,7 @@ import AppLayout from "./components/layout/AppLayout";
 import { ChatSkeleton } from "./components/common/Skeletons";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
 import { LandscapeBlocker } from "./components/LandscapeBlocker";
-import { AppNavigation } from "./components/layout/AppNavigation";
+
 import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
 import { ImageModal } from "./components/common/ImageModal";
@@ -1227,16 +1227,7 @@ export default function App() {
         initialChallengeId={selectedChallengeId}
       />
 
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && activeNavigationItem !== "wordup" && activeNavigationItem !== "more" && (
-        <AppNavigation
-          activeItem={activeNavigationItem}
-          onNavigate={handleNavigation}
-          challengeUnreadCount={challengeUnreadCount}
-          chatUnreadCount={isChatOpen ? 0 : unreadCount}
-          wordupUnreadCount={wordupUnreadCount}
-          userId={user?.id}
-        />
-      )}
+
 
       {navLoading.active && <TransitionLoader message={navLoading.message} />}
 
