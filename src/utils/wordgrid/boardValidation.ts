@@ -1,6 +1,5 @@
 // src/utils/wordgrid/boardValidation.ts
 
-import { BOARD_SIZE, CENTER_CELL } from './constants';
 import type { GridCell, PlacedTile } from './constants';
 
 export interface ValidationResult {
@@ -15,15 +14,18 @@ export interface ValidationResult {
  */
 export function validateBoardPlacement(
   placedTiles: PlacedTile[],
-  existingBoard: GridCell[]
+  existingBoard: GridCell[],
+  gridSize = 11
 ): ValidationResult {
   if (placedTiles.length === 0) {
     return { isValid: false, error: 'No tiles placed.' };
   }
 
+  const centerCell = Math.floor(gridSize / 2);
+
   // Create a fast-lookup map for existing tiles
   const boardMap = new Map<string, string>();
-  existingBoard.forEach(cell => {
+  existingBoard.forEach((cell) => {
     boardMap.set(`${cell.x},${cell.y}`, cell.letter.toUpperCase());
   });
 
@@ -38,17 +40,17 @@ export function validateBoardPlacement(
 
   // 1. First move must touch the center cell
   if (isFirstMove) {
-    const touchesCenter = placedTiles.some(t => t.x === CENTER_CELL && t.y === CENTER_CELL);
+    const touchesCenter = placedTiles.some((t) => t.x === centerCell && t.y === centerCell);
     if (!touchesCenter) {
-      return { isValid: false, error: 'The first word must cover the center cell (5,5).' };
+      return { isValid: false, error: `The first word must cover the center cell (${centerCell},${centerCell}).` };
     }
   }
 
   // 2. Alignment Check: all placed tiles must be in the same row or column
   let direction: 'horizontal' | 'vertical' | null = null;
   if (placedTiles.length > 1) {
-    const sameRow = placedTiles.every(t => t.y === placedTiles[0].y);
-    const sameCol = placedTiles.every(t => t.x === placedTiles[0].x);
+    const sameRow = placedTiles.every((t) => t.y === placedTiles[0].y);
+    const sameCol = placedTiles.every((t) => t.x === placedTiles[0].x);
 
     if (!sameRow && !sameCol) {
       return { isValid: false, error: 'Tiles must be placed in a single straight row or column.' };
@@ -66,7 +68,7 @@ export function validateBoardPlacement(
         { x: tile.x, y: tile.y + 1 },
         { x: tile.x, y: tile.y - 1 },
       ];
-      if (neighbors.some(n => boardMap.has(`${n.x},${n.y}`))) {
+      if (neighbors.some((n) => boardMap.has(`${n.x},${n.y}`))) {
         connects = true;
         break;
       }
@@ -77,17 +79,16 @@ export function validateBoardPlacement(
   }
 
   // 4. Contiguous check: the placed tiles (plus any existing tiles in between them) must form a solid line
-  // Let's create a combined board simulation map
   const tempBoard = new Map(boardMap);
-  placedTiles.forEach(tile => {
+  placedTiles.forEach((tile) => {
     tempBoard.set(`${tile.x},${tile.y}`, tile.letter.toUpperCase());
   });
 
   if (placedTiles.length > 1) {
     if (direction === 'horizontal') {
       const y = placedTiles[0].y;
-      const minX = Math.min(...placedTiles.map(t => t.x));
-      const maxX = Math.max(...placedTiles.map(t => t.x));
+      const minX = Math.min(...placedTiles.map((t) => t.x));
+      const maxX = Math.max(...placedTiles.map((t) => t.x));
       for (let x = minX; x <= maxX; x++) {
         if (!tempBoard.has(`${x},${y}`)) {
           return { isValid: false, error: 'The placed word must be contiguous, with no empty gaps.' };
@@ -95,8 +96,8 @@ export function validateBoardPlacement(
       }
     } else {
       const x = placedTiles[0].x;
-      const minY = Math.min(...placedTiles.map(t => t.y));
-      const maxY = Math.max(...placedTiles.map(t => t.y));
+      const minY = Math.min(...placedTiles.map((t) => t.y));
+      const maxY = Math.max(...placedTiles.map((t) => t.y));
       for (let y = minY; y <= maxY; y++) {
         if (!tempBoard.has(`${x},${y}`)) {
           return { isValid: false, error: 'The placed word must be contiguous, with no empty gaps.' };
@@ -108,43 +109,37 @@ export function validateBoardPlacement(
   // 5. Extract all newly formed words
   const wordsFormed: { word: string; tiles: PlacedTile[] }[] = [];
 
-  // Determine primary direction if only 1 tile is placed
   if (placedTiles.length === 1) {
-    // Check horizontal line passing through this tile
-    const horizWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'horizontal', tempBoard, boardMap);
+    const horizWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'horizontal', tempBoard, boardMap, gridSize);
     if (horizWord && horizWord.word.length > 1) {
       wordsFormed.push(horizWord);
     }
-    // Check vertical line passing through this tile
-    const vertWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'vertical', tempBoard, boardMap);
+    const vertWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'vertical', tempBoard, boardMap, gridSize);
     if (vertWord && vertWord.word.length > 1) {
       wordsFormed.push(vertWord);
     }
 
     if (wordsFormed.length === 0) {
-      // Single letter not touching anything, but wait, if it is the first move, it's valid
       if (isFirstMove) {
         wordsFormed.push({
           word: placedTiles[0].letter.toUpperCase(),
-          tiles: [placedTiles[0]]
+          tiles: [placedTiles[0]],
         });
       } else {
         return { isValid: false, error: 'Placed tile must touch another tile to form a valid word.' };
       }
     }
   } else {
-    // Primary direction word
     const primaryDir = direction!;
     const refTile = placedTiles[0];
-    const primaryWord = getWordAt(refTile.x, refTile.y, primaryDir, tempBoard, boardMap);
+    const primaryWord = getWordAt(refTile.x, refTile.y, primaryDir, tempBoard, boardMap, gridSize);
     if (primaryWord) {
       wordsFormed.push(primaryWord);
     }
 
-    // Secondary direction (cross words) for each placed tile
     const secondaryDir = primaryDir === 'horizontal' ? 'vertical' : 'horizontal';
     for (const tile of placedTiles) {
-      const crossWord = getWordAt(tile.x, tile.y, secondaryDir, tempBoard, boardMap);
+      const crossWord = getWordAt(tile.x, tile.y, secondaryDir, tempBoard, boardMap, gridSize);
       if (crossWord && crossWord.word.length > 1) {
         wordsFormed.push(crossWord);
       }
@@ -153,7 +148,7 @@ export function validateBoardPlacement(
 
   return {
     isValid: true,
-    wordsFormed
+    wordsFormed,
   };
 }
 
@@ -165,25 +160,26 @@ function getWordAt(
   startY: number,
   dir: 'horizontal' | 'vertical',
   tempBoard: Map<string, string>,
-  boardMap: Map<string, string>
+  boardMap: Map<string, string>,
+  gridSize: number
 ): { word: string; tiles: PlacedTile[] } | null {
   const isHoriz = dir === 'horizontal';
   let minCoord = isHoriz ? startX : startY;
   let maxCoord = isHoriz ? startX : startY;
 
-  const getKey = (c: number) => isHoriz ? `${c},${startY}` : `${startX},${c}`;
+  const getKey = (c: number) => (isHoriz ? `${c},${startY}` : `${startX},${c}`);
 
   // Trace backwards
   while (minCoord > 0 && tempBoard.has(getKey(minCoord - 1))) {
     minCoord--;
   }
   // Trace forwards
-  while (maxCoord < BOARD_SIZE - 1 && tempBoard.has(getKey(maxCoord + 1))) {
+  while (maxCoord < gridSize - 1 && tempBoard.has(getKey(maxCoord + 1))) {
     maxCoord++;
   }
 
   if (minCoord === maxCoord) {
-    return null; // Just a single tile, not a word
+    return null;
   }
 
   let word = '';
@@ -194,15 +190,15 @@ function getWordAt(
     const letter = tempBoard.get(key)!;
     word += letter;
 
-    // Only include tiles that are newly placed (not in boardMap)
     if (!boardMap.has(key)) {
       tiles.push({
         x: isHoriz ? c : startX,
         y: isHoriz ? startY : c,
-        letter
+        letter,
       });
     }
   }
 
   return { word, tiles };
 }
+
