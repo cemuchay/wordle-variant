@@ -163,9 +163,9 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   const completedMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'completed');
 
   return (
-    <div className="flex flex-col max-h-[85vh] overflow-y-auto p-6 bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200 pr-2">
+    <div className="flex flex-col max-h-[85vh] overflow-y-auto p-6 bg-slate-900 border border-slate-800 rounded-3xl w-full mx-auto shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200 pr-2">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+      <div className="flex items-center justify-between my-10 py-6 pb-12 border-b border-slate-800 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🔠</span>
           <div>
@@ -192,11 +192,10 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
               <button
                 key={sz}
                 onClick={() => setSelectedGridSize(sz)}
-                className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                  selectedGridSize === sz
-                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                }`}
+                className={`py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${selectedGridSize === sz
+                  ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
               >
                 {sz}×{sz}
               </button>
@@ -214,9 +213,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                   <button
                     key={count}
                     onClick={() => setSelectedPlayers(count)}
-                    className={`px-3 py-1 text-[10px] font-black rounded-lg cursor-pointer transition-colors ${
-                      targetPlayers === count ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1 text-[10px] font-black rounded-lg cursor-pointer transition-colors ${targetPlayers === count ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     {count} Players
                   </button>
@@ -258,11 +256,10 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wider ${
-                      isMyTurn
-                        ? 'bg-emerald-950/80 border-emerald-500 text-emerald-400 animate-pulse'
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}>
+                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border tracking-wider ${isMyTurn
+                      ? 'bg-emerald-950/80 border-emerald-500 text-emerald-400 animate-pulse'
+                      : 'bg-slate-800 border-slate-700 text-slate-400'
+                      }`}>
                       {isMyTurn ? 'Your Turn' : 'Waiting'}
                     </span>
                     <button
@@ -315,9 +312,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                 <button
                   key={diff}
                   onClick={() => setDifficulty(diff)}
-                  className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg cursor-pointer transition-colors ${
-                    difficulty === diff ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                  }`}
+                  className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg cursor-pointer transition-colors ${difficulty === diff ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
                 >
                   {diff}
                 </button>
@@ -412,11 +408,10 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                       Final: {myScore} - {oppScore}
                     </span>
                   </div>
-                  <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${
-                    won
-                      ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
-                      : 'bg-rose-950 border-rose-500/40 text-rose-400'
-                  }`}>
+                  <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${won
+                    ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
+                    : 'bg-rose-950 border-rose-500/40 text-rose-400'
+                    }`}>
                     {won ? 'Won' : 'Lost'}
                   </span>
                 </div>

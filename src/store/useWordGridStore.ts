@@ -367,12 +367,12 @@ interface WordGridState {
    // Game turn submissions (No Pass option - Swap or Play only)
    submitMove: (
       userId: string,
-      triggerToast: (msg: string, duration?: number) => void,
+      triggerToast: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<boolean>;
    exchangeTiles: (
       userId: string,
       lettersToExchange: string[],
-      triggerToast?: (msg: string, duration?: number) => void,
+      triggerToast?: (msg: string, duration?: number, isLarge?: boolean) => void,
    ) => Promise<void>;
    resignMatch: (userId: string) => Promise<void>;
 
@@ -562,8 +562,10 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    updateFromMatchRecord: (record, currentUserId) => {
-      const isP1 = record.player1_id === currentUserId;
-      const isP2 = record.player2_id === currentUserId;
+      // In bot matches or guest matches where player1_id was inserted as null in DB, treat current user as player1
+      const isBotMatch = record.is_bot_match || get().isBotMatch;
+      const isP1 = record.player1_id === currentUserId || isBotMatch || !record.player1_id;
+      const isP2 = !isP1 && record.player2_id === currentUserId;
       const role = isP1 ? "player1" : isP2 ? "player2" : null;
 
       // Extract player list (support new multi-player structure or legacy 2p schema)
@@ -589,12 +591,12 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          ];
       }
 
-      const activePlayerObj = playersList.find((p) => p.id === currentUserId);
+      const activePlayerObj = playersList.find((p) => p.id === currentUserId || (isP1 && p.id !== 'bot'));
       const activeRack = activePlayerObj
          ? activePlayerObj.rack
          : isP1
-           ? record.p1_rack
-           : record.p2_rack;
+           ? (record.p1_rack || playersList[0]?.rack)
+           : (record.p2_rack || playersList[1]?.rack);
 
       const turnIndex =
          record.current_turn_index !== undefined &&
@@ -773,7 +775,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             currentTurnIndex: nextTurnIdx,
             currentTurn: nextPlayerTurnId,
          });
-         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`);
+         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, 4000, true);
 
          // Handle Bot Turn if applicable
          if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
@@ -987,7 +989,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       ];
 
       try {
-         const { data, error } = await safeWordGridInsert({
+         const insertRes = await safeWordGridInsert({
             player1_id: dbPlayer1Id,
             player2_id: null,
             is_bot_match: true,
@@ -1007,30 +1009,30 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             moves: [],
          });
 
-         if (error) throw error;
-         if (data) {
-            set({
-               matchId: data.id,
-               gridSize,
-               role: "player1",
-               view: "active",
-               rack: p1Rack,
-               board: [],
-               players: initialPlayers,
-               tileBag: finalBag,
-               p1Score: 0,
-               p2Score: 0,
-               currentTurnIndex: 0,
-               currentTurn: userId,
-               isBotMatch: true,
-               botDifficulty: difficulty,
-               player1: { id: userId, username: "Player (You)" },
-               player2: {
-                  id: "bot",
-                  username: `AI (${difficulty.toUpperCase()})`,
-               },
-            });
-         }
+         const matchIdToUse = insertRes?.data?.id || `bot_match_${Date.now()}`;
+
+         set({
+            matchId: matchIdToUse,
+            gridSize,
+            role: "player1",
+            view: "active",
+            rack: p1Rack,
+            board: [],
+            players: initialPlayers,
+            tileBag: finalBag,
+            p1Score: 0,
+            p2Score: 0,
+            currentTurnIndex: 0,
+            currentTurn: userId,
+            isBotMatch: true,
+            botDifficulty: difficulty,
+            status: "active",
+            player1: { id: userId, username: "Player (You)" },
+            player2: {
+               id: "bot",
+               username: `AI (${difficulty.toUpperCase()})`,
+            },
+         });
       } catch (e: any) {
          console.error("startBotMatch error:", e);
          set({ error: e?.message || "Failed to start bot match" });

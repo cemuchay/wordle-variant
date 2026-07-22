@@ -14,6 +14,8 @@ import { wordupAudio } from "../utils/wordupAudio";
 import { useWordUpStore } from "../store/useWordUpStore";
 import { MarathonConfigModal } from "./shared/MarathonConfigModal";
 
+import { useTheme } from "../hooks/useTheme";
+
 interface WordUpContainerProps {
    wordupMode: "live" | "async" | null;
    setWordupMode: (mode: "live" | "async" | null) => void;
@@ -27,6 +29,7 @@ export const WordUpContainer = ({
    onTutorial,
    onBackToClassic,
 }: WordUpContainerProps) => {
+   useTheme("wordup");
    const { user: authUser } = useAuth();
    const { triggerToast, allProfiles } = useApp();
 

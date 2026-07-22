@@ -8,12 +8,14 @@ import { WordGridTutorialModal } from './components/WordGridTutorialModal';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
+import { useTheme } from '../hooks/useTheme';
 
 interface WordGridContainerProps {
   onBackToClassic: () => void;
 }
 
 export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) => {
+  useTheme('wordgrid');
   const { user } = useAuth();
   const { triggerToast, allProfiles } = useApp();
 
@@ -118,10 +120,18 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     recallTile(x, y);
   };
 
+  const [isValidatingWord, setIsValidatingWord] = useState(false);
+
   const handleSubmit = async () => {
-    const success = await submitMove(effectiveUserId, triggerToast);
-    if (!success) {
-      // Keep placed tiles on validation error
+    setIsValidatingWord(true);
+    triggerToast("Validating word...", 3000, true);
+    try {
+      const success = await submitMove(effectiveUserId, triggerToast);
+      if (!success) {
+        // Keep placed tiles on validation error
+      }
+    } finally {
+      setIsValidatingWord(false);
     }
   };
 
@@ -164,7 +174,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   if (view === 'lobby' || view === 'matchmaking') {
     return (
-      <div className="h-full w-full flex items-center justify-center p-4 bg-slate-950 select-none">
+      <div className="h-full flex items-center justify-center select-none">
         <MatchmakingLobby userId={effectiveUserId} allProfiles={allProfiles} onBack={onBackToClassic} />
       </div>
     );
@@ -174,9 +184,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const activePlayersList = players.length > 0
     ? players
     : [
-        { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: useWordGridStore.getState().p1Score, rack: [] },
-        { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: useWordGridStore.getState().p2Score, rack: [] },
-      ];
+      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: useWordGridStore.getState().p1Score, rack: [] },
+      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: useWordGridStore.getState().p2Score, rack: [] },
+    ];
 
   return (
     <div
@@ -193,12 +203,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         />
       )}
 
-      {/* Responsive Grid Container: Mobile 1 column, Tablet/Desktop 12-column Side-by-Side layout */}
-      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-        
-        {/* Left Column (Controls, Merged Header, Rack, Timeline on Desktop) */}
-        <div className="md:col-span-5 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
-          {/* Merged Header with Back Button, Turn Info & Live Scores */}
+      {/* Responsive Layout: Mobile flex ordering (Banner -> Actions & Rack -> Board -> Timeline), Desktop 12-column Grid */}
+      <div className="w-full max-w-6xl flex flex-col md:grid md:grid-cols-12 gap-5 items-start">
+
+        {/* Banner Header (Mobile: 1st, Desktop: top of left column) */}
+        <div className="order-1 md:col-span-5 w-full max-w-[480px] mx-auto md:max-w-none">
           <div className="w-full bg-slate-900/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 animate-in fade-in duration-300">
             {/* Left section: Back button & Status */}
             <div className="flex items-center gap-3 min-w-0 shrink-0">
@@ -249,20 +258,31 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
               )}
             </div>
           </div>
+        </div>
 
+        {/* Action Panel & Tile Rack (Mobile: 2nd, Desktop: 2nd block of left column) */}
+        <div className="order-2 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
           {/* Action panel: Play Word vs Swap Tiles */}
           {isMyTurn && (
             <div className="w-full grid grid-cols-2 gap-3 animate-in fade-in duration-300">
               <button
                 onClick={handleSubmit}
-                disabled={placedTiles.length === 0}
-                className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
-                  placedTiles.length > 0
+                disabled={placedTiles.length === 0 || isValidatingWord}
+                className={`py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg ${isValidatingWord
+                  ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
+                  : placedTiles.length > 0
                     ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
                     : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
-                }`}
+                  }`}
               >
-                Play Word ({placedTiles.length})
+                {isValidatingWord ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <span>Validating Word...</span>
+                  </>
+                ) : (
+                  <span>Play Word ({placedTiles.length})</span>
+                )}
               </button>
               <button
                 onClick={handleOpenExchange}
@@ -282,13 +302,10 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onRecallAll={recallAllTiles}
             isMyTurn={isMyTurn}
           />
-
-          {/* Move History */}
-          <MoveHistory moves={moves} player1={player1} player2={player2} />
         </div>
 
-        {/* Right Column: Centered Game Board Grid */}
-        <div className="md:col-span-7 flex flex-col items-center justify-center w-full">
+        {/* Board Grid (Mobile: 3rd, Desktop: Right column md:col-span-7) */}
+        <div className="order-3 md:order-none md:col-span-7 md:col-start-6 md:row-start-1 md:row-span-4 flex flex-col items-center justify-center w-full">
           <BoardGrid
             gridSize={gridSize}
             board={board}
@@ -298,6 +315,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onPlaceTile={handlePlaceTile}
             onRecallTile={handleRecallTile}
           />
+        </div>
+
+        {/* Move History / Timeline (Mobile: 4th/Bottom, Desktop: 3rd block of left column) */}
+        <div className="order-4 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
+          <MoveHistory moves={moves} player1={player1} player2={player2} />
         </div>
 
       </div>
@@ -318,11 +340,10 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 <button
                   key={idx}
                   onClick={() => handleToggleExchangeSelection(idx)}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black cursor-pointer transition-all ${
-                    exchangeSelections[idx]
-                      ? 'bg-rose-600 text-white ring-2 ring-rose-400 shadow-lg scale-105'
-                      : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'
-                  }`}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black cursor-pointer transition-all ${exchangeSelections[idx]
+                    ? 'bg-rose-600 text-white ring-2 ring-rose-400 shadow-lg scale-105'
+                    : 'bg-slate-800 text-white border border-slate-700 hover:bg-slate-700'
+                    }`}
                 >
                   {letter.toUpperCase()}
                 </button>
