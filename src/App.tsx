@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import AppLayout from "./components/layout/AppLayout";
 import { ChatSkeleton } from "./components/common/Skeletons";
-import { DynamicIslandStatus } from "./components/DynamicIslandStatus";
 import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
 import { LandscapeBlocker } from "./components/LandscapeBlocker";
-import { AppHeader } from "./components/layout/AppHeader";
 import { AppNavigation } from "./components/layout/AppNavigation";
 import { GameArea } from "./components/layout/GameArea";
 import { ModalsManager } from "./components/layout/ModalsManager";
@@ -952,14 +951,52 @@ export default function App() {
     );
   }
 
+  const currentTheme = isChallengeOpen || activeNavigationItem === "challenges" || isPlayingChallenge
+    ? "#111827"
+    : activeNavigationItem === "wordup" || isWordUpOpen
+      ? "#18181b"
+      : moreGameMode === "wordgrid"
+        ? "#0f172a"
+        : "#121213";
+
+  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || isTutorialOpen || isWordupTutorialOpen || showAlreadyPlayedScreen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
+
   return (
-    <div className="h-dvh w-full flex flex-col text-white font-sans overflow-hidden bg-dark">
+    <AppLayout
+      theme={currentTheme}
+      hideHeader={hideHeader}
+      hideNavigation={false}
+      headerProps={{
+        hideGameplayActions: activeNavigationItem !== "play",
+        onOpenSettings: () => setIsSettingsOpen(true),
+        onOpenSearch: () => setIsSettingsOpen(true),
+        onOpenInfo: () => setIsInfoOpen(true),
+        onOpenWeeklyWrapped: () => setIsWeeklyWrappedOpen(true),
+        onHint: actions.handleHint,
+        onReset: () => window.location.reload(),
+        onShare: () => actions.setGameOverModalOpen(true),
+        onRetrySync: actions.retrySync,
+        isGameOver: state.isGameOver,
+        isRevealing: state.isRevealing,
+        usedHint: state.usedHint,
+        canShowHint: stableGuessesCount >= 2,
+        isHintLocked: (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 || stableIsHintDisabled) && !state.usedHint,
+        syncStatus: state.syncStatus,
+        isMonday: isMonday
+      }}
+      navigationProps={{
+        activeItem: activeNavigationItem,
+        onNavigate: handleNavigation,
+        challengeUnreadCount: challengeUnreadCount,
+        chatUnreadCount: unreadCount,
+        wordupUnreadCount: wordupUnreadCount,
+        userId: user?.id
+      }}
+    >
       <LandscapeBlocker />
-      <DynamicIslandStatus />
       <GlobalAudioPlayer />
       <NotificationsManager />
       {user && <FloatingChatBubble />}
-      {/* Toast component has been migrated to DynamicIslandStatus */}
       {user && showDisconnectedUI && (
         <DisconnectedUI reconnectStatus={reconnectStatus} handleManualReconnect={handleManualReconnect} />
       )}
@@ -971,57 +1008,30 @@ export default function App() {
         />
       )}
 
-      {/* Global Persistent Header */}
-      {!isPlayingChallenge && !isBattlePlaying && !isChatConversationOpen && !selectedChallenge && !isTutorialOpen && !isWordupTutorialOpen && !showAlreadyPlayedScreen && !(activeNavigationItem === "more" && moreGameMode === "wordgrid") && (
-        <div className="w-full px-4 pt-4 pb-1 shrink-0 z-10">
-          <AppHeader
-            hideGameplayActions={activeNavigationItem !== "play"}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenSearch={() => setIsSettingsOpen(true)}
-            onOpenInfo={() => setIsInfoOpen(true)}
-            onOpenWeeklyWrapped={() => setIsWeeklyWrappedOpen(true)}
-            onHint={actions.handleHint}
-            onReset={() => window.location.reload()}
-            onShare={() => actions.setGameOverModalOpen(true)}
-            onRetrySync={actions.retrySync}
-            isGameOver={state.isGameOver}
-            isRevealing={state.isRevealing}
-            usedHint={state.usedHint}
-            canShowHint={stableGuessesCount >= 2}
-            isHintLocked={
-              (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 ||
-                stableIsHintDisabled) &&
-              !state.usedHint
-            }
-            syncStatus={state.syncStatus}
-            isMonday={isMonday}
-          />
-          {showNotificationBar && (
-            <div className="mt-2 animate-in slide-in-from-top-2 duration-300">
-              <div className="bg-slate-900/80 border border-slate-800/60 backdrop-blur-md px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 shadow-lg">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Bell size={13} className="text-indigo-400 shrink-0" />
-                  <p className="text-[10px] font-bold tracking-wide text-gray-200 truncate">
-                    Enable Push Notifications to receive real-time updates.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={handleEnablePush}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Enable
-                  </button>
-                  <button
-                    onClick={handleDismissNotificationBar}
-                    className="text-gray-500 hover:text-gray-300 px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
+      {showNotificationBar && !hideHeader && (
+        <div className="w-full px-4 pt-1 pb-1 shrink-0 z-10 animate-in slide-in-from-top-2 duration-300">
+          <div className="bg-slate-900/80 border border-slate-800/60 backdrop-blur-md px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bell size={13} className="text-indigo-400 shrink-0" />
+              <p className="text-[10px] font-bold tracking-wide text-gray-200 truncate">
+                Enable Push Notifications to receive real-time updates.
+              </p>
             </div>
-          )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleEnablePush}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Enable
+              </button>
+              <button
+                onClick={handleDismissNotificationBar}
+                className="text-gray-500 hover:text-gray-300 px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1521,6 +1531,6 @@ export default function App() {
       <ImageModal />
       <PWAInstallBanner />
       <NotificationPermissionPrompt />
-    </div>
+    </AppLayout>
   );
 }

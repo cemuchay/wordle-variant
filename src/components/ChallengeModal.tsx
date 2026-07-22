@@ -985,10 +985,10 @@ export const ChallengeModal = ({
   if (inline) {
     return (
       <div
-        className={`flex flex-col h-full w-full mx-auto bg-gray-900 overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] transition-all duration-300 ${isPlaying ? 'max-w-none rounded-none border-none' : 'max-w-lg sm:rounded-[40px] sm:border sm:border-white/10'}`}
+        className={`flex flex-col h-full flex-1 min-h-0 w-full mx-auto bg-gray-900 overflow-hidden relative shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] transition-all duration-300 ${isPlaying ? 'max-w-none rounded-none border-none' : 'max-w-lg sm:rounded-[40px] sm:border sm:border-white/10'}`}
         style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
       >
-        <div className="w-full max-w-xl mx-auto flex flex-col h-full relative overflow-hidden transition-all duration-300">
+        <div className="w-full max-w-xl mx-auto flex flex-col h-full min-h-0 flex-1 relative overflow-hidden">
           {renderContent()}
         </div>
       </div>
