@@ -344,6 +344,9 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
                  playersList.findIndex((p) => p.id === record.current_turn),
               );
 
+      const resolvedCurrentTurn =
+         record.current_turn || (playersList[turnIndex]?.id || "bot");
+
       set({
          matchId: record.id,
          gridSize: record.grid_size || DEFAULT_GRID_SIZE,
@@ -354,7 +357,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          tileBag: record.tile_bag || record.tileBag || [],
          players: playersList,
          currentTurnIndex: turnIndex,
-         currentTurn: record.current_turn,
+         currentTurn: resolvedCurrentTurn,
 
          p1Score: record.p1_score || (playersList[0]?.score ?? 0),
          p2Score: record.p2_score || (playersList[1]?.score ?? 0),
@@ -383,11 +386,12 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          currentTurn,
          tileBag,
          moves,
+         gridSize,
       } = get();
       if (!matchId || currentTurn !== userId) return false;
 
       // 1. Board placement alignment validation
-      const validation = validateBoardPlacement(placedTiles, board);
+      const validation = validateBoardPlacement(placedTiles, board, gridSize);
       if (!validation.isValid) {
          triggerToast(validation.error || "Invalid placement");
          return false;
@@ -470,7 +474,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          p2_score: updatedPlayers[1]?.score || 0,
          moves: nextMoves,
          current_turn_index: nextTurnIdx,
-         current_turn: nextPlayerTurnId,
+         current_turn: isUuid(nextPlayerTurnId) ? nextPlayerTurnId : null,
          last_move_at: new Date().toISOString(),
       };
 
@@ -563,7 +567,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          p2_rack: updatedPlayers[1]?.rack || [],
          moves: [...moves, movePayload],
          current_turn_index: nextTurnIdx,
-         current_turn: nextPlayerTurnId,
+         current_turn: isUuid(nextPlayerTurnId) ? nextPlayerTurnId : null,
          last_move_at: new Date().toISOString(),
       };
 
@@ -710,7 +714,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             p1_rack: p1Rack,
             p2_rack: botRack,
             current_turn_index: 0,
-            current_turn: userId,
+            current_turn: isUuid(userId) ? userId : null,
             p1_score: 0,
             p2_score: 0,
             moves: [],
@@ -798,8 +802,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
       try {
          const { data, error } = await safeWordGridInsert({
-            player1_id: userId,
-            player2_id: opponentId,
+            player1_id: isUuid(userId) ? userId : null,
+            player2_id: isUuid(opponentId) ? opponentId : null,
             grid_size: gridSize,
             max_players: 2,
             is_bot_match: false,
@@ -810,7 +814,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             p1_rack: p1Rack,
             p2_rack: p2Rack,
             current_turn_index: 0,
-            current_turn: userId,
+            current_turn: isUuid(userId) ? userId : null,
             p1_score: 0,
             p2_score: 0,
             moves: [],
@@ -947,7 +951,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          p2_score: updatedPlayers[1]?.score || 0,
          moves: [...moves, movePayload],
          current_turn_index: nextTurnIdx,
-         current_turn: nextPlayerTurnId,
+         current_turn: isUuid(nextPlayerTurnId) ? nextPlayerTurnId : null,
          last_move_at: new Date().toISOString(),
       };
 
