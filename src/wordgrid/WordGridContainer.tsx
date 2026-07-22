@@ -51,18 +51,19 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     return !localStorage.getItem('wordgrid_tutorial_completed');
   });
 
-  const userId = user?.id || '';
-  const isMyTurn = currentTurn === userId && status === 'active';
+  const isBotMatch = useWordGridStore((s) => s.isBotMatch);
+  const effectiveUserId = user?.id || (isBotMatch ? (player1?.id || 'p1') : 'guest');
+  const userId = effectiveUserId;
+  const isMyTurn = (currentTurn === userId || (isBotMatch && currentTurn !== 'bot')) && status === 'active';
 
   const handleTutorialComplete = () => {
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
     setShowTutorial(false);
   };
 
-
   // Resubscribe to match updates when matchId changes
   useEffect(() => {
-    if (!matchId || !userId) return;
+    if (!matchId || !effectiveUserId) return;
 
     const channel = supabase
       .channel(`wordgrid_match_${matchId}`)
@@ -75,7 +76,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
           filter: `id=eq.${matchId}`,
         },
         (payload) => {
-          updateFromMatchRecord(payload.new, userId);
+          updateFromMatchRecord(payload.new, effectiveUserId);
         }
       )
       .subscribe();
@@ -83,26 +84,31 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [matchId, userId, updateFromMatchRecord]);
+  }, [matchId, effectiveUserId, updateFromMatchRecord]);
 
   const handleSelectTile = (idx: number) => {
     setSelectedRackIdx(idx);
   };
 
   const handlePlaceTile = (x: number, y: number, rackIdx: number) => {
+    if (!isMyTurn) {
+      triggerToast("It's your opponent's turn!");
+      return;
+    }
     const letter = rack[rackIdx];
-    placeTile(x, y, letter);
-    if (selectedRackIdx === rackIdx) {
+    if (letter !== undefined) {
+      placeTile(x, y, letter);
       setSelectedRackIdx(null);
     }
   };
 
   const handleRecallTile = (x: number, y: number) => {
+    if (!isMyTurn) return;
     recallTile(x, y);
   };
 
   const handleSubmit = async () => {
-    const success = await submitMove(userId, triggerToast);
+    const success = await submitMove(effectiveUserId, triggerToast);
     if (!success) {
       // Keep placed tiles on validation error
     }
@@ -125,13 +131,13 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       setShowExchangeModal(false);
       return;
     }
-    await exchangeTiles(userId, selectedLetters, triggerToast);
+    await exchangeTiles(effectiveUserId, selectedLetters, triggerToast);
     setShowExchangeModal(false);
   };
 
   const handleResign = async () => {
     if (window.confirm('Are you sure you want to resign the match?')) {
-      await resignMatch(userId);
+      await resignMatch(effectiveUserId);
       triggerToast('You resigned the match.');
     }
   };
@@ -143,8 +149,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   if (view === 'lobby' || view === 'matchmaking') {
     return (
-      <div className="h-full w-full flex items-center justify-center p-4 bg-slate-950">
-        <MatchmakingLobby userId={userId} allProfiles={allProfiles} onBack={onBackToClassic} />
+      <div className="h-full w-full flex items-center justify-center p-4 bg-slate-950 select-none">
+        <MatchmakingLobby userId={effectiveUserId} allProfiles={allProfiles} onBack={onBackToClassic} />
       </div>
     );
   }
@@ -158,7 +164,13 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       ];
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 space-y-4 mx-auto">
+    <div
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
+      className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 space-y-4 mx-auto select-none"
+    >
       {showTutorial && (
         <WordGridTutorialModal
           onComplete={handleTutorialComplete}
