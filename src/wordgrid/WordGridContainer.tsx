@@ -25,6 +25,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     rack,
     placedTiles,
     currentTurn,
+    currentTurnIndex,
+    role,
     moves,
     players,
     player1,
@@ -53,7 +55,12 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const isBotMatch = useWordGridStore((s) => s.isBotMatch);
   const effectiveUserId = user?.id || (isBotMatch ? (player1?.id || 'p1') : 'guest');
   const userId = effectiveUserId;
-  const isMyTurn = (currentTurn === userId || (isBotMatch && currentTurn !== 'bot')) && status === 'active';
+  const isMyTurn = status === 'active' && (
+    currentTurn === userId ||
+    (isBotMatch && currentTurn !== 'bot') ||
+    (players.length > 0 && players[currentTurnIndex]?.id === userId) ||
+    (players.length > 0 && currentTurnIndex === 0 && (role === 'player1' || !role))
+  );
 
   const handleTutorialComplete = () => {
     localStorage.setItem('wordgrid_tutorial_completed', 'true');
@@ -119,7 +126,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
   const handleOpenExchange = () => {
-    setExchangeSelections(Array(rack.length).fill(false));
+    // Recall any placed tiles back to rack first so full rack is available to swap
+    recallAllTiles();
+    setExchangeSelections(Array(rack.length + placedTiles.length).fill(false));
     setShowExchangeModal(true);
   };
 
@@ -130,13 +139,15 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
   const handleConfirmExchange = async () => {
-    const selectedLetters = rack.filter((_, idx) => exchangeSelections[idx]);
+    // Current working rack after recalling all placed tiles
+    const fullRack = [...rack, ...placedTiles.map(t => t.letter)];
+    const selectedLetters = fullRack.filter((_, idx) => exchangeSelections[idx]);
     if (selectedLetters.length === 0) {
-      setShowExchangeModal(false);
+      triggerToast("Select at least one tile to swap.");
       return;
     }
-    await exchangeTiles(effectiveUserId, selectedLetters, triggerToast);
     setShowExchangeModal(false);
+    await exchangeTiles(effectiveUserId, selectedLetters, triggerToast);
   };
 
   const handleResign = async () => {

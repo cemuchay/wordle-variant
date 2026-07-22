@@ -535,6 +535,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    loadMatch: async (matchId, currentUserId) => {
+      get().resetGame();
       set({ loading: true, error: null });
       try {
          const { data, error } = await supabase
@@ -605,7 +606,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
               );
 
       const resolvedCurrentTurn =
-         record.current_turn || playersList[turnIndex]?.id || "bot";
+         record.current_turn || playersList[turnIndex]?.id || currentUserId || (isP1 ? record.player1_id : record.player2_id);
 
       // Check if a local storage draft exists for this matchId and restore uncommitted placed tiles
       let activePlaced = get().placedTiles;
@@ -794,10 +795,16 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       const { matchId, players, tileBag, currentTurnIndex, moves } = get();
       if (!matchId || lettersToExchange.length === 0) return;
 
-      const activeIdx = players.findIndex((p) => p.id === userId);
-      if (activeIdx === -1) return;
+      // 1. Locate active player index in players array
+      let activeIdx = players.findIndex((p) => p.id === userId);
+      if (activeIdx === -1) {
+         if (userId === get().player1?.id) activeIdx = 0;
+         else if (userId === get().player2?.id) activeIdx = 1;
+         else activeIdx = currentTurnIndex;
+      }
 
-      const currentRack = [...players[activeIdx].rack];
+      const activePlayer = players[activeIdx] || { id: userId, rack: get().rack };
+      const currentRack = [...activePlayer.rack];
 
       // Remove letters to exchange
       lettersToExchange.forEach((l) => {
@@ -943,7 +950,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
     startBotMatch: async (userId, difficulty, gridSize = DEFAULT_GRID_SIZE) => {
-       set({ loading: true, error: null });
+       get().resetGame();
+       set({ loading: true, error: null, isBotMatch: true, botDifficulty: difficulty });
        preloadBotWordPools();
        const initialBag = generateInitialTileBag();
 
@@ -993,7 +1001,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             p1_rack: p1Rack,
             p2_rack: botRack,
             current_turn_index: 0,
-            current_turn: isUuid(userId) ? userId : null,
+            current_turn: userId,
             p1_score: 0,
             p2_score: 0,
             moves: [],
