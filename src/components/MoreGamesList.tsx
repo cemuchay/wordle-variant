@@ -1,5 +1,5 @@
 
-const MoreGamesList = ({ setMoreGameMode, handleNavigation }: { setMoreGameMode: React.Dispatch<React.SetStateAction<"wordup" | "select" | "wordgrid">>, handleNavigation: (item) => void }) => {
+const MoreGamesList = ({ setMoreGameMode, handleNavigation }: { setMoreGameMode: React.Dispatch<React.SetStateAction<"wordup" | "select" | "wordgrid">>, handleNavigation: (item: "wordup" | "play" | "challenges" | "leaderboard" | "chat" | "more") => void }) => {
     return (<div className="flex flex-col p-4 bg-slate-900/80 border border-white/10 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
         <div className="space-y-1">
             <span className="text-4xl">🎮</span>
