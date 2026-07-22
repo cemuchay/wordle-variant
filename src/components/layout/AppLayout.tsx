@@ -60,6 +60,19 @@ export const AppLayout = ({
     useEffect(() => {
         if (theme) {
             document.documentElement.setAttribute('data-theme', theme);
+            const activeBg = theme.startsWith('#') ? theme : '#121213';
+            document.documentElement.style.backgroundColor = activeBg;
+            document.body.style.backgroundColor = activeBg;
+
+            // Sync HTML meta theme-color tag for mobile status & home bar background
+            let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+            if (!metaThemeColor) {
+                metaThemeColor = document.createElement('meta');
+                metaThemeColor.setAttribute('name', 'theme-color');
+                document.head.appendChild(metaThemeColor);
+            }
+            metaThemeColor.setAttribute('content', activeBg);
+
             if (theme === 'dark' || theme === 'light') {
                 if (preferences.theme !== theme) {
                     setPreferences({ ...preferences, theme });

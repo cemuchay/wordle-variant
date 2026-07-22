@@ -358,6 +358,7 @@ interface WordGridState {
    setMatchId: (matchId: string | null) => void;
 
    // Board & Rack play actions
+   moveTileInGrid: (fromX: number, fromY: number, toX: number, toY: number) => void;
    placeTile: (x: number, y: number, letter: string) => void;
    recallTile: (x: number, y: number) => void;
    recallAllTiles: () => void;
@@ -462,6 +463,23 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    setMatchId: (matchId) => set({ matchId }),
+
+   moveTileInGrid: (fromX: number, fromY: number, toX: number, toY: number) => {
+      const { placedTiles, board, matchId } = get();
+      // Cannot move to an already occupied cell (either on existing board or placed tiles)
+      const isBoardOccupied = board.some((c) => c.x === toX && c.y === toY);
+      const isPlacedOccupied = placedTiles.some((t) => t.x === toX && t.y === toY);
+      if (isBoardOccupied || isPlacedOccupied) return;
+
+      const tileIdx = placedTiles.findIndex((t) => t.x === fromX && t.y === fromY);
+      if (tileIdx === -1) return;
+
+      const newPlaced = [...placedTiles];
+      newPlaced[tileIdx] = { ...newPlaced[tileIdx], x: toX, y: toY };
+
+      set({ placedTiles: newPlaced });
+      saveDraftToLocalStorage(matchId, newPlaced, get().rack);
+   },
 
    placeTile: (x, y, letter) => {
       const { rack, placedTiles, matchId } = get();
@@ -667,7 +685,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       }
 
       // 3. Score calculation
-      const scoreResult = calculateTurnScore(words, placedTiles.length, board);
+      const scoreResult = calculateTurnScore(words, placedTiles.length, board, gridSize);
 
       // Update board state
       const newBoard = [...board];
@@ -713,6 +731,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          player_id: userId,
          word: words.map((w) => w.word).join(", "),
          score: scoreResult.totalScore,
+         breakdown: scoreResult.words.map((w) => w.breakdown).join(" | ") + (scoreResult.bingoApplied ? " + 50 (1st Move Bingo Bonus)" : ""),
          tiles_placed: placedTiles,
          timestamp: new Date().toISOString(),
       };
@@ -756,10 +775,10 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`);
 
          // Handle Bot Turn if applicable
-         if (get().isBotMatch && !isCompleted && nextPlayerTurnId === "bot") {
+         if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
             setTimeout(
                () => get().playBotTurn(newBoard, newBag, nextTurnIdx),
-               1200,
+               600,
             );
          }
 
@@ -849,11 +868,11 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          triggerToast(`Swapped ${lettersToExchange.length} tiles. Turn ended.`);
       }
 
-      // Trigger bot turn if next player is bot
-      if (get().isBotMatch && nextPlayerTurnId === "bot") {
+      // Handle Bot Turn if applicable after swapping tiles
+      if (get().isBotMatch && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
          setTimeout(
             () => get().playBotTurn(get().board, nextBag, nextTurnIdx),
-            1200,
+            600,
          );
       }
    },
@@ -1117,6 +1136,9 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
        const { matchId, moves, players, gridSize, botDifficulty } = get();
        if (!matchId) return;
 
+       // Preload bot word pools if not preloaded yet
+       await preloadBotWordPools();
+
        const updatedPlayers = [...players];
        const botPlayer = updatedPlayers[botPlayerIdx] || {
           id: "bot",
@@ -1187,7 +1209,8 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          player_id: "bot",
          word: wordPlaced,
          score: addedScore,
-         tiles_placed: [],
+         breakdown: botMove?.score ? `${botMove.word} = ${botMove.score} pts` : undefined,
+         tiles_placed: botMove?.placedTiles || [],
          timestamp: new Date().toISOString(),
       };
 

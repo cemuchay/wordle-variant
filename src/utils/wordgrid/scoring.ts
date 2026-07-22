@@ -1,6 +1,6 @@
 // src/utils/wordgrid/scoring.ts
 
-import { TILE_VALUES, PREMIUM_CELLS } from './constants';
+import { TILE_VALUES, getPremiumCellsForGrid } from './constants';
 import type { GridCell, PlacedTile } from './constants';
 
 export interface WordScoreResult {
@@ -20,12 +20,15 @@ export interface TurnScoreResult {
  * @param wordsFormed - list of words formed with their new tiles
  * @param placedTilesCount - number of tiles placed in this turn (to check for 7-tile bingo)
  * @param existingBoard - existing tiles on the board before this turn
+ * @param gridSize - size of the grid (default 7)
  */
 export function calculateTurnScore(
   wordsFormed: { word: string; tiles: PlacedTile[] }[],
   placedTilesCount: number,
-  existingBoard: GridCell[]
+  existingBoard: GridCell[],
+  gridSize = 7
 ): TurnScoreResult {
+  const premiumCells = getPremiumCellsForGrid(gridSize);
   // Map of existing tiles for quick lookup of already placed cells
   const existingMap = new Map<string, boolean>();
   existingBoard.forEach(c => {
@@ -82,8 +85,8 @@ export function calculateTurnScore(
       let cellPremium = 'NONE';
 
       // Multipliers only apply if it is a NEW tile placed on a premium cell
-      if (isNewTile && PREMIUM_CELLS[cellKey]) {
-        cellPremium = PREMIUM_CELLS[cellKey];
+      if (isNewTile && premiumCells[cellKey]) {
+        cellPremium = premiumCells[cellKey];
         if (cellPremium === 'DL') {
           letterMultiplier = 2;
         } else if (cellPremium === 'TL') {
@@ -125,7 +128,8 @@ export function calculateTurnScore(
     });
   }
 
-  const bingoApplied = placedTilesCount === 7;
+  const isFirstPlay = existingBoard.length === 0;
+  const bingoApplied = isFirstPlay && placedTilesCount === 7;
   if (bingoApplied) {
     totalScore += 50;
   }

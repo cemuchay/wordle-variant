@@ -32,6 +32,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     view,
     setView,
     resetGame,
+    moveTileInGrid,
     placeTile,
     recallTile,
     recallAllTiles,
@@ -187,8 +188,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         {/* Left Column (Controls, Merged Header, Rack, Timeline on Desktop) */}
         <div className="md:col-span-5 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
           {/* Merged Header with Back Button, Turn Info & Live Scores */}
-          <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-2 animate-in fade-in duration-300">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="w-full bg-slate-900/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 animate-in fade-in duration-300">
+            {/* Left section: Back button & Status */}
+            <div className="flex items-center gap-3 min-w-0 shrink-0">
               <button
                 onClick={handleBackToLobby}
                 className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md active:scale-95 shrink-0"
@@ -198,41 +200,43 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
-                  <span className="text-[9px] font-black px-1.5 py-0.2 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
                     {gridSize}×{gridSize}
                   </span>
                 </div>
-                <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-300'}`}>
-                  {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting...'}
+                <span className={`text-[11px] font-black leading-tight truncate mt-0.5 ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
+                  {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting for move...'}
                 </span>
               </div>
             </div>
 
-            {/* Merged Player Scores Pill */}
-            <div className="flex items-center gap-2 bg-slate-950/80 px-2.5 py-1.5 border border-slate-800 rounded-2xl shrink-0">
-              {activePlayersList.map((p, i) => {
-                const isYou = p.id === userId;
-                const isCurrent = currentTurn === p.id && status === 'active';
-                return (
-                  <div key={p.id} className="flex items-center gap-1 text-[10px] font-black">
-                    {i > 0 && <span className="text-slate-700">•</span>}
-                    <span className={isCurrent ? 'text-emerald-400' : 'text-slate-400'}>
-                      {isYou ? 'You' : p.username}:
-                    </span>
-                    <span className="text-white text-xs font-black">{p.score}</span>
-                  </div>
-                );
-              })}
-            </div>
+            {/* Right section: Scores & Resign */}
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <div className="flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner">
+                {activePlayersList.map((p, i) => {
+                  const isYou = p.id === userId;
+                  const isCurrent = currentTurn === p.id && status === 'active';
+                  return (
+                    <div key={p.id} className="flex items-center gap-1.5 text-[10px] font-black">
+                      {i > 0 && <span className="text-slate-700 font-bold">•</span>}
+                      <span className={isCurrent ? 'text-emerald-400 font-extrabold' : 'text-slate-400'}>
+                        {isYou ? 'You' : p.username}:
+                      </span>
+                      <span className="text-white text-xs font-black">{p.score}</span>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {status !== 'completed' && (
-              <button
-                onClick={handleResign}
-                className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
-              >
-                Resign
-              </button>
-            )}
+              {status !== 'completed' && (
+                <button
+                  onClick={handleResign}
+                  className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                >
+                  Resign
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Action panel: Play Word vs Swap Tiles */}
@@ -279,6 +283,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             board={board}
             placedTiles={placedTiles}
             selectedIdx={selectedRackIdx}
+            onMoveTileInGrid={moveTileInGrid}
             onPlaceTile={handlePlaceTile}
             onRecallTile={handleRecallTile}
           />
