@@ -955,7 +955,7 @@ export default function App() {
     ? "#111827"
     : activeNavigationItem === "wordup" || isWordUpOpen
       ? "#18181b"
-      : moreGameMode === "wordgrid"
+      : activeNavigationItem === "more" && moreGameMode === "wordgrid"
         ? "#0f172a"
         : "#121213";
 
@@ -1153,11 +1153,8 @@ export default function App() {
                           }
                         }}
                         onBackToClassic={() => {
-                          if (activeNavigationItem === "more") {
-                            setMoreGameMode("select");
-                          } else {
-                            handleNavigation('play');
-                          }
+                          setMoreGameMode("select");
+                          handleNavigation('play');
                         }}
                       />
                     </Suspense>
