@@ -74,6 +74,7 @@ export const AppLayout = ({
         <div
             className={`w-full h-dvh max-h-dvh flex flex-col overflow-hidden bg-dark text-white relative select-none ${className}`}
             style={{
+                backgroundColor: theme && theme.startsWith('#') ? theme : undefined,
                 paddingTop: 'env(safe-area-inset-top, 0px)',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
                 paddingLeft: 'env(safe-area-inset-left, 0px)',

@@ -1002,20 +1002,12 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className={`fixed inset-0 flex items-center justify-center bg-gray-900/90 md:backdrop-blur-xs transition-[padding,background-color] duration-300 ${isPlaying
-          ? "p-0 pt-[env(safe-area-inset-top,0)] pb-[env(safe-area-inset-bottom,0)] sm:p-4 sm:pt-[calc(2rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
-          : "p-0 pt-[env(safe-area-inset-top,0)] pb-[env(safe-area-inset-bottom,0)] sm:p-4 sm:pt-[calc(1rem+env(safe-area-inset-top,0))] sm:pb-[calc(2rem+env(safe-area-inset-bottom,0))]"
+        className={`bg-gray-900 w-full h-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
+          ? "max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
+          : "max-h-full rounded-none border-none sm:max-w-xl sm:rounded-3xl sm:border sm:border-white/10 sm:h-[85vh] sm:max-h-[85vh]"
           }`}
-        style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
       >
-        <div
-          className={`bg-gray-900 w-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
-            ? "h-full max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
-            : "h-full max-h-full rounded-none border-none sm:max-w-xl sm:rounded-3xl sm:border sm:border-white/10 sm:h-[85vh] sm:max-h-[85vh]"
-            }`}
-        >
-          <ChallengeModalContent onClose={onClose} user={user} />
-        </div>
+        <ChallengeModalContent onClose={onClose} user={user} />
       </div>
     </ChallengeProvider>
   );

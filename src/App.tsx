@@ -951,7 +951,7 @@ export default function App() {
     );
   }
 
-  const currentTheme = isChallengeOpen || activeNavigationItem === "challenges" || isPlayingChallenge
+  const currentTheme = selectedChallenge || isChallengeOpen || isStatsOpen || activeNavigationItem === "challenges" || activeNavigationItem === "leaderboard" || isPlayingChallenge
     ? "#111827"
     : activeNavigationItem === "wordup" || isWordUpOpen
       ? "#18181b"
@@ -959,13 +959,13 @@ export default function App() {
         ? "#0f172a"
         : "#121213";
 
-  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || isTutorialOpen || isWordupTutorialOpen || showAlreadyPlayedScreen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
+  const hideHeader = isPlayingChallenge || isBattlePlaying || isChatConversationOpen || !!selectedChallenge || activeNavigationItem === "leaderboard" || isTutorialOpen || isWordupTutorialOpen || showAlreadyPlayedScreen || (activeNavigationItem === "more" && moreGameMode === "wordgrid");
 
   return (
     <AppLayout
       theme={currentTheme}
       hideHeader={hideHeader}
-      hideNavigation={false}
+      hideNavigation={isPlayingChallenge || isBattlePlaying}
       headerProps={{
         hideGameplayActions: activeNavigationItem !== "play",
         onOpenSettings: () => setIsSettingsOpen(true),
@@ -1097,7 +1097,7 @@ export default function App() {
             )}
 
             {activeNavigationItem === "leaderboard" && (
-              <div className="h-full flex flex-col items-center justify-center p-2 bg-dark">
+              <div className="h-full w-full flex flex-col items-center justify-center p-0 sm:p-2 bg-gray-900">
                 <Suspense fallback={null}>
                   <StatsModal
                     isOpen={true}
@@ -1189,7 +1189,7 @@ export default function App() {
         modals={{
           isSettingsOpen,
           isInfoOpen,
-          isStatsOpen,
+          isStatsOpen: isStatsOpen && activeNavigationItem !== "leaderboard",
           isChallengeOpen,
           isNotificationsOpen: showNotifications,
           isAuthOpen,
