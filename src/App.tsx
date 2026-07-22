@@ -37,6 +37,9 @@ import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
+import MoreGamesList from "./components/MoreGamesList";
+import AppLoadingSkeleton from "./components/app/AppLoadingSkeleton";
+import DisconnectedUI from "./components/app/DisconnectedUI";
 
 const ChatRoom = safeLazy(() => import("./components/chatRoom"));
 const StatsModal = safeLazy(() => import("./components/StatsModal").then(m => ({ default: m.StatsModal })));
@@ -936,43 +939,7 @@ export default function App() {
 
   if (!isHydrated || isLoadingDate || isAuthLoading) {
     return (
-      <div className="h-dvh w-full flex flex-col bg-dark text-white p-4 justify-between animate-pulse select-none">
-        {/* Header Skeleton */}
-        <div className="flex items-center justify-between border-b border-white/5 pb-4 shrink-0 px-2 mt-2">
-          <div className="w-8 h-8 rounded-full bg-white/10" />
-          <div className="h-6 w-32 bg-white/10 rounded-lg" />
-          <div className="flex gap-2">
-            <div className="w-8 h-8 rounded-lg bg-white/10" />
-            <div className="w-8 h-8 rounded-lg bg-white/10" />
-          </div>
-        </div>
-
-        {/* Board Grid Skeleton: a full unified pulsing block about the height of the grid */}
-        <div className="flex-1 flex items-center justify-center min-h-0 py-8 w-full px-4">
-          <div className="w-full max-w-[280px] sm:max-w-[320px] aspect-5/6 max-h-[350px] sm:max-h-[400px] bg-white/5 border border-white/10 rounded-3xl" />
-        </div>
-
-        {/* Keyboard Skeleton */}
-        <div className="w-full max-w-lg mx-auto pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] space-y-1.5 shrink-0 px-2">
-          <div className="flex justify-center gap-1.5">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
-            ))}
-          </div>
-          <div className="flex justify-center gap-1.5 px-3">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
-            ))}
-          </div>
-          <div className="flex justify-center gap-1.5">
-            <div className="h-12 w-14 rounded bg-white/10" />
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-12 flex-1 rounded bg-white/10" />
-            ))}
-            <div className="h-12 w-14 rounded bg-white/10" />
-          </div>
-        </div>
-      </div>
+      <AppLoadingSkeleton />
     );
   }
 
@@ -994,45 +961,7 @@ export default function App() {
       {user && <FloatingChatBubble />}
       {/* Toast component has been migrated to DynamicIslandStatus */}
       {user && showDisconnectedUI && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-3 bg-amber-950/90 backdrop-blur-md border border-amber-500/30 px-4 py-2.5 rounded-2xl shadow-xl">
-            <span className={`w-2 h-2 rounded-full ${reconnectStatus === "failed" ? "bg-red-500 animate-pulse" : "bg-amber-500 animate-ping"}`} />
-            <p className="text-[10px] uppercase font-black tracking-wide text-amber-200">
-              {reconnectStatus === "attempting"
-                ? "Attempting to reconnect..."
-                : reconnectStatus === "failed"
-                  ? "Live sync failed. Please refresh."
-                  : "Live sync disconnected"}
-            </p>
-            <div className="flex items-center gap-2">
-              {reconnectStatus !== "attempting" && reconnectStatus !== "failed" && (
-                <button
-                  onClick={handleManualReconnect}
-                  className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  Reconnect
-                </button>
-              )}
-              {reconnectStatus === "failed" && (
-                <button
-                  onClick={handleManualReconnect}
-                  className="bg-amber-500/50 hover:bg-amber-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  Retry
-                </button>
-              )}
-              <button
-                onClick={() => window.location.reload()}
-                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer ${reconnectStatus === "failed"
-                  ? "bg-amber-500 hover:bg-amber-600 text-black animate-pulse"
-                  : "bg-white/10 hover:bg-white/20 text-white"
-                  }`}
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-        </div>
+        <DisconnectedUI reconnectStatus={reconnectStatus} handleManualReconnect={handleManualReconnect} />
       )}
 
       {!user && guestOptedIn && date && guestBannerLastDismissed !== date && (
@@ -1193,50 +1122,7 @@ export default function App() {
             {(activeNavigationItem === "wordup" || activeNavigationItem === "more") && (
               <div className="h-full flex flex-col items-center justify-center p-2 bg-dark w-full">
                 {activeNavigationItem === "more" && moreGameMode === "select" ? (
-                  <div className="flex flex-col p-6 bg-slate-900/80 border border-white/10 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
-                    <div className="space-y-1">
-                      <span className="text-3xl">🎮</span>
-                      <h2 className="text-lg font-black uppercase tracking-wider text-white">More Games</h2>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Choose a challenge below</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* WordUp game card */}
-                      <button
-                        onClick={() => setMoreGameMode("wordup")}
-                        className="w-full flex items-center gap-4 p-4 bg-linear-to-br from-rose-500/10 to-rose-600/5 hover:from-rose-500/20 hover:to-rose-600/10 border border-rose-500/20 rounded-2xl cursor-pointer text-left transition-all active:scale-98 group"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center shrink-0 text-2xl group-hover:scale-105 transition-transform">
-                          ⚔️
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-black uppercase text-rose-300 tracking-wide">WordUp Battles</p>
-                          <p className="text-[10px] text-gray-400 font-medium leading-normal mt-0.5">Rapid multiplayer definition matching game. Climb the rankings and defeat players in real-time!</p>
-                        </div>
-                      </button>
-
-                      {/* WordGrid game card */}
-                      <button
-                        onClick={() => setMoreGameMode("wordgrid")}
-                        className="w-full flex items-center gap-4 p-4 bg-linear-to-br from-indigo-500/10 to-indigo-600/5 hover:from-indigo-500/20 hover:to-indigo-600/10 border border-indigo-500/20 rounded-2xl cursor-pointer text-left transition-all active:scale-98 group"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0 text-2xl group-hover:scale-105 transition-transform">
-                          🔠
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-black uppercase text-indigo-300 tracking-wide">WordGrid Arena</p>
-                          <p className="text-[10px] text-gray-400 font-medium leading-normal mt-0.5">Asynchronous 11x11 Scrabble board game. Place words, use multipliers, and score bonuses.</p>
-                        </div>
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => handleNavigation('play')}
-                      className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 text-[9px] font-black uppercase tracking-wider text-white/60 hover:text-white transition-all cursor-pointer"
-                    >
-                      Back to Classic Wordle
-                    </button>
-                  </div>
+                  <MoreGamesList setMoreGameMode={setMoreGameMode} handleNavigation={handleNavigation} />
                 ) : moreGameMode === "wordgrid" ? (
                   <Suspense fallback={<div className="text-xs text-gray-400 animate-pulse font-bold">Loading WordGrid...</div>}>
                     <WordGridContainer onBackToClassic={() => setMoreGameMode("select")} />

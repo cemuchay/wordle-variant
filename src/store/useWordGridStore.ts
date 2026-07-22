@@ -18,6 +18,7 @@ import {
 } from "../utils/wordgrid/bagBalancing";
 
 import { safeLocalStorage } from "../utils/storage";
+import { preloadBotWordPools, findBotWordMove } from "../utils/wordgrid/botAI";
 
 export type WordGridViewType = "lobby" | "matchmaking" | "active" | "completed";
 
@@ -922,9 +923,10 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       set({ view: "lobby" });
    },
 
-   startBotMatch: async (userId, difficulty, gridSize = DEFAULT_GRID_SIZE) => {
-      set({ loading: true, error: null });
-      const initialBag = generateInitialTileBag();
+    startBotMatch: async (userId, difficulty, gridSize = DEFAULT_GRID_SIZE) => {
+       set({ loading: true, error: null });
+       preloadBotWordPools();
+       const initialBag = generateInitialTileBag();
 
       // Draw balanced 7 tiles for player, and 7 tiles for bot
       const { rack: p1Rack, newBag: bagAfterP1 } = await drawBalancedRack(
@@ -1105,85 +1107,77 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       } catch (e: any) {
          console.error("startDirectChallenge error:", e);
          triggerToast(e?.message || "Failed to create challenge.");
-      } finally {
-         set({ loading: false });
       }
    },
+    playBotTurn: async (
+       newBoard: GridCell[],
+       newBag: string[],
+       botPlayerIdx: number,
+    ) => {
+       const { matchId, moves, players, gridSize, botDifficulty } = get();
+       if (!matchId) return;
 
-   // Bot AI action (Places or Swaps)
-   playBotTurn: async (
-      newBoard: GridCell[],
-      newBag: string[],
-      botPlayerIdx: number,
-   ) => {
-      const { matchId, moves, players, gridSize } = get();
-      if (!matchId) return;
+       const updatedPlayers = [...players];
+       const botPlayer = updatedPlayers[botPlayerIdx] || {
+          id: "bot",
+          username: "AI",
+          score: 0,
+          rack: [],
+       };
+       const botRack = [...botPlayer.rack];
+       const updatedBoard = [...newBoard];
+       let currentBag = [...newBag];
+       let addedScore = 0;
+       let wordPlaced = "SWAP";
 
-      const updatedPlayers = [...players];
-      const botPlayer = updatedPlayers[botPlayerIdx] || {
-         id: "bot",
-         username: "AI",
-         score: 0,
-         rack: [],
-      };
-      const botRack = [...botPlayer.rack];
+       const botMove = await findBotWordMove(updatedBoard, botRack, gridSize, botDifficulty);
 
-      const updatedBoard = [...newBoard];
-      let currentBag = [...newBag];
-      let addedScore = 0;
-      let wordPlaced = "SWAP";
-
-      // Bot attempts placement or tile swap
-      if (botRack.length > 0) {
-         let placeX = Math.floor(gridSize / 2);
-         let placeY = Math.floor(gridSize / 2);
-
-         if (newBoard.length > 0) {
-            const refCell =
-               newBoard[Math.floor(Math.random() * newBoard.length)];
-            const dirs = [
-               [0, 1],
-               [0, -1],
-               [1, 0],
-               [-1, 0],
-            ];
-            for (const [dx, dy] of dirs) {
-               const tx = refCell.x + dx;
-               const ty = refCell.y + dy;
-               if (
-                  tx >= 0 &&
-                  tx < gridSize &&
-                  ty >= 0 &&
-                  ty < gridSize &&
-                  !newBoard.some((c) => c.x === tx && c.y === ty)
-               ) {
-                  placeX = tx;
-                  placeY = ty;
-                  break;
-               }
-            }
+      if (botMove && botMove.placedTiles.length > 0) {
+         // Apply placed tiles to board
+         for (const tile of botMove.placedTiles) {
+            updatedBoard.push({
+               x: tile.x,
+               y: tile.y,
+               letter: tile.letter.toUpperCase(),
+               ownerId: "bot",
+            });
+            const rIdx = botRack.findIndex((l) => l.toUpperCase() === tile.letter.toUpperCase());
+            if (rIdx !== -1) botRack.splice(rIdx, 1);
          }
 
-         const letter = botRack[0];
-         updatedBoard.push({
-            x: placeX,
-            y: placeY,
-            letter,
-            ownerId: "bot",
-         });
-
-         botRack.splice(0, 1);
-         const { rack: refreshedRack, newBag: nextBag } =
-            await drawBalancedRack(currentBag, botRack, 7, false);
+         const { rack: refreshedRack, newBag: nextBag } = await drawBalancedRack(
+            currentBag,
+            botRack,
+            7,
+            false,
+         );
          currentBag = nextBag;
-         addedScore = 4;
-         wordPlaced = letter;
+         addedScore = botMove.score;
+         wordPlaced = botMove.word;
 
          updatedPlayers[botPlayerIdx] = {
             ...botPlayer,
             score: botPlayer.score + addedScore,
             rack: refreshedRack,
          };
+      } else {
+         // If no word can be formed, exchange 2 tiles if bag is not empty
+         const swapCount = Math.min(2, botRack.length);
+         if (swapCount > 0 && currentBag.length > 0) {
+            const swappedLetters = botRack.splice(0, swapCount);
+            const { rack: refreshedRack, newBag: tempBag } = await drawBalancedRack(
+               currentBag,
+               botRack,
+               7,
+               false,
+            );
+            currentBag = [...tempBag, ...swappedLetters];
+            wordPlaced = `SWAP (${swapCount} tiles)`;
+            updatedPlayers[botPlayerIdx] = {
+               ...botPlayer,
+               rack: refreshedRack,
+            };
+         }
       }
 
       const nextTurnIdx = (botPlayerIdx + 1) % players.length;
