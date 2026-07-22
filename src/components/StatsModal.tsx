@@ -480,13 +480,15 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         )}
       </div>
 
-      {/* The Modal */}
+      {/* The Modal / Full Height Preview Overlay */}
       {(selectedEntry && (timeframe === "today" || timeframe === "yesterday" || activeTab === 'stats')) && (
-        <GuessPreviewModal
-          entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
-          yesterday={timeframe === "yesterday"}
-        />
+        <div className="absolute inset-0 z-30 bg-gray-900 flex flex-col h-full w-full min-h-0">
+          <GuessPreviewModal
+            entry={selectedEntry}
+            onClose={() => setSelectedEntry(null)}
+            yesterday={timeframe === "yesterday"}
+          />
+        </div>
       )}
     </>
   );

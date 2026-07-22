@@ -271,6 +271,7 @@ const AuthenticatedChallengeContent = memo(
 
     // Reset played page when navigating tabs or changing filters
     useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlayedPage(1);
     }, [listColumn, modeFilter, lengthFilter, searchQuery]);
 
@@ -855,33 +856,35 @@ const AuthenticatedChallengeContent = memo(
         </AnimatePresence>
 
         {previewParticipant && (
-          <GuessPreviewModal
-            entry={previewParticipant}
-            onClose={() => {
-              setPreviewParticipant(null);
-              setPreviewMarathonLength(null);
-              setPreviewMarathonGameIndex(null);
-            }}
-            myParticipation={myParticipation}
-            initialMarathonGameIndex={previewMarathonGameIndex ?? undefined}
-            initialData={{
-              guesses: previewParticipant.guesses,
-              skill_score: previewParticipant.score,
-              hints_used: previewParticipant.hints_used,
-              hint_record: previewParticipant.hint_record,
-              time_taken: previewParticipant.time_taken,
-              target_words: previewParticipant.target_words || undefined,
-            }}
-            targetWord={selectedChallenge?.target_word}
-            salt={selectedChallenge?.salt}
-            challenge={selectedChallenge}
-            lengthOfWord={selectedChallenge?.word_length}
-            isCreator={
-              selectedChallenge?.creator_id === user?.id &&
-              !!selectedChallenge?.is_custom_word
-            }
-            isShapeshifter={selectedChallenge?.is_shapeshifter}
-          />
+          <div className="absolute inset-0 z-30 bg-gray-900 flex flex-col h-full w-full min-h-0">
+            <GuessPreviewModal
+              entry={previewParticipant}
+              onClose={() => {
+                setPreviewParticipant(null);
+                setPreviewMarathonLength(null);
+                setPreviewMarathonGameIndex(null);
+              }}
+              myParticipation={myParticipation}
+              initialMarathonGameIndex={previewMarathonGameIndex ?? undefined}
+              initialData={{
+                guesses: previewParticipant.guesses,
+                skill_score: previewParticipant.score,
+                hints_used: previewParticipant.hints_used,
+                hint_record: previewParticipant.hint_record,
+                time_taken: previewParticipant.time_taken,
+                target_words: previewParticipant.target_words || undefined,
+              }}
+              targetWord={selectedChallenge?.target_word}
+              salt={selectedChallenge?.salt}
+              challenge={selectedChallenge}
+              lengthOfWord={selectedChallenge?.word_length}
+              isCreator={
+                selectedChallenge?.creator_id === user?.id &&
+                !!selectedChallenge?.is_custom_word
+              }
+              isShapeshifter={selectedChallenge?.is_shapeshifter}
+            />
+          </div>
         )}
 
         {/* Bootstrapping Overlay Loader */}
