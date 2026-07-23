@@ -526,22 +526,7 @@ const ChatRoom = ({ user, onClose }: { user: AppUser; onClose?: () => void }) =>
                         exit={{ opacity: 0, x: -20 }}
                         className="flex flex-col h-full z-10"
                     >
-                        {/* Sidebar Header */}
-                        <div className={`p-6 border-b border-white/5 bg-[#1f2c34] flex justify-between items-center shrink-0 transition-all ${isDynamicIslandVisible ? 'mt-7 sm:mt-9' : ''}`}>
-                            <h2 className="text-lg font-black uppercase tracking-wider text-white flex items-center gap-2">
-                                <MessageSquare className="text-correct" size={20} /> Messages
-                            </h2>
-                            <div className="flex gap-2">
-                                {onClose && (
-                                    <button
-                                        onClick={onClose}
-                                        className="w-8 h-8 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all"
-                                    >
-                                        <ChevronLeft size={16} className="text-white" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+
 
                         {/* Chat Search Box */}
                         <div className="px-6 py-3 border-b border-white/5 shrink-0 bg-[#0b141a]/60">

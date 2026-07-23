@@ -494,7 +494,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 flex-1 w-full max-w-xl mx-auto bg-gray-900 overflow-hidden px-2 py-3 relative"
+      className="flex flex-col h-full min-h-0 flex-1 w-full max-w-xl mx-auto bg-gray-900 overflow-hidden px-3 py-3 relative"
       style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
     >
       <div className="w-full max-w-xl mx-auto flex flex-col h-full min-h-0 flex-1 relative overflow-hidden">
@@ -624,7 +624,7 @@ const LeaderboardRow: React.FC<{ entry: LeaderboardEntry; rank: number; tieIndex
         }
       }}
       className={`
-    flex items-center justify-between p-3 rounded-xl border transition-all duration-300
+    flex items-center justify-between p-3 rounded-xl border transition-all duration-300 mx-auto
     ${isFirst
           ? 'bg-linear-to-r from-yellow-900/40 via-yellow-600/10 to-transparent border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]'
           : isCurrentUser ? 'bg-correct/10 border-correct/30' : 'bg-gray-800/40 border-gray-800'
