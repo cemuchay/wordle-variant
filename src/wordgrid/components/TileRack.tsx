@@ -1,5 +1,6 @@
 // src/wordgrid/components/TileRack.tsx
 
+import { useEffect } from 'react';
 import { TILE_VALUES } from '../../utils/wordgrid/constants';
 
 interface TileRackProps {
@@ -10,6 +11,7 @@ interface TileRackProps {
   onRecallAll: () => void;
   isMyTurn: boolean;
   onTurnAlert?: () => void;
+  onReorderRack?: (fromIdx: number, toIdx: number) => void;
 }
 
 export const TileRack = ({
@@ -20,9 +22,20 @@ export const TileRack = ({
   onRecallAll,
   isMyTurn,
   onTurnAlert,
+  onReorderRack,
 }: TileRackProps) => {
+  // Auto-clear selection after 3 seconds of inactivity
+  useEffect(() => {
+    if (selectedIdx === null || selectedIdx < 0) return;
+
+    const timer = setTimeout(() => {
+      onSelectTile(-1);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [selectedIdx, onSelectTile]);
   return (
-    <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
+    <div className="w-full max-w-[480px] bg-[#0c121e] border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
       {/* Title / Turn status indicator */}
       <div className="flex items-center justify-between">
         <span className={`text-[11px] font-black uppercase tracking-wider ${isMyTurn ? 'text-emerald-400' : 'text-slate-400'}`}>
@@ -58,13 +71,42 @@ export const TileRack = ({
               onDragStart={(e) => {
                 if (isMyTurn) {
                   e.dataTransfer.setData('text/plain', idx.toString());
+                  e.dataTransfer.setData('source', 'rack');
                   e.dataTransfer.effectAllowed = 'move';
                   onSelectTile(idx);
                 }
               }}
+              onDragEnd={() => {
+                if (isSelected) {
+                  onSelectTile(-1);
+                }
+              }}
+              onDragOver={(e) => {
+                if (isMyTurn) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }
+              }}
+              onDrop={(e) => {
+                if (!isMyTurn) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const rawIdx = e.dataTransfer.getData('text/plain');
+                if (rawIdx !== '') {
+                  const fromIdx = parseInt(rawIdx, 10);
+                  if (!isNaN(fromIdx) && fromIdx !== idx && onReorderRack) {
+                    onReorderRack(fromIdx, idx);
+                    onSelectTile(-1);
+                  }
+                }
+              }}
               onClick={() => {
                 if (isMyTurn) {
-                  onSelectTile(idx);
+                  if (isSelected) {
+                    onSelectTile(-1);
+                  } else {
+                    onSelectTile(idx);
+                  }
                 } else if (onTurnAlert) {
                   onTurnAlert();
                 }

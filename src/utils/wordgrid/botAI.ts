@@ -1,7 +1,10 @@
-import { TILE_VALUES, getPremiumCellsForGrid } from './constants';
+import { getPremiumCellsForGrid } from './constants';
 import type { GridCell, PlacedTile } from './constants';
 import { EASY_WORDS_3, EASY_WORDS_4, EASY_WORDS_5 } from '../../data/easy-words';
 import { loadWordLists } from '../../data/words';
+import { validateBoardPlacement } from './boardValidation';
+import { validateWordInDictionary } from './dictionary';
+import { calculateTurnScore } from './scoring';
 
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
@@ -40,7 +43,8 @@ export async function preloadBotWordPools(): Promise<void> {
     if (results[0].status === 'fulfilled') words5 = results[0].value;
     if (results[1].status === 'fulfilled') words6 = results[1].value;
     if (results[2].status === 'fulfilled') words7 = results[2].value;
-  } catch {
+  } catch (err) {
+    console.warn('Failed to load word lists for bot pool:', err);
   }
 
   const easySet = new Set([
@@ -82,41 +86,6 @@ function getWordPool(difficulty: BotDifficulty): string[] {
     throw new Error('Bot word pools not preloaded. Call preloadBotWordPools() first.');
   }
   return preloadedPools[difficulty];
-}
-
-function scoreWordPlacement(
-  word: string,
-  startX: number,
-  startY: number,
-  direction: 'horizontal' | 'vertical',
-  boardMap: Map<string, string>,
-  premiumCells: Record<string, string>,
-): number {
-  let total = 0;
-  let wordMultiplier = 1;
-
-  for (let i = 0; i < word.length; i++) {
-    const x = direction === 'horizontal' ? startX + i : startX;
-    const y = direction === 'horizontal' ? startY : startY + i;
-    const letter = word[i];
-    const key = `${x},${y}`;
-    const baseValue = TILE_VALUES[letter] || 0;
-
-    const isNewTile = !boardMap.has(key);
-    let letterMultiplier = 1;
-    const cellType = premiumCells[key] || 'NONE';
-
-    if (isNewTile) {
-      if (cellType === 'DL') letterMultiplier = 2;
-      else if (cellType === 'TL') letterMultiplier = 3;
-      else if (cellType === 'DW') wordMultiplier *= 2;
-      else if (cellType === 'TW') wordMultiplier *= 3;
-    }
-
-    total += baseValue * letterMultiplier;
-  }
-
-  return total * wordMultiplier;
 }
 
 function hasLettersInRack(word: string, rack: string[], boardMap: Map<string, string>, startX: number, startY: number, direction: 'horizontal' | 'vertical'): boolean {
@@ -169,8 +138,7 @@ function tryWordInDirection(
   direction: 'horizontal' | 'vertical',
   gridSize: number,
   rack: string[],
-  premiumCells: Record<string, string>,
-): { score: number; placedTiles: PlacedTile[]; startX: number; startY: number } | null {
+): { placedTiles: PlacedTile[]; startX: number; startY: number } | null {
   const charIdx = word.indexOf(cell.letter.toUpperCase());
   if (charIdx === -1) return null;
 
@@ -186,20 +154,17 @@ function tryWordInDirection(
   const placedTiles = buildPlacedTiles(word, startX, startY, direction, boardMap);
   if (placedTiles.length === 0) return null;
 
-  const score = scoreWordPlacement(word, startX, startY, direction, boardMap, premiumCells);
-
-  return { score, placedTiles, startX, startY };
+  return { placedTiles, startX, startY };
 }
 
 function tryWordOnEmptyBoard(
   word: string,
   gridSize: number,
   rack: string[],
-  premiumCells: Record<string, string>,
-): { score: number; placedTiles: PlacedTile[] } | null {
+): { placedTiles: PlacedTile[] } | null {
   const center = Math.floor(gridSize / 2);
   const boardMap = new Map<string, string>();
-  const direction: 'horizontal' = 'horizontal';
+  const direction = 'horizontal' as const;
   const startX = Math.max(0, center - Math.floor(word.length / 2));
   const startY = center;
 
@@ -212,9 +177,7 @@ function tryWordOnEmptyBoard(
     letter,
   }));
 
-  const score = scoreWordPlacement(word, startX, startY, direction, boardMap, premiumCells);
-
-  return { score, placedTiles };
+  return { placedTiles };
 }
 
 interface CandidateMove {
@@ -228,6 +191,37 @@ interface CandidateMove {
 function isPremiumBlockingCell(x: number, y: number, premiumCells: Record<string, string>): boolean {
   const cellType = premiumCells[`${x},${y}`] || 'NONE';
   return cellType === 'TW' || cellType === 'DW';
+}
+
+async function validateCandidateMove(
+  placedTiles: PlacedTile[],
+  board: GridCell[],
+  gridSize: number,
+  direction: 'horizontal' | 'vertical',
+  premiumCells: Record<string, string>,
+): Promise<CandidateMove | null> {
+  const validation = validateBoardPlacement(placedTiles, board, gridSize);
+  if (!validation.isValid || !validation.wordsFormed || validation.wordsFormed.length === 0) {
+    return null;
+  }
+
+  for (const formed of validation.wordsFormed) {
+    const isValidDict = await validateWordInDictionary(formed.word);
+    if (!isValidDict) {
+      return null;
+    }
+  }
+
+  const scoreResult = calculateTurnScore(validation.wordsFormed, placedTiles.length, board, gridSize);
+  const premiumCount = placedTiles.filter(t => isPremiumBlockingCell(t.x, t.y, premiumCells)).length;
+
+  return {
+    word: validation.wordsFormed.map(w => w.word).join(', '),
+    placedTiles,
+    score: scoreResult.totalScore,
+    direction,
+    premiumCount,
+  };
 }
 
 export async function findBotWordMove(
@@ -245,35 +239,25 @@ export async function findBotWordMove(
 
   if (board.length === 0) {
     for (const w of pool) {
-      const result = tryWordOnEmptyBoard(w, gridSize, rackUpper, premiumCells);
+      const result = tryWordOnEmptyBoard(w, gridSize, rackUpper);
       if (result) {
-        candidates.push({
-          word: w,
-          placedTiles: result.placedTiles,
-          score: result.score,
-          direction: 'horizontal',
-          premiumCount: result.placedTiles.filter(t => isPremiumBlockingCell(t.x, t.y, premiumCells)).length,
-        });
+        const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, 'horizontal', premiumCells);
+        if (candidate) {
+          candidates.push(candidate);
+        }
       }
     }
   } else {
     for (const w of pool) {
       for (const cell of board) {
         for (const direction of ['horizontal', 'vertical'] as const) {
-          const result = tryWordInDirection(w, boardMap, cell, direction, gridSize, rackUpper, premiumCells);
+          const result = tryWordInDirection(w, boardMap, cell, direction, gridSize, rackUpper);
           if (!result) continue;
 
-          const premiumCount = result.placedTiles.filter(t =>
-            isPremiumBlockingCell(t.x, t.y, premiumCells),
-          ).length;
-
-          candidates.push({
-            word: w,
-            placedTiles: result.placedTiles,
-            score: result.score,
-            direction,
-            premiumCount,
-          });
+          const candidate = await validateCandidateMove(result.placedTiles, board, gridSize, direction, premiumCells);
+          if (candidate) {
+            candidates.push(candidate);
+          }
         }
       }
     }

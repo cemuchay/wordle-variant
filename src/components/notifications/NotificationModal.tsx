@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
-import { X, Bell, Trash2, BellOff, Mail, MailOpen } from 'lucide-react';
+import { X, Bell, Trash2, BellOff, Mail, MailOpen, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApp } from '../../context/AppContext';
@@ -34,10 +34,10 @@ const NotificationItem = memo(({
             onClick={onClick ? () => onClick(notification) : undefined}
             className={`p-4 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.98]' : ''
                 } ${isNew
-                    ? 'bg-white/[0.08] border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
+                    ? 'bg-white/8 border-l-4 border-l-correct border-y-white/10 border-r-white/10 shadow-lg shadow-black/30'
                     : isUnread
-                        ? 'bg-white/[0.06] border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
-                        : 'bg-white/[0.03] border-white/5 opacity-90'
+                        ? 'bg-white/6 border-l-4 border-l-blue-500 border-y-white/10 border-r-white/10 shadow-md shadow-black/20'
+                        : 'bg-white/3 border-white/5 opacity-90'
                 }`}
         >
             <div className="flex justify-between items-start gap-3">
@@ -211,7 +211,7 @@ export const NotificationModal = memo(() => {
                                 onClick={() => markAllAsRead()}
                                 className="text-[9px] font-black uppercase tracking-widest text-correct hover:text-white transition-colors px-3 py-1.5 bg-correct/10 rounded-lg"
                             >
-                                Mark all as read
+                                <CheckCheck size={20} />
                             </button>
                         )}
                         <button
