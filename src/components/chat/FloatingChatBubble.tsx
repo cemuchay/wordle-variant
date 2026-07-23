@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,15 +32,15 @@ const CORE_GROUPS: Record<string, string> = {
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
-    const [dismissed, setDismissed] = useState(false);
-    const [conversationSearchQuery, setConversationSearchQuery] = useState("");
-    const [isDragging, setIsDragging] = useState(false);
+   const [dismissed, setDismissed] = useState(false);
+   const [conversationSearchQuery, setConversationSearchQuery] = useState("");
+   const [isDragging, setIsDragging] = useState(false);
    const [isNearDismiss, setIsNearDismiss] = useState(false);
    const [isOverlayOpen, setIsOverlayOpen] = useState(false);
    const overlayOpenedAtRef = useRef<number>(0);
    const prevOverlayOpenRef = useRef(false);
 
-    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+   const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
 
    // Synchronize status bar theme-color meta tag with Challenge mode bg-gray-900 when floating bubble is open
    useEffect(() => {
@@ -97,10 +98,10 @@ export default function FloatingChatBubble() {
    const timerRef = useRef<number | null>(null);
    const wavRecorderRef = useRef<any>(null);
 
-    // Reaction states
-    const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
-    const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
-    const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
+   // Reaction states
+   const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+   const [reactingModalMessageId, setReactingModalMessageId] = useState<string | null>(null);
+   const [showReactionDetailsId, setShowReactionDetailsId] = useState<string | null>(null);
 
    // Reply tracking
    const [replyingToMsg, setReplyingToMsg] = useState<any>(null);
@@ -113,47 +114,47 @@ export default function FloatingChatBubble() {
    const [visibleUnreadId, setVisibleUnreadId] = useState<string | null>(null);
    const [showUnreadLine, setShowUnreadLine] = useState(true);
 
-    const reactionsRef = useRef<HTMLDivElement>(null);
-    const detailsRef = useRef<HTMLDivElement>(null);
-    const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const hasDraggedRef = useRef(false);
-    const longPressMsgIdRef = useRef<string | null>(null);
+   const reactionsRef = useRef<HTMLDivElement>(null);
+   const detailsRef = useRef<HTMLDivElement>(null);
+   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   const hasDraggedRef = useRef(false);
+   const longPressMsgIdRef = useRef<string | null>(null);
 
-    // Cleanup long press timeout
-    useEffect(() => {
-       return () => {
-          if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
-       };
-    }, []);
+   // Cleanup long press timeout
+   useEffect(() => {
+      return () => {
+         if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+      };
+   }, []);
 
-    const handleTouchStart = (msgId: string) => {
-       hasDraggedRef.current = false;
-       longPressMsgIdRef.current = msgId;
-       if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
-       longPressTimeoutRef.current = setTimeout(() => {
-          if (!hasDraggedRef.current && longPressMsgIdRef.current) {
-             setReactingModalMessageId(prev => prev === longPressMsgIdRef.current ? null : longPressMsgIdRef.current);
-             if (navigator.vibrate) navigator.vibrate(50);
-          }
-       }, 500);
-    };
+   const handleTouchStart = (msgId: string) => {
+      hasDraggedRef.current = false;
+      longPressMsgIdRef.current = msgId;
+      if (longPressTimeoutRef.current) clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = setTimeout(() => {
+         if (!hasDraggedRef.current && longPressMsgIdRef.current) {
+            setReactingModalMessageId(prev => prev === longPressMsgIdRef.current ? null : longPressMsgIdRef.current);
+            if (navigator.vibrate) navigator.vibrate(50);
+         }
+      }, 500);
+   };
 
-    const handleTouchEnd = () => {
-       if (longPressTimeoutRef.current) {
-          clearTimeout(longPressTimeoutRef.current);
-          longPressTimeoutRef.current = null;
-       }
-    };
+   const handleTouchEnd = () => {
+      if (longPressTimeoutRef.current) {
+         clearTimeout(longPressTimeoutRef.current);
+         longPressTimeoutRef.current = null;
+      }
+   };
 
-    const handleTouchMove = () => {
-       hasDraggedRef.current = true;
-       if (longPressTimeoutRef.current) {
-          clearTimeout(longPressTimeoutRef.current);
-          longPressTimeoutRef.current = null;
-       }
-    };
+   const handleTouchMove = () => {
+      hasDraggedRef.current = true;
+      if (longPressTimeoutRef.current) {
+         clearTimeout(longPressTimeoutRef.current);
+         longPressTimeoutRef.current = null;
+      }
+   };
 
-    // Inactivity timer for auto-closing the overlay (not the bubble)
+   // Inactivity timer for auto-closing the overlay (not the bubble)
    const clearInactivityTimer = () => {
       if (inactivityTimerRef.current !== null) {
          clearTimeout(inactivityTimerRef.current);
@@ -326,78 +327,78 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-           setReplyText("");
-           startInactivityTimer();
-        } catch (err) {
-           console.error("Failed to send voice note:", err);
-          useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
-       } finally {
-          setIsSending(false);
-       }
-    };
+         setReplyText("");
+         startInactivityTimer();
+      } catch (err) {
+         console.error("Failed to send voice note:", err);
+         useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+      } finally {
+         setIsSending(false);
+      }
+   };
 
-    const handleSendImage = async (file: File) => {
-       if (!user?.id || !selectedGroupId) return;
-       setIsSending(true);
-       try {
-          const compressedBlob = await compressImage(file);
-          // eslint-disable-next-line react-hooks/purity
-          const fileName = `${user.id}/${Date.now()}.jpg`;
+   const handleSendImage = async (file: File) => {
+      if (!user?.id || !selectedGroupId) return;
+      setIsSending(true);
+      try {
+         const compressedBlob = await compressImage(file);
+         // eslint-disable-next-line react-hooks/purity
+         const fileName = `${user.id}/${Date.now()}.jpg`;
 
-          // 1. Upload to storage
-          const { error: uploadErr } = await supabase.storage
-             .from("chat-images")
-             .upload(fileName, compressedBlob, {
-                contentType: "image/jpeg",
-                cacheControl: "3600",
-             });
+         // 1. Upload to storage
+         const { error: uploadErr } = await supabase.storage
+            .from("chat-images")
+            .upload(fileName, compressedBlob, {
+               contentType: "image/jpeg",
+               cacheControl: "3600",
+            });
 
-          if (uploadErr) throw uploadErr;
+         if (uploadErr) throw uploadErr;
 
-          const {
-             data: { publicUrl },
-          } = supabase.storage.from("chat-images").getPublicUrl(fileName);
+         const {
+            data: { publicUrl },
+         } = supabase.storage.from("chat-images").getPublicUrl(fileName);
 
-          // 2. Persist to database
-          const messagePayload = {
-             id: crypto.randomUUID(),
-             content: "[Image]",
-             user_id: user.id,
-             is_read: false,
-             image_url: publicUrl,
-             group_id: selectedGroupId,
-          };
+         // 2. Persist to database
+         const messagePayload = {
+            id: crypto.randomUUID(),
+            content: "[Image]",
+            user_id: user.id,
+            is_read: false,
+            image_url: publicUrl,
+            group_id: selectedGroupId,
+         };
 
-          const { error } = await supabase.from("messages").insert([messagePayload]);
-          if (error) throw error;
+         const { error } = await supabase.from("messages").insert([messagePayload]);
+         if (error) throw error;
 
-          // Mark group as read immediately
-          const timestamp = new Date().toISOString();
-          updateReadReceipt(selectedGroupId, timestamp);
-          await supabase.from("chat_read_receipts").upsert(
-             {
-                user_id: user.id,
-                group_id: selectedGroupId,
-                last_seen_at: timestamp,
-             },
-             { onConflict: "user_id,group_id" }
-          );
+         // Mark group as read immediately
+         const timestamp = new Date().toISOString();
+         updateReadReceipt(selectedGroupId, timestamp);
+         await supabase.from("chat_read_receipts").upsert(
+            {
+               user_id: user.id,
+               group_id: selectedGroupId,
+               last_seen_at: timestamp,
+            },
+            { onConflict: "user_id,group_id" }
+         );
 
-           setReplyText("");
-           startInactivityTimer();
-        } catch (err) {
-           console.error("Failed to send image:", err);
-          useAppStore.getState().triggerToast("Failed to send image.", 4000);
-       } finally {
-          setIsSending(false);
-       }
-    };
+         setReplyText("");
+         startInactivityTimer();
+      } catch (err) {
+         console.error("Failed to send image:", err);
+         useAppStore.getState().triggerToast("Failed to send image.", 4000);
+      } finally {
+         setIsSending(false);
+      }
+   };
 
    const globalMessages = useAppStore((s) => s.globalMessages);
    const readReceipts = useAppStore((s) => s.readReceipts);
    const joinedGroupIds = useAppStore((s) => s.joinedGroupIds);
-    const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
-    const { user } = useAuth();
+   const updateReadReceipt = useAppStore((s) => s.updateReadReceipt);
+   const { user } = useAuth();
 
    // Profiles cache for reactor names
    const [profilesCache, setProfilesCache] = useState<Record<string, string>>({});
@@ -590,15 +591,15 @@ export default function FloatingChatBubble() {
       }
    }, [selectedGroupId, globalMessages]);
 
-    // Re-show bubble on new unread after dismissal
-    if (unreadCount !== prevUnreadCount) {
-       setPrevUnreadCount(unreadCount);
-       if (unreadCount > prevUnreadCount && dismissed) {
-          setDismissed(false);
-       }
-    }
+   // Re-show bubble on new unread after dismissal
+   if (unreadCount !== prevUnreadCount) {
+      setPrevUnreadCount(unreadCount);
+      if (unreadCount > prevUnreadCount && dismissed) {
+         setDismissed(false);
+      }
+   }
 
-    const isVisible = !isChatOpen && !dismissed;
+   const isVisible = !isChatOpen && !dismissed;
 
    // Filter out unread messages globally
    const joinedSet = new Set(joinedGroupIds);
@@ -615,44 +616,44 @@ export default function FloatingChatBubble() {
 
 
 
-    // Unified conversation list: all groups with messages, sorted by latest
-    const conversations = (() => {
-       const joinedSet = new Set(joinedGroupIds);
-       const groupMap = new Map<string, { group: any; lastMessage: any; unreadCount: number }>();
-       groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
-       globalMessages.forEach((m: any) => {
-          if (!user?.id) return;
-          if (!joinedSet.has(m.group_id)) return;
-          if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
-          const entry = groupMap.get(m.group_id);
-          if (!entry) return;
-          if (m.user_id !== user.id) {
-             const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
-             if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
-                entry.unreadCount++;
-             }
-          }
-            if (m.content?.startsWith("[reaction:")) return;
-              if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
-                 entry.lastMessage = m;
-              }
-       });
-       return Array.from(groupMap.values())
-          .filter(e => e.lastMessage)
-          .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
-    })();
+   // Unified conversation list: all groups with messages, sorted by latest
+   const conversations = (() => {
+      const joinedSet = new Set(joinedGroupIds);
+      const groupMap = new Map<string, { group: any; lastMessage: any; unreadCount: number }>();
+      groups.forEach(g => groupMap.set(g.id, { group: g, lastMessage: null, unreadCount: 0 }));
+      globalMessages.forEach((m: any) => {
+         if (!user?.id) return;
+         if (!joinedSet.has(m.group_id)) return;
+         if (!hasPlayedToday && m.group_id === "00000000-0000-0000-0000-000000000002") return;
+         const entry = groupMap.get(m.group_id);
+         if (!entry) return;
+         if (m.user_id !== user.id) {
+            const lastSeen = readReceipts[m.group_id] || new Date(0).toISOString();
+            if (new Date(m.created_at).getTime() > new Date(lastSeen).getTime()) {
+               entry.unreadCount++;
+            }
+         }
+         if (m.content?.startsWith("[reaction:")) return;
+         if (!entry.lastMessage || new Date(m.created_at) > new Date(entry.lastMessage.created_at)) {
+            entry.lastMessage = m;
+         }
+      });
+      return Array.from(groupMap.values())
+         .filter(e => e.lastMessage)
+         .sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
+   })();
 
-    // Filter conversations by search query
-    const filteredConversations = (() => {
-       if (!conversationSearchQuery.trim()) return conversations;
-       const q = conversationSearchQuery.toLowerCase();
-       return conversations.filter(({ group }) => {
-          const name = group?.name || CORE_GROUPS[group.id] || "";
-          return name.toLowerCase().includes(q);
-       });
-    })();
+   // Filter conversations by search query
+   const filteredConversations = (() => {
+      if (!conversationSearchQuery.trim()) return conversations;
+      const q = conversationSearchQuery.toLowerCase();
+      return conversations.filter(({ group }) => {
+         const name = group?.name || CORE_GROUPS[group.id] || "";
+         return name.toLowerCase().includes(q);
+      });
+   })();
 
-    // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
+   // Smart initials from group name (e.g. "Game Analysis" → "GA", "Bugs & Features" → "B&F")
    const getSmartInitials = (name: string) =>
       name.split(' ').map(w => w[0]?.toUpperCase() || '').join('');
 
@@ -734,15 +735,15 @@ export default function FloatingChatBubble() {
             { onConflict: "user_id,group_id" }
          );
 
-          setReplyText("");
-          setReplyingToMsg(null);
-          startInactivityTimer();
-       } catch (err) {
-          console.error("Failed to send reply:", err);
-       } finally {
-          setIsSending(false);
-       }
-    };
+         setReplyText("");
+         setReplyingToMsg(null);
+         startInactivityTimer();
+      } catch (err) {
+         console.error("Failed to send reply:", err);
+      } finally {
+         setIsSending(false);
+      }
+   };
 
    // Edit Message
    const handleEditSave = async (messageId: string) => {
@@ -767,12 +768,12 @@ export default function FloatingChatBubble() {
          } else {
             const textArea = document.createElement("textarea");
             textArea.value = text;
-             textArea.style.position = "fixed";
-             textArea.style.top = "0";
-             textArea.style.left = "0";
-             textArea.style.width = "1px";
-             textArea.style.height = "1px";
-             textArea.style.opacity = "0";
+            textArea.style.position = "fixed";
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.width = "1px";
+            textArea.style.height = "1px";
+            textArea.style.opacity = "0";
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
@@ -1094,91 +1095,132 @@ export default function FloatingChatBubble() {
                         setIsOverlayOpen(false);
                         setSelectedGroupId(null);
                      }}
-                     className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
-                  >
-                     <X className="w-4 h-4" />
-                  </button>
-               </div>
-            </div>
+                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
+                  />
 
-                      {/* Content List */}
-                       <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
-                          {!selectedGroupId ? (
-                             /* Screen A: Conversation List */
-                             <div className="space-y-1.5">
-                                {/* Search input */}
-                                <div className="relative mb-2">
-                                   <input
-                                      type="text"
-                                      value={conversationSearchQuery}
-                                      onChange={(e) => setConversationSearchQuery(e.target.value)}
-                                      placeholder="Search conversations..."
-                                      className="w-full bg-gray-800/90 border border-gray-700/60 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-gray-400 outline-none focus:border-indigo-500 transition-all"
-                                   />
-                                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                                </div>
-                                {filteredConversations.length === 0 ? (
-                                   <div className="flex flex-col items-center justify-center h-full py-12">
-                                      <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
-                                      <p className="text-xs text-gray-500">
-                                         {conversationSearchQuery ? "No matching conversations" : "No conversations yet"}
-                                      </p>
-                                   </div>
-                                ) : (
-                                    filteredConversations.map(({ group, lastMessage, unreadCount }) => {
-                                       const name = group?.name || CORE_GROUPS[group.id] || "Room";
-                                       const isCore = CORE_GROUPS[group.id] !== undefined;
-                                       const isDM = group?.type === "dm" && !!group?.dm_partner?.avatar_url;
-                                       return (
-                                          <button
-                                             key={group.id}
-                                             onClick={() => { setSelectedGroupId(group.id); }}
-                                             className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-800 border border-gray-800 hover:border-gray-700/60 transition-all cursor-pointer text-left"
-                                          >
-                                              {isDM ? (
-                                                 <ProtectedAvatar
-                                                    userId={group.dm_partner!.id}
-                                                    src={group.dm_partner!.avatar_url}
-                                                    username={name}
-                                                    className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
-                                                 />
-                                              ) : isCore ? (
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0 text-sm">
-                                                   #
-                                                </div>
-                                             ) : (
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
-                                                   <Users size={18} />
-                                                </div>
-                                             )}
-                                            <div className="min-w-0 flex-1">
-                                               <div className="flex items-center justify-between">
-                                                  <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
-                                                     {name}
-                                                  </span>
-                                                  {unreadCount > 0 && (
-                                                     <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
-                                                        {unreadCount} unread
-                                                     </span>
-                                                  )}
-                                               </div>
-                                               <p className="text-[11px] text-gray-400 truncate mt-1">
-                                                  {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
-                                                  {lastMessage.voice_url ? (
-                                                     <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
-                                                  ) : lastMessage.image_url ? (
-                                                     <span className="text-indigo-400 font-semibold">📷 Image</span>
-                                                  ) : (
-                                                     getDecryptedContent(lastMessage)
-                                                  )}
-                                               </p>
-                                            </div>
-                                         </button>
-                                      );
-                                   })
-                                )}
+                  {/* Bottom Sheet / Popover Modal Card */}
+                  <motion.div
+                     initial={{ opacity: 0, y: "100%", x: "-50%" }}
+                     animate={{ opacity: 1, y: 0, x: "-50%" }}
+                     exit={{ opacity: 0, y: "100%", x: "-50%" }}
+                     transition={{ type: "spring", damping: 25, stiffness: 280 }}
+                     className="fixed bottom-4 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                  >
+                     {/* Header */}
+                     <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                           {selectedGroupId && (
+                              <button
+                                 onClick={() => setSelectedGroupId(null)}
+                                 className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                              >
+                                 <ArrowLeft className="w-4 h-4" />
+                              </button>
+                           )}
+                           <span className="text-xs font-black uppercase tracking-wider text-gray-200 py-3">
+                              {selectedGroupId ? selectedGroupName : "Conversations"}
+                           </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                           {selectedGroupId && (
+                              <button
+                                 onClick={handleExpand}
+                                 className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                 title="Open full chat"
+                              >
+                                 <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                           )}
+                           <button
+                              onClick={() => {
+                                 setIsOverlayOpen(false);
+                                 setSelectedGroupId(null);
+                              }}
+                              className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                           >
+                              <X className="w-4 h-4" />
+                           </button>
+                        </div>
+                     </div>
+
+                     {/* Content List */}
+                     <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
+                        {!selectedGroupId ? (
+                           /* Screen A: Conversation List */
+                           <div className="space-y-1">
+                              {/* Search input */}
+                              <div className="relative mb-1">
+                                 <input
+                                    type="text"
+                                    value={conversationSearchQuery}
+                                    onChange={(e) => setConversationSearchQuery(e.target.value)}
+                                    placeholder="Search conversations..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                 />
+                                 <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
                               </div>
-                           ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
+                              {filteredConversations.length === 0 ? (
+                                 <div className="flex flex-col items-center justify-center h-full py-12">
+                                    <MessageCircle className="w-8 h-8 text-gray-600 mb-2" />
+                                    <p className="text-xs text-gray-500">
+                                       {conversationSearchQuery ? "No matching conversations" : "No conversations yet"}
+                                    </p>
+                                 </div>
+                              ) : (
+                                 filteredConversations.map(({ group, lastMessage, unreadCount }) => {
+                                    const name = group?.name || CORE_GROUPS[group.id] || "Room";
+                                    const isCore = CORE_GROUPS[group.id] !== undefined;
+                                    const isDM = group?.type === "dm" && !!group?.dm_partner?.avatar_url;
+                                    return (
+                                       <button
+                                          key={group.id}
+                                          onClick={() => { setSelectedGroupId(group.id); }}
+                                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                       >
+                                          {isDM ? (
+                                             <ProtectedAvatar
+                                                userId={group.dm_partner!.id}
+                                                src={group.dm_partner!.avatar_url}
+                                                username={name}
+                                                className="w-10 h-10 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                             />
+                                          ) : isCore ? (
+                                             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-correct text-black font-black shrink-0 text-sm">
+                                                #
+                                             </div>
+                                          ) : (
+                                             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/10 text-white shrink-0">
+                                                <Users size={18} />
+                                             </div>
+                                          )}
+                                          <div className="min-w-0 flex-1">
+                                             <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-indigo-400 tracking-wide truncate">
+                                                   {name}
+                                                </span>
+                                                {unreadCount > 0 && (
+                                                   <span className="bg-rose-500/25 border border-rose-500/20 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                                      {unreadCount} unread
+                                                   </span>
+                                                )}
+                                             </div>
+                                             <p className="text-[11px] text-gray-400 truncate mt-1">
+                                                {lastMessage.profiles ? `${lastMessage.profiles.username}: ` : ""}
+                                                {lastMessage.voice_url ? (
+                                                   <span className="text-indigo-400 font-semibold">🎤 Voice note</span>
+                                                ) : lastMessage.image_url ? (
+                                                   <span className="text-indigo-400 font-semibold">📷 Image</span>
+                                                ) : (
+                                                   getDecryptedContent(lastMessage)
+                                                )}
+                                             </p>
+                                          </div>
+                                       </button>
+                                    );
+                                 })
+                              )}
+                           </div>
+                        ) : selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday ? (
                            /* Locked Game Analysis placeholder */
                            <div className="flex flex-col items-center justify-center h-full py-12 text-center px-6">
                               <ShieldAlert className="w-10 h-10 text-red-400 mb-3" />
@@ -1189,10 +1231,10 @@ export default function FloatingChatBubble() {
                            </div>
                         ) : (
                            (
-                               <div className="space-y-4">
-                                  <VoiceControlBar />
-                                  {hasMoreMessages && (
-                                     <div className="flex flex-col items-center gap-2 pb-2">
+                              <div className="space-y-4">
+                                 <VoiceControlBar />
+                                 {hasMoreMessages && (
+                                    <div className="flex flex-col items-center gap-2 pb-2">
                                        <button onClick={handleExpand} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 rounded-full transition-colors cursor-pointer">
                                           {allRoomMessages.length - 20}+ older · View full chat
                                        </button>
@@ -1205,14 +1247,14 @@ export default function FloatingChatBubble() {
                                     const content = getDecryptedContent(msg);
 
                                     return (
-                                        <div
-                                           key={msg.id}
-                                           onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
-                                           onTouchStart={() => handleTouchStart(msg.id)}
-                                           onTouchEnd={handleTouchEnd}
-                                           onTouchMove={handleTouchMove}
-                                           onTouchCancel={handleTouchEnd}
-                                            className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
+                                       <div
+                                          key={msg.id}
+                                          onMouseEnter={() => !isMe && !msg.is_read && handleMarkAsRead(msg.id)}
+                                          onTouchStart={() => handleTouchStart(msg.id)}
+                                          onTouchEnd={handleTouchEnd}
+                                          onTouchMove={handleTouchMove}
+                                          onTouchCancel={handleTouchEnd}
+                                          className={`relative ${reactingMessageId === msg.id || reactingModalMessageId === msg.id ? 'z-50' : 'z-auto'} overflow-visible`}
                                        >
                                           {/* Unread divider */}
                                           {msg.id === visibleUnreadId && showUnreadLine && (
@@ -1240,18 +1282,18 @@ export default function FloatingChatBubble() {
                                                       onClick={() => setReactingMessageId(null)}
                                                       className="fixed inset-0 bg-black/20 z-40"
                                                    />
-                                                    <ReactionPicker
-                                                       ref={reactionsRef}
-                                                       isMe={isMe}
-                                                       onReact={(emoji) => handleReact(msg.id, emoji)}
-                                                       currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
-                                                       onCopy={() => {
-                                                          copyToClipboard(content);
-                                                          setReactingMessageId(null);
-                                                       }}
-                                                       onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
-                                                       onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
-                                                    />
+                                                   <ReactionPicker
+                                                      ref={reactionsRef}
+                                                      isMe={isMe}
+                                                      onReact={(emoji) => handleReact(msg.id, emoji)}
+                                                      currentReaction={user?.id ? msg.reactions?.[user.id] : undefined}
+                                                      onCopy={() => {
+                                                         copyToClipboard(content);
+                                                         setReactingMessageId(null);
+                                                      }}
+                                                      onEdit={isMe && !msg.voice_url && !msg.image_url ? () => { setEditingMessageId(msg.id); setEditText(content); setReactingMessageId(null); } : undefined}
+                                                      onDelete={isMe ? () => { handleDeleteMessage(msg.id); setReactingMessageId(null); } : undefined}
+                                                   />
                                                 </>
                                              )}
                                           </AnimatePresence>
@@ -1270,8 +1312,8 @@ export default function FloatingChatBubble() {
                                                    <div className="flex flex-col gap-1.5">
                                                       {Object.entries(msg.reactions).map(([uid, emoji]) => (
                                                          <div key={uid} className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-white/5 rounded-lg transition-colors">
-                                                             <span className="text-[10px] font-black text-white truncate">
-                                                                {getUserName(uid)}
+                                                            <span className="text-[10px] font-black text-white truncate">
+                                                               {getUserName(uid)}
                                                             </span>
                                                             <span className="text-[12px] shrink-0">{emoji as string}</span>
                                                          </div>
@@ -1281,13 +1323,13 @@ export default function FloatingChatBubble() {
                                              )}
                                           </AnimatePresence>
 
-                                           <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-                                              <ProtectedAvatar
-                                                 userId={msg.user_id}
-                                                 src={msg.profiles?.avatar_url}
-                                                 username={msg.profiles?.username}
-                                                 className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 shrink-0"
-                                              />
+                                          <div className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                                             <ProtectedAvatar
+                                                userId={msg.user_id}
+                                                src={msg.profiles?.avatar_url}
+                                                username={msg.profiles?.username}
+                                                className="w-8 h-8 rounded-full border border-white/10 bg-slate-900 shrink-0"
+                                             />
                                              <div className={`min-w-0 max-w-[75%] ${isMe ? "items-end" : ""}`}>
                                                 <div className="flex items-baseline gap-1.5 flex-wrap">
                                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
@@ -1332,32 +1374,32 @@ export default function FloatingChatBubble() {
                                                          <X className="w-3.5 h-3.5" />
                                                       </button>
                                                    </div>
-                                                 ) : (
-                                                    <div className="relative group/msg pb-2 sm:pb-4">
-                                                       {/* Reply preview */}
-                                                       {msg.reply_to && !msg.is_deleted && (() => {
-                                                          const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
-                                                          if (!replyToMsg) return null;
-                                                          return (
-                                                             <div className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] ${isMe ? 'flex-row-reverse ml-auto' : ''}`}>
-                                                                <Reply size={10} className="text-correct shrink-0" />
-                                                                <span className="truncate text-gray-400">
-                                                                   {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
-                                                                </span>
-                                                             </div>
-                                                          );
-                                                       })()}
-                                                        {msg.voice_url ? (
-                                                          <ConnectedAudioPlayer
-                                                             url={msg.voice_url}
-                                                             messageId={msg.id}
-                                                             allMessageIds={activeRoomMessages.map((m: any) => m.id)}
-                                                             allMessages={activeRoomMessages}
-                                                             userId={user?.id || ""}
-                                                          />
-                                                       ) : msg.image_url ? (
-                                                          <ChatImage url={msg.image_url} />
-                                                       ) : (
+                                                ) : (
+                                                   <div className="relative group/msg pb-2 sm:pb-4">
+                                                      {/* Reply preview */}
+                                                      {msg.reply_to && !msg.is_deleted && (() => {
+                                                         const replyToMsg = allRoomMessages.find((m: any) => m.id === msg.reply_to);
+                                                         if (!replyToMsg) return null;
+                                                         return (
+                                                            <div className={`flex items-center gap-2 mb-1.5 text-[10px] text-white/60 bg-white/5 border-l-2 border-correct/40 px-3 py-1.5 rounded-t-xl max-w-[85%] ${isMe ? 'flex-row-reverse ml-auto' : ''}`}>
+                                                               <Reply size={10} className="text-correct shrink-0" />
+                                                               <span className="truncate text-gray-400">
+                                                                  {replyToMsg.profiles?.username || 'User'}: {replyToMsg.voice_url ? '🎤 Voice note' : replyToMsg.image_url ? '📷 Image' : getDecryptedContent(replyToMsg)}
+                                                               </span>
+                                                            </div>
+                                                         );
+                                                      })()}
+                                                      {msg.voice_url ? (
+                                                         <ConnectedAudioPlayer
+                                                            url={msg.voice_url}
+                                                            messageId={msg.id}
+                                                            allMessageIds={activeRoomMessages.map((m: any) => m.id)}
+                                                            allMessages={activeRoomMessages}
+                                                            userId={user?.id || ""}
+                                                         />
+                                                      ) : msg.image_url ? (
+                                                         <ChatImage url={msg.image_url} />
+                                                      ) : (
                                                          <motion.div
                                                             drag={!msg.is_deleted && !isEditing ? "x" : false}
                                                             dragDirectionLock
@@ -1370,7 +1412,7 @@ export default function FloatingChatBubble() {
                                                                }
                                                             }}
                                                          >
-                                                             <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
+                                                            <p className={`text-xs text-left text-gray-200 mt-1 leading-relaxed whitespace-pre-wrap break-words px-3 py-2 rounded-2xl ${isMe ? 'bg-indigo-500/15 border-indigo-500/25' : 'bg-white/5 border border-white/5'}`}>
                                                                {getDecryptedContent(msg)}
                                                                {msg.is_edited && (
                                                                   <span className="text-[8px] text-gray-500 ml-1">(edited)</span>
@@ -1439,18 +1481,18 @@ export default function FloatingChatBubble() {
                            ))}
                      </div>
 
-                      {/* Reply footer for detailed chat screen */}
-                      {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
-                         <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
-                             {selectedGroupObject?.type !== "dm" && (
-                                <UserSuggestions
-                                   users={profilesList}
-                                   filter={mentionState?.filter || ""}
-                                   isVisible={!!mentionState?.isVisible}
-                                   onSelect={handleUserSelect}
-                                   currentInput={replyText}
-                                />
-                             )}
+                     {/* Reply footer for detailed chat screen */}
+                     {selectedGroupId && !(selectedGroupId === "00000000-0000-0000-0000-000000000002" && !hasPlayedToday) && (
+                        <div className="p-3 bg-white/5 border-t border-white/10 flex flex-col gap-2 shrink-0 relative">
+                           {selectedGroupObject?.type !== "dm" && (
+                              <UserSuggestions
+                                 users={profilesList}
+                                 filter={mentionState?.filter || ""}
+                                 isVisible={!!mentionState?.isVisible}
+                                 onSelect={handleUserSelect}
+                                 currentInput={replyText}
+                              />
+                           )}
                            <input
                               ref={fileInputRef}
                               type="file"
@@ -1520,41 +1562,41 @@ export default function FloatingChatBubble() {
                                     rows={1}
                                     placeholder={replyingToMsg ? "Write a reply..." : "Write a message..."}
                                     value={replyText}
-                                   onChange={(e) => {
-                                         const value = e.target.value;
-                                         setReplyText(value);
-                                         resetInactivityTimer();
-                                         if (selectedGroupObject?.type !== "dm") {
-                                            const cursorPos = e.target.selectionStart;
-                                            const textBeforeCursor = value.substring(0, cursorPos);
-                                            const lastAtPos = textBeforeCursor.lastIndexOf("@");
-                                            if (lastAtPos !== -1) {
-                                               const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
-                                               if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
-                                                  setMentionState({ isVisible: true, filter: textAfterAt, cursorPosition: cursorPos });
-                                               } else {
-                                                  setMentionState(null);
-                                               }
-                                            } else {
-                                               setMentionState(null);
-                                            }
-                                         } else {
-                                            setMentionState(null);
-                                         }
-                                      }}
-                                     onInput={(e) => {
-                                        e.currentTarget.style.height = 'auto';
-                                        e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
-                                     }}
-                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-                                           e.preventDefault();
-                                           handleSendReply();
-                                        }
-                                        if (e.key === 'Escape') {
-                                           setMentionState(null);
-                                        }
-                                     }}
+                                    onChange={(e) => {
+                                       const value = e.target.value;
+                                       setReplyText(value);
+                                       resetInactivityTimer();
+                                       if (selectedGroupObject?.type !== "dm") {
+                                          const cursorPos = e.target.selectionStart;
+                                          const textBeforeCursor = value.substring(0, cursorPos);
+                                          const lastAtPos = textBeforeCursor.lastIndexOf("@");
+                                          if (lastAtPos !== -1) {
+                                             const textAfterAt = textBeforeCursor.substring(lastAtPos + 1);
+                                             if (!textAfterAt.includes("\n") && !textAfterAt.includes(" ")) {
+                                                setMentionState({ isVisible: true, filter: textAfterAt, cursorPosition: cursorPos });
+                                             } else {
+                                                setMentionState(null);
+                                             }
+                                          } else {
+                                             setMentionState(null);
+                                          }
+                                       } else {
+                                          setMentionState(null);
+                                       }
+                                    }}
+                                    onInput={(e) => {
+                                       e.currentTarget.style.height = 'auto';
+                                       e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
+                                    }}
+                                    onKeyDown={(e) => {
+                                       if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+                                          e.preventDefault();
+                                          handleSendReply();
+                                       }
+                                       if (e.key === 'Escape') {
+                                          setMentionState(null);
+                                       }
+                                    }}
                                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none overflow-hidden"
                                  />
                               )}
@@ -1592,28 +1634,28 @@ export default function FloatingChatBubble() {
                      )}
          </ModalLayout>
 
-          {/* Reaction Modal (mobile long-press) */}
-          <AnimatePresence>
-             {reactingModalMessageId && (() => {
-                const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
-                if (!modalMsg) return null;
-                const isMe = modalMsg.user_id === user?.id;
-                const content = getDecryptedContent(modalMsg);
-                return (
-                   <ReactionModal
-                      isMe={isMe}
-                      onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
-                      currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
-                      onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
-                      onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
-                      onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
-                      onClose={() => setReactingModalMessageId(null)}
-                   />
-                );
-             })()}
-          </AnimatePresence>
+         {/* Reaction Modal (mobile long-press) */}
+         <AnimatePresence>
+            {reactingModalMessageId && (() => {
+               const modalMsg = activeRoomMessages.find((m: any) => m.id === reactingModalMessageId);
+               if (!modalMsg) return null;
+               const isMe = modalMsg.user_id === user?.id;
+               const content = getDecryptedContent(modalMsg);
+               return (
+                  <ReactionModal
+                     isMe={isMe}
+                     onReact={(emoji) => { handleReact(modalMsg.id, emoji); setReactingModalMessageId(null); }}
+                     currentReaction={user?.id ? modalMsg.reactions?.[user.id] : undefined}
+                     onCopy={() => { copyToClipboard(content); setReactingModalMessageId(null); }}
+                     onEdit={isMe && !modalMsg.voice_url && !modalMsg.image_url ? () => { setEditingMessageId(modalMsg.id); setEditText(content); setReactingModalMessageId(null); } : undefined}
+                     onDelete={isMe ? () => { handleDeleteMessage(modalMsg.id); setReactingModalMessageId(null); } : undefined}
+                     onClose={() => setReactingModalMessageId(null)}
+                  />
+               );
+            })()}
+         </AnimatePresence>
 
-          {/* Dismiss Zone overlay at the bottom center */}
+         {/* Dismiss Zone overlay at the bottom center */}
          <AnimatePresence>
             {isDragging && isVisible && (
                <motion.div
