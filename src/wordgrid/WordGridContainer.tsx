@@ -174,7 +174,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   if (view === 'lobby' || view === 'matchmaking') {
     return (
-      <div className="h-full flex items-center justify-center select-none">
+      <div className="h-full w-full flex items-center justify-center select-none px-2 md:px-6">
         <MatchmakingLobby userId={effectiveUserId} allProfiles={allProfiles} onBack={onBackToClassic} />
       </div>
     );
@@ -204,11 +204,11 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       )}
 
       {/* Responsive Layout: Mobile flex ordering (Banner -> Actions & Rack -> Board -> Timeline), Desktop 12-column Grid */}
-      <div className="w-full max-w-6xl flex flex-col md:grid md:grid-cols-12 gap-5 items-start">
+      <div className="w-full max-w-none md:px-6 flex flex-col md:grid md:grid-cols-12 gap-5 items-start">
 
         {/* Banner Header (Mobile: 1st, Desktop: top of left column) */}
         <div className="order-1 md:col-span-5 w-full max-w-[480px] mx-auto md:max-w-none">
-          <div className="w-full bg-slate-900/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 animate-in fade-in duration-300">
+          <div className="w-full bg-[#0c121e]/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 animate-in fade-in duration-300">
             {/* Left section: Back button & Status */}
             <div className="flex items-center gap-3 min-w-0 shrink-0">
               <button
@@ -232,7 +232,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
             {/* Right section: Scores & Resign */}
             <div className="flex items-center gap-2 shrink-0 ml-auto">
-              <div className="flex items-center gap-2 bg-slate-950/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner">
+              <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner">
                 {activePlayersList.map((p, i) => {
                   const isYou = p.id === userId;
                   const isCurrent = currentTurn === p.id && status === 'active';
@@ -272,7 +272,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   ? 'bg-indigo-700 text-white animate-pulse border border-indigo-500'
                   : placedTiles.length > 0
                     ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 border border-indigo-400'
-                    : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
+                    : 'bg-[#0c121e] text-slate-600 border border-slate-800 cursor-not-allowed opacity-50'
                   }`}
               >
                 {isValidatingWord ? (
@@ -328,7 +328,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       {/* Exchange Selection Modal */}
       {showExchangeModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-center">
+          <div className="bg-[#0c121e] border border-slate-800 rounded-3xl p-6 max-w-xs w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-center">
             <div>
               <h4 className="text-base font-black uppercase text-white tracking-wider">Swap Tiles</h4>
               <p className="text-[11px] text-slate-300 font-bold uppercase tracking-wider mt-1">

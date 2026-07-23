@@ -35,7 +35,7 @@ export const TileRack = ({
     return () => clearTimeout(timer);
   }, [selectedIdx, onSelectTile]);
   return (
-    <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
+    <div className="w-full max-w-[480px] bg-[#0c121e] border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
       {/* Title / Turn status indicator */}
       <div className="flex items-center justify-between">
         <span className={`text-[11px] font-black uppercase tracking-wider ${isMyTurn ? 'text-emerald-400' : 'text-slate-400'}`}>
