@@ -122,6 +122,11 @@ code {
 
 
 @theme {
+  /* Font Family Definitions */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
   /* Wordle Brand Colors */
   --color-correct: #6aaa64;
   --color-present: #c9b458;

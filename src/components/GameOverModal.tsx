@@ -56,9 +56,8 @@ export const GameOverModal: React.FC<Props> = ({
 
   return (
     <div
-      className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto ${
-        isStandalone ? "pb-4" : "pb-20 sm:pb-4"
-      }`}
+      className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto ${isStandalone ? "pb-4" : "pb-20 sm:pb-4"
+        }`}
     >
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-2 shadow-2xl text-center relative my-auto">
         <button
@@ -68,7 +67,7 @@ export const GameOverModal: React.FC<Props> = ({
         >
           <X size={18} />
         </button>
-        <div className="mb-3 mt-3 flex flex-col items-center">
+        <div className="mb-3 mt-6 flex flex-col items-center">
           {showWord ? (
             <h2 className="text-2xl font-serif font-bold text-white tracking-widest animate-in fade-in zoom-in duration-300">
               {config?.word || "???"}

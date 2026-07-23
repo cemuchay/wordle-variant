@@ -23,8 +23,6 @@ export const AppNavigation = ({
     // const { preferences } = useApp();
     const queryClient = useQueryClient();
 
-    const showLeaderboard = activeItem === 'play' || activeItem === 'leaderboard';
-
     const allItems = [
         {
             id: 'play' as const,
@@ -37,11 +35,11 @@ export const AppNavigation = ({
             icon: MessageSquare,
             badge: chatUnreadCount,
         },
-        ...(showLeaderboard ? [{
+        {
             id: 'leaderboard' as const,
             label: 'Leaderboard',
             icon: BarChart2,
-        }] : []),
+        },
         {
             id: 'challenges' as const,
             label: 'Challenges',
