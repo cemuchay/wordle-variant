@@ -4,7 +4,6 @@ import { AppNavigation } from './AppNavigation';
 import { DynamicIslandStatus } from '../DynamicIslandStatus';
 import { useAppStore } from '../../store/useAppStore';
 import { useApp } from '../../context/AppContext';
-import { useIsStandalone } from '../../hooks/useIsStandalone';
 import { applyTheme } from '../../utils/theme';
 import type { SyncStatus } from '../../types/game';
 
@@ -71,7 +70,6 @@ export const AppLayout = ({
     }, [theme, preferences, setPreferences]);
 
     const { isDynamicIslandVisible } = useApp();
-    const isStandalone = useIsStandalone();
 
     return (
         <div
@@ -79,7 +77,7 @@ export const AppLayout = ({
             style={{
                 backgroundColor: theme && theme.startsWith('#') ? theme : undefined,
                 paddingTop: 'env(safe-area-inset-top, 0px)',
-                paddingBottom: isStandalone ? '0px' : 'env(safe-area-inset-bottom, 0px)',
+                paddingBottom: '0px',
                 paddingLeft: 'env(safe-area-inset-left, 0px)',
                 paddingRight: 'env(safe-area-inset-right, 0px)',
             }}

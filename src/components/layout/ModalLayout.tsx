@@ -48,17 +48,12 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         isOverlay
           ? `fixed inset-0 ${zIndex} bg-gray-900`
           : 'relative flex-1 h-full min-h-0'
-      } flex flex-col w-full h-full min-h-0 overflow-hidden select-none bg-gray-900 ${className}`}
+      } flex flex-col w-full h-full min-h-dvh max-h-dvh overflow-hidden select-none bg-gray-900 ${className}`}
       style={{
         fontFamily:
           'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         paddingTop: isOverlay
           ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem)'
-          : undefined,
-        paddingBottom: isOverlay
-          ? isStandalone
-            ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
-            : 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)'
           : undefined,
       }}
     >
@@ -66,6 +61,13 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-hidden px-3 py-3 ${
           isDynamicIslandVisible && isOverlay ? 'pt-6 sm:pt-8' : ''
         } ${containerClassName}`}
+        style={{
+          paddingBottom: isOverlay
+            ? isStandalone
+              ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
+              : 'calc(env(safe-area-inset-bottom, 0px) + 1rem)'
+            : undefined,
+        }}
       >
         <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
           {title ? (

@@ -18,8 +18,16 @@ import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
+import { ModalLayout } from "../layout/ModalLayout";
 
 const CLOSE_DELAY = 10000;
+
+// Core group constant names
+const CORE_GROUPS: Record<string, string> = {
+   "00000000-0000-0000-0000-000000000001": "General",
+   "00000000-0000-0000-0000-000000000002": "Game Analysis",
+   "00000000-0000-0000-0000-000000000003": "Bugs & Features"
+};
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
@@ -32,6 +40,18 @@ export default function FloatingChatBubble() {
    const prevOverlayOpenRef = useRef(false);
 
     const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+
+   // Synchronize status bar theme-color meta tag with Challenge mode bg-gray-900 when floating bubble is open
+   useEffect(() => {
+      if (isOverlayOpen) {
+         const meta = document.querySelector('meta[name="theme-color"]');
+         const prevColor = meta?.getAttribute('content') || '#121213';
+         if (meta) meta.setAttribute('content', '#111827');
+         return () => {
+            if (meta) meta.setAttribute('content', prevColor);
+         };
+      }
+   }, [isOverlayOpen]);
 
    // Inactivity timer for auto-closing the overlay
    const inactivityTimerRef = useRef<number | null>(null);
@@ -380,7 +400,7 @@ export default function FloatingChatBubble() {
     const { user } = useAuth();
 
    // Profiles cache for reactor names
-   const profilesCacheRef = useRef<Record<string, string>>({});
+   const [profilesCache, setProfilesCache] = useState<Record<string, string>>({});
    useEffect(() => {
       const map: Record<string, string> = {};
       globalMessages.forEach((m: any) => {
@@ -403,22 +423,16 @@ export default function FloatingChatBubble() {
             .in("id", Array.from(missing))
             .then(({ data }) => {
                if (data) data.forEach((p: any) => { map[p.id] = p.username; });
-               profilesCacheRef.current = map;
+               setProfilesCache(map);
             });
       } else {
-         profilesCacheRef.current = map;
+         // eslint-disable-next-line react-hooks/set-state-in-effect
+         setProfilesCache(map);
       }
    }, [globalMessages, user?.id]);
    const getUserName = (uid: string) => {
       if (uid === user?.id) return 'You';
-      return profilesCacheRef.current[uid] || uid;
-   };
-
-   // Core group constant names
-   const CORE_GROUPS: Record<string, string> = {
-      "00000000-0000-0000-0000-000000000001": "General",
-      "00000000-0000-0000-0000-000000000002": "Game Analysis",
-      "00000000-0000-0000-0000-000000000003": "Bugs & Features"
+      return profilesCache[uid] || uid;
    };
 
    // Sync groups list — fast local cache then server fetch
@@ -962,7 +976,6 @@ export default function FloatingChatBubble() {
 
          if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
             // Fully in view — auto-hide after short delay
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             const timer = setTimeout(() => setShowUnreadLine(false), 6000);
             cleanupTimers.push(timer);
          }
@@ -1040,83 +1053,69 @@ export default function FloatingChatBubble() {
             </AnimatePresence>
          </div>
 
-         {/* Centered Modal Popover */}
-         <AnimatePresence>
-            {isOverlayOpen && isVisible && (
-               <>
-                  {/* Backdrop */}
-                  <motion.div
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
-                     exit={{ opacity: 0 }}
+         {/* Centered Modal Popover using ModalLayout */}
+         <ModalLayout
+            isOpen={isOverlayOpen && isVisible}
+            onClose={() => {
+               setIsOverlayOpen(false);
+               setSelectedGroupId(null);
+            }}
+            maxWidth="md"
+            showCloseButton={false}
+            zIndex="z-[99991]"
+         >
+            {/* Header */}
+            <div className="px-4 py-3 bg-gray-800/80 border-b border-gray-700/60 flex items-center justify-between shrink-0 -mx-3 -mt-3 mb-2">
+               <div className="flex items-center gap-2">
+                  {selectedGroupId && (
+                     <button
+                        onClick={() => setSelectedGroupId(null)}
+                        className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
+                     >
+                        <ArrowLeft className="w-4 h-4" />
+                     </button>
+                  )}
+                  <span className="text-xs font-black uppercase tracking-wider text-gray-100">
+                     {selectedGroupId ? selectedGroupName : "Conversations"}
+                  </span>
+               </div>
+               <div className="flex items-center gap-1.5">
+                  {selectedGroupId && (
+                     <button
+                        onClick={handleExpand}
+                        className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
+                        title="Open full chat"
+                     >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                     </button>
+                  )}
+                  <button
                      onClick={() => {
-                        if (Date.now() - overlayOpenedAtRef.current < 400) return;
                         setIsOverlayOpen(false);
                         setSelectedGroupId(null);
                      }}
-                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99990] pointer-events-auto"
-                  />
-
-                  {/* Centered Modal Card */}
-                   <motion.div
-                      initial={{ opacity: 0, scale: 0.9, x: "-50%" }}
-                      animate={{ opacity: 1, scale: 1, x: "-50%" }}
-                      exit={{ opacity: 0, scale: 0.9, x: "-50%" }}
-                      transition={{ type: "spring", duration: 0.3 }}
-                       className="fixed top-2 left-1/2 w-[92%] max-w-md h-[75vh] bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col pointer-events-auto overflow-hidden z-[99991]"
+                     className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
                   >
-                     {/* Header */}
-                     <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-2">
-                           {selectedGroupId && (
-                              <button
-                                 onClick={() => setSelectedGroupId(null)}
-                                 className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                              >
-                                 <ArrowLeft className="w-4 h-4" />
-                              </button>
-                           )}
-                           <span className="text-xs font-black uppercase tracking-wider text-gray-200">
-                              {selectedGroupId ? selectedGroupName : "Conversations"}
-                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                           {selectedGroupId && (
-                              <button
-                                 onClick={handleExpand}
-                                 className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                                 title="Open full chat"
-                              >
-                                 <ExternalLink className="w-3.5 h-3.5" />
-                              </button>
-                           )}
-                           <button
-                              onClick={() => {
-                                 setIsOverlayOpen(false);
-                                 setSelectedGroupId(null);
-                              }}
-                              className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                           >
-                              <X className="w-4 h-4" />
-                           </button>
-                        </div>
-                     </div>
+                     <X className="w-4 h-4" />
+                  </button>
+               </div>
+            </div>
 
                       {/* Content List */}
-                       <div className="flex-1 overflow-y-auto p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
+                       <div className="flex-1 overflow-y-auto p-2 sm:p-4 min-h-0 scrollbar-hide h-full" ref={scrollRef} onScroll={handleScroll}>
                           {!selectedGroupId ? (
                              /* Screen A: Conversation List */
-                             <div className="space-y-1">
+                             <div className="space-y-1.5">
                                 {/* Search input */}
-                                <div className="relative mb-1">
+                                <div className="relative mb-2">
                                    <input
                                       type="text"
                                       value={conversationSearchQuery}
                                       onChange={(e) => setConversationSearchQuery(e.target.value)}
                                       placeholder="Search conversations..."
-                                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-white/30 outline-none focus:border-correct transition-all"
+                                      className="w-full bg-gray-800/90 border border-gray-700/60 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder-gray-400 outline-none focus:border-indigo-500 transition-all"
                                    />
-                                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
+                                   <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                                 </div>
                                 {filteredConversations.length === 0 ? (
                                    <div className="flex flex-col items-center justify-center h-full py-12">
@@ -1134,7 +1133,7 @@ export default function FloatingChatBubble() {
                                           <button
                                              key={group.id}
                                              onClick={() => { setSelectedGroupId(group.id); }}
-                                             className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer text-left border border-transparent hover:border-white/5"
+                                             className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-800/40 hover:bg-gray-800 border border-gray-800 hover:border-gray-700/60 transition-all cursor-pointer text-left"
                                           >
                                               {isDM ? (
                                                  <ProtectedAvatar
@@ -1591,10 +1590,7 @@ export default function FloatingChatBubble() {
                            </div>
                         </div>
                      )}
-                  </motion.div>
-               </>
-            )}
-         </AnimatePresence>
+         </ModalLayout>
 
           {/* Reaction Modal (mobile long-press) */}
           <AnimatePresence>
