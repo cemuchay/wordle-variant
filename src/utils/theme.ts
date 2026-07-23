@@ -9,7 +9,7 @@ export function getThemeBackgroundColor(theme?: AppThemeValue): string {
    if (!theme) return "#121213";
    if (theme.startsWith("#")) return theme;
    if (theme === "wordup") return "#18181b";
-   if (theme === "wordgrid") return "#0F172B";
+   if (theme === "wordgrid") return "#101828";
    if (theme === "light") return "#ffffff";
    if (theme === "dark") return "#121213";
    return "#121213";

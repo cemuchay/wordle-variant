@@ -19,8 +19,16 @@ import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
+import { ModalLayout } from "../layout/ModalLayout";
 
 const CLOSE_DELAY = 10000;
+
+// Core group constant names
+const CORE_GROUPS: Record<string, string> = {
+   "00000000-0000-0000-0000-000000000001": "General",
+   "00000000-0000-0000-0000-000000000002": "Game Analysis",
+   "00000000-0000-0000-0000-000000000003": "Bugs & Features"
+};
 
 export default function FloatingChatBubble() {
    const { unreadCount, isChatOpen, date } = useApp();
@@ -33,6 +41,18 @@ export default function FloatingChatBubble() {
    const prevOverlayOpenRef = useRef(false);
 
    const [prevUnreadCount, setPrevUnreadCount] = useState(unreadCount);
+
+   // Synchronize status bar theme-color meta tag with Challenge mode bg-gray-900 when floating bubble is open
+   useEffect(() => {
+      if (isOverlayOpen) {
+         const meta = document.querySelector('meta[name="theme-color"]');
+         const prevColor = meta?.getAttribute('content') || '#121213';
+         if (meta) meta.setAttribute('content', '#111827');
+         return () => {
+            if (meta) meta.setAttribute('content', prevColor);
+         };
+      }
+   }, [isOverlayOpen]);
 
    // Inactivity timer for auto-closing the overlay
    const inactivityTimerRef = useRef<number | null>(null);
@@ -381,7 +401,7 @@ export default function FloatingChatBubble() {
    const { user } = useAuth();
 
    // Profiles cache for reactor names
-   const profilesCacheRef = useRef<Record<string, string>>({});
+   const [profilesCache, setProfilesCache] = useState<Record<string, string>>({});
    useEffect(() => {
       const map: Record<string, string> = {};
       globalMessages.forEach((m: any) => {
@@ -404,22 +424,16 @@ export default function FloatingChatBubble() {
             .in("id", Array.from(missing))
             .then(({ data }) => {
                if (data) data.forEach((p: any) => { map[p.id] = p.username; });
-               profilesCacheRef.current = map;
+               setProfilesCache(map);
             });
       } else {
-         profilesCacheRef.current = map;
+         // eslint-disable-next-line react-hooks/set-state-in-effect
+         setProfilesCache(map);
       }
    }, [globalMessages, user?.id]);
    const getUserName = (uid: string) => {
       if (uid === user?.id) return 'You';
-      return profilesCacheRef.current[uid] || uid;
-   };
-
-   // Core group constant names
-   const CORE_GROUPS: Record<string, string> = {
-      "00000000-0000-0000-0000-000000000001": "General",
-      "00000000-0000-0000-0000-000000000002": "Game Analysis",
-      "00000000-0000-0000-0000-000000000003": "Bugs & Features"
+      return profilesCache[uid] || uid;
    };
 
    // Sync groups list — fast local cache then server fetch
@@ -963,7 +977,6 @@ export default function FloatingChatBubble() {
 
          if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
             // Fully in view — auto-hide after short delay
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             const timer = setTimeout(() => setShowUnreadLine(false), 6000);
             cleanupTimers.push(timer);
          }
@@ -1041,17 +1054,44 @@ export default function FloatingChatBubble() {
             </AnimatePresence>
          </div>
 
-         {/* Centered Modal Popover */}
-         <AnimatePresence>
-            {isOverlayOpen && isVisible && (
-               <>
-                  {/* Backdrop */}
-                  <motion.div
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
-                     exit={{ opacity: 0 }}
+         {/* Centered Modal Popover using ModalLayout */}
+         <ModalLayout
+            isOpen={isOverlayOpen && isVisible}
+            onClose={() => {
+               setIsOverlayOpen(false);
+               setSelectedGroupId(null);
+            }}
+            maxWidth="md"
+            showCloseButton={false}
+            zIndex="z-[99991]"
+         >
+            {/* Header */}
+            <div className="px-4 py-3 bg-gray-800/80 border-b border-gray-700/60 flex items-center justify-between shrink-0 -mx-3 -mt-3 mb-2">
+               <div className="flex items-center gap-2">
+                  {selectedGroupId && (
+                     <button
+                        onClick={() => setSelectedGroupId(null)}
+                        className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
+                     >
+                        <ArrowLeft className="w-4 h-4" />
+                     </button>
+                  )}
+                  <span className="text-xs font-black uppercase tracking-wider text-gray-100">
+                     {selectedGroupId ? selectedGroupName : "Conversations"}
+                  </span>
+               </div>
+               <div className="flex items-center gap-1.5">
+                  {selectedGroupId && (
+                     <button
+                        onClick={handleExpand}
+                        className="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-colors cursor-pointer"
+                        title="Open full chat"
+                     >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                     </button>
+                  )}
+                  <button
                      onClick={() => {
-                        if (Date.now() - overlayOpenedAtRef.current < 400) return;
                         setIsOverlayOpen(false);
                         setSelectedGroupId(null);
                      }}
@@ -1592,10 +1632,7 @@ export default function FloatingChatBubble() {
                            </div>
                         </div>
                      )}
-                  </motion.div>
-               </>
-            )}
-         </AnimatePresence>
+         </ModalLayout>
 
          {/* Reaction Modal (mobile long-press) */}
          <AnimatePresence>
