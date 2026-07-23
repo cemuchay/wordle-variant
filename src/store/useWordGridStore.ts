@@ -363,6 +363,7 @@ interface WordGridState {
    recallTile: (x: number, y: number) => void;
    recallAllTiles: () => void;
    shuffleRack: () => void;
+   reorderRack: (fromIdx: number, toIdx: number) => void;
 
    // Game turn submissions (No Pass option - Swap or Play only)
    submitMove: (
@@ -532,6 +533,18 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
       }
       set({ rack: newRack });
+   },
+
+   reorderRack: (fromIdx: number, toIdx: number) => {
+      const { rack, matchId, placedTiles } = get();
+      if (fromIdx < 0 || fromIdx >= rack.length || toIdx < 0 || toIdx >= rack.length || fromIdx === toIdx) return;
+
+      const newRack = [...rack];
+      const [movedTile] = newRack.splice(fromIdx, 1);
+      newRack.splice(toIdx, 0, movedTile);
+
+      set({ rack: newRack });
+      saveDraftToLocalStorage(matchId, placedTiles, newRack);
    },
 
    loadMatch: async (matchId, currentUserId) => {
