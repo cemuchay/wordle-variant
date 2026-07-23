@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { ProtectedAvatar } from '../../components/chat/ProtectedAvatar';
 import { supabase } from '../../lib/supabaseClient';
 import { ALLOWED_GRID_SIZES, RECOMMENDED_MAX_PLAYERS } from '../../utils/wordgrid/constants';
+import { useTheme } from '@/hooks/useTheme';
 
 interface PlayerProfile {
   id: string;
@@ -46,6 +47,8 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     loadMatch,
     loading
   } = useWordGridStore();
+
+  useTheme('wordGrid');
 
   const { triggerToast } = useApp();
   const [selectedGridSize, setSelectedGridSize] = useState<number>(7);
@@ -130,7 +133,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
 
   if (loading || view === 'matchmaking') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
+      <div className="flex flex-col items-center justify-center p-8 bg-[#101828] border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none">
         <div className="relative flex items-center justify-center">
           <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
           <span className="absolute text-2xl animate-bounce">🔠</span>

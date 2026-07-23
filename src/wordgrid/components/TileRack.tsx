@@ -1,5 +1,6 @@
 // src/wordgrid/components/TileRack.tsx
 
+import { useEffect } from 'react';
 import { TILE_VALUES } from '../../utils/wordgrid/constants';
 
 interface TileRackProps {
@@ -23,6 +24,16 @@ export const TileRack = ({
   onTurnAlert,
   onReorderRack,
 }: TileRackProps) => {
+  // Auto-clear selection after 3 seconds of inactivity
+  useEffect(() => {
+    if (selectedIdx === null || selectedIdx < 0) return;
+
+    const timer = setTimeout(() => {
+      onSelectTile(-1);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [selectedIdx, onSelectTile]);
   return (
     <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
       {/* Title / Turn status indicator */}
@@ -65,6 +76,11 @@ export const TileRack = ({
                   onSelectTile(idx);
                 }
               }}
+              onDragEnd={() => {
+                if (isSelected) {
+                  onSelectTile(-1);
+                }
+              }}
               onDragOver={(e) => {
                 if (isMyTurn) {
                   e.preventDefault();
@@ -80,12 +96,17 @@ export const TileRack = ({
                   const fromIdx = parseInt(rawIdx, 10);
                   if (!isNaN(fromIdx) && fromIdx !== idx && onReorderRack) {
                     onReorderRack(fromIdx, idx);
+                    onSelectTile(-1);
                   }
                 }
               }}
               onClick={() => {
                 if (isMyTurn) {
-                  onSelectTile(idx);
+                  if (isSelected) {
+                    onSelectTile(-1);
+                  } else {
+                    onSelectTile(idx);
+                  }
                 } else if (onTurnAlert) {
                   onTurnAlert();
                 }

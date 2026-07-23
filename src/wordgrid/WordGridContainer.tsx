@@ -15,7 +15,7 @@ interface WordGridContainerProps {
 }
 
 export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) => {
-  useTheme('wordgrid');
+  useTheme('wordGrid');
   const { user } = useAuth();
   const { triggerToast, allProfiles } = useApp();
 
@@ -100,7 +100,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   }, [matchId, effectiveUserId, updateFromMatchRecord]);
 
   const handleSelectTile = (idx: number) => {
-    setSelectedRackIdx(idx);
+    setSelectedRackIdx(idx < 0 ? null : idx);
   };
 
   const handlePlaceTile = (x: number, y: number, rackIdx: number) => {
@@ -194,7 +194,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       onCut={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
       style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
-      className="h-full w-full flex flex-col items-center justify-start bg-slate-950 overflow-y-auto pb-10 scrollbar-none px-3 pt-12 sm:pt-14 md:pt-6 space-y-4 mx-auto select-none"
+      className="h-full w-full flex flex-col items-center justify-start bg-[#101828] overflow-y-auto pb-10 scrollbar-hide px-3 pt-12 sm:pt-14 md:pt-6 space-y-4 mx-auto select-none"
     >
       {showTutorial && (
         <WordGridTutorialModal
