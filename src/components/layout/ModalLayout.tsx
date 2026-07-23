@@ -13,7 +13,7 @@ export interface ModalLayoutProps {
   className?: string;
   containerClassName?: string;
   zIndex?: string;
-  variant?: 'fullscreen' | 'dialog';
+  isOverlay?: boolean;
 }
 
 const maxWidthMap = {
@@ -30,92 +30,65 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
   onClose,
   children,
   title,
-  maxWidth = 'lg',
+  maxWidth = 'xl',
   showCloseButton = true,
   className = '',
   containerClassName = '',
   zIndex = 'z-150',
-  variant = 'fullscreen',
+  isOverlay = true,
 }) => {
   const isStandalone = useIsStandalone();
   const { isDynamicIslandVisible } = useApp();
 
   if (!isOpen) return null;
 
-  if (variant === 'dialog') {
-    return (
-      <div
-        className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center ${zIndex} p-4 overflow-y-auto ${className}`}
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)',
-          paddingBottom: isStandalone
-            ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
-            : 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)',
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget && onClose) {
-            onClose();
-          }
-        }}
-      >
-        <div
-          className={`bg-gray-900 border border-gray-800 w-full ${maxWidthMap[maxWidth]} rounded-2xl p-6 shadow-2xl text-center relative my-auto max-h-[85vh] overflow-y-auto scrollbar-hide flex flex-col ${containerClassName}`}
-        >
-          {onClose && showCloseButton && (
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5 cursor-pointer z-10"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-          )}
-
-          {title && (
-            <h2 className="text-xl uppercase font-black tracking-tighter text-white mb-4 shrink-0">
-              {title}
-            </h2>
-          )}
-
-          {children}
-        </div>
-      </div>
-    );
-  }
-
-  // Full Screen layout (default): fills 100% viewport width and height cleanly without black borders or bottom side gaps
   return (
     <div
-      className={`fixed inset-0 bg-gray-900 ${zIndex} flex flex-col w-full h-dvh min-h-dvh max-h-dvh overflow-hidden select-none ${className}`}
+      className={`${
+        isOverlay
+          ? `fixed inset-0 ${zIndex} bg-gray-900`
+          : 'relative flex-1 h-full min-h-0'
+      } flex flex-col w-full h-full min-h-0 overflow-hidden select-none bg-gray-900 ${className}`}
       style={{
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
-        paddingBottom: isStandalone
-          ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
-          : 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+        fontFamily:
+          'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        paddingTop: isOverlay
+          ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem)'
+          : undefined,
+        paddingBottom: isOverlay
+          ? isStandalone
+            ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
+            : 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)'
+          : undefined,
       }}
     >
       <div
-        className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-y-auto px-4 py-4 sm:px-6 scrollbar-hide ${
-          isDynamicIslandVisible ? 'pt-8 sm:pt-10' : ''
+        className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-hidden px-3 py-3 ${
+          isDynamicIslandVisible && isOverlay ? 'pt-6 sm:pt-8' : ''
         } ${containerClassName}`}
       >
-        {onClose && showCloseButton && (
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5 cursor-pointer z-20"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        )}
+        <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
+          {title ? (
+            <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">
+              {title}
+            </h2>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {onClose && showCloseButton && (
+            <button
+              onClick={onClose}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer z-20"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
 
-        {title && (
-          <h2 className="text-xl uppercase font-black tracking-tighter text-white mb-4 shrink-0 text-center">
-            {title}
-          </h2>
-        )}
-
-        {children}
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
+          {children}
+        </div>
       </div>
     </div>
   );
