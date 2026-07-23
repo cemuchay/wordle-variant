@@ -1,5 +1,6 @@
 import { Eye, Trophy, X } from "lucide-react";
 import React, { useState } from "react";
+import { useIsStandalone } from "../hooks/useIsStandalone";
 import { generateShareText } from "../lib/share";
 import type { GameConfig, GameStats, GuessResult } from "../types/game";
 import CountDown from "./common/CountDown";
@@ -32,6 +33,7 @@ export const GameOverModal: React.FC<Props> = ({
     guesses[guesses.length - 1]?.every((r) => r.status === "correct") ?? false;
 
   const [showWord, setShowWord] = useState(false);
+  const isStandalone = useIsStandalone();
 
   const revealWord = () => {
     if (showWord) return; // Prevent multiple timers
@@ -53,7 +55,11 @@ export const GameOverModal: React.FC<Props> = ({
     return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto">
+    <div
+      className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-150 p-4 overflow-y-auto ${
+        isStandalone ? "pb-4" : "pb-20 sm:pb-4"
+      }`}
+    >
       <div className="bg-gray-900 border border-gray-700 w-full max-w-sm rounded-2xl p-8 pt-2 shadow-2xl text-center relative my-auto">
         <button
           onClick={onClose}

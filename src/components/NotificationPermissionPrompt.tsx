@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import { subscribeToPush } from '../lib/pushService';
 import { useAuth } from '../hooks/useAuth';
+import { useIsStandalone } from '../hooks/useIsStandalone';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 
 export default function NotificationPermissionPrompt() {
   const { user } = useAuth();
+  const isStandalone = useIsStandalone();
   const [showPrompt, setShowPrompt] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    if (!user) { setShowPrompt(false); return; }
-
-    // Check if running in standalone mode (PWA is installed and opened)
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window.navigator as any).standalone === true;
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowPrompt(false);
+      return;
+    }
 
     // Check if notifications are supported and not allowed yet
     const notificationsSupported = 'Notification' in window;
@@ -29,9 +29,10 @@ export default function NotificationPermissionPrompt() {
     setIsDismissed(isMuted);
 
     if ((isStandalone || import.meta.env.DEV) && notGranted && !isMuted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowPrompt(true);
     }
-  }, []);
+  }, [user, isStandalone]);
 
   const handleEnable = async () => {
     try {

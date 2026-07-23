@@ -1,5 +1,6 @@
 import { Gamepad2, Trophy, BarChart2, MessageSquare } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useIsStandalone } from '../../hooks/useIsStandalone';
 // import { useApp } from '../../context/AppContext';
 
 interface AppNavigationProps {
@@ -55,11 +56,7 @@ export const AppNavigation = ({
         }
     ];
 
-    const isStandalone = typeof window !== 'undefined' && (
-        window.matchMedia('(display-mode: standalone)').matches ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window.navigator as any).standalone === true
-    );
+    const isStandalone = useIsStandalone();
 
     return (
         <nav className={`w-full z-140 bg-black/5 backdrop-blur-lg border-t border-white/10 px-1 pt-1.5 ${isStandalone ? 'pb-1' : 'pb-2.5'} sm:self-center sm:mb-2 sm:rounded-2xl sm:border sm:border-white/10 sm:max-w-lg sm:px-6 sm:py-2 sm:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-all duration-300`}>

@@ -4,6 +4,7 @@ import { AppNavigation } from './AppNavigation';
 import { DynamicIslandStatus } from '../DynamicIslandStatus';
 import { useAppStore } from '../../store/useAppStore';
 import { useApp } from '../../context/AppContext';
+import { useIsStandalone } from '../../hooks/useIsStandalone';
 import { applyTheme } from '../../utils/theme';
 import type { SyncStatus } from '../../types/game';
 
@@ -70,12 +71,7 @@ export const AppLayout = ({
     }, [theme, preferences, setPreferences]);
 
     const { isDynamicIslandVisible } = useApp();
-
-    const isStandalone = typeof window !== 'undefined' && (
-        window.matchMedia('(display-mode: standalone)').matches ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window.navigator as any).standalone === true
-    );
+    const isStandalone = useIsStandalone();
 
     return (
         <div
