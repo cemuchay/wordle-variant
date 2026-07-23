@@ -301,6 +301,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onShuffle={shuffleRack}
             onRecallAll={recallAllTiles}
             isMyTurn={isMyTurn}
+            onReorderRack={useWordGridStore.getState().reorderRack}
           />
         </div>
 

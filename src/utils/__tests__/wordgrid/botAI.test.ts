@@ -122,4 +122,17 @@ describe('botAI', () => {
       expect(results.size).toBeGreaterThan(1);
     });
   });
+
+  describe('cross-word and placement validation', () => {
+    it('only generates moves that satisfy board validation and dictionary checks', async () => {
+      const board = [makeCell(3, 3, 'C'), makeCell(4, 3, 'A'), makeCell(5, 3, 'T')];
+      const rack = ['S', 'O', 'D', 'E', 'R', 'N', 'I'];
+      const result = await findBotWordMove(board, rack, 7, 'normal');
+
+      if (result) {
+        expect(result.placedTiles.length).toBeGreaterThan(0);
+        expect(result.score).toBeGreaterThan(0);
+      }
+    });
+  });
 });

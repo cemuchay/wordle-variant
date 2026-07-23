@@ -10,6 +10,7 @@ interface TileRackProps {
   onRecallAll: () => void;
   isMyTurn: boolean;
   onTurnAlert?: () => void;
+  onReorderRack?: (fromIdx: number, toIdx: number) => void;
 }
 
 export const TileRack = ({
@@ -20,6 +21,7 @@ export const TileRack = ({
   onRecallAll,
   isMyTurn,
   onTurnAlert,
+  onReorderRack,
 }: TileRackProps) => {
   return (
     <div className="w-full max-w-[480px] bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex flex-col space-y-4 select-none mx-auto animate-in fade-in duration-300">
@@ -58,8 +60,27 @@ export const TileRack = ({
               onDragStart={(e) => {
                 if (isMyTurn) {
                   e.dataTransfer.setData('text/plain', idx.toString());
+                  e.dataTransfer.setData('source', 'rack');
                   e.dataTransfer.effectAllowed = 'move';
                   onSelectTile(idx);
+                }
+              }}
+              onDragOver={(e) => {
+                if (isMyTurn) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }
+              }}
+              onDrop={(e) => {
+                if (!isMyTurn) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const rawIdx = e.dataTransfer.getData('text/plain');
+                if (rawIdx !== '') {
+                  const fromIdx = parseInt(rawIdx, 10);
+                  if (!isNaN(fromIdx) && fromIdx !== idx && onReorderRack) {
+                    onReorderRack(fromIdx, idx);
+                  }
                 }
               }}
               onClick={() => {
