@@ -1,6 +1,6 @@
 // src/wordgrid/components/TileRack.tsx
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TILE_VALUES } from '../../utils/wordgrid/constants';
 
 interface TileRackProps {
@@ -124,25 +124,22 @@ export const TileRack = ({
                   onTurnAlert();
                 }
               }}
-              className={`w-11 h-12 sm:w-12 sm:h-13 rounded-2xl flex flex-col items-center justify-center relative transition-all duration-150 transform select-none ${
-                isSelected
+              className={`w-11 h-12 sm:w-12 sm:h-13 rounded-2xl flex flex-col items-center justify-center relative transition-all duration-150 transform select-none ${isSelected
                   ? 'bg-indigo-600 text-white shadow-2xl -translate-y-2.5 scale-105 ring-4 ring-indigo-400 border-2 border-white cursor-grab'
                   : dragOverIdx === idx
-                  ? 'bg-indigo-500 text-white shadow-xl scale-105 ring-2 ring-indigo-400 border-2 border-indigo-300'
-                  : isMyTurn
-                  ? 'bg-amber-200 hover:bg-amber-100 text-slate-950 hover:shadow-xl cursor-grab active:cursor-grabbing border-2 border-amber-300 active:scale-95'
-                  : 'bg-amber-100/70 text-slate-900 border border-amber-300/60 opacity-70 cursor-not-allowed'
-              }`}
+                    ? 'bg-indigo-500 text-white shadow-xl scale-105 ring-2 ring-indigo-400 border-2 border-indigo-300'
+                    : isMyTurn
+                      ? 'bg-amber-200 hover:bg-amber-100 text-slate-950 hover:shadow-xl cursor-grab active:cursor-grabbing border-2 border-amber-300 active:scale-95'
+                      : 'bg-amber-100/70 text-slate-900 border border-amber-300/60 opacity-70 cursor-not-allowed'
+                }`}
             >
-              <span className={`text-base sm:text-lg font-black leading-none select-none ${
-                isSelected ? 'text-white' : 'text-slate-950'
-              }`}>
+              <span className={`text-base sm:text-lg font-black leading-none select-none ${isSelected ? 'text-white' : 'text-slate-950'
+                }`}>
                 {char}
               </span>
               <span
-                className={`text-[8px] sm:text-[9px] font-extrabold absolute bottom-0.5 right-1.5 select-none ${
-                  isSelected ? 'text-indigo-200' : 'text-slate-800'
-                }`}
+                className={`text-[8px] sm:text-[9px] font-extrabold absolute bottom-0.5 right-1.5 select-none ${isSelected ? 'text-indigo-200' : 'text-slate-800'
+                  }`}
               >
                 {val}
               </span>

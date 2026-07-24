@@ -85,11 +85,11 @@ export const CATEGORIES = [
       name: "Video Games",
       desc: "Gaming history, console wars, retro arcade, and modern e-sports",
    },
-   {
-      id: "music",
-      name: "Music",
-      desc: "Popular bands, hit songs, genres, instruments, and music history",
-   },
+   // {
+   //    id: "music",
+   //    name: "Music",
+   //    desc: "Popular bands, hit songs, genres, instruments, and music history",
+   // },
    // {
    //    id: "animals",
    //    name: "Animals & Wildlife",
