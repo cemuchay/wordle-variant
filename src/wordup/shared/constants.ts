@@ -90,11 +90,11 @@ export const CATEGORIES = [
       name: "Music",
       desc: "Popular bands, hit songs, genres, instruments, and music history",
    },
-   {
-      id: "animals",
-      name: "Animals & Wildlife",
-      desc: "Mammals, birds, reptiles, marine life, and zoological details",
-   },
+   // {
+   //    id: "animals",
+   //    name: "Animals & Wildlife",
+   //    desc: "Mammals, birds, reptiles, marine life, and zoological details",
+   // },
    {
       id: "computers",
       name: "Computer Science",

@@ -139,6 +139,42 @@ function generateQuestion(
    const meta = entity?.metadata || {};
    const rng = createSeededRandom(hashSeed(seed));
 
+   // ── Choice count normalization safety: Ensure strictly 4 options (or 2 for T/F) ──
+   if (qObj && qObj.choices && Array.isArray(qObj.choices)) {
+      const isTrueFalse = qObj.choices.includes("True") && qObj.choices.includes("False");
+      if (!isTrueFalse && qObj.choices.length < 4 && qObj.answer) {
+         const fallbackPool = [
+            "Book of Thomas",
+            "Genesis",
+            "Exodus",
+            "Leviticus",
+            "Revelation",
+            "Psalms",
+            "Proverbs",
+            "Isaiah",
+            "Matthew",
+            "Mark",
+            "Luke",
+            "John",
+            "Acts",
+            "Romans",
+            "Corinthians"
+         ];
+         const uniqueChoices = new Set(qObj.choices);
+         uniqueChoices.add(qObj.answer);
+         let fbIdx = 0;
+         while (uniqueChoices.size < 4 && fbIdx < fallbackPool.length) {
+            const pad = fallbackPool[fbIdx++];
+            if (pad !== qObj.answer) uniqueChoices.add(pad);
+         }
+         let padCounter = 1;
+         while (uniqueChoices.size < 4) {
+            uniqueChoices.add(`Option ${padCounter++}`);
+         }
+         qObj.choices = seededShuffle(Array.from(uniqueChoices), rng);
+      }
+   }
+
    // ── Misspelling distractor injection (15% chance for multiple choice) ──
    if (
       qObj &&
@@ -291,7 +327,7 @@ function _generateQuestion(
 
        // bible_real_book: use fake book names as distractors
        if (template.id === "bible_real_book") {
-          distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 2);
+          distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 3);
        }
 
        // bible_fake_book: answer is a fake book, distractors are real books
@@ -303,6 +339,37 @@ function _generateQuestion(
              rng,
           ).slice(0, 3);
           explanationText = `"${fakeBook}" is not a real book of the Bible.`;
+       }
+
+       // Handle template-based True/False questions
+       if (template.isTrueFalse) {
+          const isTrue = Math.floor(rng() * 2) === 0;
+          let tfPrompt = promptText;
+          let tfAnswer = isTrue ? "True" : "False";
+          if (!isTrue) {
+             // Generate a false statement by picking a wrong value from distractors or peers
+             if (template.id === "bible_tf_testament") {
+                const wrongTestament = meta.testament === "Old" ? "New" : "Old";
+                tfPrompt = tfPrompt.replace(new RegExp(meta.testament, "gi"), wrongTestament);
+             } else if (template.id === "bible_tf_canonical_order") {
+                const wrongNext = seededShuffle(
+                   allEntities.filter((e) => e.label !== label && e.label !== meta.next_book).map((e) => e.label),
+                   rng
+                )[0] || "Genesis";
+                if (meta.next_book) {
+                   tfPrompt = tfPrompt.replace(new RegExp(meta.next_book, "gi"), wrongNext);
+                }
+             }
+          }
+          return {
+             type: "definition",
+             prompt: tfPrompt,
+             choices: ["True", "False"],
+             answer: tfAnswer,
+             explanation: explanationText,
+             imageUrl: entity.metadata?.image || undefined,
+             imageUrls: entity.metadata?.images || undefined,
+          };
        }
 
       return {

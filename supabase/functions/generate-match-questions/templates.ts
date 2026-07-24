@@ -8,6 +8,7 @@ export interface MatrixTemplate {
    explanations: string[];
    answerKey?: string;
    weight?: number;
+   isTrueFalse?: boolean;
 }
 
 export const QUESTION_TEMPLATES: MatrixTemplate[] = [
@@ -766,6 +767,205 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       ],
    },
    {
+      id: "lang_idiom_meaning",
+      category: "english_language",
+      requiredKeys: ["idiom_meaning"],
+      prompts: [
+         'What is the actual meaning of the idiom "{label}"?',
+         'If someone uses the idiom "{label}", what do they mean?',
+         'Identify the figurative meaning of the phrase "{label}":',
+         'Which definition best explains the common idiom "{label}"?',
+      ],
+      explanations: [
+         'The idiom "{label}" means "{idiom_meaning}".',
+         'Figuratively, "{label}" is used to describe "{idiom_meaning}".',
+      ],
+   },
+   {
+      id: "lang_confusion_reason",
+      category: "english_language",
+      requiredKeys: ["confusion_reason"],
+      prompts: [
+         'Why are the words "{label}" commonly confused in English?',
+         'What is the primary source of confusion between "{label}"?',
+         'Identify the linguistic explanation for confusing "{label}":',
+         'What causes writers to frequently mix up "{label}"?',
+      ],
+      explanations: [
+         '"{label}" are confused because: {confusion_reason}.',
+         'The confusion surrounding "{label}" arises from: {confusion_reason}.',
+      ],
+   },
+   {
+      id: "lang_plural_form",
+      category: "english_language",
+      requiredKeys: ["plural_form"],
+      prompts: [
+         'What is the correct plural form of the word "{label}"?',
+         'How do you write the plural of "{label}"?',
+         'Identify the plural version of "{label}":',
+         'In English grammar, which of these is the plural of "{label}"?',
+      ],
+      explanations: [
+         'The plural of "{label}" is "{plural_form}".',
+         'To make "{label}" plural, we write "{plural_form}".',
+      ],
+   },
+   {
+      id: "lang_derived_form",
+      category: "english_language",
+      requiredKeys: ["derived_form"],
+      prompts: [
+         'What is the noun or adjective form derived from the verb "{label}"?',
+         'Which word is a direct derivation of "{label}"?',
+         'Identify the derived word form of "{label}":',
+         'In vocabulary building, which of these is derived from "{label}"?',
+      ],
+      explanations: [
+         'The derived form of "{label}" is "{derived_form}".',
+         '"{derived_form}" is directly derived from "{label}".',
+      ],
+   },
+
+   // ═══════════════════════════════════════════════════════════
+   // FOOTBALL (10 templates)
+   // ═══════════════════════════════════════════════════════════
+   {
+      id: "foot_record_holder",
+      category: "football",
+      requiredKeys: ["record_holder", "record_value"],
+      prompts: [
+         "Who holds the record for {label}?",
+         "Which football player or club holds the record of {record_value} for {label}?",
+         "Identify the record holder for {label}:",
+         "For {label}, which name is associated with the record of {record_value}?",
+      ],
+      explanations: [
+         "{record_holder} holds the record for {label} with {record_value}.",
+         "The record for {label} is held by {record_holder} ({record_value}).",
+      ],
+   },
+   {
+      id: "foot_team_nick",
+      category: "football",
+      requiredKeys: ["nickname", "stadium"],
+      prompts: [
+         "Which football club playing at {stadium} is famously nicknamed '{nickname}'?",
+         "Which team has their home ground at {stadium} and is nicknamed '{nickname}'?",
+         "Identify the club associated with the stadium {stadium} and the nickname '{nickname}':",
+         "If a club is nicknamed '{nickname}' and plays at {stadium}, which club is it?",
+      ],
+      explanations: [
+         "{label} plays at {stadium} and is nicknamed '{nickname}'.",
+         "Famously nicknamed '{nickname}', {label} plays their home matches at {stadium}.",
+      ],
+   },
+   {
+      id: "foot_ucl_wins",
+      category: "football",
+      requiredKeys: ["ucl_titles", "country"],
+      prompts: [
+         "Which football club from {country} has won the UEFA Champions League {ucl_titles} times?",
+         "Hailing from {country}, which team has claimed {ucl_titles} UCL trophies?",
+         "Identify the club in {country} with exactly {ucl_titles} Champions League titles:",
+         "Which team boasts {ucl_titles} UEFA Champions League titles and plays in {country}?",
+      ],
+      explanations: [
+         "{label} of {country} has won the UCL {ucl_titles} times.",
+         "With {ucl_titles} UCL titles, {label} is one of {country}'s most decorated clubs.",
+      ],
+   },
+   {
+      id: "foot_ballon_dor",
+      category: "football",
+      requiredKeys: ["ballon_dor_wins"],
+      prompts: [
+         "How many times has {label} won the prestigious Ballon d'Or award?",
+         "What is the total number of Ballon d'Or titles claimed by {label}?",
+         "Identify the number of times {label} has been crowned with the Ballon d'Or:",
+         "How many Ballon d'Or trophies are in the cabinet of {label}?",
+      ],
+      explanations: [
+         "{label} has won the Ballon d'Or {ballon_dor_wins} times.",
+         "The Ballon d'Or has been awarded to {label} a record {ballon_dor_wins} times.",
+      ],
+   },
+   {
+      id: "foot_founded_year",
+      category: "football",
+      requiredKeys: ["founded_year", "country"],
+      prompts: [
+         "In which year was the football club {label} founded in {country}?",
+         "What is the founding year of the club {label} (located in {country})?",
+         "Which year marks the establishment of {label} in {country}?",
+         "When was the team {label} formed in {country}?",
+      ],
+      explanations: [
+         "{label} was founded in {country} in the year {founded_year}.",
+         "The establishment of {label} in {country} occurred in {founded_year}.",
+      ],
+   },
+   {
+      id: "foot_manager",
+      category: "football",
+      requiredKeys: ["famous_manager", "manager_tenure"],
+      prompts: [
+         "Which manager led {label} during their iconic tenure ({manager_tenure})?",
+         "Who was the legendary manager of {label} during the period {manager_tenure}?",
+         "Identify the famous manager associated with {label} from {manager_tenure}:",
+         "Under whose management did {label} compete during {manager_tenure}?",
+      ],
+      explanations: [
+         "{famous_manager} managed {label} during {manager_tenure}.",
+         "{label} was managed by the legendary {famous_manager} during {manager_tenure}.",
+      ],
+   },
+   {
+      id: "foot_league",
+      category: "football",
+      requiredKeys: ["domestic_league"],
+      prompts: [
+         "Which domestic league does the club {label} compete in?",
+         "In which country's top division (league: {domestic_league}) does {label} play?",
+         "Identify the primary domestic league for the club {label}:",
+         "What is the home league of the football team {label}?",
+      ],
+      explanations: [
+         "{label} competes in the {domestic_league}.",
+         "The domestic league for {label} is the {domestic_league}.",
+      ],
+   },
+   {
+      id: "foot_rivalry",
+      category: "football",
+      requiredKeys: ["main_rival", "derby_name"],
+      prompts: [
+         "What is the famous name of the derby rivalry between {label} and {main_rival}?",
+         "The match between {label} and {main_rival} is known as what?",
+         "Which derby matches {label} against their main rival {main_rival}?",
+         "Identify the rivalry name ({derby_name}) involving {label}:",
+      ],
+      explanations: [
+         "The rivalry between {label} and {main_rival} is called {derby_name}.",
+         "Known as the {derby_name}, this match pits {label} against {main_rival}.",
+      ],
+   },
+   {
+      id: "foot_top_scorer",
+      category: "football",
+      requiredKeys: ["all_time_top_scorer"],
+      prompts: [
+         "Who is the all-time top goal scorer in the history of the club {label}?",
+         "Which legendary player holds the record for most goals scored for {label}?",
+         "Identify the all-time top scorer of {label}:",
+         "Whose name leads the scoring records of {label} as all-time top scorer?",
+      ],
+      explanations: [
+         "The all-time top scorer of {label} is {all_time_top_scorer}.",
+         "{all_time_top_scorer} has scored more goals for {label} than any other player.",
+      ],
+   },
+   {
       id: "foot_kit_colors",
       category: "football",
       requiredKeys: ["home_kit_colors"],
@@ -781,7 +981,7 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       ],
    },
    // ═══════════════════════════════════════════════════════════
-   // FLAG BEARER (3 templates)
+   // FLAG BEARER (8 templates)
    // ═══════════════════════════════════════════════════════════
    {
       id: "flag_identify",
@@ -899,15 +1099,15 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
    },
 
    // ═══════════════════════════════════════════════════════════
-    // BIBLE (7 templates — book facts)
+   // BIBLE (9 templates — book facts & T/F)
    // ═══════════════════════════════════════════════════════════
 
-    // ── TYPE 1: "Which book comes before X?" ──
-    {
-       id: "bible_book_before",
-       category: "bible",
-       requiredKeys: ["previous_book", "canonical_order"],
-       weight: 2.5,
+   // ── TYPE 1: "Which book comes before X?" ──
+   {
+      id: "bible_book_before",
+      category: "bible",
+      requiredKeys: ["previous_book", "canonical_order"],
+      weight: 2.5,
       prompts: [
          "Which book of the Bible comes immediately before {label}?",
          "Name the book that precedes {label} in the Bible:",
@@ -921,12 +1121,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "previous_book",
    },
 
-    // ── TYPE 2: "Which book comes after X?" ──
-    {
-       id: "bible_book_after",
-       category: "bible",
-       requiredKeys: ["next_book", "canonical_order"],
-       weight: 1.5,
+   // ── TYPE 2: "Which book comes after X?" ──
+   {
+      id: "bible_book_after",
+      category: "bible",
+      requiredKeys: ["next_book", "canonical_order"],
+      weight: 1.5,
       prompts: [
          "Which book of the Bible comes immediately after {label}?",
          "Name the book that follows {label} in the Bible:",
@@ -940,12 +1140,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "next_book",
    },
 
-    // ── TYPE 3: "How many chapters?" ──
-    {
-       id: "bible_chapters",
-       category: "bible",
-       requiredKeys: ["chapter_count"],
-       weight: 0.3,
+   // ── TYPE 3: "How many chapters?" ──
+   {
+      id: "bible_chapters",
+      category: "bible",
+      requiredKeys: ["chapter_count"],
+      weight: 0.3,
       prompts: [
          "How many chapters does the book of {label} have?",
          "What is the chapter count of the book of {label}?",
@@ -959,12 +1159,12 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       answerKey: "chapter_count",
    },
 
-    // ── TYPE 4: "Which book is in the Old/New Testament?" ──
-    {
-       id: "bible_testament",
-       category: "bible",
-       requiredKeys: ["testament"],
-       weight: 1.5,
+   // ── TYPE 4: "Which book is in the Old/New Testament?" ──
+   {
+      id: "bible_testament",
+      category: "bible",
+      requiredKeys: ["testament"],
+      weight: 1.5,
       prompts: [
          "Which of the following books is in the {testament} Testament?",
          "Identify the book that belongs to the {testament} Testament:",
@@ -976,63 +1176,96 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       ],
    },
 
-     // ── TYPE 5: "Which is a real book of the Bible?" ──
-     {
-        id: "bible_real_book",
-        category: "bible",
-        requiredKeys: ["testament"],
-        weight: 1.5,
-       prompts: [
-          "Which of the following is a real book of the Bible?",
-          "Identify the actual book of the Bible from the list below:",
-          "Which one is a genuine book of the Bible?",
-       ],
-       explanations: [
-          "{label} is indeed a real book of the Bible.",
-          "The book of {label} is one of the 66 books in the Bible.",
-       ],
-    },
+   // ── TYPE 5: "Which is a real book of the Bible?" ──
+   {
+      id: "bible_real_book",
+      category: "bible",
+      requiredKeys: ["testament"],
+      weight: 1.5,
+      prompts: [
+         "Which of the following is a real book of the Bible?",
+         "Identify the actual book of the Bible from the list below:",
+         "Which one is a genuine book of the Bible?",
+      ],
+      explanations: [
+         "{label} is indeed a real book of the Bible.",
+         "The book of {label} is one of the 66 books in the Bible.",
+      ],
+   },
 
-     // ── TYPE 6: "Which is NOT in the Old/New Testament?" ──
-     {
-        id: "bible_not_in_testament",
-        category: "bible",
-        requiredKeys: ["testament"],
-        weight: 2.5,
-       prompts: [
-          "Which of the following books is NOT in the {testament} Testament?",
-          "Identify the book that does NOT belong to the {testament} Testament:",
-          "Which book is NOT part of the {testament} Testament?",
-       ],
-       explanations: [
-          "{label} is not in the {testament} Testament.",
-          "The book of {label} does not belong to the {testament} Testament.",
-       ],
-    },
+   // ── TYPE 6: "Which is NOT in the Old/New Testament?" ──
+   {
+      id: "bible_not_in_testament",
+      category: "bible",
+      requiredKeys: ["testament"],
+      weight: 2.5,
+      prompts: [
+         "Which of the following books is NOT in the {testament} Testament?",
+         "Identify the book that does NOT belong to the {testament} Testament:",
+         "Which book is NOT part of the {testament} Testament?",
+      ],
+      explanations: [
+         "{label} is not in the {testament} Testament.",
+         "The book of {label} does not belong to the {testament} Testament.",
+      ],
+   },
 
-     // ── TYPE 7: "All are real books EXCEPT" ──
-     {
-        id: "bible_fake_book",
-        category: "bible",
-        requiredKeys: ["testament"],
-        weight: 1.5,
-       prompts: [
-          "All of the following are real books of the Bible EXCEPT:",
-          "Which of these is NOT a real book of the Bible?",
-          "One of these books is not in the Bible. Which one?",
-       ],
-       explanations: [
-          "{fake_book} is not a real book of the Bible.",
-          "The book of {fake_book} does not exist in the Bible.",
-       ],
-    },
+   // ── TYPE 7: "All are real books EXCEPT" ──
+   {
+      id: "bible_fake_book",
+      category: "bible",
+      requiredKeys: ["testament"],
+      weight: 1.5,
+      prompts: [
+         "All of the following are real books of the Bible EXCEPT:",
+         "Which of these is NOT a real book of the Bible?",
+         "One of these books is not in the Bible. Which one?",
+      ],
+      explanations: [
+         "{fake_book} is not a real book of the Bible.",
+         "The book of {fake_book} does not exist in the Bible.",
+      ],
+   },
+
+   // ── TYPE 8: True/False: Testament Membership ──
+   {
+      id: "bible_tf_testament",
+      category: "bible",
+      requiredKeys: ["testament"],
+      weight: 2.0,
+      isTrueFalse: true,
+      prompts: [
+         "True or False: The book of {label} is in the {testament} Testament.",
+         "Is it true or false that {label} belongs to the {testament} Testament?",
+      ],
+      explanations: [
+         "{label} is in the {testament} Testament.",
+         "The book of {label} belongs to the {testament} Testament.",
+      ],
+   },
+
+   // ── TYPE 9: True/False: Canonical Sequence ──
+   {
+      id: "bible_tf_canonical_order",
+      category: "bible",
+      requiredKeys: ["next_book", "canonical_order"],
+      weight: 2.0,
+      isTrueFalse: true,
+      prompts: [
+         "True or False: In the Bible, the book of {label} comes immediately before {next_book}.",
+         "Is it true or false that {label} is followed right after by {next_book}?",
+      ],
+      explanations: [
+         "{next_book} comes immediately after {label} in the canonical order of the Bible.",
+      ],
+   },
 ];
 
 export const FAKE_BIBLE_BOOKS = [
    "Gospel of Thomas",
    "Enoch",
    "Judas",
-   "Book of Jasher",
+   "Jasher",
    "Acts of Paul",
    "Apocalypse of Peter",
    "Mary",
