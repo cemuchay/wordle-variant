@@ -1,6 +1,5 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { useIsStandalone } from '../../hooks/useIsStandalone';
 import { useApp } from '../../context/AppContext';
 
 export interface ModalLayoutProps {
@@ -37,7 +36,6 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
   zIndex = 'z-150',
   isOverlay = true,
 }) => {
-  const isStandalone = useIsStandalone();
   const { isDynamicIslandVisible } = useApp();
 
   if (!isOpen) return null;
@@ -47,49 +45,45 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
       className={`${
         isOverlay
           ? `fixed inset-0 ${zIndex} bg-gray-900`
-          : 'relative flex-1 h-full min-h-0'
-      } flex flex-col w-full h-full min-h-dvh max-h-dvh overflow-hidden select-none bg-gray-900 ${className}`}
+          : 'relative flex-1'
+      } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none bg-gray-900 text-white ${className}`}
       style={{
-        fontFamily:
-          'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        paddingTop: isOverlay
-          ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem)'
-          : undefined,
+        paddingTop: isOverlay ? 'env(safe-area-inset-top, 0px)' : undefined,
+        paddingBottom: isOverlay ? '0px' : undefined,
+        paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
+        paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
       }}
     >
       <div
-        className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-hidden px-3 py-3 ${
-          isDynamicIslandVisible && isOverlay ? 'pt-6 sm:pt-8' : ''
-        } ${containerClassName}`}
-        style={{
-          paddingBottom: isOverlay
-            ? isStandalone
-              ? 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)'
-              : 'calc(env(safe-area-inset-bottom, 0px) + 1rem)'
-            : undefined,
-        }}
+        className={`flex flex-col flex-1 min-h-0 w-full relative transition-[padding] duration-200 ${
+          isDynamicIslandVisible && isOverlay ? 'pt-10 sm:pt-14' : 'pt-0'
+        }`}
       >
-        <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
-          {title ? (
-            <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">
-              {title}
-            </h2>
-          ) : (
-            <div className="flex-1" />
-          )}
-          {onClose && showCloseButton && (
-            <button
-              onClick={onClose}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer z-20"
-              aria-label="Close"
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
+        <div
+          className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-hidden px-3 py-3 ${containerClassName}`}
+        >
+          <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
+            {title ? (
+              <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">
+                {title}
+              </h2>
+            ) : (
+              <div className="flex-1" />
+            )}
+            {onClose && showCloseButton && (
+              <button
+                onClick={onClose}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer z-20"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
 
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
-          {children}
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
+            {children}
+          </div>
         </div>
       </div>
     </div>
