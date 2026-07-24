@@ -222,7 +222,7 @@ function generateQuestion(
          ? meta.image
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
    } else if (meta.flag_code) {
-      qObj.imageUrl = `https://flagcdn.com/h240/${meta.flag_code.toLowerCase()}.png`;
+      qObj.imageUrl = meta.flag_code.toLowerCase();
    }
    return qObj;
 }
@@ -372,15 +372,35 @@ function _generateQuestion(
           };
        }
 
-      return {
-         type: "definition",
-         prompt: promptText,
-         choices: seededShuffle([answerVal, ...distractors], rng),
-         answer: answerVal,
-         explanation: explanationText,
-         imageUrl: entity.metadata?.image || undefined,
-         imageUrls: entity.metadata?.images || undefined,
-      };
+       // Attach flag codes to imageUrls when choices are country labels in flag_bearer category
+       if (categoryType === "flag_bearer" && template.id === "flag_identify") {
+          const choiceFlagCodes = (seededShuffle([answerVal, ...distractors], rng) as string[]).map((c) => {
+             const matched = allEntities.find((e) => e.label === c);
+             return matched?.metadata?.flag_code ? String(matched.metadata.flag_code).toLowerCase() : c;
+          });
+          return {
+             type: "definition",
+             prompt: promptText,
+             choices: choiceFlagCodes.map((fc) => {
+                const matched = allEntities.find((e) => String(e.metadata?.flag_code).toLowerCase() === fc);
+                return matched?.label || fc;
+             }),
+             answer: answerVal,
+             explanation: explanationText,
+             imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : undefined,
+             imageUrls: choiceFlagCodes,
+          };
+       }
+
+       return {
+          type: "definition",
+          prompt: promptText,
+          choices: seededShuffle([answerVal, ...distractors], rng),
+          answer: answerVal,
+          explanation: explanationText,
+          imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : (entity.metadata?.image || undefined),
+          imageUrls: entity.metadata?.images || undefined,
+       };
    }
 
    // Localized Key Selection & Peer Filtering
@@ -1610,7 +1630,20 @@ serve(async (req) => {
                `${logPrefix} Round ${i}: question generated successfully (prompt="${q.prompt}")`,
             );
          } else {
-            console.warn(`${logPrefix} Round ${i}: failed to generate any unique question`);
+            console.warn(`${logPrefix} Round ${i}: failed to generate any unique question — generating fallback`);
+            const fallbackSeed = `${seed}-${i}-emergency-fallback`;
+            const fallbackRng = createSeededRandom(hashSeed(fallbackSeed));
+            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || { label: "Nigeria", metadata: { flag_code: "ng" } };
+            const fallbackQuestion = generateQuestion(
+               fallbackSeed,
+               emergencyEntity,
+               entityList.length > 0 ? entityList : [emergencyEntity],
+               0,
+               category,
+               config.variantWeights,
+               dbTemplatesList,
+            );
+            questions.push(fallbackQuestion);
          }
       }
 
