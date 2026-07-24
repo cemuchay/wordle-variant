@@ -137,8 +137,8 @@ export const UnifiedLobby = ({
       }
 
       try {
-         // Fire both queries concurrently
-         const queryLimit = 20
+         // Fire both queries concurrently in the background
+         const queryLimit = 20;
          const [liveResponse, asyncResponse] = await Promise.all([
             supabase
                .from("wordup_matches")
@@ -181,9 +181,7 @@ export const UnifiedLobby = ({
    }, [currentUser]);
 
    useEffect(() => {
-      Promise.resolve().then(() => {
-         fetchHistory();
-      });
+      fetchHistory();
    }, [fetchHistory, activeTab]);
 
    const allHistory = [...(historyMatches || []), ...(asyncHistoryMatches || [])]
