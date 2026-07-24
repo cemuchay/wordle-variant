@@ -166,10 +166,15 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
 
       // Save bot match record to DB with retry queue
       if (match.is_bot_match) {
+         const dbMatchId = match.id.startsWith("bot-marathon-")
+            ? match.id.replace("bot-marathon-", "")
+            : match.id.startsWith("bot-match-")
+               ? match.id.replace("bot-match-", "")
+               : match.id;
          const record = {
-            id: match.id,
+            id: dbMatchId,
             category: match.category,
-            player1_id: effectiveUser.id,
+            player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
             player2_id: "00000000-0000-0000-0000-000000000b0b",
             is_bot_match: true,
             bot_profile: match.bot_profile,

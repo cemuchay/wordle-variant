@@ -28,12 +28,18 @@ const ALLOWED_LENGTHS_DEFAULT = [3, 4, 5, 6, 7, 8, 9, 10];
 
 const resolveAllowedLengths = (category: string): number[] => {
    switch (category) {
-      case "3_letters": return [3];
-      case "4_letters": return [4];
-      case "5_letters": return [5];
-      case "6_letters": return [6];
-      case "7_plus": return [7, 8, 9, 10];
-      default: return ALLOWED_LENGTHS_DEFAULT;
+      case "3_letters":
+         return [3];
+      case "4_letters":
+         return [4];
+      case "5_letters":
+         return [5];
+      case "6_letters":
+         return [6];
+      case "7_plus":
+         return [7, 8, 9, 10];
+      default:
+         return ALLOWED_LENGTHS_DEFAULT;
    }
 };
 
@@ -51,7 +57,7 @@ const getTypeByWeight = (
       { type: "pattern", weight: 0.9 },
       { type: "length", weight: 1.0 },
       { type: "missing_letter", weight: 1.0 },
-      { type: "reverse_wordle", weight: 0.2 },
+      { type: "reverse_wordle", weight: 0.5 },
       { type: "definition", weight: 1.0 },
       { type: "math", weight: 0 },
       { type: "odd_one_out", weight: 0.8 },
@@ -65,7 +71,7 @@ const getTypeByWeight = (
       { type: "compound_break", weight: 0.7 },
       { type: "word_within", weight: 0.5 },
       { type: "cryptogram", weight: 0.7 },
-      { type: "category_sort", weight: 0.3 },
+      { type: "category_sort", weight: 0.1 },
       { type: "letter_add_remove", weight: 0.7 },
    ];
    const totalWeight = typeWeights.reduce((sum, item) => sum + item.weight, 0);
@@ -115,12 +121,28 @@ export const generateWordUpQuestions = async (
    count: number = 7,
 ): Promise<WordUpQuestion[]> => {
    const specificTypes: WordUpQuestion["type"][] = [
-      "real_fake", "length", "missing_letter", "reverse_wordle",
-      "definition", "anagram", "anagram_scrambled", "pattern",
-      "math", "odd_one_out", "vowel_drop", "rhyme_match",
-      "letter_count", "word_ladder", "synonym_match", "word_chain",
-      "letter_shift", "compound_break", "word_within", "cryptogram",
-      "category_sort", "letter_add_remove",
+      "real_fake",
+      "length",
+      "missing_letter",
+      "reverse_wordle",
+      "definition",
+      "anagram",
+      "anagram_scrambled",
+      "pattern",
+      "math",
+      "odd_one_out",
+      "vowel_drop",
+      "rhyme_match",
+      "letter_count",
+      "word_ladder",
+      "synonym_match",
+      "word_chain",
+      "letter_shift",
+      "compound_break",
+      "word_within",
+      "cryptogram",
+      "category_sort",
+      "letter_add_remove",
    ];
    // eslint-disable-next-line @typescript-eslint/no-explicit-any
    const isSpecificType = specificTypes.includes(category as any);
