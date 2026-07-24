@@ -41,9 +41,56 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
    const loadLeaderboard = useCallback(async () => {
       setLoading(true);
       try {
-         const isGlobal = !categoryId || categoryId === "mixed";
+         const targetCategory = (!categoryId || categoryId === "mixed") ? "global" : categoryId;
 
-         // 1. Fetch top 30 active players
+         // 1. Try querying the simplified unified view
+         const { data: viewData, error: viewError } = await supabase
+            .from("wordup_unified_leaderboard_view")
+            .select("*")
+            .eq("category", targetCategory)
+            .order("rank_position", { ascending: true })
+            .limit(WORDUP_GAME.LEADERBOARD_LIMIT);
+
+         if (!viewError && viewData) {
+            const processed: LeaderboardEntry[] = viewData.map((entry: Record<string, any>) => ({
+               id: entry.user_id,
+               rating: entry.rating,
+               xp: entry.xp,
+               games_played: entry.games_played,
+               games_won: entry.games_won,
+               games_lost: entry.games_lost,
+               games_tied: entry.games_tied,
+               rank_name: entry.rank_name || "Bronze",
+               updated_at: entry.updated_at,
+               profiles: {
+                  username: entry.username,
+                  avatar_url: entry.avatar_url,
+               },
+            }));
+
+            setRankings(processed);
+
+            // Fetch current user's rank position if outside top 30
+            if (currentUser) {
+               const userEntryInTop = viewData.find((e: Record<string, any>) => e.user_id === currentUser.id);
+               if (userEntryInTop) {
+                  setMyRankPosition(null);
+               } else {
+                  const { data: selfView } = await supabase
+                     .from("wordup_unified_leaderboard_view")
+                     .select("rank_position")
+                     .eq("category", targetCategory)
+                     .eq("user_id", currentUser.id)
+                     .maybeSingle();
+
+                  setMyRankPosition(selfView ? (selfView as { rank_position: number }).rank_position : null);
+               }
+            }
+            return;
+         }
+
+         // Fallback to raw table queries if view is not created yet
+         const isGlobal = targetCategory === "global";
          const query = isGlobal
             ? supabase
                .from("wordup_profiles")
@@ -73,19 +120,25 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
 
          if (error) throw error;
 
-         // Resolve decayed ratings for everyone on the fly
          const processed: LeaderboardEntry[] = ((data as any[]) || []).map((entry) => ({
             ...entry,
             id: isGlobal ? entry.id : entry.user_id,
-            rating: getDecayedRating(entry)
+            xp: entry.xp || 0,
+            games_played: entry.games_played || 0,
+            games_won: entry.games_won || 0,
+            games_lost: entry.games_lost || 0,
+            games_tied: entry.games_tied || 0,
+            rating: getDecayedRating({
+               updated_at: entry.updated_at,
+               games_played: entry.games_played || 0,
+               rating: entry.rating || 600,
+            }),
+            rank_name: entry.rank_name || "Bronze",
          }));
 
-         // Sort again based on resolved decayed ratings
          processed.sort((a, b) => b.rating - a.rating);
-
          setRankings(processed);
 
-         // 2. Fetch current user's stats for this category if not global
          let myStats = userStats;
          if (!isGlobal && currentUser) {
             const { data: catData } = await supabase
@@ -94,14 +147,9 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                .eq("user_id", currentUser.id)
                .eq("category", categoryId)
                .maybeSingle();
-            if (catData) {
-               myStats = catData as any;
-            } else {
-               myStats = null;
-            }
+            myStats = catData ? (catData as ProfileStats) : null;
          }
 
-         // 3. If current user is active, find their rank position if not in top 30
          if (currentUser && myStats && myStats.games_played > 0) {
             const inTop30 = processed.some(entry => entry.id === currentUser.id);
             if (!inTop30) {
@@ -120,7 +168,6 @@ export const RankingView = ({ currentUser, userStats, categoryId }: RankingViewP
                      .gt("rating", myCurrentDecayedRating);
 
                const { count, error: countError } = await countQuery;
-
                if (!countError && count !== null) {
                   setMyRankPosition(count + 1);
                }
