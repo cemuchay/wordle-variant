@@ -1355,9 +1355,9 @@ serve(async (req) => {
       const usedIds = new Set<string>();
       const questions: any[] = [];
       let matchSeenCount = 0;
-      const MATCH_SEEN_CAP = 2;
+      const MATCH_SEEN_CAP = category === "flag_bearer" ? 999 : 2;
       let difficulty1Count = 0;
-      const DIFFICULTY1_CAP = 3;
+      const DIFFICULTY1_CAP = category === "flag_bearer" ? 999 : 3;
 
       const isDifficulty1Capped = (e: any) =>
          (e.difficulty || 1) <= 1 && difficulty1Count >= DIFFICULTY1_CAP;
