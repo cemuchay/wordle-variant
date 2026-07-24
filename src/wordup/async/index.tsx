@@ -110,21 +110,83 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          }
 
          const myAnswers = isP1 ? match.p1_answers : match.p2_answers;
-         const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
-         const gameMultiplier = Math.max(1, Math.round((match.total_rounds || match.questions?.length || 7) / 7));
-         const xpReward = (XP.BASE_REWARD * gameMultiplier) + (won ? XP.WIN_BONUS * gameMultiplier : 0) + (correctCount * XP.PER_CORRECT);
-         const myRating = userStats?.rating || RATING.DEFAULT;
-         const storeOppStats = useAsyncStore.getState().opponentStats;
-         const oppRating = storeOppStats?.rating || RATING.DEFAULT_OPPONENT;
-         const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
-         const actual = won ? 1 : tied ? 0.5 : 0;
-         const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected)) * gameMultiplier;
-         const accuracyBonus = won ? correctCount : 0;
-         let eloGain = baseEloChange + accuracyBonus;
-         if (won && eloGain < RATING.MIN_GAIN_ON_WIN * gameMultiplier) eloGain = RATING.MIN_GAIN_ON_WIN * gameMultiplier;
-         if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS * gameMultiplier) eloGain = RATING.MAX_LOSS_ON_LOSS * gameMultiplier;
-          try { await updateStats(eloGain, xpReward, won, tied, match.category); }
-          catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
+         const oppAnswers = isP1 ? match.p2_answers : match.p1_answers;
+
+         const isMarathon = !!match.is_marathon || (match.total_rounds && match.total_rounds > 7);
+         const totalRounds = match.total_rounds || match.questions?.length || 7;
+         const gameMultiplier = Math.max(1, Math.round(totalRounds / 7));
+
+         let xpReward = 0;
+         let eloGain = 0;
+         let netWon = false;
+         let netTied = false;
+         let totalGamesWon = 0;
+         let totalGamesLost = 0;
+         let totalGamesTied = 0;
+
+         if (isMarathon && gameMultiplier > 1) {
+            for (let g = 0; g < gameMultiplier; g++) {
+               const startRound = g * 7;
+               const endRound = startRound + 7;
+               const chunkMyAnswers = (myAnswers || []).filter((a: any) => a.question_idx >= startRound && a.question_idx < endRound);
+               const chunkOppAnswers = (oppAnswers || []).filter((a: any) => a.question_idx >= startRound && a.question_idx < endRound);
+
+               const chunkMyPoints = chunkMyAnswers.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+               const chunkOppPoints = chunkOppAnswers.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+
+               const chunkWon = chunkMyPoints > chunkOppPoints;
+               const chunkTied = chunkMyPoints === chunkOppPoints;
+               const chunkCorrectCount = chunkMyAnswers.filter((a: any) => a.correct).length;
+
+               if (chunkWon) totalGamesWon++;
+               else if (chunkTied) totalGamesTied++;
+               else totalGamesLost++;
+
+               const chunkXp = XP.BASE_REWARD + (chunkWon ? XP.WIN_BONUS : 0) + (chunkCorrectCount * XP.PER_CORRECT);
+               xpReward += chunkXp;
+
+               const myRating = userStats?.rating || RATING.DEFAULT;
+               const storeOppStats = useAsyncStore.getState().opponentStats;
+               const oppRating = storeOppStats?.rating || RATING.DEFAULT_OPPONENT;
+
+               const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
+               const actual = chunkWon ? 1 : chunkTied ? 0.5 : 0;
+               const chunkBaseElo = Math.round(RATING.K_FACTOR * (actual - expected));
+               const chunkAccBonus = chunkWon ? chunkCorrectCount : 0;
+
+               let chunkElo = chunkBaseElo + chunkAccBonus;
+               if (chunkWon && chunkElo < RATING.MIN_GAIN_ON_WIN) chunkElo = RATING.MIN_GAIN_ON_WIN;
+               if (!chunkWon && !chunkTied && chunkElo < RATING.MAX_LOSS_ON_LOSS) chunkElo = RATING.MAX_LOSS_ON_LOSS;
+
+               eloGain += chunkElo;
+            }
+
+            netWon = totalGamesWon > totalGamesLost;
+            netTied = totalGamesWon === totalGamesLost;
+         } else {
+            const correctCount = myAnswers?.filter((a: any) => a.correct).length || 0;
+            xpReward = XP.BASE_REWARD + (won ? XP.WIN_BONUS : 0) + (correctCount * XP.PER_CORRECT);
+
+            const myRating = userStats?.rating || RATING.DEFAULT;
+            const storeOppStats = useAsyncStore.getState().opponentStats;
+            const oppRating = storeOppStats?.rating || RATING.DEFAULT_OPPONENT;
+
+            const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / RATING.DIVISOR));
+            const actual = won ? 1 : tied ? 0.5 : 0;
+            const baseEloChange = Math.round(RATING.K_FACTOR * (actual - expected));
+            const accuracyBonus = won ? correctCount : 0;
+
+            eloGain = baseEloChange + accuracyBonus;
+            if (won && eloGain < RATING.MIN_GAIN_ON_WIN) eloGain = RATING.MIN_GAIN_ON_WIN;
+            if (!won && !tied && eloGain < RATING.MAX_LOSS_ON_LOSS) eloGain = RATING.MAX_LOSS_ON_LOSS;
+
+            netWon = won;
+            netTied = tied;
+            if (won) totalGamesWon = 1; else if (tied) totalGamesTied = 1; else totalGamesLost = 1;
+         }
+
+         try { await updateStats(eloGain, xpReward, netWon, netTied, match.category, isMarathon ? { gamesWon: totalGamesWon, gamesLost: totalGamesLost, gamesTied: totalGamesTied } : undefined); }
+         catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
 
           // Fire-and-forget: record handcrafted question answers for difficulty tracking
           try {

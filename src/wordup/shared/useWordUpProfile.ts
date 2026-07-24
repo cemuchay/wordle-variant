@@ -98,8 +98,21 @@ export const useWordUpProfile = (user: { id: string } | null) => {
       }
    }, []);
 
-   const updateStats = useCallback(async (eloGain: number, xpReward: number, won: boolean, tied: boolean, category?: string | null) => {
+   const updateStats = useCallback(async (
+      eloGain: number,
+      xpReward: number,
+      won: boolean,
+      tied: boolean,
+      category?: string | null,
+      marathonGamesCounts?: { gamesWon: number; gamesLost: number; gamesTied: number }
+   ) => {
       if (!user) return;
+      const playedInc = marathonGamesCounts
+         ? (marathonGamesCounts.gamesWon + marathonGamesCounts.gamesLost + marathonGamesCounts.gamesTied)
+         : 1;
+      const wonInc = marathonGamesCounts ? marathonGamesCounts.gamesWon : (won ? 1 : 0);
+      const lostInc = marathonGamesCounts ? marathonGamesCounts.gamesLost : (won || tied ? 0 : 1);
+      const tiedInc = marathonGamesCounts ? marathonGamesCounts.gamesTied : (tied ? 1 : 0);
       try {
          await (async () => {
             const currentProf = await fetchWithRetry(async () => {
@@ -146,10 +159,10 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                      .update({
                         rating: newRating,
                         xp: newXp,
-                        games_played: currentProf.games_played + 1,
-                        games_won: currentProf.games_won + (won ? 1 : 0),
-                        games_lost: currentProf.games_lost + (won || tied ? 0 : 1),
-                        games_tied: currentProf.games_tied + (tied ? 1 : 0),
+                        games_played: currentProf.games_played + playedInc,
+                        games_won: currentProf.games_won + wonInc,
+                        games_lost: currentProf.games_lost + lostInc,
+                        games_tied: currentProf.games_tied + tiedInc,
                         rank_name: rank,
                         updated_at: new Date().toISOString()
                      })
@@ -191,10 +204,10 @@ export const useWordUpProfile = (user: { id: string } | null) => {
                            category: category,
                            rating: newTopicRating,
                            xp: newTopicXp,
-                           games_played: startPlayed + 1,
-                           games_won: startWon + (won ? 1 : 0),
-                           games_lost: startLost + (won || tied ? 0 : 1),
-                           games_tied: startTied + (tied ? 1 : 0),
+                           games_played: startPlayed + playedInc,
+                           games_won: startWon + wonInc,
+                           games_lost: startLost + lostInc,
+                           games_tied: startTied + tiedInc,
                            rank_name: topicRank,
                            updated_at: new Date().toISOString()
                         }, { onConflict: "user_id,category" });

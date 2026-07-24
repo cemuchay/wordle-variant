@@ -21,7 +21,11 @@ export function getCachedFlagUrl(code: string): string {
       return code;
    }
    const resolved = getFlagCode(code) || code;
-   return flagUrlCache[resolved.toLowerCase()] || getPrimaryFlagUrl(resolved);
+   const lower = resolved.toLowerCase();
+   if (flagUrlCache[lower]) {
+      return flagUrlCache[lower];
+   }
+   return getPrimaryFlagUrl(lower);
 }
 
 /**
@@ -112,32 +116,40 @@ function preloadGeneralImage(url: string): Promise<void> {
  */
 export async function preloadMatchImages(
    questions: WordUpQuestion[],
- ): Promise<void> {
-    const flagCodes = new Set<string>();
-    const generalUrls = new Set<string>();
- 
-    for (const q of questions) {
-       if (q.imageUrl) {
-          const resolved = getFlagCode(q.imageUrl);
-          if (resolved && resolved.length === 2) {
-             flagCodes.add(resolved);
-          } else {
-             generalUrls.add(q.imageUrl);
-          }
-       }
-       if (q.imageUrls) {
-          for (const entry of q.imageUrls) {
-             if (entry) {
-                const resolved = getFlagCode(entry);
-                if (resolved && resolved.length === 2) {
-                   flagCodes.add(resolved);
-                } else {
-                   generalUrls.add(entry);
-                }
-             }
-          }
-       }
-    }
+): Promise<void> {
+   const flagCodes = new Set<string>();
+   const generalUrls = new Set<string>();
+
+   for (const q of questions) {
+      if (q.imageUrl) {
+         if (q.imageUrl.length === 2) {
+            flagCodes.add(q.imageUrl.toLowerCase());
+         } else {
+            const resolved = getFlagCode(q.imageUrl);
+            if (resolved) {
+               flagCodes.add(resolved.toLowerCase());
+            } else {
+               generalUrls.add(q.imageUrl);
+            }
+         }
+      }
+      if (q.imageUrls) {
+         for (const entry of q.imageUrls) {
+            if (entry) {
+               if (entry.length === 2) {
+                  flagCodes.add(entry.toLowerCase());
+               } else {
+                  const resolved = getFlagCode(entry);
+                  if (resolved) {
+                     flagCodes.add(resolved.toLowerCase());
+                  } else {
+                     generalUrls.add(entry);
+                  }
+               }
+            }
+         }
+      }
+   }
  
     const tasks: Promise<void>[] = [];
  

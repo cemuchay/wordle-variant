@@ -139,7 +139,7 @@ export const WordUpContainer = ({
 
             // Non-blocking optional insert to database (safe against missing schema columns)
             const dbInsertData = {
-               id: localMatchId,
+               id: rawMatchId,
                category: cat,
                player1_id: (effectiveUser.id || "").startsWith("guest-") ? null : effectiveUser.id,
                player2_id: "00000000-0000-0000-0000-000000000b0b",

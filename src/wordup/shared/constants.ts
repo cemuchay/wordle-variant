@@ -70,11 +70,11 @@ export const CATEGORIES = [
       name: "General Knowledge",
       desc: "Diverse trivia across pop culture, science, history, and miscellaneous facts",
    },
-   {
-      id: "movies",
-      name: "Movies & Cinema",
-      desc: "Classic films, blockbusters, actors, directors, and Academy Awards",
-   },
+   // {
+   //    id: "movies",
+   //    name: "Movies & Cinema",
+   //    desc: "Classic films, blockbusters, actors, directors, and Academy Awards",
+   // },
    {
       id: "television",
       name: "Television",
@@ -85,16 +85,16 @@ export const CATEGORIES = [
       name: "Video Games",
       desc: "Gaming history, console wars, retro arcade, and modern e-sports",
    },
-   {
-      id: "music",
-      name: "Music",
-      desc: "Popular bands, hit songs, genres, instruments, and music history",
-   },
-   {
-      id: "animals",
-      name: "Animals & Wildlife",
-      desc: "Mammals, birds, reptiles, marine life, and zoological details",
-   },
+   // {
+   //    id: "music",
+   //    name: "Music",
+   //    desc: "Popular bands, hit songs, genres, instruments, and music history",
+   // },
+   // {
+   //    id: "animals",
+   //    name: "Animals & Wildlife",
+   //    desc: "Mammals, birds, reptiles, marine life, and zoological details",
+   // },
    {
       id: "computers",
       name: "Computer Science",

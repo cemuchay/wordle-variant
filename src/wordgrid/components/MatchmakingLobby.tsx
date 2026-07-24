@@ -7,6 +7,8 @@ import { ProtectedAvatar } from '../../components/chat/ProtectedAvatar';
 import { supabase } from '../../lib/supabaseClient';
 import { ALLOWED_GRID_SIZES, RECOMMENDED_MAX_PLAYERS } from '../../utils/wordgrid/constants';
 import { useTheme } from '@/hooks/useTheme';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { Trash2 } from 'lucide-react';
 
 interface PlayerProfile {
   id: string;
@@ -45,6 +47,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     loadMatchesList,
     matchesList,
     loadMatch,
+    deleteMatch,
     loading
   } = useWordGridStore();
 
@@ -54,6 +57,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
   const [selectedGridSize, setSelectedGridSize] = useState<number>(7);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [playerSearch, setPlayerSearch] = useState('');
+  const [matchToDelete, setMatchToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const maxPlayersAllowed = RECOMMENDED_MAX_PLAYERS[selectedGridSize] || 2;
   const [selectedPlayers, setSelectedPlayers] = useState<number>(2);
@@ -326,6 +330,15 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                           }`}>
                           {isMyTurn ? 'Your Turn' : 'Waiting'}
                         </span>
+                        {match.is_bot_match && (
+                          <button
+                            onClick={() => setMatchToDelete({ id: match.id, name: opp.username })}
+                            className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-xl transition-all cursor-pointer"
+                            title="Delete Bot Match"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleResumeMatch(match.id)}
                           className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
@@ -418,12 +431,23 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
                           Final: {myScore} - {oppScore}
                         </span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${won
-                        ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
-                        : 'bg-rose-950 border-rose-500/40 text-rose-400'
-                        }`}>
-                        {won ? 'Won' : 'Lost'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${won
+                          ? 'bg-emerald-950 border-emerald-500/40 text-emerald-400'
+                          : 'bg-rose-950 border-rose-500/40 text-rose-400'
+                          }`}>
+                          {won ? 'Won' : 'Lost'}
+                        </span>
+                        {match.is_bot_match && (
+                          <button
+                            onClick={() => setMatchToDelete({ id: match.id, name: opp.username })}
+                            className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-xl transition-all cursor-pointer"
+                            title="Delete Bot Match"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -432,6 +456,23 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={matchToDelete !== null}
+        onClose={() => setMatchToDelete(null)}
+        onConfirm={async () => {
+          if (matchToDelete) {
+            await deleteMatch(matchToDelete.id, userId);
+            triggerToast(`Deleted match vs ${matchToDelete.name}`);
+            setMatchToDelete(null);
+          }
+        }}
+        title="Delete Bot Game"
+        message={`Are you sure you want to delete your game vs ${matchToDelete?.name}? This action cannot be undone.`}
+        confirmLabel="Delete Game"
+        cancelLabel="Keep Game"
+        type="danger"
+      />
     </div>
   );
 };

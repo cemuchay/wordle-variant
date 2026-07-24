@@ -139,6 +139,42 @@ function generateQuestion(
    const meta = entity?.metadata || {};
    const rng = createSeededRandom(hashSeed(seed));
 
+   // ── Choice count normalization safety: Ensure strictly 4 options (or 2 for T/F) ──
+   if (qObj && qObj.choices && Array.isArray(qObj.choices)) {
+      const isTrueFalse = qObj.choices.includes("True") && qObj.choices.includes("False");
+      if (!isTrueFalse && qObj.choices.length < 4 && qObj.answer) {
+         const fallbackPool = [
+            "Book of Thomas",
+            "Genesis",
+            "Exodus",
+            "Leviticus",
+            "Revelation",
+            "Psalms",
+            "Proverbs",
+            "Isaiah",
+            "Matthew",
+            "Mark",
+            "Luke",
+            "John",
+            "Acts",
+            "Romans",
+            "Corinthians"
+         ];
+         const uniqueChoices = new Set(qObj.choices);
+         uniqueChoices.add(qObj.answer);
+         let fbIdx = 0;
+         while (uniqueChoices.size < 4 && fbIdx < fallbackPool.length) {
+            const pad = fallbackPool[fbIdx++];
+            if (pad !== qObj.answer) uniqueChoices.add(pad);
+         }
+         let padCounter = 1;
+         while (uniqueChoices.size < 4) {
+            uniqueChoices.add(`Option ${padCounter++}`);
+         }
+         qObj.choices = seededShuffle(Array.from(uniqueChoices), rng);
+      }
+   }
+
    // ── Misspelling distractor injection (15% chance for multiple choice) ──
    if (
       qObj &&
@@ -173,20 +209,21 @@ function generateQuestion(
       }
    }
 
-   if (meta.images && Array.isArray(meta.images) && meta.images.length > 0) {
-      const imgIdx = Math.floor(rng() * meta.images.length);
-      const chosenImage = meta.images[imgIdx];
+   const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
+   if (validImages.length > 0) {
+      const imgIdx = Math.floor(rng() * validImages.length);
+      const chosenImage = validImages[imgIdx];
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       qObj.imageUrl = chosenImage.startsWith("http")
          ? chosenImage
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
-   } else if (meta.image) {
+   } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       qObj.imageUrl = meta.image.startsWith("http")
          ? meta.image
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
    } else if (meta.flag_code) {
-      qObj.imageUrl = `https://flagcdn.com/h240/${meta.flag_code.toLowerCase()}.png`;
+      qObj.imageUrl = String(meta.flag_code).toLowerCase();
    }
    return qObj;
 }
@@ -291,7 +328,7 @@ function _generateQuestion(
 
        // bible_real_book: use fake book names as distractors
        if (template.id === "bible_real_book") {
-          distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 2);
+          distractors = seededShuffle(FAKE_BIBLE_BOOKS, rng).slice(0, 3);
        }
 
        // bible_fake_book: answer is a fake book, distractors are real books
@@ -305,15 +342,71 @@ function _generateQuestion(
           explanationText = `"${fakeBook}" is not a real book of the Bible.`;
        }
 
-      return {
-         type: "definition",
-         prompt: promptText,
-         choices: seededShuffle([answerVal, ...distractors], rng),
-         answer: answerVal,
-         explanation: explanationText,
-         imageUrl: entity.metadata?.image || undefined,
-         imageUrls: entity.metadata?.images || undefined,
-      };
+       // Handle template-based True/False questions
+       if (template.isTrueFalse) {
+          const isTrue = Math.floor(rng() * 2) === 0;
+          let tfPrompt = promptText;
+          let tfAnswer = isTrue ? "True" : "False";
+          if (!isTrue) {
+             // Generate a false statement by picking a wrong value from distractors or peers
+             if (template.id === "bible_tf_testament") {
+                const wrongTestament = meta.testament === "Old" ? "New" : "Old";
+                tfPrompt = tfPrompt.replace(new RegExp(meta.testament, "gi"), wrongTestament);
+             } else if (template.id === "bible_tf_canonical_order") {
+                const wrongNext = seededShuffle(
+                   allEntities.filter((e) => e.label !== label && e.label !== meta.next_book).map((e) => e.label),
+                   rng
+                )[0] || "Genesis";
+                if (meta.next_book) {
+                   tfPrompt = tfPrompt.replace(new RegExp(meta.next_book, "gi"), wrongNext);
+                }
+             }
+          }
+          return {
+             type: "definition",
+             prompt: tfPrompt,
+             choices: ["True", "False"],
+             answer: tfAnswer,
+             explanation: explanationText,
+             imageUrl: entity.metadata?.image || undefined,
+             imageUrls: entity.metadata?.images || undefined,
+          };
+       }
+
+       // Attach flag codes to imageUrls when choices are country labels in flag_bearer category
+       if (categoryType === "flag_bearer" && template.id === "flag_identify") {
+          const choiceFlagCodes = (seededShuffle([answerVal, ...distractors], rng) as string[]).map((c) => {
+             const matched = allEntities.find((e) => e.label === c);
+             return matched?.metadata?.flag_code ? String(matched.metadata.flag_code).toLowerCase() : c;
+          });
+          return {
+             type: "definition",
+             prompt: promptText,
+             choices: choiceFlagCodes.map((fc) => {
+                const matched = allEntities.find((e) => String(e.metadata?.flag_code).toLowerCase() === fc);
+                return matched?.label || fc;
+             }),
+             answer: answerVal,
+             explanation: explanationText,
+             imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : undefined,
+             imageUrls: choiceFlagCodes,
+          };
+       }
+
+       const validEntityImages = Array.isArray(entity.metadata?.images) ? entity.metadata.images.filter(Boolean) : [];
+       const chosenEntityImage = validEntityImages.length > 0
+          ? validEntityImages[Math.floor(rng() * validEntityImages.length)]
+          : (entity.metadata?.image && typeof entity.metadata.image === "string" && entity.metadata.image.trim() !== "" ? entity.metadata.image : undefined);
+
+       return {
+          type: "definition",
+          prompt: promptText,
+          choices: seededShuffle([answerVal, ...distractors], rng),
+          answer: answerVal,
+          explanation: explanationText,
+          imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : chosenEntityImage,
+          imageUrls: validEntityImages.length > 0 ? validEntityImages : undefined,
+       };
    }
 
    // Localized Key Selection & Peer Filtering
@@ -1268,9 +1361,9 @@ serve(async (req) => {
       const usedIds = new Set<string>();
       const questions: any[] = [];
       let matchSeenCount = 0;
-      const MATCH_SEEN_CAP = 2;
+      const MATCH_SEEN_CAP = category === "flag_bearer" ? 999 : 2;
       let difficulty1Count = 0;
-      const DIFFICULTY1_CAP = 3;
+      const DIFFICULTY1_CAP = category === "flag_bearer" ? 999 : 3;
 
       const isDifficulty1Capped = (e: any) =>
          (e.difficulty || 1) <= 1 && difficulty1Count >= DIFFICULTY1_CAP;
@@ -1543,7 +1636,20 @@ serve(async (req) => {
                `${logPrefix} Round ${i}: question generated successfully (prompt="${q.prompt}")`,
             );
          } else {
-            console.warn(`${logPrefix} Round ${i}: failed to generate any unique question`);
+            console.warn(`${logPrefix} Round ${i}: failed to generate any unique question — generating fallback`);
+            const fallbackSeed = `${seed}-${i}-emergency-fallback`;
+            const fallbackRng = createSeededRandom(hashSeed(fallbackSeed));
+            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || { label: "Nigeria", metadata: { flag_code: "ng" } };
+            const fallbackQuestion = generateQuestion(
+               fallbackSeed,
+               emergencyEntity,
+               entityList.length > 0 ? entityList : [emergencyEntity],
+               0,
+               category,
+               config.variantWeights,
+               dbTemplatesList,
+            );
+            questions.push(fallbackQuestion);
          }
       }
 

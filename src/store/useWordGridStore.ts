@@ -116,6 +116,56 @@ export function loadDraftFromLocalStorage(
    return null;
 }
 
+// 2b. Local Storage Full Match Snapshot (LS-First State Pipeline)
+export function saveMatchSnapshotToLocalStorage(matchId: string | null, snapshot: Record<string, any>) {
+   if (!matchId) return;
+   try {
+      const key = `wordgrid_snapshot_${matchId}`;
+      safeLocalStorage.setItem(
+         key,
+         JSON.stringify({ ...snapshot, timestamp: Date.now() }),
+      );
+   } catch (e) {
+      console.warn("[WordGrid] Failed to save match snapshot:", e);
+   }
+}
+
+export function loadMatchSnapshotFromLocalStorage(matchId: string | null): Record<string, any> | null {
+   if (!matchId) return null;
+   try {
+      const key = `wordgrid_snapshot_${matchId}`;
+      const dataStr = safeLocalStorage.getItem(key);
+      if (!dataStr) return null;
+      const parsed = JSON.parse(dataStr);
+      if (parsed && parsed.timestamp && Date.now() - parsed.timestamp > SEVEN_DAYS_MS) {
+         safeLocalStorage.removeItem(key);
+         return null;
+      }
+      return parsed;
+   } catch (e) {
+      console.warn("[WordGrid] Failed to load match snapshot:", e);
+   }
+   return null;
+}
+
+export function clearMatchSnapshotFromLocalStorage(matchId: string | null) {
+   if (!matchId) return;
+   try {
+      safeLocalStorage.removeItem(`wordgrid_snapshot_${matchId}`);
+   } catch (e) {
+      console.warn("[WordGrid] Failed to clear match snapshot:", e);
+   }
+}
+
+// Sequence-based turn helper
+export function deriveTurnFromMoves(movesList: any[], playersList: WordGridPlayer[]) {
+   if (!playersList || playersList.length === 0) return { turnIndex: 0, turnPlayerId: null };
+   const validMovesCount = Array.isArray(movesList) ? movesList.length : 0;
+   const turnIndex = validMovesCount % playersList.length;
+   const turnPlayerId = playersList[turnIndex]?.id || null;
+   return { turnIndex, turnPlayerId };
+}
+
 // 3. Pending Uploads Queue in Local Storage
 const PENDING_UPLOADS_KEY = "wordgrid_pending_uploads";
 
@@ -405,6 +455,7 @@ interface WordGridState {
       newBag: string[],
       botPlayerIdx: number,
    ) => Promise<void>;
+   deleteMatch: (matchId: string, userId: string) => Promise<void>;
 }
 
 export const useWordGridStore = create<WordGridState>((set, get) => ({
@@ -550,6 +601,11 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    loadMatch: async (matchId, currentUserId) => {
       get().resetGame();
       set({ loading: true, error: null });
+      // 1. Prefer LocalStorage Snapshot if available
+      const localSnapshot = loadMatchSnapshotFromLocalStorage(matchId);
+      if (localSnapshot) {
+         get().updateFromMatchRecord(localSnapshot, currentUserId);
+      }
       try {
          const { data, error } = await supabase
             .from("wordgrid_matches")
@@ -565,16 +621,28 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
          if (error) throw error;
          if (data) {
-            get().updateFromMatchRecord(data, currentUserId);
+            // Only update from DB if DB data is at least as up to date as local snapshot
+            const localMovesCount = localSnapshot?.moves?.length || 0;
+            const dbMovesCount = data.moves?.length || 0;
+            if (dbMovesCount >= localMovesCount) {
+               get().updateFromMatchRecord(data, currentUserId);
+            }
          }
       } catch (e: any) {
-         set({ error: e.message });
+         console.warn("[WordGrid] Network loadMatch error, using local snapshot fallback:", e);
+         if (!localSnapshot) {
+            set({ error: e.message });
+         }
       } finally {
          set({ loading: false });
       }
    },
 
    updateFromMatchRecord: (record, currentUserId) => {
+      const activeMatchId = get().matchId;
+      if (activeMatchId && record.id && activeMatchId !== record.id) {
+         return;
+      }
       // In bot matches or guest matches where player1_id was inserted as null in DB, treat current user as player1
       const isBotMatch = record.is_bot_match || get().isBotMatch;
       const isP1 = record.player1_id === currentUserId || isBotMatch || !record.player1_id;
@@ -611,17 +679,18 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
            ? (record.p1_rack || playersList[0]?.rack)
            : (record.p2_rack || playersList[1]?.rack);
 
+      // Derive turn index & active turn player using move sequence helper
+      const movesList = record.moves || [];
+      const { turnIndex: derivedTurnIndex, turnPlayerId: derivedTurnPlayerId } = deriveTurnFromMoves(movesList, playersList);
+
       const turnIndex =
          record.current_turn_index !== undefined &&
          record.current_turn_index !== null
             ? record.current_turn_index
-            : Math.max(
-                 0,
-                 playersList.findIndex((p) => p.id === record.current_turn),
-              );
+            : derivedTurnIndex;
 
       const resolvedCurrentTurn =
-         record.current_turn || playersList[turnIndex]?.id || currentUserId || (isP1 ? record.player1_id : record.player2_id);
+         record.current_turn || derivedTurnPlayerId || playersList[turnIndex]?.id || currentUserId;
 
       // Check if a local storage draft exists for this matchId and restore uncommitted placed tiles
       let activePlaced = get().placedTiles;
@@ -739,62 +808,78 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          rack: newRack,
       };
 
-      // Determine next player's turn
-      const nextTurnIdx = (get().currentTurnIndex + 1) % players.length;
-      const nextPlayerTurnId = updatedPlayers[nextTurnIdx].id;
-
-      const movePayload = {
-         player_id: userId,
-         word: words.map((w) => w.word).join(", "),
-         score: scoreResult.totalScore,
-         breakdown: scoreResult.words.map((w) => w.breakdown).join(" | ") + (scoreResult.bingoApplied ? " + 50 (1st Move Bingo Bonus)" : ""),
-         tiles_placed: placedTiles,
-         timestamp: new Date().toISOString(),
-      };
-
-      const nextMoves = [...moves, movePayload];
-
-      // Check game end condition: empty bag and all players unable to move / rack empty
-      const isCompleted =
-         newBag.length === 0 && updatedPlayers.some((p) => p.rack.length === 0);
-
-      const updatePayload: any = {
-         board: newBoard,
-         tile_bag: newBag,
-         players_data: updatedPlayers,
-         p1_rack: updatedPlayers[0]?.rack || [],
-         p2_rack: updatedPlayers[1]?.rack || [],
-         p1_score: updatedPlayers[0]?.score || 0,
-         p2_score: updatedPlayers[1]?.score || 0,
-         moves: nextMoves,
-         current_turn_index: nextTurnIdx,
-         current_turn: isUuid(nextPlayerTurnId) ? nextPlayerTurnId : null,
-         last_move_at: new Date().toISOString(),
-      };
-
-      if (isCompleted) {
-         updatePayload.status = "completed";
-         updatePayload.completed_at = new Date().toISOString();
-      }
-
       try {
-         const { error } = await safeWordGridUpdate(matchId, updatePayload);
+         const movePayload = {
+            player_id: userId,
+            word: words.map((w) => w.word).join(", "),
+            score: scoreResult.totalScore,
+            breakdown: scoreResult.words.map((w) => w.breakdown).join(" | ") + (scoreResult.bingoApplied ? " + 50 (1st Move Bingo Bonus)" : ""),
+            tiles_placed: placedTiles,
+            timestamp: new Date().toISOString(),
+         };
 
-         if (error) throw error;
+         // Determine next player's turn using sequence derivation helper
+         const nextMoves = [...moves, movePayload];
+         const { turnIndex: nextTurnIdx, turnPlayerId: nextPlayerTurnId } = deriveTurnFromMoves(nextMoves, updatedPlayers);
+
+         // Check game end condition: empty bag and all players unable to move / rack empty
+         const isCompleted =
+            newBag.length === 0 && updatedPlayers.some((p) => p.rack.length === 0);
+
+         const updatePayload: any = {
+            board: newBoard,
+            tile_bag: newBag,
+            players_data: updatedPlayers,
+            p1_rack: updatedPlayers[0]?.rack || [],
+            p2_rack: updatedPlayers[1]?.rack || [],
+            p1_score: updatedPlayers[0]?.score || 0,
+            p2_score: updatedPlayers[1]?.score || 0,
+            moves: nextMoves,
+            current_turn_index: nextTurnIdx,
+            current_turn: isUuid(nextPlayerTurnId || "") ? nextPlayerTurnId : null,
+            last_move_at: new Date().toISOString(),
+         };
+
+         if (isCompleted) {
+            updatePayload.status = "completed";
+            updatePayload.completed_at = new Date().toISOString();
+         }
+
+         // 1. Optimistic Local Commitment & LS Snapshot (LS-First)
          set({
             placedTiles: [],
             rack: newRack,
+            board: newBoard,
+            tileBag: newBag,
             players: updatedPlayers,
+            p1Score: updatedPlayers[0]?.score || 0,
+            p2Score: updatedPlayers[1]?.score || 0,
+            moves: nextMoves,
             currentTurnIndex: nextTurnIdx,
             currentTurn: nextPlayerTurnId,
+            status: isCompleted ? "completed" : get().status,
          });
+
+         saveMatchSnapshotToLocalStorage(matchId, {
+            ...updatePayload,
+            id: matchId,
+            grid_size: gridSize,
+            is_bot_match: get().isBotMatch,
+            bot_difficulty: get().botDifficulty,
+         });
+
          triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, 4000, true);
 
-         // Handle Bot Turn if applicable
+         // 2. Dispatch network sync asynchronously
+         safeWordGridUpdate(matchId, updatePayload).catch((err) => {
+            console.warn("[WordGrid] Background move sync failed (queued in LS):", err);
+         });
+
+         // 3. Trigger Bot Turn immediately if derived turn points to bot
          if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
             setTimeout(
                () => get().playBotTurn(newBoard, newBag, nextTurnIdx),
-               600,
+               400,
             );
          }
 
@@ -986,22 +1071,22 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
       const dbPlayer1Id = isUuid(userId) ? userId : null;
 
-      const initialPlayers: WordGridPlayer[] = [
-         {
-            id: userId,
-            username: "Player (You)",
-            score: 0,
-            rack: p1Rack,
-         },
-         {
-            id: "bot",
-            username: `AI (${difficulty.toUpperCase()})`,
-            score: 0,
-            rack: botRack,
-         },
-      ];
-
       try {
+         const initialPlayers: WordGridPlayer[] = [
+            {
+               id: userId,
+               username: "Player (You)",
+               score: 0,
+               rack: p1Rack,
+            },
+            {
+               id: "bot",
+               username: `AI (${difficulty.toUpperCase()})`,
+               score: 0,
+               rack: botRack,
+            },
+         ];
+
          const insertRes = await safeWordGridInsert({
             player1_id: dbPlayer1Id,
             player2_id: null,
@@ -1077,6 +1162,29 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          set({ matchesList: data || [] });
       } catch (e) {
          console.error("Failed to load matches list:", e);
+      }
+   },
+
+   deleteMatch: async (matchId: string, userId: string) => {
+      clearDraftFromLocalStorage(matchId);
+      set((state) => ({
+         matchesList: state.matchesList.filter((m) => m.id !== matchId),
+         ...(state.matchId === matchId ? { matchId: null, view: "lobby" as const } : {}),
+      }));
+      try {
+         const { error } = await supabase
+            .from("wordgrid_matches")
+            .delete()
+            .eq("id", matchId);
+         if (error) {
+            console.warn("[WordGrid] DB match deletion warning:", error);
+         }
+      } catch (e) {
+         console.error("[WordGrid] Failed to delete match:", e);
+      } finally {
+         if (userId && isUuid(userId)) {
+            get().loadMatchesList(userId);
+         }
       }
    },
 
@@ -1225,9 +1333,6 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          }
       }
 
-      const nextTurnIdx = (botPlayerIdx + 1) % players.length;
-      const nextPlayerTurnId = updatedPlayers[nextTurnIdx].id;
-
       const movePayload = {
          player_id: "bot",
          word: wordPlaced,
@@ -1236,6 +1341,9 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          tiles_placed: botMove?.placedTiles || [],
          timestamp: new Date().toISOString(),
       };
+
+      const nextMoves = [...moves, movePayload];
+      const { turnIndex: nextTurnIdx, turnPlayerId: nextPlayerTurnId } = deriveTurnFromMoves(nextMoves, updatedPlayers);
 
       const isCompleted =
          currentBag.length === 0 &&
@@ -1247,9 +1355,9 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          players_data: updatedPlayers,
          p2_rack: updatedPlayers[1]?.rack || [],
          p2_score: updatedPlayers[1]?.score || 0,
-         moves: [...moves, movePayload],
+         moves: nextMoves,
          current_turn_index: nextTurnIdx,
-         current_turn: isUuid(nextPlayerTurnId) ? nextPlayerTurnId : null,
+         current_turn: isUuid(nextPlayerTurnId || "") ? nextPlayerTurnId : null,
          last_move_at: new Date().toISOString(),
       };
 
@@ -1258,9 +1366,29 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          updatePayload.completed_at = new Date().toISOString();
       }
 
-      const { error } = await safeWordGridUpdate(matchId, updatePayload);
-      if (error) {
-         console.error("playBotTurn error:", error);
-      }
+      // 1. Optimistic Local Commitment & LS Snapshot (LS-First)
+      set({
+         board: updatedBoard,
+         tileBag: currentBag,
+         players: updatedPlayers,
+         p2Score: updatedPlayers[1]?.score || 0,
+         moves: nextMoves,
+         currentTurnIndex: nextTurnIdx,
+         currentTurn: nextPlayerTurnId,
+         status: isCompleted ? "completed" : get().status,
+      });
+
+      saveMatchSnapshotToLocalStorage(matchId, {
+         ...updatePayload,
+         id: matchId,
+         grid_size: gridSize,
+         is_bot_match: get().isBotMatch,
+         bot_difficulty: get().botDifficulty,
+      });
+
+      // 2. Dispatch network sync asynchronously
+      safeWordGridUpdate(matchId, updatePayload).catch((err) => {
+         console.warn("[WordGrid] Background bot turn sync failed (queued in LS):", err);
+      });
    },
 }));

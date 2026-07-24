@@ -111,16 +111,20 @@ export const generateMissingLetter = async (
 export const generateReverseWordle = async (
    allowedLengths: number[],
 ): Promise<WordUpQuestion> => {
-   const length = allowedLengths[rand(0, allowedLengths.length - 1)];
+   // Filter allowedLengths to min 3 and max 5
+   const filteredLengths = allowedLengths.filter((l) => l >= 3 && l <= 5);
+   const validLengths = filteredLengths.length > 0 ? filteredLengths : [3, 4, 5];
+   const length = validLengths[rand(0, validLengths.length - 1)];
+
    const { official } = await loadWordLists(length);
    const randomWord = () => official[rand(0, official.length - 1)];
 
    let target = randomWord();
 
-   // Generate 3 unique guesses with non-empty/some colored patterns
+   // Generate 2 unique guesses with non-empty/some colored patterns
    const clues: { guess: string; pattern: string }[] = [];
    let attempts = 0;
-   while (clues.length < 3 && attempts < 200) {
+   while (clues.length < 2 && attempts < 200) {
       attempts++;
       const g = randomWord();
       if (g === target || clues.some((c) => c.guess === g)) continue;
@@ -131,7 +135,7 @@ export const generateReverseWordle = async (
       }
    }
 
-   while (clues.length < 3) {
+   while (clues.length < 2) {
       const g = randomWord();
       if (g !== target && !clues.some((c) => c.guess === g)) {
          clues.push({ guess: g, pattern: calculateWordlePattern(target, g) });
