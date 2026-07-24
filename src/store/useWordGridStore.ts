@@ -405,6 +405,7 @@ interface WordGridState {
       newBag: string[],
       botPlayerIdx: number,
    ) => Promise<void>;
+   deleteMatch: (matchId: string, userId: string) => Promise<void>;
 }
 
 export const useWordGridStore = create<WordGridState>((set, get) => ({
@@ -1077,6 +1078,29 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          set({ matchesList: data || [] });
       } catch (e) {
          console.error("Failed to load matches list:", e);
+      }
+   },
+
+   deleteMatch: async (matchId: string, userId: string) => {
+      clearDraftFromLocalStorage(matchId);
+      set((state) => ({
+         matchesList: state.matchesList.filter((m) => m.id !== matchId),
+         ...(state.matchId === matchId ? { matchId: null, view: "lobby" as const } : {}),
+      }));
+      try {
+         const { error } = await supabase
+            .from("wordgrid_matches")
+            .delete()
+            .eq("id", matchId);
+         if (error) {
+            console.warn("[WordGrid] DB match deletion warning:", error);
+         }
+      } catch (e) {
+         console.error("[WordGrid] Failed to delete match:", e);
+      } finally {
+         if (userId && isUuid(userId)) {
+            get().loadMatchesList(userId);
+         }
       }
    },
 
