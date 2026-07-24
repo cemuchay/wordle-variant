@@ -60,38 +60,21 @@ export function generateMathsQuestion(
       }
 
       if (subType === 2) {
-         // Algebra Solver
-         const algIdx = Math.floor(rng() * 2);
-         if (algIdx === 0) {
-            const a = Math.floor(rng() * 8) + 2; 
-            const x = Math.floor(rng() * 21) - 5; 
-            const b = Math.floor(rng() * 30) - 15; 
-            const c = a * x + b;
-            const correct = String(x);
-            const fakes = smartFakeAnswers(x, rng).map(String);
-            const equationStr = `${a}x ${b >= 0 ? "+ " + b : "- " + Math.abs(b)} = ${c}`;
-            return {
-               type: "math_algebra",
-               prompt: `Solve for x: ${equationStr}`,
-               choices: seededShuffle([...new Set([correct, ...fakes])].slice(0, 4), rng),
-               answer: correct,
-               explanation: `Solving ${equationStr}: x = ${correct}.`,
-            };
-         } else {
-            const x = Math.floor(rng() * 12) + 2; 
-            const y = Math.floor(rng() * 10) + 1; 
-            const s = x + y;
-            const d = x - y;
-            const correct = String(x);
-            const fakes = smartFakeAnswers(x, rng).map(String);
-            return {
-               type: "math_algebra",
-               prompt: `If x + y = ${s} and x - y = ${d}, what is the value of x?`,
-               choices: seededShuffle([...new Set([correct, ...fakes])].slice(0, 4), rng),
-               answer: correct,
-               explanation: `Adding the two equations: 2x = ${s + d}, so x = ${correct}.`,
-            };
-         }
+         // Algebra Solver (Short single-line equations)
+         const a = Math.floor(rng() * 8) + 2; 
+         const x = Math.floor(rng() * 15) + 1; 
+         const b = Math.floor(rng() * 20) - 10; 
+         const c = a * x + b;
+         const correct = String(x);
+         const fakes = smartFakeAnswers(x, rng).map(String);
+         const equationStr = `${a}x ${b === 0 ? "" : b > 0 ? "+ " + b : "- " + Math.abs(b)} = ${c}`;
+         return {
+            type: "math_algebra",
+            prompt: `Solve for x: ${equationStr}`,
+            choices: seededShuffle([...new Set([correct, ...fakes])].slice(0, 4), rng),
+            answer: correct,
+            explanation: `Solving ${equationStr}: x = ${correct}.`,
+         };
       }
 
       if (subType === 3) {
