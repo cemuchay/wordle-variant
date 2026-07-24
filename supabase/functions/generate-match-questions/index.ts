@@ -209,20 +209,21 @@ function generateQuestion(
       }
    }
 
-   if (meta.images && Array.isArray(meta.images) && meta.images.length > 0) {
-      const imgIdx = Math.floor(rng() * meta.images.length);
-      const chosenImage = meta.images[imgIdx];
+   const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
+   if (validImages.length > 0) {
+      const imgIdx = Math.floor(rng() * validImages.length);
+      const chosenImage = validImages[imgIdx];
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       qObj.imageUrl = chosenImage.startsWith("http")
          ? chosenImage
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
-   } else if (meta.image) {
+   } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       qObj.imageUrl = meta.image.startsWith("http")
          ? meta.image
          : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
    } else if (meta.flag_code) {
-      qObj.imageUrl = meta.flag_code.toLowerCase();
+      qObj.imageUrl = String(meta.flag_code).toLowerCase();
    }
    return qObj;
 }
@@ -392,14 +393,19 @@ function _generateQuestion(
           };
        }
 
+       const validEntityImages = Array.isArray(entity.metadata?.images) ? entity.metadata.images.filter(Boolean) : [];
+       const chosenEntityImage = validEntityImages.length > 0
+          ? validEntityImages[Math.floor(rng() * validEntityImages.length)]
+          : (entity.metadata?.image && typeof entity.metadata.image === "string" && entity.metadata.image.trim() !== "" ? entity.metadata.image : undefined);
+
        return {
           type: "definition",
           prompt: promptText,
           choices: seededShuffle([answerVal, ...distractors], rng),
           answer: answerVal,
           explanation: explanationText,
-          imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : (entity.metadata?.image || undefined),
-          imageUrls: entity.metadata?.images || undefined,
+          imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : chosenEntityImage,
+          imageUrls: validEntityImages.length > 0 ? validEntityImages : undefined,
        };
    }
 

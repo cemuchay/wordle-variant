@@ -30,7 +30,19 @@ const FormulaRenderer: React.FC<FormulaRendererProps> = ({ text, className = "" 
                         />
                     );
                 } else {
-                    // Normal text (preserve line breaks if any)
+                    // Check if plain text contains chemical formulas or subscripts (e.g. H2O, O2, CO2, Na+)
+                    const hasChemFormula = /([A-Z][a-z]?[0-9]+)|([A-Z][a-z]?[\+\-\u2212\u2013])|(_[0-9a-zA-Z]+)/.test(part);
+                    if (hasChemFormula) {
+                        const htmlContent = formatFormulaHTML(part);
+                        return (
+                            <span
+                                key={index}
+                                className="whitespace-pre-line"
+                                dangerouslySetInnerHTML={{ __html: htmlContent }}
+                            />
+                        );
+                    }
+                    // Normal text (preserve line breaks)
                     return (
                         <span key={index} className="whitespace-pre-line">
                             {part}

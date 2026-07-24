@@ -33,15 +33,21 @@ const formatFormulaHTML = (formula: string): string => {
    formatted = formatted.replace(/\*/g, " &times; ");
    formatted = formatted.replace(/\//g, " &divide; ");
 
+   // Handle chemical formula subscript notation with underscores: e.g. H_2O -> H<sub>2</sub>O
+   formatted = formatted.replace(/_\{([^}]+)\}/g, "<sub>$1</sub>");
+   formatted = formatted.replace(/_([0-9a-zA-Z+-]+)/g, "<sub>$1</sub>");
+
+   // Handle inline chemical formula digits (e.g. H2O -> H<sub>2</sub>O, CO2 -> CO<sub>2</sub>, Ca2+ -> Ca<sup>2+</sup>)
+   formatted = formatted.replace(/([A-Z][a-z]?)([0-9]+)/g, "$1<sub>$2</sub>");
+   formatted = formatted.replace(/([A-Z][a-z]?|\))([0-9]*)([\+\-\u2212\u2013])/g, (_, elem, num, sign) => {
+      const s = sign === "-" || sign === "\u2212" || sign === "\u2013" ? "&minus;" : sign;
+      return `${elem}<sup>${num}${s}</sup>`;
+   });
+
    // Handle superscript with braces: e.g. x^{12} -> x<sup>12</sup>
    formatted = formatted.replace(/\^\{([^}]+)\}/g, "<sup>$1</sup>");
    // Handle superscript single char/digit: e.g. x^2 -> x<sup>2</sup>
    formatted = formatted.replace(/\^([0-9a-zA-Z+-]+)/g, "<sup>$1</sup>");
-
-   // Handle subscript with braces: e.g. H_{2} -> H<sub>2</sub>
-   formatted = formatted.replace(/_\{([^}]+)\}/g, "<sub>$1</sub>");
-   // Handle subscript single char/digit: e.g. H_2 -> H<sub>2</sub>
-   formatted = formatted.replace(/_([0-9a-zA-Z+-]+)/g, "<sub>$1</sub>");
 
    // Wrap mathematical variables (individual letters) in italicized serif spans
    // Avoid modifying HTML entities (like &times;) or tag names
