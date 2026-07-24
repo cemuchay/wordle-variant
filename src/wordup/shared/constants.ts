@@ -70,11 +70,11 @@ export const CATEGORIES = [
       name: "General Knowledge",
       desc: "Diverse trivia across pop culture, science, history, and miscellaneous facts",
    },
-   {
-      id: "movies",
-      name: "Movies & Cinema",
-      desc: "Classic films, blockbusters, actors, directors, and Academy Awards",
-   },
+   // {
+   //    id: "movies",
+   //    name: "Movies & Cinema",
+   //    desc: "Classic films, blockbusters, actors, directors, and Academy Awards",
+   // },
    {
       id: "television",
       name: "Television",

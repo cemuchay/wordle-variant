@@ -576,6 +576,10 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    updateFromMatchRecord: (record, currentUserId) => {
+      const activeMatchId = get().matchId;
+      if (activeMatchId && record.id && activeMatchId !== record.id) {
+         return;
+      }
       // In bot matches or guest matches where player1_id was inserted as null in DB, treat current user as player1
       const isBotMatch = record.is_bot_match || get().isBotMatch;
       const isP1 = record.player1_id === currentUserId || isBotMatch || !record.player1_id;
@@ -987,22 +991,22 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
 
       const dbPlayer1Id = isUuid(userId) ? userId : null;
 
-      const initialPlayers: WordGridPlayer[] = [
-         {
-            id: userId,
-            username: "Player (You)",
-            score: 0,
-            rack: p1Rack,
-         },
-         {
-            id: "bot",
-            username: `AI (${difficulty.toUpperCase()})`,
-            score: 0,
-            rack: botRack,
-         },
-      ];
-
       try {
+         const initialPlayers: WordGridPlayer[] = [
+            {
+               id: userId,
+               username: "Player (You)",
+               score: 0,
+               rack: p1Rack,
+            },
+            {
+               id: "bot",
+               username: `AI (${difficulty.toUpperCase()})`,
+               score: 0,
+               rack: botRack,
+            },
+         ];
+
          const insertRes = await safeWordGridInsert({
             player1_id: dbPlayer1Id,
             player2_id: null,
