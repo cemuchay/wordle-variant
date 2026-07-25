@@ -321,10 +321,66 @@ function _generateQuestion(
             .map((e) => e.label);
       }
 
-      let distractors = seededShuffle(
-         [...new Set(distValues)].filter((v) => v !== answerVal),
-         rng,
-      ).slice(0, 3);
+       let distractors = seededShuffle(
+          [...new Set(distValues)].filter((v) => v !== answerVal),
+          rng,
+       ).slice(0, 3);
+
+       // ── Smart Sensible Distractor Selection for Flag Bearer ──
+       if (categoryType === "flag_bearer") {
+          // Rule: Make distractors sensible (prefer countries from the same continent or sharing currency)
+          if (!answerKey && meta.continent) {
+             const sameContinentEntities = allEntities.filter(
+                (e) => e.id !== entity.id && e.metadata?.continent === meta.continent
+             );
+             if (sameContinentEntities.length >= 3) {
+                distractors = seededShuffle(
+                   sameContinentEntities.map((e) => e.label).filter((l) => l !== answerVal),
+                   rng
+                ).slice(0, 3);
+             }
+          }
+       }
+
+       // flag_same_continent: Pick 1 country from same continent (answerVal) and 3 from different continents (distractors)
+       if (categoryType === "flag_bearer" && template.id === "flag_same_continent") {
+          const continent = meta.continent;
+          const sameContPeers = allEntities.filter(
+             (e) => e.id !== entity.id && e.metadata?.continent === continent
+          );
+          const diffContPeers = allEntities.filter(
+             (e) => e.metadata?.continent && e.metadata.continent !== continent
+          );
+          if (sameContPeers.length >= 1 && diffContPeers.length >= 3) {
+             answerVal = seededShuffle(sameContPeers, rng)[0].label;
+             distractors = seededShuffle(
+                [...new Set(diffContPeers.map((e) => e.label))],
+                rng
+             ).slice(0, 3);
+             explanationText = `${answerVal} is located in ${continent}, sharing the same continent as ${label}.`;
+          }
+       }
+
+       // flag_not_same_continent: Pick 3 countries from target continent (choices) and 1 from another continent (answerVal)
+       if (categoryType === "flag_bearer" && template.id === "flag_not_same_continent") {
+          const continent = meta.continent;
+          const sameContPeers = allEntities.filter(
+             (e) => e.id !== entity.id && e.metadata?.continent === continent
+          );
+          const diffContPeers = allEntities.filter(
+             (e) => e.metadata?.continent && e.metadata.continent !== continent
+          );
+          if (sameContPeers.length >= 2 && diffContPeers.length >= 1) {
+             answerVal = seededShuffle(diffContPeers, rng)[0].label;
+             const sameContLabels = seededShuffle(
+                [...new Set([label, ...sameContPeers.map((e) => e.label)])],
+                rng
+             ).slice(0, 3);
+             distractors = sameContLabels;
+             const oddCont = diffContPeers.find((e) => e.label === answerVal)?.metadata?.continent || "another continent";
+             explanationText = `${answerVal} is in ${oddCont}, while the other countries are all located in ${continent}.`;
+          }
+       }
 
        // bible_real_book: use fake book names as distractors
        if (template.id === "bible_real_book") {
@@ -1387,6 +1443,13 @@ serve(async (req) => {
                return e;
             }
          }
+         // Fallback: find ANY entity that has not been used in this match yet
+         const unused = shuffledEntities.find((e) => !usedIds.has(e.id));
+         if (unused) {
+            usedIds.add(unused.id);
+            return unused;
+         }
+         // If all entities in the database have been used, pick next by cursor
          const e = shuffledEntities[entityCursor % shuffledEntities.length];
          entityCursor++;
          return e;
