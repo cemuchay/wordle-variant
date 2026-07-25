@@ -560,9 +560,9 @@ function _generateQuestion(
          }
       }
 
-      // Final fallback padding
+      // Final fallback padding (category-aware)
       while (distractors.length < 5) {
-         distractors.push(`Alternative ${label} Metric`);
+         distractors.push(`Option ${distractors.length + 1}`);
       }
    }
 
@@ -1692,8 +1692,16 @@ serve(async (req) => {
          } else {
             console.warn(`${logPrefix} Round ${i}: failed to generate any unique question — generating fallback`);
             const fallbackSeed = `${seed}-${i}-emergency-fallback`;
-            const fallbackRng = createSeededRandom(hashSeed(fallbackSeed));
-            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || { label: "Nigeria", metadata: { flag_code: "ng" } };
+            let categoryDefaultEntity = { label: "General Topic", metadata: {} };
+            if (category === "chemistry") {
+               categoryDefaultEntity = { label: "Hydrogen", metadata: { symbol: "H", atomic_number: "1" } };
+            } else if (category === "bible_books" || category === "bible_characters" || category.includes("bible")) {
+               categoryDefaultEntity = { label: "Genesis", metadata: { testament: "Old", author: "Moses" } };
+            } else if (category === "flag_bearer") {
+               categoryDefaultEntity = { label: "Nigeria", metadata: { flag_code: "ng", continent: "Africa" } };
+            }
+
+            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || categoryDefaultEntity;
             const fallbackQuestion = generateQuestion(
                fallbackSeed,
                emergencyEntity,
