@@ -381,7 +381,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showDiagnostics || showLegal;
 
     return (
-        <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-150 flex items-start justify-center overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0))]">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -389,7 +389,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
+            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80dvh] sm:max-h-[90dvh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     .settings-modal-content *:not(svg):not(path) {
@@ -439,7 +439,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 <h3 className="text-sm font-black uppercase tracking-wider text-indigo-400">Review Changes</h3>
                                 <p className="text-[10px] text-gray-400 leading-relaxed">Please review the modified settings before saving.</p>
                             </div>
-                            <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+                            <div className="space-y-2.5 max-h-[40dvh] overflow-y-auto pr-1">
                                 {getChanges().map((change, idx) => (
                                     <div key={idx} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-1.5">
                                         <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">{change.name}</span>
