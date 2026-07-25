@@ -66,7 +66,7 @@ export const GameOverView = ({
       <motion.div
          initial={{ opacity: 0, scale: 0.95 }}
          animate={{ opacity: 1, scale: 1 }}
-         className="flex flex-col flex-1 justify-center gap-6 py-4"
+         className="flex flex-col flex-1 justify-center gap-6 py-1"
       >
          <div className="text-center space-y-1">
             <Award size={48} className={`mx-auto animate-bounce ${statusTextClass}`} />

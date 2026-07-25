@@ -201,7 +201,7 @@ export async function preloadMatchImages(
        choices: q.choices.map(decodeEntities),
        explanation: q.explanation ? decodeEntities(q.explanation) : undefined,
        imageUrl: q.imageUrl ? resolveWiki(q.imageUrl) : undefined,
-       imageUrls: q.imageUrls ? q.imageUrls.map(resolveWiki) as string[] : undefined,
+       imageUrls: undefined,
     };
  }
  

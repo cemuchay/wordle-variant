@@ -373,23 +373,14 @@ function _generateQuestion(
           };
        }
 
-       // Attach flag codes to imageUrls when choices are country labels in flag_bearer category
        if (categoryType === "flag_bearer" && template.id === "flag_identify") {
-          const choiceFlagCodes = (seededShuffle([answerVal, ...distractors], rng) as string[]).map((c) => {
-             const matched = allEntities.find((e) => e.label === c);
-             return matched?.metadata?.flag_code ? String(matched.metadata.flag_code).toLowerCase() : c;
-          });
           return {
              type: "definition",
              prompt: promptText,
-             choices: choiceFlagCodes.map((fc) => {
-                const matched = allEntities.find((e) => String(e.metadata?.flag_code).toLowerCase() === fc);
-                return matched?.label || fc;
-             }),
+             choices: seededShuffle([answerVal, ...distractors], rng),
              answer: answerVal,
              explanation: explanationText,
              imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : undefined,
-             imageUrls: choiceFlagCodes,
           };
        }
 
