@@ -82,7 +82,7 @@ export const CategorySelectModal = ({
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-[#121212]/95 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl"
+            className="bg-[#121212]/95 border border-white/10 w-full max-w-2xl rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl"
          >
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-white/5">
@@ -145,11 +145,11 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
-               {/* Editor's Picks — vertical list */}
+               {/* Editor's Picks — 2 columns on desktop, 1 column on mobile */}
                {featuredCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-[#E85151] tracking-widest pl-1">Editor's Picks</p>
-                     <div className="flex flex-col gap-2">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {featuredCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -158,14 +158,14 @@ export const CategorySelectModal = ({
                               <button
                                  key={cat.id}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
+                                 className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
                               >
-                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${visual.emojiContainerClass}`}>
+                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
                                     {style.emoji}
                                  </div>
                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                    <p className="text-xs text-white/60 mt-0.5 leading-tight">{cat.desc}</p>
+                                    <p className="text-xs font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                    <p className="text-[11px] text-white/60 mt-0.5 leading-tight line-clamp-2">{cat.desc}</p>
                                  </div>
                               </button>
                            );
@@ -174,11 +174,11 @@ export const CategorySelectModal = ({
                   </div>
                )}
 
-               {/* All Categories (alphabetical) — single column */}
+               {/* All Categories — 2 columns on desktop, 1 column on mobile */}
                {regularCats.length > 0 && (
                   <div className="space-y-2">
                      <p className="text-[9px] font-extrabold uppercase text-white/40 tracking-widest pl-1">All Categories</p>
-                     <div className="flex flex-col gap-2">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {regularCats.map((cat) => {
                            const isSel = category === cat.id;
                            const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
@@ -187,14 +187,14 @@ export const CategorySelectModal = ({
                               <button
                                  key={cat.id}
                                  onClick={() => handleCategoryClick(cat.id)}
-                                 className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
+                                 className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer w-full ${visual.btnClass}`}
                               >
-                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${visual.emojiContainerClass}`}>
+                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 ${visual.emojiContainerClass}`}>
                                     {style.emoji}
                                  </div>
                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
-                                    <p className="text-xs text-white/60 mt-0.5 leading-tight">{cat.desc}</p>
+                                    <p className="text-xs font-black uppercase tracking-wider text-white truncate">{cat.name}</p>
+                                    <p className="text-[11px] text-white/60 mt-0.5 leading-tight line-clamp-2">{cat.desc}</p>
                                  </div>
                               </button>
                            );
