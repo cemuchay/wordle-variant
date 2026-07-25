@@ -88,6 +88,19 @@ export const BattleView = ({
 
    const activeQuestion = questions[currentIdx];
 
+   // Pre-verify image load status when activeQuestion changes
+   useEffect(() => {
+      const url = activeQuestion?.imageUrl;
+      if (!url) return;
+
+      const targetUrl = url.length === 2 ? getCachedFlagUrl(url) : url;
+      const img = new Image();
+      img.onerror = () => {
+         setImgErrorMap((prev) => ({ ...prev, [url]: true }));
+      };
+      img.src = targetUrl;
+   }, [activeQuestion?.imageUrl]);
+
    const isP1 = role === "player1";
    const myScore = isP1 ? (matchData?.p1_score || 0) : (matchData?.p2_score || 0);
    const oppScore = isP1 ? (matchData?.p2_score || 0) : (matchData?.p1_score || 0);

@@ -112,6 +112,19 @@ export const BattleView = ({
    const popupIdRef = useRef(0);
 
    const activeQuestion = questions[currentIdx];
+
+   // Pre-verify image load status when activeQuestion changes
+   useEffect(() => {
+      const url = activeQuestion?.imageUrl;
+      if (!url) return;
+
+      const targetUrl = url.length === 2 ? getCachedFlagUrl(url) : url;
+      const img = new Image();
+      img.onerror = () => {
+         setImgErrorMap((prev) => ({ ...prev, [url]: true }));
+      };
+      img.src = targetUrl;
+   }, [activeQuestion?.imageUrl]);
    const qMaxTime = activeQuestion ? getQuestionDuration(activeQuestion.type) : maxTime || 10.0;
 
 

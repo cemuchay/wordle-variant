@@ -253,20 +253,20 @@ export const TopicDetailsView = ({
                               <span>Play Live Match</span>
                            </button>
 
-                           <button
-                              onClick={onPlayBot}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 px-2 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                           >
-                              <span>Play vs Bot</span>
-                           </button>
-
-                           {onPlayMarathon && (
+                           {onPlayMarathon ? (
                               <button
                                  onClick={onPlayMarathon}
                                  className="w-full bg-linear-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 text-white font-black uppercase py-4 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-[0_4px_20px_rgba(245,158,11,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                               >
                                  <Flame size={18} className="fill-white" />
-                                 <span>Play Marathon</span>
+                                 <span>Play vs Bot / Marathon</span>
+                              </button>
+                           ) : (
+                              <button
+                                 onClick={onPlayBot}
+                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase py-4 px-2 rounded-2xl flex items-center justify-center gap-2.5 tracking-widest shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                              >
+                                 <span>Play vs Bot</span>
                               </button>
                            )}
 
