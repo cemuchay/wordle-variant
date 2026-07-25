@@ -372,7 +372,21 @@ export const WordUpContainer = ({
 
          {wordupMode === "live" && (
             <LiveView
-               onBack={() => setWordupMode(null)}
+               onBack={(goHome) => {
+                  if (goHome) {
+                     setLastCategory(null);
+                     setWordupMode(null);
+                  } else {
+                     // Async sequence: exit to lobby and ensure topic details opens smoothly
+                     const targetCategory = lastCategory || useLiveStore.getState().category;
+                     setWordupMode(null);
+                     setTimeout(() => {
+                        if (targetCategory) {
+                           setLastCategory(targetCategory);
+                        }
+                     }, 50);
+                  }
+               }}
                onSwitchMode={setWordupMode}
                onTutorial={onTutorial}
                onBackToClassic={onBackToClassic}

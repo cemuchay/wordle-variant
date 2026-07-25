@@ -35,7 +35,7 @@ export const MarathonConfigModal = ({
    const catObj = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
    const totalQuestions = totalGames * 7;
 
-   const gameOptions = [2, 3, 5, 7, 10];
+   const gameOptions = [1, 2, 3, 5, 7, 10];
 
    const filteredProfiles = allProfiles.filter((p: any) =>
       (p.username || "").toLowerCase().includes(userSearch.toLowerCase())
@@ -97,7 +97,7 @@ export const MarathonConfigModal = ({
                      </span>
                   </div>
 
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-6 gap-1.5">
                      {gameOptions.map((g) => (
                         <button
                            key={g}

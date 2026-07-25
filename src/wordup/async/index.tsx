@@ -188,35 +188,35 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
          try { await updateStats(eloGain, xpReward, netWon, netTied, match.category, isMarathon ? { gamesWon: totalGamesWon, gamesLost: totalGamesLost, gamesTied: totalGamesTied } : undefined); }
          catch { triggerToast("Rating update delayed. Syncing...", WORDUP_TIMEOUT.TOAST_DURATION); }
 
-          // Fire-and-forget: record handcrafted question answers for difficulty tracking
-          try {
-             const questions = useAsyncStore.getState().questions;
-             const userAnswers = isP1 ? match.p1_answers : match.p2_answers;
-             if (questions?.length > 0 && userAnswers?.length > 0) {
-                const hcIds: string[] = [];
-                const corrects: boolean[] = [];
-                const timesTaken: number[] = [];
-                for (const a of userAnswers) {
-                   const q = questions[a.question_idx];
-                   const hcId = q && (q as any).id;
-                   if (hcId) {
-                      hcIds.push(hcId);
-                      corrects.push(!!a.correct);
-                      timesTaken.push(a.time_taken ?? 0);
-                   }
-                }
-                if (hcIds.length > 0) {
-                   await supabase.rpc("record_match_answers", {
-                      p_user_id: effectiveUser.id,
-                      p_topic_slug: match.category || "general_knowledge",
-                      p_question_ids: hcIds,
-                      p_corrects: corrects,
-                      p_times_taken: timesTaken,
-                   });
-                }
-             }
-          } catch { /* best-effort difficulty tracking */ }
-       }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]),
+         // Fire-and-forget: record handcrafted question answers for difficulty tracking
+         try {
+            const questions = useAsyncStore.getState().questions;
+            const userAnswers = isP1 ? match.p1_answers : match.p2_answers;
+            if (questions?.length > 0 && userAnswers?.length > 0) {
+               const hcIds: string[] = [];
+               const corrects: boolean[] = [];
+               const timesTaken: number[] = [];
+               for (const a of userAnswers) {
+                  const q = questions[a.question_idx];
+                  const hcId = q && (q as any).id;
+                  if (hcId) {
+                     hcIds.push(hcId);
+                     corrects.push(!!a.correct);
+                     timesTaken.push(a.time_taken ?? 0);
+                  }
+               }
+               if (hcIds.length > 0) {
+                  await supabase.rpc("record_match_answers", {
+                     p_user_id: effectiveUser.id,
+                     p_topic_slug: match.category || "general_knowledge",
+                     p_question_ids: hcIds,
+                     p_corrects: corrects,
+                     p_times_taken: timesTaken,
+                  });
+               }
+            }
+         } catch { /* best-effort difficulty tracking */ }
+      }, [effectiveUser, updateStats, triggerToast, role, userStats, setView]),
    });
 
    const { handleAnswerSelect, startMatch } = engine;
@@ -340,36 +340,36 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       setIsBattlePlaying(view === "battle");
    }, [view, setIsBattlePlaying]);
 
-    // Auto-trigger startMatch when store is set externally (e.g., invite accept)
-    useEffect(() => {
-       if (matchData?.status === "completed") return;
-       if (view === "loading" && matchId && role && engine.state.phase === "idle") {
-          startMatch?.(matchId, role);
-       }
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [view, matchId, role, startMatch, matchData?.status]);
+   // Auto-trigger startMatch when store is set externally (e.g., invite accept)
+   useEffect(() => {
+      if (matchData?.status === "completed") return;
+      if (view === "loading" && matchId && role && engine.state.phase === "idle") {
+         startMatch?.(matchId, role);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [view, matchId, role, startMatch, matchData?.status]);
 
    const pendingChallengePlayer = useAsyncStore((s) => s.pendingChallengePlayer);
    const setPendingChallengePlayer = useAsyncStore((s) => s.setPendingChallengePlayer);
    const processingPlayerRef = useRef<string | null>(null);
    const [isProcessingChallenge, setIsProcessingChallenge] = useState(false);
 
-    useEffect(() => {
-       if (pendingChallengePlayer && effectiveUser && view === "menu") {
-          const player = pendingChallengePlayer;
-          if (processingPlayerRef.current === player.id) return;
-          processingPlayerRef.current = player.id;
-          
-          setIsProcessingChallenge(true);
-          setTimeout(() => {
-             setPendingChallengePlayer(null);
-             processingPlayerRef.current = null;
-             handleChallengePlayer(player).finally(() => {
-                setIsProcessingChallenge(false);
-             });
-          }, 0);
-       }
-    }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
+   useEffect(() => {
+      if (pendingChallengePlayer && effectiveUser && view === "menu") {
+         const player = pendingChallengePlayer;
+         if (processingPlayerRef.current === player.id) return;
+         processingPlayerRef.current = player.id;
+
+         setIsProcessingChallenge(true);
+         setTimeout(() => {
+            setPendingChallengePlayer(null);
+            processingPlayerRef.current = null;
+            handleChallengePlayer(player).finally(() => {
+               setIsProcessingChallenge(false);
+            });
+         }, 0);
+      }
+   }, [pendingChallengePlayer, effectiveUser, view, handleChallengePlayer, setPendingChallengePlayer]);
 
    useEffect(() => {
       if (view === "menu" && !pendingChallengePlayer && !pendingChallenge && !isProcessingChallenge) {
@@ -394,48 +394,48 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-       if (effectiveUser) refreshPending();
-       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [effectiveUser?.id, refreshPending]);
+      if (effectiveUser) refreshPending();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [effectiveUser?.id, refreshPending]);
 
-    // Recovery from refresh
-    useEffect(() => {
-       const activeGameStr = safeLocalStorage.getItem("wordup_async_active_game");
-       if (!activeGameStr) return;
-       let mounted = true;
-       let recoveryTimer: number | null = null;
-       try {
-          const activeGame = JSON.parse(activeGameStr);
-          if (!activeGame || !activeGame.matchId || activeGame.matchData?.status === "completed") return;
-          if (activeGame.role && !["player1", "player2"].includes(activeGame.role)) {
-             safeLocalStorage.removeItem("wordup_async_active_game");
-             return;
-          }
-          console.log("[WordUp Logs] Restoring active async game from localStorage:", activeGame.matchId);
+   // Recovery from refresh
+   useEffect(() => {
+      const activeGameStr = safeLocalStorage.getItem("wordup_async_active_game");
+      if (!activeGameStr) return;
+      let mounted = true;
+      let recoveryTimer: number | null = null;
+      try {
+         const activeGame = JSON.parse(activeGameStr);
+         if (!activeGame || !activeGame.matchId || activeGame.matchData?.status === "completed") return;
+         if (activeGame.role && !["player1", "player2"].includes(activeGame.role)) {
+            safeLocalStorage.removeItem("wordup_async_active_game");
+            return;
+         }
+         console.log("[WordUp Logs] Restoring active async game from localStorage:", activeGame.matchId);
 
-          const store = useAsyncStore.getState();
-          store.setMatchId(activeGame.matchId);
-          store.setRole(activeGame.role);
-          store.setCategory(activeGame.matchData?.category || "mixed");
-          store.setQuestions(activeGame.questions || []);
-          store.setCurrentIdx(activeGame.currentRound ?? activeGame.currentIdx ?? 0);
-          store.setMatchData(activeGame.matchData);
-          store.setOpponentStats(activeGame.opponentStats);
-          store.setRevealAnswers(activeGame.revealAnswers || false);
-          store.setSelectedAnswer(activeGame.selectedAnswer || null);
+         const store = useAsyncStore.getState();
+         store.setMatchId(activeGame.matchId);
+         store.setRole(activeGame.role);
+         store.setCategory(activeGame.matchData?.category || "mixed");
+         store.setQuestions(activeGame.questions || []);
+         store.setCurrentIdx(activeGame.currentRound ?? activeGame.currentIdx ?? 0);
+         store.setMatchData(activeGame.matchData);
+         store.setOpponentStats(activeGame.opponentStats);
+         store.setRevealAnswers(activeGame.revealAnswers || false);
+         store.setSelectedAnswer(activeGame.selectedAnswer || null);
 
-          recoveryTimer = window.setTimeout(async () => {
-             if (!mounted) return;
-             await startMatch?.(activeGame.matchId, activeGame.role);
-          }, 100);
-       } catch (err) {
-          console.error("[WordUp Logs] Failed to restore active async game:", err);
-       }
-       return () => {
-          mounted = false;
-          if (recoveryTimer !== null) clearTimeout(recoveryTimer);
-       };
-    }, [startMatch]);
+         recoveryTimer = window.setTimeout(async () => {
+            if (!mounted) return;
+            await startMatch?.(activeGame.matchId, activeGame.role);
+         }, 100);
+      } catch (err) {
+         console.error("[WordUp Logs] Failed to restore active async game:", err);
+      }
+      return () => {
+         mounted = false;
+         if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+      };
+   }, [startMatch]);
 
    // Realtime listener for async match updates
    useEffect(() => {
@@ -472,21 +472,21 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       });
    }, [pendingAsyncMatchId, effectiveUser?.id, view, handlePlayTurn, setPendingAsyncMatchId]);
 
-    const handleSelectHistoryMatch = useCallback(async (match: any) => {
-       if (!effectiveUser) return;
-       const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
-       setMatchId(match.id);
-       setRole(myRole);
-       setCategory(match.category);
-       setMatchData(match);
-       try {
-          const decrypted = await decryptMatchQuestions(match);
-          setQuestions(decrypted);
-       } catch (e) {
-          console.warn("Failed to decrypt history match questions:", e);
-       }
-       setView("gameover");
-    }, [effectiveUser, setMatchId, setRole, setCategory, setMatchData, setQuestions, setView]);
+   const handleSelectHistoryMatch = useCallback(async (match: any) => {
+      if (!effectiveUser) return;
+      const myRole = match.player1_id === effectiveUser.id ? "player1" : "player2";
+      setMatchId(match.id);
+      setRole(myRole);
+      setCategory(match.category);
+      setMatchData(match);
+      try {
+         const decrypted = await decryptMatchQuestions(match);
+         setQuestions(decrypted);
+      } catch (e) {
+         console.warn("Failed to decrypt history match questions:", e);
+      }
+      setView("gameover");
+   }, [effectiveUser, setMatchId, setRole, setCategory, setMatchData, setQuestions, setView]);
 
    const handlePurgeAndReset = useCallback(() => {
       resetGame();
@@ -503,7 +503,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
 
    if (!effectiveUser) {
       return (
-         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0))] pb-[calc(2.5rem+env(safe-area-inset-bottom,0))] text-center space-y-6">
+         <div className="w-full max-w-md mx-auto h-full flex flex-col justify-center items-center bg-linear-to-b from-indigo-950/40 to-dark px-6 text-center space-y-6">
             <div className="inline-flex p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
                <Swords size={32} />
             </div>
@@ -543,17 +543,17 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                         className="bg-indigo-500 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer">Play</button>
                   </div>
                </div>
-          )}
-          {view !== "menu" && (
-             <button
-                onClick={handleToggleSound}
-                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-                title="Toggle Sound"
-             >
-                {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-             </button>
-          )}
-       </div>
+            )}
+            {view !== "menu" && view !== "battle" && (
+               <button
+                  onClick={handleToggleSound}
+                  className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                  title="Toggle Sound"
+               >
+                  {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+               </button>
+            )}
+         </div>
       );
    }
 
@@ -574,10 +574,10 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                   onChallengePlayer={handleChallengePlayer}
                   onRefreshPending={refreshPending}
                   onRefreshHistory={refreshHistory}
-                    onSwitchMode={() => onSwitchMode?.("live")}
-                    onBack={() => onBack?.()}
-                    onTutorial={onTutorial}
-                    onBackToClassic={onBackToClassic}
+                  onSwitchMode={() => onSwitchMode?.("live")}
+                  onBack={() => onBack?.()}
+                  onTutorial={onTutorial}
+                  onBackToClassic={onBackToClassic}
                />
             )}
             {view === "loading" && (
@@ -598,6 +598,8 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                   opponentStats={opponentStats} maxTime={maxTime} selectedAnswer={selectedAnswer}
                   revealAnswers={revealAnswers} handleAnswerSelect={handleAnswerSelect}
                   role={role} playerProfile={profile}
+                  soundEnabled={soundEnabled}
+                  onToggleSound={handleToggleSound}
                />
             )}
             {view === "turn_submitted" && (

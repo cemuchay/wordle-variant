@@ -54,7 +54,7 @@ export function getCountryName(code: string): string {
    return code.toUpperCase();
 }
 
-function tryLoadImage(url: string, retries = 3, delay = 500): Promise<void> {
+function tryLoadImage(url: string, retries = 1, delay = 200): Promise<void> {
    return new Promise<void>((resolve, reject) => {
       let attempts = 0;
       const load = () => {
@@ -84,12 +84,12 @@ export function preloadFlagImage(code: string): Promise<void> {
    const primaryUrl = getPrimaryFlagUrl(lowerCode);
    const fallbackUrl = getFallbackFlagUrl(lowerCode);
 
-   return tryLoadImage(primaryUrl, 3, 500)
+   return tryLoadImage(primaryUrl, 1, 200)
       .then(() => {
          flagUrlCache[lowerCode] = primaryUrl;
       })
       .catch(() => {
-         return tryLoadImage(fallbackUrl, 3, 500)
+         return tryLoadImage(fallbackUrl, 1, 200)
             .then(() => {
                flagUrlCache[lowerCode] = fallbackUrl;
             })
@@ -106,7 +106,7 @@ export function preloadFlagImage(code: string): Promise<void> {
  */
 function preloadGeneralImage(url: string): Promise<void> {
    if (preloadedUrls.has(url)) return Promise.resolve();
-   return tryLoadImage(url, 2, 300).then(() => {
+   return tryLoadImage(url, 1, 200).then(() => {
       preloadedUrls.add(url);
    });
 }
@@ -201,7 +201,7 @@ export async function preloadMatchImages(
        choices: q.choices.map(decodeEntities),
        explanation: q.explanation ? decodeEntities(q.explanation) : undefined,
        imageUrl: q.imageUrl ? resolveWiki(q.imageUrl) : undefined,
-       imageUrls: q.imageUrls ? q.imageUrls.map(resolveWiki) as string[] : undefined,
+       imageUrls: undefined,
     };
  }
  

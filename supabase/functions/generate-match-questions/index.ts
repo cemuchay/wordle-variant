@@ -209,21 +209,25 @@ function generateQuestion(
       }
    }
 
-   const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
-   if (validImages.length > 0) {
-      const imgIdx = Math.floor(rng() * validImages.length);
-      const chosenImage = validImages[imgIdx];
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = chosenImage.startsWith("http")
-         ? chosenImage
-         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
-   } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = meta.image.startsWith("http")
-         ? meta.image
-         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
-   } else if (meta.flag_code) {
-      qObj.imageUrl = String(meta.flag_code).toLowerCase();
+   if (qObj?.suppress_image) {
+      qObj.imageUrl = undefined;
+   } else {
+      const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
+      if (validImages.length > 0) {
+         const imgIdx = Math.floor(rng() * validImages.length);
+         const chosenImage = validImages[imgIdx];
+         const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+         qObj.imageUrl = chosenImage.startsWith("http")
+            ? chosenImage
+            : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
+      } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
+         const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+         qObj.imageUrl = meta.image.startsWith("http")
+            ? meta.image
+            : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+      } else if (meta.flag_code) {
+         qObj.imageUrl = String(meta.flag_code).toLowerCase();
+      }
    }
    return qObj;
 }
@@ -321,10 +325,76 @@ function _generateQuestion(
             .map((e) => e.label);
       }
 
-      let distractors = seededShuffle(
-         [...new Set(distValues)].filter((v) => v !== answerVal),
-         rng,
-      ).slice(0, 3);
+       let distractors = seededShuffle(
+          [...new Set(distValues)].filter((v) => v !== answerVal),
+          rng,
+       ).slice(0, 3);
+
+       // ── Smart Sensible Distractor Selection for Flag Bearer ──
+       if (categoryType === "flag_bearer") {
+          // Rule: Make distractors sensible (prefer countries from the same continent or sharing currency)
+          if (!answerKey && meta.continent) {
+             const sameContinentEntities = allEntities.filter(
+                (e) => e.id !== entity.id && e.metadata?.continent === meta.continent
+             );
+             if (sameContinentEntities.length >= 3) {
+                distractors = seededShuffle(
+                   sameContinentEntities.map((e) => e.label).filter((l) => l !== answerVal),
+                   rng
+                ).slice(0, 3);
+             }
+          }
+       }
+
+       // flag_same_continent: Pick 1 country from same continent (answerVal) and 3 from different continents (distractors)
+       if (categoryType === "flag_bearer" && template.id === "flag_same_continent") {
+          const continent = meta.continent;
+          const sameContPeers = allEntities.filter(
+             (e) => e.id !== entity.id && e.metadata?.continent === continent
+          );
+          const diffContPeers = allEntities.filter(
+             (e) => e.metadata?.continent && e.metadata.continent !== continent
+          );
+          if (sameContPeers.length >= 1 && diffContPeers.length >= 3) {
+             answerVal = seededShuffle(sameContPeers, rng)[0].label;
+             distractors = seededShuffle(
+                [...new Set(diffContPeers.map((e) => e.label))],
+                rng
+             ).slice(0, 3);
+             explanationText = `${answerVal} is located in ${continent}, sharing the same continent as ${label}.`;
+          }
+       }
+
+       // flag_not_same_continent: Pick 3 countries from target continent (sameCont) and 1 country from another continent (answerVal)
+       // Do not display a flag image because multiple countries are involved
+       if (categoryType === "flag_bearer" && template.id === "flag_not_same_continent") {
+          const continent = meta.continent;
+          const sameContPeers = allEntities.filter(
+             (e) => e.id !== entity.id && e.metadata?.continent === continent
+          );
+          const diffContPeers = allEntities.filter(
+             (e) => e.metadata?.continent && e.metadata.continent !== continent
+          );
+          if (sameContPeers.length >= 2 && diffContPeers.length >= 1) {
+             answerVal = seededShuffle(diffContPeers, rng)[0].label;
+             const sameContLabels = seededShuffle(
+                [...new Set([label, ...sameContPeers.map((e) => e.label)])],
+                rng
+             ).slice(0, 3);
+             distractors = sameContLabels;
+             const oddCont = diffContPeers.find((e) => e.label === answerVal)?.metadata?.continent || "another continent";
+             explanationText = `${answerVal} is in ${oddCont}, while the other countries are all located in ${continent}.`;
+             return {
+                type: "definition",
+                prompt: promptText,
+                choices: seededShuffle([...new Set([...sameContLabels, answerVal])], rng),
+                answer: answerVal,
+                explanation: explanationText,
+                imageUrl: undefined,
+                suppress_image: true,
+             };
+          }
+       }
 
        // bible_real_book: use fake book names as distractors
        if (template.id === "bible_real_book") {
@@ -373,23 +443,14 @@ function _generateQuestion(
           };
        }
 
-       // Attach flag codes to imageUrls when choices are country labels in flag_bearer category
        if (categoryType === "flag_bearer" && template.id === "flag_identify") {
-          const choiceFlagCodes = (seededShuffle([answerVal, ...distractors], rng) as string[]).map((c) => {
-             const matched = allEntities.find((e) => e.label === c);
-             return matched?.metadata?.flag_code ? String(matched.metadata.flag_code).toLowerCase() : c;
-          });
           return {
              type: "definition",
              prompt: promptText,
-             choices: choiceFlagCodes.map((fc) => {
-                const matched = allEntities.find((e) => String(e.metadata?.flag_code).toLowerCase() === fc);
-                return matched?.label || fc;
-             }),
+             choices: seededShuffle([answerVal, ...distractors], rng),
              answer: answerVal,
              explanation: explanationText,
              imageUrl: entity.metadata?.flag_code ? String(entity.metadata.flag_code).toLowerCase() : undefined,
-             imageUrls: choiceFlagCodes,
           };
        }
 
@@ -513,9 +574,9 @@ function _generateQuestion(
          }
       }
 
-      // Final fallback padding
+      // Final fallback padding (category-aware)
       while (distractors.length < 5) {
-         distractors.push(`Alternative ${label} Metric`);
+         distractors.push(`Option ${distractors.length + 1}`);
       }
    }
 
@@ -1110,11 +1171,25 @@ serve(async (req) => {
           stretchEntities = [...stretchEntities, ...moreStretch.filter((e: any) => !seenIds.has(e.id))];
        }
 
-       // Mark each entity with its bucket origin for seen-count tracking
+       // Mark each entity with its bucket origin for seen-count tracking and normalize continent metadata
+       const NORTH_AMERICA_CODES = new Set(["us", "ca", "mx", "cu", "jm", "ht", "do", "gt", "hn", "sv", "ni", "cr", "pa", "bs", "bb", "bz"]);
        const entityList: any[] = [
           ...comfortEntities.map((e: any) => ({ ...e, _bucket: "comfort" })),
           ...stretchEntities.map((e: any) => ({ ...e, _bucket: "stretch" })),
-       ];
+       ].map((e: any) => {
+          if (e.metadata?.continent && (e.metadata.continent === "Americas" || e.metadata.continent === "America")) {
+             const flagCode = (e.metadata?.flag_code || "").toLowerCase();
+             const cleanContinent = NORTH_AMERICA_CODES.has(flagCode) ? "North America" : "South America";
+             return {
+                ...e,
+                metadata: {
+                   ...e.metadata,
+                   continent: cleanContinent,
+                },
+             };
+          }
+          return e;
+       });
 
        console.log(
           `${logPrefix} Fetched ${entityList.length} total entities (${comfortEntities.length} comfort + ${stretchEntities.length} stretch) for category="${category}"`,
@@ -1396,6 +1471,13 @@ serve(async (req) => {
                return e;
             }
          }
+         // Fallback: find ANY entity that has not been used in this match yet
+         const unused = shuffledEntities.find((e) => !usedIds.has(e.id));
+         if (unused) {
+            usedIds.add(unused.id);
+            return unused;
+         }
+         // If all entities in the database have been used, pick next by cursor
          const e = shuffledEntities[entityCursor % shuffledEntities.length];
          entityCursor++;
          return e;
@@ -1638,8 +1720,16 @@ serve(async (req) => {
          } else {
             console.warn(`${logPrefix} Round ${i}: failed to generate any unique question — generating fallback`);
             const fallbackSeed = `${seed}-${i}-emergency-fallback`;
-            const fallbackRng = createSeededRandom(hashSeed(fallbackSeed));
-            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || { label: "Nigeria", metadata: { flag_code: "ng" } };
+            let categoryDefaultEntity = { label: "General Topic", metadata: {} };
+            if (category === "chemistry") {
+               categoryDefaultEntity = { label: "Hydrogen", metadata: { symbol: "H", atomic_number: "1" } };
+            } else if (category === "bible_books" || category === "bible_characters" || category.includes("bible")) {
+               categoryDefaultEntity = { label: "Genesis", metadata: { testament: "Old", author: "Moses" } };
+            } else if (category === "flag_bearer") {
+               categoryDefaultEntity = { label: "Nigeria", metadata: { flag_code: "ng", continent: "Africa" } };
+            }
+
+            const emergencyEntity = shuffledEntities[i % Math.max(1, shuffledEntities.length)] || categoryDefaultEntity;
             const fallbackQuestion = generateQuestion(
                fallbackSeed,
                emergencyEntity,

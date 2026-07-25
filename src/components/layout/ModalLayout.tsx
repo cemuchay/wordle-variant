@@ -49,7 +49,7 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
       } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none bg-gray-900 text-white ${className}`}
       style={{
         paddingTop: isOverlay ? 'env(safe-area-inset-top, 0px)' : undefined,
-        paddingBottom: isOverlay ? '0px' : undefined,
+        paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
         paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
         paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
       }}
@@ -62,24 +62,26 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
         <div
           className={`w-full ${maxWidthMap[maxWidth]} mx-auto flex flex-col flex-1 h-full min-h-0 relative overflow-hidden px-3 py-3 ${containerClassName}`}
         >
-          <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
-            {title ? (
-              <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">
-                {title}
-              </h2>
-            ) : (
-              <div className="flex-1" />
-            )}
-            {onClose && showCloseButton && (
-              <button
-                onClick={onClose}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer z-20"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            )}
-          </div>
+          {(title || (onClose && showCloseButton)) && (
+            <div className="flex items-center justify-between mb-3 shrink-0 px-2 relative">
+              {title ? (
+                <h2 className="text-xl uppercase tracking-tighter text-gray-100 flex-1 text-center font-black">
+                  {title}
+                </h2>
+              ) : (
+                <div className="flex-1" />
+              )}
+              {onClose && showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hover:bg-white/5 p-1 rounded-full transition-colors cursor-pointer z-20"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="flex-1 flex flex-col min-h-0 overflow-y-auto scrollbar-hide">
             {children}

@@ -1003,7 +1003,7 @@ export const ChallengeModal = ({
       initialChallengeId={initialChallengeId}
     >
       <div
-        className={`bg-gray-900 w-full h-full shadow-2xl flex flex-col transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
+        className={`bg-gray-900 w-full h-full shadow-2xl flex flex-col mx-auto transition-[height,width,max-height,max-width,border-radius,border-color] animate-in fade-in slide-in-from-bottom-6 duration-200 ${isPlaying
           ? "max-h-full rounded-none border-none sm:max-w-[50vw] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-3xl sm:border sm:border-white/10"
           : "max-h-full rounded-none border-none sm:max-w-xl sm:rounded-3xl sm:border sm:border-white/10 sm:h-[85vh] sm:max-h-[85vh]"
           }`}

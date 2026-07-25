@@ -1084,6 +1084,32 @@ export const QUESTION_TEMPLATES: MatrixTemplate[] = [
       weight: 1,
    },
    {
+      id: "flag_same_continent",
+      category: "flag_bearer",
+      requiredKeys: ["continent"],
+      prompts: [
+         "Which of the following countries is in the same continent ({continent}) as {label}?",
+         "Which country shares the same continent as {label}?",
+      ],
+      explanations: [
+         "Both {label} and the correct answer are located in {continent}.",
+      ],
+      weight: 5,
+   },
+   {
+      id: "flag_not_same_continent",
+      category: "flag_bearer",
+      requiredKeys: ["continent"],
+      prompts: [
+         "Which of the following countries is NOT in the same continent ({continent}) as the others?",
+         "All of the following countries are in {continent} EXCEPT:",
+      ],
+      explanations: [
+         "The correct answer is not located in {continent}.",
+      ],
+      weight: 5,
+   },
+   {
       id: "flag_demonym",
       category: "flag_bearer",
       requiredKeys: ["demonym", "flag_code"],

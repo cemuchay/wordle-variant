@@ -74,6 +74,14 @@ export const UnifiedLobby = ({
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
+
+   useEffect(() => {
+      if (restoreCategory) {
+         setSelectedCategoryId(restoreCategory);
+      } else if (restoreCategory === null) {
+         setSelectedCategoryId(null);
+      }
+   }, [restoreCategory]);
    const [liveCategory, setLiveCategory] = useState("mixed");
    const [asyncCategory, setAsyncCategory] = useState("mixed");
    const [historyMatches, setHistoryMatches] = useState<any[]>(() => {
@@ -191,7 +199,10 @@ export const UnifiedLobby = ({
       return (
          <TopicDetailsView
             categoryId={selectedCategoryId}
-            onBack={() => setSelectedCategoryId(null)}
+            onBack={() => {
+               setSelectedCategoryId(null);
+               safeLocalStorage.removeItem("wordup_last_category");
+            }}
             currentUser={currentUser}
             userStats={userStats}
             getRankColor={getRankColor}
@@ -369,7 +380,7 @@ export const UnifiedLobby = ({
                      {frequentCategories.length > 0 && (
                         <div className="space-y-2">
                            <p className="text-[12px] font-black uppercase tracking-wider text-white">Frequently Played</p>
-                           <div className="grid grid-cols-2 gap-2">
+                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                               {frequentCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                                  return (
@@ -400,7 +411,7 @@ export const UnifiedLobby = ({
                      {featuredCategories.length > 0 && (
                         <div className="space-y-2">
                            <p className="text-[12px] font-black uppercase tracking-wider text-[#E85151]">Featured Topics</p>
-                           <div className="grid grid-cols-2 gap-2">
+                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                               {featuredCategories.slice(0, 4).map((cat) => {
                                  const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                                  return (
@@ -444,7 +455,7 @@ export const UnifiedLobby = ({
                      {/* All Topics */}
                      <div className="space-y-2">
                         <p className="text-[12px] font-black uppercase tracking-wider text-white">Topics</p>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                            {allCategories.map((cat) => {
                               const style = CATEGORY_STYLE_MAP[cat.id] || DEFAULT_STYLE;
                               return (
