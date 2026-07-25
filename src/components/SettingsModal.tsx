@@ -439,7 +439,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
                                 <h3 className="text-sm font-black uppercase tracking-wider text-indigo-400">Review Changes</h3>
                                 <p className="text-[10px] text-gray-400 leading-relaxed">Please review the modified settings before saving.</p>
                             </div>
-                            <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+                            <div className="space-y-2.5 max-h-[40dvh] overflow-y-auto pr-1">
                                 {getChanges().map((change, idx) => (
                                     <div key={idx} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-1.5">
                                         <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">{change.name}</span>
