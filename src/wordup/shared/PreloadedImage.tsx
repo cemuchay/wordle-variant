@@ -2,7 +2,11 @@ import { useState, type ImgHTMLAttributes } from "react";
 
 export const PreloadedImage = (props: ImgHTMLAttributes<HTMLImageElement>) => {
   const [loaded, setLoaded] = useState(false);
-  const { style, onLoad, ...rest } = props;
+  const [hasError, setHasError] = useState(false);
+  const { style, onLoad, onError, ...rest } = props;
+
+  if (hasError) return null;
+
   return (
     <img
       style={{
@@ -13,6 +17,10 @@ export const PreloadedImage = (props: ImgHTMLAttributes<HTMLImageElement>) => {
       onLoad={(e) => {
         setLoaded(true);
         onLoad?.(e);
+      }}
+      onError={(e) => {
+        setHasError(true);
+        onError?.(e);
       }}
       {...rest}
     />

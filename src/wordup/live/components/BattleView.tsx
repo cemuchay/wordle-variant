@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { motion } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Volume2, VolumeX } from "lucide-react";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { useConfirmation } from "../../../hooks/useConfirmation";
@@ -58,6 +58,8 @@ interface BattleViewProps {
    playerSignalLevel?: number;
    opponentSignalLevel?: number;
    onPause?: () => void;
+   soundEnabled?: boolean;
+   onToggleSound?: () => void;
 }
 
 interface Particle {
@@ -88,8 +90,11 @@ export const BattleView = ({
    playerSignalLevel,
    opponentSignalLevel,
    onPause,
+   soundEnabled,
+   onToggleSound,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
+   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
    const { ask } = useConfirmation();
 
    useEffect(() => {
@@ -174,18 +179,18 @@ export const BattleView = ({
       }
    };
 
-    const promptLen = activeQuestion.prompt.length;
-    const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-2xl" : "text-3xl sm:text-3xl";
+   const promptLen = activeQuestion.prompt.length;
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-2xl" : "text-3xl sm:text-3xl";
 
-    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
-    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
-    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
-    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
-    const choiceLUT: Record<string, Record<string, string>> = {
-       a: { "2": "text-sm sm:text-sm", "4": "text-xs sm:text-xs" },
-       b: { "2": "text-base sm:text-base", "4": "text-sm sm:text-sm" },
-       c: { "2": "text-lg sm:text-lg", "4": "text-base sm:text-base" },
-    };
+   const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
+   const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
+   const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
+   const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
+   const choiceLUT: Record<string, Record<string, string>> = {
+      a: { "2": "text-sm sm:text-sm", "4": "text-xs sm:text-xs" },
+      b: { "2": "text-base sm:text-base", "4": "text-sm sm:text-sm" },
+      c: { "2": "text-lg sm:text-lg", "4": "text-base sm:text-base" },
+   };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
 
@@ -195,7 +200,7 @@ export const BattleView = ({
       <motion.div
          initial={{ opacity: 0 }}
          animate={{ opacity: 1 }}
-         className="flex flex-col flex-1 justify-between h-full pt-3 pb-0 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]"
+         className="flex flex-col flex-1 justify-between h-full pt-0 pb-0 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]"
       >
          <GameStatusToast />
          {lastRoundPopup && (
@@ -302,8 +307,18 @@ export const BattleView = ({
             </div>
          </div>
 
-         {/* Floating Actions: Pause & Abort */}
+         {/* Floating Actions: Sound, Pause & Abort */}
          <div className="absolute bottom-3 right-3 z-40 flex items-center gap-2">
+            {onToggleSound && (
+               <button
+                  onClick={onToggleSound}
+                  className="flex items-center gap-1 bg-black/40 border border-white/10 text-gray-300 hover:text-white hover:bg-black/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+                  title="Toggle Sound"
+               >
+                  {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                  <span>{soundEnabled ? "Mute" : "Sound"}</span>
+               </button>
+            )}
             {matchData?.allow_pause && onPause && (
                <button
                   onClick={onPause}
@@ -361,7 +376,7 @@ export const BattleView = ({
                )}
             </div>
 
-            {activeQuestion.imageUrl && (
+            {activeQuestion.imageUrl && !imgErrorMap[activeQuestion.imageUrl] && (
                <div className="w-full flex justify-center shrink-0 my-0.5 sm:my-1">
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
@@ -373,6 +388,11 @@ export const BattleView = ({
                         alt="Question Clue"
                         className="max-h-full max-w-full object-contain rounded-lg select-none"
                         draggable={false}
+                        onError={() => {
+                           if (activeQuestion.imageUrl) {
+                              setImgErrorMap((prev) => ({ ...prev, [activeQuestion.imageUrl!]: true }));
+                           }
+                        }}
                      />
                   </motion.div>
                </div>

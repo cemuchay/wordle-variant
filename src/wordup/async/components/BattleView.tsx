@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { motion } from "framer-motion";
+import { Volume2, VolumeX } from "lucide-react";
 import type { TargetAndTransition, Transition } from "framer-motion";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
@@ -41,6 +42,8 @@ interface BattleViewProps {
    role: "player1" | "player2" | null;
    playerProfile: PlayerProfile | null;
    onAbort?: () => void;
+   soundEnabled?: boolean;
+   onToggleSound?: () => void;
 }
 
 interface Particle {
@@ -65,9 +68,12 @@ export const BattleView = ({
    handleAnswerSelect,
    role,
    playerProfile,
+   soundEnabled,
+   onToggleSound,
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [scorePopups, setScorePopups] = useState<Array<{ id: number; points: number; side: "my" | "opp" }>>([]);
+   const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
 
    const [lastIdx, setLastIdx] = useState(currentIdx);
    if (currentIdx !== lastIdx) {
@@ -256,6 +262,20 @@ export const BattleView = ({
             </div>
          </div>
 
+         {/* Floating Action: Sound Toggle */}
+         {onToggleSound && (
+            <div className="absolute bottom-3 right-3 z-40 flex items-center gap-2">
+               <button
+                  onClick={onToggleSound}
+                  className="flex items-center gap-1 bg-black/40 border border-white/10 text-gray-300 hover:text-white hover:bg-black/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
+                  title="Toggle Sound"
+               >
+                  {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                  <span>{soundEnabled ? "Mute" : "Sound"}</span>
+               </button>
+            </div>
+         )}
+
          {/* Timer Bar */}
          <div className="w-full h-2 bg-[#E85151]/20 rounded-full overflow-hidden shrink-0 shadow-inner">
             {!revealAnswers && (
@@ -294,7 +314,7 @@ export const BattleView = ({
                )}
             </div>
 
-            {activeQuestion.imageUrl && (
+            {activeQuestion.imageUrl && !imgErrorMap[activeQuestion.imageUrl] && (
                <div className="w-full flex justify-center shrink-0 my-0.5 sm:my-1">
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
@@ -306,6 +326,11 @@ export const BattleView = ({
                         alt="Question Clue"
                         className="max-h-full max-w-full object-contain rounded-lg select-none"
                         draggable={false}
+                        onError={() => {
+                           if (activeQuestion.imageUrl) {
+                              setImgErrorMap((prev) => ({ ...prev, [activeQuestion.imageUrl!]: true }));
+                           }
+                        }}
                      />
                   </motion.div>
                </div>

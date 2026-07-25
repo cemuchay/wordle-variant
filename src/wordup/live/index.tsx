@@ -503,7 +503,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    }
 
    return (
-      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex-1 min-h-0 flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide pt-[calc(2.5rem+env(safe-area-inset-top,0))] px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0))] relative`}>
+      <div className={`w-full ${view === "battle" ? "max-w-2xl" : "max-w-lg"} mx-auto h-full flex-1 min-h-0 flex flex-col bg-zinc-800 overflow-y-auto scrollbar-hide relative`}>
          <AnimatePresence mode="wait">
             {view === "menu" && (
                <LobbyView
@@ -564,6 +564,8 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                      resetGame();
                      onBack?.();
                   }}
+                  soundEnabled={soundEnabled}
+                  onToggleSound={handleToggleSound}
                />
             )}
             {view === "gameover" && (
@@ -588,7 +590,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
             )}
          </AnimatePresence>
          <ConnectionOverlay realtimeStatus={realtimeStatus} view={view} />
-         {view !== "menu" && (
+         {view !== "menu" && view !== "battle" && (
             <button
                onClick={handleToggleSound}
                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
