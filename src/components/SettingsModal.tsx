@@ -381,7 +381,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
     const hasResults = showProfile || showSecurity || showGameplay || showEmail || showPush || showApp || showDiagnostics || showLegal;
 
     return (
-        <div className="fixed inset-0 z-150 flex items-start justify-center overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0))]">
+        <div className="fixed inset-0 z-150 flex items-center justify-center">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -389,7 +389,7 @@ export const SettingsModal = ({ isOpen, onClose, }: SettingsModalProps) => {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80dvh] sm:max-h-[90dvh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
+            <div className="relative w-full max-w-md m-4 bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[90vh] animate-in slide-in-from-bottom-8 duration-300 settings-modal-content">
                 <style dangerouslySetInnerHTML={{
                     __html: `
                     .settings-modal-content *:not(svg):not(path) {
