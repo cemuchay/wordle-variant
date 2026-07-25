@@ -13,8 +13,8 @@ export const AnnouncementModal: React.FC<Props> = ({ announcement, isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[calc(4rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.ANNOUNCEMENT_MODAL }}>
-      <div className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75vh] sm:max-h-[80vh]">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 pt-[calc(4rem+env(safe-area-inset-top,0))] pb-[calc(5rem+env(safe-area-inset-bottom,0))]" style={{ zIndex: Z_INDEX.ANNOUNCEMENT_MODAL }}>
+      <div className="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[75dvh] sm:max-h-[80dvh]">
 
         {/* Header */}
         <div className="bg-primary/20 p-6 border-b border-gray-800 flex items-center gap-4 shrink-0">

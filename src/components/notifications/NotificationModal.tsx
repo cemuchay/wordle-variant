@@ -177,7 +177,7 @@ export const NotificationModal = memo(() => {
 
     return (
         <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0))]"
             style={{ zIndex: Z_INDEX.MODAL_CONTENT }}
             onClick={() => setIsNotificationsOpen(false)}
         >
@@ -186,7 +186,7 @@ export const NotificationModal = memo(() => {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: ANIMATION_DURATION.FAST / 1000 }}
-                className="bg-gray-900 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
+                className="bg-gray-900 border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80dvh]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
