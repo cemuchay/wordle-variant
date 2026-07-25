@@ -49,9 +49,6 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
       } w-full h-dvh min-h-dvh max-h-dvh flex flex-col flex-1 overflow-hidden select-none bg-gray-900 text-white ${className}`}
       style={{
         paddingTop: isOverlay ? 'env(safe-area-inset-top, 0px)' : undefined,
-        paddingBottom: isOverlay ? 'env(safe-area-inset-bottom, 0px)' : undefined,
-        paddingLeft: isOverlay ? 'env(safe-area-inset-left, 0px)' : undefined,
-        paddingRight: isOverlay ? 'env(safe-area-inset-right, 0px)' : undefined,
       }}
     >
       <div
