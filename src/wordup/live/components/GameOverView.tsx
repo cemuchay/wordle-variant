@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Award, } from "lucide-react";
+import { Award, ArrowLeft, Home, Loader2 } from "lucide-react";
 import { useLiveStore } from "../store/useLiveStore";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
@@ -28,6 +28,7 @@ export const GameOverView = ({
    sendRematch,
    acceptRematch
 }: GameOverViewProps) => {
+   const [isNavigatingToTopic, setIsNavigatingToTopic] = useState(false);
    const questions = useLiveStore((s) => s.questions);
    const { profile: myProfile } = useApp();
    const opponentStats = useLiveStore((s) => s.opponentStats);
@@ -173,12 +174,31 @@ export const GameOverView = ({
                <span>Play vs Bot</span>
             </button>
          </div>
-         <button
-            onClick={() => setView("menu")}
-            className="w-full bg-white/10 hover:bg-white/15 text-white font-black uppercase py-4 rounded-xl tracking-widest shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10"
-         >
-            Return to Lobby
-         </button>
+         <div className="grid grid-cols-2 gap-3">
+            <button
+               onClick={async () => {
+                  setIsNavigatingToTopic(true);
+                  await new Promise((r) => setTimeout(r, 150));
+                  setView("menu");
+               }}
+               disabled={isNavigatingToTopic}
+               className="bg-white/10 hover:bg-white/15 text-white font-black uppercase py-3.5 px-2 rounded-xl flex items-center justify-center gap-1.5 tracking-wider shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-white/10 text-xs disabled:opacity-50"
+            >
+               {isNavigatingToTopic ? (
+                  <Loader2 size={16} className="animate-spin text-[#E85151]" />
+               ) : (
+                  <ArrowLeft size={16} />
+               )}
+               <span>{isNavigatingToTopic ? "Loading..." : "Topic Lobby"}</span>
+            </button>
+            <button
+               onClick={() => setView("home" as any)}
+               className="bg-[#E85151] hover:bg-[#d44343] text-white font-black uppercase py-3.5 px-2 rounded-xl flex items-center justify-center gap-1.5 tracking-wider shadow-lg cursor-pointer hover:scale-102 active:scale-98 transition-all border border-red-500/30 text-xs"
+            >
+               <Home size={16} />
+               <span>Home</span>
+            </button>
+         </div>
 
          {/* Round Breakdown */}
          {questions && questions.length > 0 && (

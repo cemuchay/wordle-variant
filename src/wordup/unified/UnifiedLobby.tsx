@@ -74,6 +74,14 @@ export const UnifiedLobby = ({
 }: UnifiedLobbyProps) => {
    const [activeTab, setActiveTab] = useState<TabId>("home");
    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(restoreCategory || null);
+
+   useEffect(() => {
+      if (restoreCategory) {
+         setSelectedCategoryId(restoreCategory);
+      } else if (restoreCategory === null) {
+         setSelectedCategoryId(null);
+      }
+   }, [restoreCategory]);
    const [liveCategory, setLiveCategory] = useState("mixed");
    const [asyncCategory, setAsyncCategory] = useState("mixed");
    const [historyMatches, setHistoryMatches] = useState<any[]>(() => {
@@ -191,7 +199,10 @@ export const UnifiedLobby = ({
       return (
          <TopicDetailsView
             categoryId={selectedCategoryId}
-            onBack={() => setSelectedCategoryId(null)}
+            onBack={() => {
+               setSelectedCategoryId(null);
+               safeLocalStorage.removeItem("wordup_last_category");
+            }}
             currentUser={currentUser}
             userStats={userStats}
             getRankColor={getRankColor}

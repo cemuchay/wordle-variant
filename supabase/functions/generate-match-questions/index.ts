@@ -209,21 +209,25 @@ function generateQuestion(
       }
    }
 
-   const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
-   if (validImages.length > 0) {
-      const imgIdx = Math.floor(rng() * validImages.length);
-      const chosenImage = validImages[imgIdx];
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = chosenImage.startsWith("http")
-         ? chosenImage
-         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
-   } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-      qObj.imageUrl = meta.image.startsWith("http")
-         ? meta.image
-         : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
-   } else if (meta.flag_code) {
-      qObj.imageUrl = String(meta.flag_code).toLowerCase();
+   if (qObj?.suppress_image) {
+      qObj.imageUrl = undefined;
+   } else {
+      const validImages = Array.isArray(meta.images) ? meta.images.filter(Boolean) : [];
+      if (validImages.length > 0) {
+         const imgIdx = Math.floor(rng() * validImages.length);
+         const chosenImage = validImages[imgIdx];
+         const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+         qObj.imageUrl = chosenImage.startsWith("http")
+            ? chosenImage
+            : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${chosenImage}`;
+      } else if (meta.image && typeof meta.image === "string" && meta.image.trim() !== "") {
+         const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+         qObj.imageUrl = meta.image.startsWith("http")
+            ? meta.image
+            : `${supabaseUrl}/storage/v1/object/public/wordup-questions/${meta.image}`;
+      } else if (meta.flag_code) {
+         qObj.imageUrl = String(meta.flag_code).toLowerCase();
+      }
    }
    return qObj;
 }
@@ -361,7 +365,8 @@ function _generateQuestion(
           }
        }
 
-       // flag_not_same_continent: Pick 3 countries from target continent (choices) and 1 from another continent (answerVal)
+       // flag_not_same_continent: Pick 3 countries from target continent (sameCont) and 1 country from another continent (answerVal)
+       // Do not display a flag image because multiple countries are involved
        if (categoryType === "flag_bearer" && template.id === "flag_not_same_continent") {
           const continent = meta.continent;
           const sameContPeers = allEntities.filter(
@@ -379,6 +384,15 @@ function _generateQuestion(
              distractors = sameContLabels;
              const oddCont = diffContPeers.find((e) => e.label === answerVal)?.metadata?.continent || "another continent";
              explanationText = `${answerVal} is in ${oddCont}, while the other countries are all located in ${continent}.`;
+             return {
+                type: "definition",
+                prompt: promptText,
+                choices: seededShuffle([...new Set([...sameContLabels, answerVal])], rng),
+                answer: answerVal,
+                explanation: explanationText,
+                imageUrl: undefined,
+                suppress_image: true,
+             };
           }
        }
 
@@ -1157,11 +1171,25 @@ serve(async (req) => {
           stretchEntities = [...stretchEntities, ...moreStretch.filter((e: any) => !seenIds.has(e.id))];
        }
 
-       // Mark each entity with its bucket origin for seen-count tracking
+       // Mark each entity with its bucket origin for seen-count tracking and normalize continent metadata
+       const NORTH_AMERICA_CODES = new Set(["us", "ca", "mx", "cu", "jm", "ht", "do", "gt", "hn", "sv", "ni", "cr", "pa", "bs", "bb", "bz"]);
        const entityList: any[] = [
           ...comfortEntities.map((e: any) => ({ ...e, _bucket: "comfort" })),
           ...stretchEntities.map((e: any) => ({ ...e, _bucket: "stretch" })),
-       ];
+       ].map((e: any) => {
+          if (e.metadata?.continent && (e.metadata.continent === "Americas" || e.metadata.continent === "America")) {
+             const flagCode = (e.metadata?.flag_code || "").toLowerCase();
+             const cleanContinent = NORTH_AMERICA_CODES.has(flagCode) ? "North America" : "South America";
+             return {
+                ...e,
+                metadata: {
+                   ...e.metadata,
+                   continent: cleanContinent,
+                },
+             };
+          }
+          return e;
+       });
 
        console.log(
           `${logPrefix} Fetched ${entityList.length} total entities (${comfortEntities.length} comfort + ${stretchEntities.length} stretch) for category="${category}"`,

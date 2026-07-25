@@ -28,7 +28,7 @@ import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from 
 import { useLiveStore } from "./store/useLiveStore";
 
 interface LiveViewProps {
-   onBack?: () => void;
+   onBack?: (goHome?: boolean) => void;
    onSwitchMode?: (mode: "live" | "async") => void;
    onTutorial?: () => void;
    onBackToClassic?: () => void;
@@ -572,8 +572,19 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                <GameOverView
                   matchData={matchData}
                   setView={(newView) => {
-                     if (newView === "menu") { resetGame(); onBack?.(); }
-                     else if (newView === "matchmaking" || newView === "playbot") {
+                     if (newView === ("home" as any)) {
+                        resetGame();
+                        onBack?.(true);
+                     } else if (newView === "menu") {
+                        const targetCat = matchData?.category || category;
+                        if (targetCat) {
+                           setCategory(targetCat);
+                        }
+                        resetGame();
+                        setTimeout(() => {
+                           onBack?.(false);
+                        }, 50);
+                     } else if (newView === "matchmaking" || newView === "playbot") {
                         engineCleanupRef.current?.();
                         if (matchData?.category) {
                            setCategory(matchData.category);
