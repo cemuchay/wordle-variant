@@ -190,16 +190,16 @@ export const BattleView = ({
    if (!activeQuestion) return null;
 
    const promptLen = activeQuestion.prompt.length;
-   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-xl sm:text-2xl" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl";
+   const promptSizeClass = promptLen > PROMPT_FONT_SIZE.LONG_THRESHOLD ? "text-lg sm:text-xl md:text-lg" : promptLen > PROMPT_FONT_SIZE.MEDIUM_THRESHOLD ? "text-xl sm:text-2xl md:text-xl" : "text-2xl sm:text-3xl md:text-2xl";
 
    const maxChoiceLen = Math.max(...activeQuestion.choices.map((c) => c.length), 0);
    const longChoice = maxChoiceLen > CHOICE_FONT_SIZE.LONG_THRESHOLD;
    const medChoice = maxChoiceLen > CHOICE_FONT_SIZE.MEDIUM_THRESHOLD;
    const choiceBase = longChoice ? "a" : medChoice ? "b" : "c";
    const choiceLUT: Record<string, Record<string, string>> = {
-      a: { "2": "text-sm sm:text-base", "4": "text-xs sm:text-sm" },
-      b: { "2": "text-base sm:text-lg", "4": "text-sm sm:text-base" },
-      c: { "2": "text-lg sm:text-xl",   "4": "text-base sm:text-lg" },
+      a: { "2": "text-xs sm:text-sm md:text-xs", "4": "text-[11px] sm:text-xs md:text-[11px]" },
+      b: { "2": "text-sm sm:text-base md:text-sm", "4": "text-xs sm:text-sm md:text-xs" },
+      c: { "2": "text-base sm:text-lg md:text-base", "4": "text-sm sm:text-base md:text-sm" },
    };
    const isFewChoices = activeQuestion.choices.length <= 2;
    const choiceSizeClass = choiceLUT[choiceBase][isFewChoices ? "2" : "4"];
@@ -300,7 +300,7 @@ export const BattleView = ({
          </div>
 
          {/* Question Container */}
-         <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-4 overflow-y-auto scrollbar-hide min-h-0`}>
+         <div className={`relative flex-1 flex flex-col justify-center ${choicesGapClass} py-0 sm:py-2 md:py-3 pb-14 md:pb-16 overflow-y-auto scrollbar-hide min-h-0`}>
             <div className="text-center space-y-1.5 sm:space-y-2">
                {categoryName && (
                   <div className="flex items-center justify-center gap-1.5 shrink-0">
@@ -332,7 +332,7 @@ export const BattleView = ({
                   <motion.div
                      initial={{ opacity: 0, scale: 0.95 }}
                      animate={{ opacity: 1, scale: 1 }}
-                     className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
+                     className="w-full max-w-[200px] h-[90px] sm:max-w-[130px] sm:h-[72px] md:max-w-[150px] md:h-[75px] rounded-xl overflow-hidden border border-white/10 bg-slate-950/45 flex items-center justify-center p-1 shadow-inner"
                   >
                      <PreloadedImage
                         src={activeQuestion.imageUrl.length === 2 ? getCachedFlagUrl(activeQuestion.imageUrl) : activeQuestion.imageUrl}
@@ -350,11 +350,11 @@ export const BattleView = ({
             )}
 
             {activeQuestion.imageUrls && activeQuestion.imageUrls.length > 0 ? (
-               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5 min-h-[180px]">
-                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+               <div className="relative grid grid-cols-2 gap-2 sm:gap-4 shrink-0 sm:max-w-[300px] sm:mx-auto px-5 min-h-[160px]">
+                  <div className="absolute inset-y-0 -left-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
-                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                  <div className="absolute inset-y-0 -right-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice, index) => {
@@ -365,7 +365,7 @@ export const BattleView = ({
                      const imageUrl = getCachedFlagUrl(flagCode);
                      const optionLetter = String.fromCharCode(65 + index);
 
-                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] rounded-xl sm:rounded-2xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
+                     let cardClass = "relative w-full aspect-[2/1] xs:aspect-[1.8/1] sm:aspect-[1.5/1] md:aspect-[2.4/1] rounded-xl border-2 overflow-hidden flex flex-col items-center justify-center p-2 transition-all shadow-md select-none shrink-0 ";
                      if (selectedAnswer === null) {
                         cardClass += " cursor-pointer bg-white border-gray-200 hover:border-cyan-400 hover:bg-gray-50";
                      } else {
@@ -435,10 +435,10 @@ export const BattleView = ({
                </div>
             ) : (
                <div className="relative flex flex-col gap-2 sm:gap-3 w-full max-w-md mx-auto shrink-0 px-5 min-h-[180px]">
-                  <div className="absolute inset-y-0 left-0 flex items-center z-40 pointer-events-none">
+                  <div className="absolute inset-y-0 -left-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={myScore} latestCorrect={revealAnswers ? selectedAnswer === activeQuestion.answer : undefined} side="left" themeColor="bg-correct" />
                   </div>
-                  <div className="absolute inset-y-0 right-0 flex items-center z-40 pointer-events-none">
+                  <div className="absolute inset-y-0 -right-3 flex items-center z-10 pointer-events-none">
                      <ScoreBar score={oppScore} latestCorrect={revealAnswers ? oppChoice === activeQuestion.answer : undefined} side="right" themeColor="bg-[#E85151]" />
                   </div>
                   {activeQuestion.choices.map((choice) => {
@@ -446,7 +446,7 @@ export const BattleView = ({
                      const isCorrect = choice === activeQuestion.answer;
                      const isOppSelected = revealAnswers && oppChoice === choice;
 
-                     let btnClass = `p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center min-h-[48px] sm:min-h-[64px] relative overflow-hidden`;
+                     let btnClass = `p-3.5 sm:p-5 md:p-3 rounded-xl sm:rounded-2xl border-2 text-center font-black uppercase tracking-wider ${choiceSizeClass} flex items-center justify-center text-center min-h-[44px] sm:min-h-[56px] md:min-h-[42px] relative overflow-hidden`;
                      if (selectedAnswer === null) {
                         btnClass += " cursor-pointer bg-white border-gray-200 text-gray-900 hover:bg-gray-100";
                      } else {
