@@ -7,18 +7,6 @@ const corsHeaders = {
       "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
-// Define Expected Payload (Standard or Supabase Webhook)
-interface PushPayload {
-   user_id?: string;
-   notification_id?: string;
-   title?: string;
-   body?: string;
-   url?: string;
-   // Webhook specific fields
-   record?: any;
-   type?: string;
-   table?: string;
-}
 
 Deno.serve(async (req) => {
    if (req.method === "OPTIONS") {
@@ -53,7 +41,7 @@ Deno.serve(async (req) => {
          let targetUrl = "/";
 
          // Move URL logic from SQL to TypeScript
-         if (['CHALLENGE_INVITE', 'CHALLENGE_STARTED', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED'].includes(record.type)) {
+         if (['CHALLENGE_INVITE', 'CHALLENGE_STARTED', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED', 'BOT_MARATHON_NEW', 'BOT_MARATHON_OVERTAKEN', 'BOT_MARATHON_FINALE'].includes(record.type)) {
             if (record.data?.challenge_id) {
                targetUrl = `/?challenge=${record.data.challenge_id}`;
             }
@@ -63,6 +51,8 @@ Deno.serve(async (req) => {
             }
          } else if (record.type === 'LEADERBOARD_OVERTAKEN') {
             targetUrl = '/?open=leaderboard';
+         } else if (record.type === 'ADMIN_BROADCAST') {
+            targetUrl = record.data?.url || record.data?.action_url || '/';
          }
 
          payload = {
@@ -153,11 +143,13 @@ Deno.serve(async (req) => {
          JSON.stringify({ sent: subs.length, successful: successfulCount }),
          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
-   } catch (err: any) {
+   } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Internal error";
       console.error("[Push Fatal Error]", err);
-      return new Response(JSON.stringify({ error: err.message || "Internal error" }), {
+      return new Response(JSON.stringify({ error: errorMessage }), {
          headers: { ...corsHeaders, "Content-Type": "application/json" },
          status: 400,
       });
    }
+
 });

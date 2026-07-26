@@ -1012,6 +1012,338 @@ const BotMarathonManagement = ({ triggerToast }: { triggerToast: (text: string, 
 
 
 
+interface BroadcastResult {
+    total_recipients?: number;
+    push_users?: number;
+    email_sent?: number;
+}
+
+const ADMIN_BROADCAST_DRAFT_KEY = "variant_admin_broadcast_draft";
+
+const AdminCustomNotificationBroadcaster = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
+    const [title, setTitle] = useState(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).title || '' : '';
+        } catch { return ''; }
+    });
+    const [message, setMessage] = useState(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).message || '' : '';
+        } catch { return ''; }
+    });
+    const [url, setUrl] = useState(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).url || '/' : '/';
+        } catch { return '/'; }
+    });
+    const [deliveryMode, setDeliveryMode] = useState<'hybrid' | 'push_only' | 'email_only' | 'in_app_only'>(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).deliveryMode || 'hybrid' : 'hybrid';
+        } catch { return 'hybrid'; }
+    });
+    const [targetAudience, setTargetAudience] = useState<'active' | 'all' | 'participants' | 'user'>(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).targetAudience || 'active' : 'active';
+        } catch { return 'active'; }
+    });
+    const [targetUserId, setTargetUserId] = useState(() => {
+        try {
+            const saved = localStorage.getItem(ADMIN_BROADCAST_DRAFT_KEY);
+            return saved ? JSON.parse(saved).targetUserId || '' : '';
+        } catch { return ''; }
+    });
+    const [draftSaved, setDraftSaved] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [sendResult, setSendResult] = useState<BroadcastResult | null>(null);
+
+    // Debounced LocalStorage Draft Save Effect (500ms)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            try {
+                if (title.trim() || message.trim()) {
+                    const draft = { title, message, url, deliveryMode, targetAudience, targetUserId };
+                    localStorage.setItem(ADMIN_BROADCAST_DRAFT_KEY, JSON.stringify(draft));
+                    setDraftSaved(true);
+                } else {
+                    localStorage.removeItem(ADMIN_BROADCAST_DRAFT_KEY);
+                    setDraftSaved(false);
+                }
+            } catch (e) {
+                console.warn("Failed to save broadcast draft", e);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [title, message, url, deliveryMode, targetAudience, targetUserId]);
+
+    const clearDraft = () => {
+        setTitle('');
+        setMessage('');
+        setUrl('/');
+        setDeliveryMode('hybrid');
+        setTargetAudience('active');
+        setTargetUserId('');
+        setDraftSaved(false);
+        try { localStorage.removeItem(ADMIN_BROADCAST_DRAFT_KEY); } catch {}
+        triggerToast('Draft cleared!');
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!title.trim() || !message.trim()) {
+            triggerToast('Please provide both Title and Message.', 'error');
+            return;
+        }
+
+        if (targetAudience === 'user' && !targetUserId.trim()) {
+            triggerToast('Please provide a Target User ID.', 'error');
+            return;
+        }
+
+        setSending(true);
+        setSendResult(null);
+
+        try {
+            const { data, error } = await supabase.rpc('send_admin_custom_notification', {
+                p_title: title.trim(),
+                p_message: message.trim(),
+                p_url: url.trim() || '/',
+                p_delivery_mode: deliveryMode,
+                p_target_audience: targetAudience,
+                p_target_user_id: targetAudience === 'user' ? targetUserId.trim() : null
+            });
+
+            if (error) throw error;
+
+            setSendResult(data);
+            triggerToast(`Broadcast sent successfully to ${data?.total_recipients || 0} user(s)!`);
+            
+            // Clear draft on successful broadcast
+            setTitle('');
+            setMessage('');
+            setDraftSaved(false);
+            try { localStorage.removeItem(ADMIN_BROADCAST_DRAFT_KEY); } catch {}
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to dispatch custom notification broadcast.';
+            triggerToast(msg, 'error');
+        } finally {
+            setSending(false);
+        }
+    };
+
+
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Form Controls */}
+            <div className="lg:col-span-7 bg-gray-900 border border-white/10 rounded-3xl p-6 space-y-6 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400">
+                            <Bell size={22} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
+                                Broadcast Custom Notification
+                                {draftSaved && (
+                                    <span className="px-2 py-0.5 bg-correct/10 border border-correct/30 text-correct text-[9px] font-black uppercase rounded-md tracking-wider">
+                                        Draft Auto-Saved
+                                    </span>
+                                )}
+                            </h3>
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Dispatch customized alerts via push, email, & in-app</p>
+                        </div>
+                    </div>
+                    {draftSaved && (
+                        <button
+                            onClick={clearDraft}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 text-gray-400 hover:text-red-400 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                        >
+                            Clear Draft
+                        </button>
+                    )}
+                </div>
+
+
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Notification Title</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. 🎉 Weekend Championship Tournament!"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-2xl py-3.5 px-4 text-xs focus:outline-none focus:border-correct/50 text-white placeholder-gray-600 font-semibold"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Message Content</label>
+                        <textarea
+                            rows={4}
+                            placeholder="Type the message body to deliver to players..."
+                            value={message}
+                            onChange={e => setMessage(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs focus:outline-none focus:border-correct/50 text-white placeholder-gray-600 font-medium resize-none"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Target Action URL</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. / or /?challenge=123 or /?open=leaderboard"
+                                value={url}
+                                onChange={e => setUrl(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-xs focus:outline-none focus:border-correct/50 text-white font-mono"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Delivery Mode</label>
+                            <select
+                                value={deliveryMode}
+                                onChange={e => setDeliveryMode(e.target.value as any)}
+                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-3 text-xs focus:outline-none focus:border-correct/50 text-white font-semibold"
+                            >
+                                <option value="hybrid" className="bg-gray-900">Hybrid (Smart Push / Email + In-App)</option>
+                                <option value="push_only" className="bg-gray-900">Push & In-App Only</option>
+                                <option value="email_only" className="bg-gray-900">Email & In-App Only</option>
+                                <option value="in_app_only" className="bg-gray-900">In-App Notification Only</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Target Audience Segment</label>
+                            <select
+                                value={targetAudience}
+                                onChange={e => setTargetAudience(e.target.value as any)}
+                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-3 text-xs focus:outline-none focus:border-correct/50 text-white font-semibold"
+                            >
+                                <option value="active" className="bg-gray-900">Active Users (Logged in last 14 days)</option>
+                                <option value="all" className="bg-gray-900">All Registered Users</option>
+                                <option value="participants" className="bg-gray-900">Bot Marathon Participants</option>
+                                <option value="user" className="bg-gray-900">Specific User ID</option>
+                            </select>
+                        </div>
+
+                        {targetAudience === 'user' && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Target User UUID</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter target user ID"
+                                    value={targetUserId}
+                                    onChange={e => setTargetUserId(e.target.value)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-xs focus:outline-none focus:border-correct/50 text-white font-mono"
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                    <button
+                        onClick={handleSendBroadcast}
+                        disabled={sending || !title.trim() || !message.trim()}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        {sending ? <RefreshCw size={16} className="animate-spin" /> : <Bell size={16} />}
+                        {sending ? 'Broadcasting Notification...' : 'Dispatch Broadcast'}
+                    </button>
+                </div>
+
+                {sendResult && (
+                    <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 space-y-2">
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider block">Last Broadcast Stats</span>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="bg-black/30 p-2 rounded-xl">
+                                <span className="text-lg font-black text-white">{sendResult.total_recipients || 0}</span>
+                                <span className="text-[9px] text-gray-400 block uppercase">Recipients</span>
+                            </div>
+                            <div className="bg-black/30 p-2 rounded-xl">
+                                <span className="text-lg font-black text-indigo-400">{sendResult.push_users || 0}</span>
+                                <span className="text-[9px] text-gray-400 block uppercase">Push Ready</span>
+                            </div>
+                            <div className="bg-black/30 p-2 rounded-xl">
+                                <span className="text-lg font-black text-correct">{sendResult.email_sent || 0}</span>
+                                <span className="text-[9px] text-gray-400 block uppercase">Email Queued</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Live Preview Panel */}
+            <div className="lg:col-span-5 space-y-6">
+                <div className="bg-gray-900 border border-white/10 rounded-3xl p-6 space-y-6">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                        <Sparkles size={14} className="text-yellow-400" /> Live Delivery Preview
+                    </h4>
+
+                    {/* Preview 1: In-App Toast */}
+                    <div className="space-y-2">
+                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">1. In-App Alert Preview</span>
+                        <div className="bg-gray-900 border border-correct/30 rounded-2xl p-4 shadow-xl flex items-start gap-3">
+                            <div className="bg-correct/20 p-2 rounded-xl text-correct shrink-0">
+                                <Bell size={16} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h5 className="text-xs font-black uppercase tracking-tight text-white truncate">
+                                    {title || 'Sample Broadcast Title'}
+                                </h5>
+                                <p className="text-[11px] text-gray-400 line-clamp-2 leading-tight mt-1">
+                                    {message || 'Sample notification content body will be displayed here for the recipient.'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview 2: Browser Push */}
+                    <div className="space-y-2">
+                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">2. Web Push Notification Banner</span>
+                        <div className="bg-black/80 border border-white/15 rounded-2xl p-4 shadow-xl flex items-start gap-3 font-sans">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                                V
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between text-[9px] text-gray-400">
+                                    <span className="font-bold text-white uppercase">variant</span>
+                                    <span>Just now</span>
+                                </div>
+                                <h5 className="text-xs font-bold text-white mt-0.5 truncate">{title || 'Sample Title'}</h5>
+                                <p className="text-[10px] text-gray-300 line-clamp-2 leading-tight mt-0.5">{message || 'Sample notification message body...'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview 3: Dark Mode Email */}
+                    <div className="space-y-2">
+                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">3. Dark Mode Email Template</span>
+                        <div className="bg-[#030712] border border-[#1f2937] rounded-2xl p-5 text-gray-200 font-sans space-y-3">
+                            <div className="w-full h-1 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full" />
+                            <h5 className="text-sm font-black text-white uppercase">{title || 'Sample Title'}</h5>
+                            <p className="text-xs text-gray-400 leading-relaxed">{message || 'Sample email message body text.'}</p>
+                            <div className="pt-2 text-center">
+                                <span className="inline-block bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-[10px] font-extrabold uppercase tracking-wider px-4 py-2 rounded-xl">
+                                    Open Variant
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const AdminPage: React.FC = () => {
     const [WORDS_3, setWORDS_3] = useState<string[]>([]);
     const [WORDS_4, setWORDS_4] = useState<string[]>([]);
@@ -1023,7 +1355,8 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'stats'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'stats' | 'broadcast'>('words');
+
 
     // Authentication States
     const [loginEmail, setLoginEmail] = useState('');
@@ -1478,7 +1811,17 @@ SELECT create_admin_user(
                     >
                         <BarChart2 size={14} /> Game Stats
                     </button>
+                    <button
+                        onClick={() => setActiveTab('broadcast')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'broadcast'
+                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <Bell size={14} /> Broadcast
+                    </button>
                 </div>
+
 
                 {activeTab === 'words' ? (
                     <>
@@ -1891,9 +2234,12 @@ SELECT create_admin_user(
                     <WordUpCurator triggerToast={triggerToast} />
                 ) : activeTab === 'topics' ? (
                     <TopicHub triggerToast={triggerToast} />
+                ) : activeTab === 'broadcast' ? (
+                    <AdminCustomNotificationBroadcaster triggerToast={triggerToast} />
                 ) : (
                     <GameStats triggerToast={triggerToast} />
                 )}
+
             </main>
 
             {/* FLAG REVIEW / EDIT REASON DIALOG MODAL */}

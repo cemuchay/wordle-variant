@@ -129,10 +129,35 @@ interface MessageInputProps {
     dailyGuesses?: any[];
 }
 
+const DRAFT_KEY = "variant_chat_draft";
+
 const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, onCancelReply, users, isGameAnalysis, dailyGuesses }: MessageInputProps) => {
     const { profile } = useApp();
-    const [input, setInput] = useState("");
+    const [input, setInput] = useState(() => {
+        try {
+            return localStorage.getItem(DRAFT_KEY) || "";
+        } catch {
+            return "";
+        }
+    });
     const [mentionState, setMentionState] = useState<{ isVisible: boolean; filter: string; cursorPosition: number } | null>(null);
+
+    // Debounced LocalStorage Draft Save Effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            try {
+                if (input.trim()) {
+                    localStorage.setItem(DRAFT_KEY, input);
+                } else {
+                    localStorage.removeItem(DRAFT_KEY);
+                }
+            } catch (e) {
+                console.warn("Failed to save message draft to localStorage", e);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [input]);
 
     // Voice recording states
     const [isRecording, setIsRecording] = useState(false);
@@ -142,6 +167,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
 
     const adjustHeight = () => {
         const el = textareaRef.current;
@@ -217,9 +243,11 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
         onSend(input, replyingTo?.id, mentions);
         setInput("");
+        try { localStorage.removeItem(DRAFT_KEY); } catch {}
         onTyping(false);
         onCancelReply();
         setMentionState(null);
+
 
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
