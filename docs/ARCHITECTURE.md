@@ -321,7 +321,7 @@ Turn-based 7-round battle engine:
 | Unit | Vitest | `src/utils/__tests__/` | Storage, migration, Supabase client |
 | Unit | Vitest | `src/store/__tests__/` | App store |
 | Unit | Vitest | `src/lib/__tests__/` | Supabase client mock |
-| Unit | Vitest | `src/lib/game-logic/` | Daily config, skill index |
+| Unit | Vitest | `src/__tests__/game-logic/` | Daily config, checkGuess, hints, crypto, scoring (July 2026), word selection, shape shifter, stats, barrel exports |
 | Integration | Vitest | `src/__tests__/flows/` | Full game lifecycle (async, live, bot, recovery, rematch, scoring, view states) |
 | Integration | Vitest | `src/__tests__/integration/` | End-to-end game flows with mocked Supabase |
 | Regression | Vitest | `src/__tests__/regression/` | Critical bug prevention (C1-C4, L1-L4) |

@@ -82,17 +82,24 @@ Layer 3: Scoring formulas  (scoring.test.tsx)
   - pure function tests for ELO calculation and XP rewards
   - verifies clamping, edge cases, and L1 bug fix
 
-Layer 4: Regression guards  (c1-to-l4.test.tsx)
+Layer 4: Game logic unit tests  (game-logic/*.test.ts)
+  - 8 files covering: checkGuess, getLetterStatuses, hints, crypto,
+    word selection (July 27+ rotation), shape shifter, July 2026 scoring,
+    updateStats, barrel export integrity
+  - Pure function tests with mocked data layer (words, storage)
+  - Only current (July 2026+) code paths; legacy paths excluded
+
+Layer 5: Regression guards  (c1-to-l4.test.tsx)
   - named tests for all 18 previously-fixed bugs
   - if a fix is reverted, the test fails
 
-Layer 5: Hook integration  (integration/*.test.tsx)
+Layer 6: Hook integration  (integration/*.test.tsx)
   - uses REAL hooks (useWordUpGameLoop, useWordUpLiveGame, etc.)
   - only Supabase is mocked (via global vi.mock in setup.ts)
   - tests the full loading → countdown transition
   - if a hook throws or stops calling setView, this catches it
 
-Layer 6: E2E browser tests  (e2e/specs/*.spec.ts)
+Layer 7: E2E browser tests  (e2e/specs/*.spec.ts)
   - Playwright in real Chromium
   - guest login, app loading, lobby tabs
 ```

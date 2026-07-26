@@ -15,12 +15,16 @@ Determines the target word for any given date.
 
 ### 2. Scoring System (`calculateSkillIndex`)
 Calculates the "Skill Index" based on player performance.
-- **Active System (Starting 2026-05-18)**:
-    - **Discovery Bonuses**: +40 for Green discovery, +25 for Yellow discovery (one-off per placement).
-    - **Strategic Penalties**: -5 for new black letters, -20 for repeating a known black letter.
-    - **Hint Penalty**: -100 points.
+- **Active System (Starting 2026-07-06 — July 2026 Era)**:
+    - **Per-row Points**: Row-dependent for correct (65→20) and present (50→10) letters.
+    - **Absent Penalty**: -5 for new absent letters.
+    - **Repeated Absent Penalty**: -20 for re-guessing a known absent letter.
+    - **Regression Checks**: Green→Yellow (-5), Yellow same-spot (-5), Green→Black (-15), Yellow→Black (-10).
+    - **Hint Penalty**: -100 points (when hintRecord.row is defined).
+    - **Entity Tracking**: Points awarded only once per letter placement to prevent double-counting.
     - **Loss Protection**: Failing to solve the word sets the base score to 0.
-- **Legacy System**: Retained for backwards compatibility with games played before May 18th.
+- **Revamped System (2026-05-18 to 2026-07-05)**: Payoff + Deduction system with entity tracking.
+- **Legacy System (< 2026-05-18)**: Retained for backwards compatibility.
 
 ### 3. Guess Validation (`checkGuess`)
 Standard two-pass algorithm to accurately assign Green/Yellow/Black statuses while handling duplicate letters correctly.
@@ -45,8 +49,23 @@ To adjust the frequency of different word lengths, modify the weighted buckets i
 
 ## Testing
 
-Run the scoring test suite using `tsx`:
+Game logic tests live in `src/__tests__/game-logic/` and run via Vitest:
+
 ```bash
-npx tsx src/lib/game-logic/skillIndex.test.ts
+# Run all game-logic tests
+npx vitest run src/__tests__/game-logic
+
+# Run a specific test file
+npx vitest run src/__tests__/game-logic/scoringJuly2026.test.ts
 ```
-*(Note: Ensure execution policies allow script running if on Windows)*
+
+**8 test files covering current (July 2026+) paths only:**
+- `checkGuess.test.ts` — checkGuess, getLetterStatuses
+- `hints.test.ts` — isHintDisabled, getHint
+- `crypto.test.ts` — obfuscate/deobfuscate, encrypt/decrypt
+- `wordSelection.test.ts` — getWordAtDate (July 27+ rotation), getRandomWord, ISO week utils
+- `shapeShifter.test.ts` — isGuessCompatible, getShapeShifterFeedbackAndWord
+- `scoringJuly2026.test.ts` — calculateSkillIndexJuly2026
+- `dailyConfig.test.ts` — getDailyConfig (current constraint path)
+- `stats.test.ts` — updateStats
+- `barrel.test.ts` — barrel export integrity
