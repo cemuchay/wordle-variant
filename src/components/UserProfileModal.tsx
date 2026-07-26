@@ -10,6 +10,9 @@ import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
 import { calculateStreak } from '../utils/streak';
+import { Z_INDEX } from '../constants/ui';
+import { TIMEOUT } from '../constants/game';
+import { TOAST_DURATION } from '../constants/ui';
 import { useUserFollowers, useUserFollowing, useIsFollowing, useToggleFollowMutation, type FollowUser } from '../hooks/queries/useFollows';
 import { useAppStore } from '../store/useAppStore';
 import { TrophyCabinet } from './awards/TrophyCabinet';
@@ -82,7 +85,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
     useEffect(() => {
         if (avatarClicks > 0) {
-            const timer = setTimeout(() => setAvatarClicks(0), 1500);
+            const timer = setTimeout(() => setAvatarClicks(0), TIMEOUT.AVATAR_CLICK_RESET);
             return () => clearTimeout(timer);
         }
     }, [avatarClicks]);
@@ -114,9 +117,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 targetUserId: profile.id,
                 isFollowing: isFollowingTarget
             });
-            triggerToast(nextState ? `Following @${profile.username}` : `Unfollowed @${profile.username}`, 3000);
+            triggerToast(nextState ? `Following @${profile.username}` : `Unfollowed @${profile.username}`, TOAST_DURATION.DEFAULT);
         } catch {
-            triggerToast("Failed to update follow status.", 3000);
+            triggerToast("Failed to update follow status.", TOAST_DURATION.DEFAULT);
         }
     };
 
@@ -129,9 +132,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
             .eq('id', currentUser.id);
         if (!error) {
             setCommentsDisabled(newValue);
-            triggerToast(newValue ? "Comments disabled on your guesses" : "Comments enabled on your guesses", 3000);
+            triggerToast(newValue ? "Comments disabled on your guesses" : "Comments enabled on your guesses", TOAST_DURATION.DEFAULT);
         } else {
-            triggerToast("Failed to update comment settings.", 3000);
+            triggerToast("Failed to update comment settings.", TOAST_DURATION.DEFAULT);
         }
     };
 
@@ -228,7 +231,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 }
             } catch (err: any) {
                 console.error("Failed to load user profile:", err);
-                if (isMounted) triggerToast("Could not load user profile stats.", 4000);
+                if (isMounted) triggerToast("Could not load user profile stats.", TOAST_DURATION.LONG);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -361,7 +364,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     }, [dailyScores, challengeParticipations, allChallengeParticipations, currentUserChallenges, userId, currentUser, profile]);
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-9999">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -503,7 +506,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                                     <button
                                                         onClick={() => {
                                                             if (activeCall) {
-                                                                triggerToast("You are already in a call.", 4000);
+                                                                triggerToast("You are already in a call.", TOAST_DURATION.LONG);
                                                                 return;
                                                             }
                                                             initiatePrivateCall({
@@ -765,7 +768,7 @@ const FollowListModal: React.FC<{
     onSelectUser: (id: string) => void;
 }> = ({ title, users, onClose, onSelectUser }) => {
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-10000">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}

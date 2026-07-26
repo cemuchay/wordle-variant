@@ -9,7 +9,8 @@ import {
    isHintDisabled,
    getHint,
 } from "../../lib/game-logic";
-import { ANIMATION_DURATION } from "../../constants/ui";
+import { ANIMATION_DURATION, TOAST_DURATION } from "../../constants/ui";
+import { RETRY } from "../../constants/game";
 import { logger } from "../../lib/logger";
 import returnAnimationTime from "../../utils/returnAnimationTime";
 
@@ -291,7 +292,7 @@ export const useActions = ({
                while (attempt < maxSyncAttempts && !success) {
                   if (attempt > 0) {
                      setRetryCount(attempt);
-                     await new Promise((r) => setTimeout(r, 1500));
+                      await new Promise((r) => setTimeout(r, RETRY.SYNC_DELAY));
                   }
                   success = await wrappedSubmitResult(
                      resultPayload,
@@ -314,7 +315,7 @@ export const useActions = ({
                   wordLen: isMarathon ? wordLength : undefined,
                   gIdx: isMarathon ? gameIndex! : undefined,
                };
-               triggerToast("Sync failed. Check connection.", 5000);
+               triggerToast("Sync failed. Check connection.", TOAST_DURATION.VERY_LONG);
             } else {
                setSyncFailed(false);
                lastPayloadRef.current = null;
@@ -325,10 +326,10 @@ export const useActions = ({
 
                setTimeout(() => {
                   dispatch({ type: "STOP_REVEALING" });
-                  triggerToast(
+triggerToast(
                      won ? "Completed! 🎉" : `The word was ${targetWord}`,
-                     5000,
-                  );
+                     TOAST_DURATION.VERY_LONG,
+                   );
                   if (isMarathon) {
                      if (onLengthComplete) onLengthComplete();
                   } else {
@@ -398,7 +399,7 @@ export const useActions = ({
          return;
       }
       if (guesses.length < 2) {
-         triggerToast("Hint unlocks after 2 attempts.", 3000);
+         triggerToast("Hint unlocks after 2 attempts.", TOAST_DURATION.DEFAULT);
          return;
       }
 
@@ -406,10 +407,10 @@ export const useActions = ({
       if (hint) {
          const hintWithRow = { ...hint, row: guesses.length };
          dispatch({ type: "SET_HINT", hint: hintWithRow });
-         triggerToast(
+triggerToast(
             `Hint: "${hint.letter}" at position ${hint.index + 1}.`,
-            5000,
-         );
+            TOAST_DURATION.VERY_LONG,
+          );
 
          setIsSaving(true);
          try {
@@ -443,10 +444,10 @@ export const useActions = ({
                isMarathon ? wordLength : undefined,
                isMarathon ? gameIndex! : undefined,
             );
-            if (!success) triggerToast("Failed to save hint usage.", 3000);
+            if (!success) triggerToast("Failed to save hint usage.", TOAST_DURATION.DEFAULT);
          } catch (e) {
             logger.error("[Engine] Error in handleHint sync", { error: e });
-            triggerToast("Failed to save hint usage.", 3000);
+            triggerToast("Failed to save hint usage.", TOAST_DURATION.DEFAULT);
          } finally {
             setIsSaving(false);
          }

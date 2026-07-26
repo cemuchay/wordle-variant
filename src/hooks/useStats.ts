@@ -4,6 +4,7 @@ import type { AppUser, GameStats } from "../types/game";
 import { useApp } from "../context/AppContext";
 import { safeLocalStorage } from "../utils/storage";
 import { calculateStreak } from "@/utils/streak";
+import { QUERY } from "../constants/queries";
 
 const INITIAL_STATS: GameStats = {
    gamesPlayed: 0,
@@ -39,7 +40,7 @@ export const useWordleStats = (
       if (userId && date) {
          const prefix = "wordle-";
          const todayKey = `${prefix}${date}`;
-         const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const sevenDaysAgo = Date.now() - QUERY.STALE_24H;
 
          safeLocalStorage.getAllKeys().forEach((key) => {
             // Remove only daily wordle keys that aren't for today

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { deobfuscateWord } from '../lib/game-logic';
-import { BOT_MARATHON_WORD_LENGTHS } from '../constants/game';
+import { BOT_MARATHON_WORD_LENGTHS, DEFAULT_WORD_LENGTH } from '../constants/game';
 
 export interface MarathonGame {
     gameIndex: number;
@@ -74,11 +74,11 @@ export function parseMarathonGames(targetWordField: string | any, salt?: string)
  * Safely lookup timer by game index or fallback to length-based timer
  */
 export function getMarathonTimer(challenge: any, gameIndex: number, wordLength: number): number {
-    if (!challenge) return 5;
+    if (!challenge) return DEFAULT_WORD_LENGTH;
     const timers = challenge.marathon_timers;
-    if (!timers) return challenge.max_time || 5;
+    if (!timers) return challenge.max_time || DEFAULT_WORD_LENGTH;
 
-    const defaultTime = challenge.max_time || 5;
+    const defaultTime = challenge.max_time || DEFAULT_WORD_LENGTH;
 
     if (Array.isArray(timers)) {
         if (timers.length === 0) return defaultTime;

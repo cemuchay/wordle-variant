@@ -33,6 +33,7 @@ import { useTimer } from "./useTimer";
 import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 import { safeLocalStorage } from "../../utils/storage";
+import { MAX_ATTEMPTS } from "../../constants/game";
 
 import { useChallengeStore } from "../../store/useChallengeStore";
 
@@ -107,7 +108,7 @@ export const useChallengeGameEngine = ({
 
    const maxAttempts = challenge.is_shapeshifter 
       ? 20 
-      : (challenge.max_attempts || 6);
+      : (challenge.max_attempts || MAX_ATTEMPTS);
 
    const [targetWords, setTargetWords] = useState<string[]>([]);
    const [activeTargetWord, setActiveTargetWord] = useState<string>("");

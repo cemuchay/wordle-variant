@@ -12,6 +12,7 @@ import { useAsyncStore } from "./async/store/useAsyncStore";
 import { decryptMatchQuestions } from "../utils/wordupQuestionGenerator";
 import { wordupAudio } from "../utils/wordupAudio";
 import { useWordUpStore } from "../store/useWordUpStore";
+import { TOAST_DURATION } from "../constants/ui";
 import { MarathonConfigModal } from "./shared/MarathonConfigModal";
 
 import { useTheme } from "../hooks/useTheme";
@@ -216,7 +217,7 @@ export const WordUpContainer = ({
          }
       } catch (err) {
          console.error("Failed to start marathon:", err);
-         triggerToast("Error launching marathon match", 3000);
+         triggerToast("Error launching marathon match", TOAST_DURATION.DEFAULT);
       }
    }, [effectiveUser, marathonConfigCategory, setWordupMode, triggerToast]);
 

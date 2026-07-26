@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import { useTheme } from '../hooks/useTheme';
+import { TOAST_DURATION } from '../constants/ui';
 
 interface WordGridContainerProps {
   onBackToClassic: () => void;
@@ -124,7 +125,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   const handleSubmit = async () => {
     setIsValidatingWord(true);
-    triggerToast("Validating word...", 3000, true);
+    triggerToast("Validating word...", TOAST_DURATION.DEFAULT, true);
     try {
       const success = await submitMove(effectiveUserId, triggerToast);
       if (!success) {

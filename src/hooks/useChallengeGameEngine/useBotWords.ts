@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
+import { TOAST_DURATION } from '../../constants/ui';
 
 export const useBotWords = (challenge: any, triggerToast: (msg: string, duration?: number) => void) => {
    const [botDailyWords, setBotDailyWords] = useState<
@@ -38,7 +39,7 @@ export const useBotWords = (challenge: any, triggerToast: (msg: string, duration
          }
       } catch (err: any) {
          logger.error("Failed to fetch bot daily words", { error: err });
-         triggerToast("Failed to fetch today's words.", 4000);
+         triggerToast("Failed to fetch today's words.", TOAST_DURATION.LONG);
       }
    }, [challenge.is_bot_marathon, challenge.target_word, triggerToast]);
 

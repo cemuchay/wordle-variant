@@ -2,6 +2,7 @@
 import { Suspense, useEffect } from 'react';
 import type { AppUser, GuessResult } from '../../types/game';
 import { safeLazy } from '../../utils/safeLazy';
+import { TIMEOUT } from '../../constants/game';
 
 const ChallengeModal = safeLazy(() => import('../ChallengeModal').then(m => ({ default: m.ChallengeModal })));
 const GameOverModal = safeLazy(() => import('../GameOverModal').then(m => ({ default: m.GameOverModal })));
@@ -74,7 +75,7 @@ export const ModalsManager = ({
             (window as any).requestIdleCallback(preloadComponents);
         } else {
             // 1.5 seconds
-            const timer = setTimeout(preloadComponents, 1500);
+            const timer = setTimeout(preloadComponents, TIMEOUT.PRELOAD);
             return () => clearTimeout(timer);
         }
     }, []);

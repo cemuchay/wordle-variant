@@ -1,6 +1,8 @@
+import { RETRY } from '../constants/game';
+
 export async function fetchWithRetry<T>(
     fetchFn: () => Promise<T>,
-    maxAttempts: number = 3,
+    maxAttempts: number = RETRY.SYNC_COUNT,
     delayMs: number = 1000,
     onRetry?: (attempt: number, error: any) => void
 ): Promise<T> {

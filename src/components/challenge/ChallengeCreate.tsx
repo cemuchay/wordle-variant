@@ -8,6 +8,7 @@ import { useAdminStatus } from '../../hooks/useAdminStatus';
 import { ProtectedAvatar } from '../chat/ProtectedAvatar';
 
 import { useAppStore, type ChallengePreset } from '../../store/useAppStore';
+import { DEFAULT_WORD_LENGTH } from '../../constants/game';
 import { safeLocalStorage } from '../../utils/storage';
 import { CreateStepIndicator } from './create/CreateStepIndicator';
 import { MarathonGameSequence } from './create/MarathonGameSequence';
@@ -869,7 +870,7 @@ export const ChallengeCreate = memo(function ChallengeCreate({ onSuccess, editin
     useEffect(() => {
         const validate = async () => {
             const errs: string[] = [];
-            const resolvedLength = length === 0 ? 5 : length;
+            const resolvedLength = length === 0 ? DEFAULT_WORD_LENGTH : length;
 
             if (isCustomWord) {
                 if (length === 1) {

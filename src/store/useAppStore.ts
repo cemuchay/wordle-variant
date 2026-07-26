@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { type GameStats } from "../types/game";
 import { safeLocalStorage, asyncStorage } from "../utils/storage";
+import { TOAST_DURATION } from "../constants/ui";
 
 interface UserPreferences {
    allowRoasts: boolean;
@@ -192,7 +193,7 @@ interface AppState {
 
          // Actions
          setHasHydrated: (hasHydrated) => set({ hasHydrated }),
-         triggerToast: (message, duration = 3000, isLarge = false) =>
+         triggerToast: (message, duration = TOAST_DURATION.DEFAULT, isLarge = false) =>
             set({ toast: { show: true, message, duration, isLarge } }),
          setToast: (toast) => set({ toast }),
          setChallengeOpen: (isChallengeOpen) => set({ isChallengeOpen }),

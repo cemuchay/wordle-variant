@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Z_INDEX, ANIMATION_DURATION } from '../constants/ui';
+import { Z_INDEX, ANIMATION_DURATION, TOAST_DURATION } from '../constants/ui';
 
 interface ToastProps {
   message: string;
@@ -10,7 +10,7 @@ interface ToastProps {
   duration?: number;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, duration = 3000 }) => {
+export const Toast: React.FC<ToastProps> = ({ message, isVisible, onClose, duration = TOAST_DURATION.DEFAULT }) => {
   useEffect(() => {
     if (isVisible) {
       const timer = setTimeout(onClose, duration);

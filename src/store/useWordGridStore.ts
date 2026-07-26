@@ -18,6 +18,8 @@ import {
 } from "../utils/wordgrid/bagBalancing";
 
 import { safeLocalStorage } from "../utils/storage";
+import { TIMEOUT } from "../constants/game";
+import { TOAST_DURATION } from "../constants/ui";
 import { preloadBotWordPools, findBotWordMove } from "../utils/wordgrid/botAI";
 
 export type WordGridViewType = "lobby" | "matchmaking" | "active" | "completed";
@@ -79,7 +81,7 @@ export function saveDraftToLocalStorage(
       } catch (e) {
          console.warn("[WordGrid] Failed to save draft:", e);
       }
-   }, 300);
+   }, TIMEOUT.DRAFT_DEBOUNCE);
 }
 
 export function clearDraftFromLocalStorage(matchId: string | null) {
@@ -868,7 +870,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
             bot_difficulty: get().botDifficulty,
          });
 
-         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, 4000, true);
+         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, TOAST_DURATION.LONG, true);
 
          // 2. Dispatch network sync asynchronously
          safeWordGridUpdate(matchId, updatePayload).catch((err) => {
@@ -879,7 +881,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
             setTimeout(
                () => get().playBotTurn(newBoard, newBag, nextTurnIdx),
-               400,
+               TIMEOUT.BOT_TURN,
             );
          }
 
@@ -979,7 +981,7 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       if (get().isBotMatch && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
          setTimeout(
             () => get().playBotTurn(get().board, nextBag, nextTurnIdx),
-            600,
+            TIMEOUT.BOT_TURN,
          );
       }
    },

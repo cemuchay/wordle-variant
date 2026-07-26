@@ -1,5 +1,7 @@
 import { supabase } from "../lib/supabaseClient";
 import { useAppStore } from "../store/useAppStore";
+import { TOAST_DURATION } from "../constants/ui";
+import { CHALLENGE_TIMEOUT } from "../constants/challenge";
 import { getDMRoomKey, encryptDM } from "./useChat";
 
 export async function editMessage(
@@ -14,8 +16,8 @@ export async function editMessage(
   const msg = (useAppStore.getState().globalMessages as any[]).find((m: any) => m.id === messageId);
   if (msg) {
     const elapsed = Date.now() - new Date(msg.created_at).getTime();
-    if (elapsed > 15 * 60 * 1000) {
-      useAppStore.getState().triggerToast("Editing window expired (15 min)", 2000);
+    if (elapsed > CHALLENGE_TIMEOUT.EDIT_TIME_LIMIT) {
+      useAppStore.getState().triggerToast("Editing window expired", TOAST_DURATION.SHORT);
       return;
     }
   }

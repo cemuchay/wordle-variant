@@ -2,6 +2,7 @@
 // src/components/wordup/WordUpView/services/wordupNetworkGate.ts
 import { supabase } from "../../lib/supabaseClient";
 import { safeLocalStorage } from "../../utils/storage";
+import { RETRY } from "../../constants/game";
 
 export type RequestType = "get" | "post" | "put" | "delete" | "rpc";
 
@@ -239,7 +240,7 @@ class WordUpNetworkGate {
             error.message?.includes("Failed to fetch") ||
             error.message?.includes("Network Error");
 
-         if (isTransient && task.config && task.retryCount < 5) {
+          if (isTransient && task.config && task.retryCount < RETRY.NETWORK_GATE_MAX) {
             task.retryCount++;
             task.status = "pending";
 

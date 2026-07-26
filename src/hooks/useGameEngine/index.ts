@@ -18,6 +18,7 @@ import { getLocalSalt, areGuessesCoherent, saveGameWithBackup } from "./utils";
 import { usePersistence } from "./usePersistence";
 import { useActions } from "./useActions";
 import { supabase } from "../../lib/supabaseClient";
+import { TOAST_DURATION } from "../../constants/ui";
 
 export const useGameEngine = (
    date: string,
@@ -367,7 +368,7 @@ export const useGameEngine = (
                            }
                         }
 
-                        triggerToast("Sync conflict resolved: restored from cloud.", 5000);
+                        triggerToast("Sync conflict resolved: restored from cloud.", TOAST_DURATION.VERY_LONG);
 
                         // Trigger admin email notification
                         supabase.functions.invoke("send-error-email", {

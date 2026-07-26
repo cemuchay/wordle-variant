@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useCallback } from 'react';
 import { useChallengeStore } from '../../store/useChallengeStore';
+import { TOAST_DURATION } from '../../constants/ui';
 
 interface UseTimerProps {
    timeLeft: number | null;
@@ -46,7 +47,7 @@ export const useTimer = ({
    const handleTimeExpired = useCallback(async () => {
       if (isSaving) return;
       dispatch({ type: "TIME_UP" });
-      triggerToast("Time's up!", 3000);
+      triggerToast("Time's up!", TOAST_DURATION.DEFAULT);
       setIsSaving(true);
 
       try {
@@ -69,7 +70,7 @@ export const useTimer = ({
                wordLength,
                gameIndex!,
             );
-            if (!success) triggerToast("Failed to save progress.", 3000);
+            if (!success) triggerToast("Failed to save progress.", TOAST_DURATION.DEFAULT);
             if (onLengthComplete) onLengthComplete();
          } else {
             const success = await wrappedSubmitResult({
@@ -81,7 +82,7 @@ export const useTimer = ({
                hint_record: hintRecord,
                time_taken: timeTaken,
             });
-            if (!success) triggerToast("Failed to save result.", 4000);
+            if (!success) triggerToast("Failed to save result.", TOAST_DURATION.LONG);
             onFinish();
          }
       } finally {

@@ -10,6 +10,8 @@ import { logger } from './lib/logger.ts'
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { safeLocalStorage, safeSessionStorage, runLegacyMigration } from './utils/storage'
+import { QUERY_RETRY } from './constants/queries'
+import { TIMEOUT } from './constants/game'
 
 // Install global storage overrides to catch security and storage full errors globally
 try {
@@ -120,7 +122,7 @@ try {
       // Redirect after 800ms
       setTimeout(() => {
         window.location.replace(redirectUrl);
-      }, 800);
+      }, TIMEOUT.SCROLL);
     }
   } else {
     // We are on the target domain: check if we arrived with a migration payload
@@ -173,7 +175,7 @@ const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      retry: 3,
+      retry: QUERY_RETRY,
       refetchOnWindowFocus: true,
     },
   },

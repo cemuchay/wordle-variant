@@ -2,6 +2,7 @@ import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { GuessResult } from '../types/game';
 import { HelpCircle, X } from 'lucide-react';
 import { ANIMATION_DURATION } from '../constants/ui';
+import { LAYOUT } from '../constants/game';
 import returnAnimationTime from '../utils/returnAnimationTime';
 import { useIsResponsive } from '../hooks/useResponsive';
 
@@ -134,14 +135,14 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   let cellSizePx: number | null = null;
   if (maxGridWidth && maxGridHeight) {
     const gapSize = compact ? 4 : 6;
-    const padding = compact ? 16 : 32;
-    const extraWidth = maxAttempts > 6 ? 32 : 0;
+    const padding = compact ? LAYOUT.GRID_PADDING_COMPACT : LAYOUT.GRID_PADDING;
+    const extraWidth = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? LAYOUT.GRID_EXTRA_WIDTH : 0;
 
     const usableWidth = maxGridWidth - padding - extraWidth;
 
     const cellWidthLimit = Math.max(20, (usableWidth - (wordLength - 1) * gapSize) / wordLength);
 
-    if (maxAttempts > 6) {
+    if (maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD) {
       cellSizePx = Math.floor(cellWidthLimit);
     } else {
       const usableHeight = maxGridHeight - padding;
@@ -152,7 +153,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
     // On desktop in challenge mode, apply the resize scale
     const isChallenge = gameplayType === 'challenge' || compact;
     if (isDesktop && isChallenge) {
-      const resizeScale = maxAttempts > 6 ? 0.35 : 0.85;
+      const resizeScale = maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD ? 0.35 : LAYOUT.GRID_RESIZE_SCALE;
       cellSizePx = Math.floor(cellSizePx * resizeScale);
     }
   }
@@ -279,7 +280,7 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
   const currentRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (maxAttempts > 6) {
+    if (maxAttempts > LAYOUT.COMPACT_GRID_THRESHOLD) {
       if (isLost && scrollContainerRef.current) {
         const delay = isCurrentRevealing ? returnAnimationTime(wordLength) : 0;
         const timer = setTimeout(() => {

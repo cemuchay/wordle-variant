@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 import { type AppNotification } from '../../types/notifications';
-import { Z_INDEX } from '../../constants/ui';
+import { Z_INDEX, TOAST_DURATION } from '../../constants/ui';
 import { useApp } from '../../context/AppContext';
 
 export const NotificationToast = memo(() => {
@@ -26,7 +26,7 @@ export const NotificationToast = memo(() => {
             timer = setTimeout(() => {
                 setCurrentNotification(null);
                 timer = null;
-            }, 5000);
+            }, TOAST_DURATION.VERY_LONG);
         };
 
         window.addEventListener('new-notification', handleNewNotification);

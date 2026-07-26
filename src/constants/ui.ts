@@ -28,8 +28,14 @@ export const Z_INDEX = {
    AUTH_MODAL: 200,
    /** Toast notifications. */
    TOAST: 300,
-   /** Dynamic Island status overlay (highest priority). */
-   DYNAMIC_ISLAND: 999,
+    /** Dynamic Island status overlay (highest priority). */
+    DYNAMIC_ISLAND: 999,
+    /** Floating chat bubble overlay. */
+    CHAT_BUBBLE: 99999,
+    /** User profile modal overlay. */
+    USER_PROFILE: 10000,
+    /** Topic details modal. */
+    TOPIC_DETAILS: 1000,
 } as const;
 
 /** Duration (ms) for various animations. */

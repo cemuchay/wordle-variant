@@ -12,6 +12,7 @@ import { getWordAtDateSub } from "./helpers/getWordAtDate";
 import { syncGameStateSub } from "./helpers/syncGameState";
 import { syncStatsFromLocalStorageSub } from "./helpers/syncStatsFromLocalStorage";
 import { updateStatsSub } from "./helpers/updateStats";
+import { RETRY } from "../../constants/game";
 
 /**
  * Aggregates the statuses of all letters used in the game so far.
@@ -392,7 +393,7 @@ export const syncWithRetry = async (
          return { success: true, score: score || 0 };
       } catch (err) {
          if (i === retries - 1) throw err;
-         await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, RETRY.SYNC_DELAY));
       }
    }
    return { success: false, score: 0 };

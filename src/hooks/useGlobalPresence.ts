@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { TIMEOUT, LIMITS } from '../constants/game';
 
 export interface PresenceUser {
     id: string;
@@ -20,7 +21,7 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
             .from('profiles')
             .select('id, username, avatar_url, last_seen_at')
             .order('last_seen_at', { ascending: false, nullsFirst: false })
-            .limit(100);
+            .limit(LIMITS.PRESENCE);
         if (data) {
             setAllProfiles(data as PresenceUser[]);
         }
@@ -48,7 +49,7 @@ export const useGlobalPresence = (userId: string | undefined, currentVoiceRoomId
         }
 
         updateLastSeen();
-        const heartbeat = setInterval(updateLastSeen, 2 * 60 * 1000);
+        const heartbeat = setInterval(updateLastSeen, TIMEOUT.HEARTBEAT_INTERVAL);
 
         const channelId = 'global_presence';
         const channel = supabase.channel(channelId, {

@@ -7,6 +7,7 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
 import { getPreviousIsoWeekKey } from '../utils/isoWeek';
 import type { UserAward } from '../types/awards';
+import { DEFAULT_WORD_LENGTH, WRAPPED } from '../constants/game';
 
 const getWeekNumber = (d: Date): number => {
     const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -879,7 +880,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             // Draw Wordle grid of guesses
             const guesses = dayScore.guesses;
             const rows = guesses.length;
-            const cols = guesses[0]?.length || 5;
+            const cols = guesses[0]?.length || DEFAULT_WORD_LENGTH;
 
             // Scale tiles and gap to canvas resolution to guarantee visual quality
             // Scale down if word length > 8 to prevent horizontal overflow on 1080px canvas
@@ -1016,8 +1017,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 5. Share a single slide as PNG (actual browser share with download fallback)
     const exportSlideImage = () => {
         const canvas = canvasRef.current || document.createElement('canvas');
-        canvas.width = 1080;
-        canvas.height = 1920;
+        canvas.width = WRAPPED.CANVAS_WIDTH;
+        canvas.height = WRAPPED.CANVAS_HEIGHT;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -1090,7 +1091,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         // Draw the very first slide immediately BEFORE capturing and starting the recorder
         // This ensures the stream is initialized with image frames right away, preventing initial blank screens
-        drawSlideToCanvas(ctx, 0, 1080, 1920, 0);
+        drawSlideToCanvas(ctx, 0, WRAPPED.CANVAS_WIDTH, WRAPPED.CANVAS_HEIGHT, 0);
 
         // Setup MediaStream
         const stream = canvas.captureStream(30); // 30 FPS
@@ -1193,7 +1194,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         // Pre-recording drawing loop: draw slide 0 at 20fps to feed the stream during startup
         preRecordIntervalRef.current = setInterval(() => {
-            drawSlideToCanvas(ctx, 0, 1080, 1920, 0);
+            drawSlideToCanvas(ctx, 0, WRAPPED.CANVAS_WIDTH, WRAPPED.CANVAS_HEIGHT, 0);
         }, 50);
 
         // Synchronize actual recording timeline with MediaRecorder onstart event
@@ -1204,7 +1205,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             }
 
             // Play through all slides programmatically for the video recording (4.0 seconds per slide)
-            const slideDuration = 4000; // ms
+            const slideDuration = WRAPPED.SLIDE_DURATION;
             const totalDuration = totalSlides * slideDuration;
 
             let elapsed = 0;

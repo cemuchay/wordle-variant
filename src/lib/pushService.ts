@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./supabaseClient";
 import { useAppStore } from "../store/useAppStore";
+import { TOAST_DURATION } from "../constants/ui";
+import { RETRY, MISC } from "../constants/game";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -66,7 +68,7 @@ export async function subscribeToPush() {
    try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-         toast("Notification permission was denied.", 4000);
+         toast("Notification permission was denied.", TOAST_DURATION.LONG);
          throw new Error("Notification permission not granted");
       }
 
@@ -84,7 +86,7 @@ export async function subscribeToPush() {
       }
 
       let attempt = 0;
-      const maxAttempts = 3;
+      const maxAttempts = RETRY.PUSH_COUNT;
       let subscription: PushSubscription | null = null;
       let dbError: any = null;
 
@@ -127,7 +129,7 @@ export async function subscribeToPush() {
          } catch (err: any) {
             dbError = err;
             if (attempt < maxAttempts) {
-               await new Promise((resolve) => setTimeout(resolve, 1500)); // Wait 1.5s before retry
+               await new Promise((resolve) => setTimeout(resolve, RETRY.SYNC_DELAY)); // Wait 1s before retry
             }
          }
       }
@@ -135,11 +137,11 @@ export async function subscribeToPush() {
       if (dbError || !subscription) {
          const errorMsg =
             dbError?.message || "Failed to register push subscription";
-         toast(`Push Notification Error: ${errorMsg}`, 5000);
+         toast(`Push Notification Error: ${errorMsg}`, TOAST_DURATION.VERY_LONG);
          throw dbError || new Error("Push subscription registration failed");
       }
 
-      toast("Notifications successfully enabled!", 3000);
+      toast("Notifications successfully enabled!", TOAST_DURATION.DEFAULT);
       return subscription;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
    } catch (err: any) {
@@ -170,11 +172,11 @@ export async function unsubscribeFromPush() {
 
          // Unsubscribe in browser
          await subscription.unsubscribe();
-         toast("Notifications disabled.", 3000);
+         toast("Notifications disabled.", TOAST_DURATION.DEFAULT);
       }
    } catch (err: any) {
       console.error("[Push Service] Unsubscribe failed:", err);
-      toast("Failed to disable notifications.", 3000);
+      toast("Failed to disable notifications.", TOAST_DURATION.DEFAULT);
    }
 }
 
@@ -222,7 +224,7 @@ export async function syncPushSubscriptionIfNeeded() {
                const now = new Date().getTime();
                const hoursSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60);
 
-               if (hoursSinceLastSeen > 24) {
+               if (hoursSinceLastSeen > MISC.PUSH_THROTTLE_HOURS) {
                   await supabase
                      .from("push_subscriptions")
                      .update({ last_seen_at: new Date().toISOString() })

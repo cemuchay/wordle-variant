@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "./supabaseClient";
 import { safeLocalStorage } from "../utils/storage";
+import { RETRY, TIMEOUT } from "../constants/game";
 
 export interface SerializedRequest {
    type: "supabase";
@@ -34,7 +35,7 @@ class NetworkGate {
    constructor() {
       this.loadQueue();
       // Start processing any persisted tasks on boot/mount after a brief delay
-      setTimeout(() => this.processQueue(), 500);
+      setTimeout(() => this.processQueue(), TIMEOUT.QUEUE_PROCESS);
    }
 
    private loadQueue() {
@@ -103,7 +104,7 @@ class NetworkGate {
             let result: any = null;
             let lastError: any = null;
 
-            while (entry.retries < 3 && !success) {
+            while (entry.retries < RETRY.QUEUE_MAX && !success) {
                try {
                   result = await this.executeRequest(entry.request);
                   success = true;
@@ -111,7 +112,7 @@ class NetworkGate {
                   lastError = err;
                   entry.retries++;
                   this.saveQueue();
-                  if (entry.retries < 3) {
+                  if (entry.retries < RETRY.QUEUE_MAX) {
                      // Exponential backoff: wait 1s, then 2s
                      await new Promise((res) =>
                         setTimeout(res, 1000 * entry.retries),
@@ -132,7 +133,7 @@ class NetworkGate {
                   callbacks.reject(
                      lastError ||
                         new Error(
-                           `Request failed after 3 retries: ${entry.action}`,
+                           `Request failed after ${RETRY.QUEUE_MAX} retries: ${entry.action}`,
                         ),
                   );
                }

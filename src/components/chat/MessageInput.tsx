@@ -6,6 +6,7 @@ import type { Message } from "../../hooks/useChat";
 import UserSuggestions from "./UserSuggestions";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
+import { TOAST_DURATION } from "../../constants/ui";
 
 export class WAVRecorder {
     private audioContext: AudioContext | null = null;
@@ -274,7 +275,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
             }, 1000);
         } catch (err) {
             console.error("Error accessing microphone:", err);
-            useAppStore.getState().triggerToast("Could not access microphone. Ensure you have granted permission.", 4000);
+            useAppStore.getState().triggerToast("Could not access microphone. Ensure you have granted permission.", TOAST_DURATION.LONG);
         }
     };
 
@@ -290,7 +291,7 @@ const MessageInput = ({ onSend, onSendVoice, onSendImage, onTyping, replyingTo, 
 
         if (audioBlob.size < 500) {
             console.warn("Captured audio is too small, likely failed:", audioBlob.size);
-            useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", 4000);
+            useAppStore.getState().triggerToast("Audio capture failed. Please check permissions.", TOAST_DURATION.LONG);
         } else {
             onSendVoice(audioBlob);
         }

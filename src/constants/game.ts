@@ -57,3 +57,71 @@ export const SCORING = {
     /** Score penalty for using a hint. */
     HINT_PENALTY: 100,
 } as const;
+
+/** Retry configuration for network operations. */
+export const RETRY = {
+   SYNC_DELAY: 1000,
+   PUSH_COUNT: 3,
+   QUEUE_MAX: 3,
+   NETWORK_GATE_MAX: 5,
+   SYNC_COUNT: 3,
+} as const;
+
+/** Timeouts and delay values used across the app. */
+export const TIMEOUT = {
+   CHANNEL_CLEANUP: 1000,
+   RECONNECT_GRACE: 5000,
+   RECONNECT_CHECK: 4000,
+   PRELOAD: 2000,
+   QUEUE_PROCESS: 500,
+   STORAGE_FLUSH: 500,
+   TYPING: 2000,
+   HEARTBEAT_INTERVAL: 2 * 60 * 1000,
+   AVATAR_CLICK_RESET: 1500,
+   LEADERBOARD_REFRESH: 1500,
+   BOT_TURN: 600,
+   DRAFT_DEBOUNCE: 300,
+   IMAGE_RETRY: 200,
+   SCROLL: 150,
+   MESSAGE_SYNC_THROTTLE: 10000,
+   REFRESH_AFTER_HIDDEN: 30 * 60 * 1000,
+   AUDIO_RECONNECT: 90000,
+} as const;
+
+/** Page size and limit constants for data fetching. */
+export const LIMITS = {
+   NOTIFICATIONS: 50,
+   PRESENCE: 100,
+   MESSAGES: 300,
+   COMMENTS: 3,
+   RECENT_PLAYERS: 5,
+   ADMIN_PAGE: 1000,
+   MARATHON_SORT: 15,
+} as const;
+
+/** Layout and dimension values. */
+export const LAYOUT = {
+   COMPACT_GRID_THRESHOLD: 6,
+   GRID_PADDING_COMPACT: 16,
+   GRID_PADDING: 32,
+   GRID_EXTRA_WIDTH: 32,
+   GRID_RESIZE_SCALE: 0.85,
+} as const;
+
+/** Wrapped modal canvas and timing. */
+export const WRAPPED = {
+   CANVAS_WIDTH: 1080,
+   CANVAS_HEIGHT: 1920,
+   SLIDE_DURATION: 4000,
+} as const;
+
+/** Misc domain constants. */
+export const MISC = {
+   MESSAGE_PURGE_DAYS: 7,
+   DEFAULT_CHALLENGE_DAYS: 7,
+   CACHE_EXPIRATION_MS: 24 * 60 * 60 * 1000,
+   MESSAGE_EDIT_TIMEOUT: 5 * 60 * 1000,
+   PUSH_THROTTLE_HOURS: 24,
+   VS_STAGGER: 0.1,
+   LOADING_STAGGER: 0.1,
+} as const;

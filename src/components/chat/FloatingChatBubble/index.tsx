@@ -10,6 +10,7 @@ import { compressImage, decryptDM, encryptDM, getDMRoomKey } from "../../../hook
 import { supabase } from "../../../lib/supabaseClient";
 import { useAppStore } from "../../../store/useAppStore";
 import { safeLocalStorage } from "../../../utils/storage";
+import { Z_INDEX, TOAST_DURATION } from "../../../constants/ui";
 import { ModalLayout } from "../../layout/ModalLayout";
 import { ReactionModal } from "../ChatMessage/ReactionModal";
 import { ProtectedAvatar } from "../ProtectedAvatar";
@@ -197,7 +198,7 @@ export default function FloatingChatBubble() {
          }, 1000);
       } catch (err) {
          console.error("Error accessing microphone:", err);
-         useAppStore.getState().triggerToast("Could not access microphone.", 4000);
+         useAppStore.getState().triggerToast("Could not access microphone.", TOAST_DURATION.LONG);
       }
    };
 
@@ -212,7 +213,7 @@ export default function FloatingChatBubble() {
       }
 
       if (audioBlob.size < 500) {
-         useAppStore.getState().triggerToast("Audio capture failed.", 4000);
+         useAppStore.getState().triggerToast("Audio capture failed.", TOAST_DURATION.LONG);
       } else {
          await handleSendVoice(audioBlob);
       }
@@ -327,7 +328,7 @@ export default function FloatingChatBubble() {
          startInactivityTimer();
       } catch (err) {
          console.error("Failed to send voice note:", err);
-         useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+         useAppStore.getState().triggerToast("Failed to send voice note.", TOAST_DURATION.LONG);
       } finally {
          setIsSending(false);
       }
@@ -384,7 +385,7 @@ export default function FloatingChatBubble() {
          startInactivityTimer();
       } catch (err) {
          console.error("Failed to send image:", err);
-         useAppStore.getState().triggerToast("Failed to send image.", 4000);
+         useAppStore.getState().triggerToast("Failed to send image.", TOAST_DURATION.LONG);
       } finally {
          setIsSending(false);
       }
@@ -780,10 +781,10 @@ export default function FloatingChatBubble() {
             }
             textArea.remove();
          }
-         useAppStore.getState().triggerToast("Message copied to clipboard", 2000);
+         useAppStore.getState().triggerToast("Message copied to clipboard", TOAST_DURATION.SHORT);
       } catch (err) {
          console.error('Failed to copy:', err);
-         useAppStore.getState().triggerToast("Failed to copy message", 2000);
+         useAppStore.getState().triggerToast("Failed to copy message", TOAST_DURATION.SHORT);
       }
    };
 
@@ -1022,7 +1023,7 @@ export default function FloatingChatBubble() {
                      whileTap={{ scale: 0.95 }}
                      className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
                      style={{
-                        zIndex: 99999,
+                         zIndex: Z_INDEX.CHAT_BUBBLE,
                      }}
                   >
                      {unreadCount > 0 && latestUnreadMsg ? (

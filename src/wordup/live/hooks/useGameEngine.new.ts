@@ -24,6 +24,7 @@ import { supabase } from "../../../lib/supabaseClient";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useLiveStore } from "../store/useLiveStore";
 import { wordupAudio } from "../../../utils/wordupAudio";
+import { TOAST_DURATION } from "../../../constants/ui";
 import { getQuestionDuration, calcPoints } from "./useGameEngine.core";
 import {
     decryptMatchQuestions,
@@ -435,7 +436,7 @@ export function useGameEngine(props: EngineProps) {
             } else {
                 if ((currentRoundRef.current + 2) % 7 === 0 || currentRoundRef.current === totalRounds - 2) {
                     wordupAudio.playFinalRoundAnticipationStart();
-                    triggerToast("DOUBLE POINTS ROUND!", 3000);
+                    triggerToast("DOUBLE POINTS ROUND!", TOAST_DURATION.DEFAULT);
                     wordupAudio.startFinalRoundBeat();
                 }
                 advanceRound();
@@ -1106,7 +1107,7 @@ export function useGameEngine(props: EngineProps) {
                     }
                 })
                 .on("broadcast", { event: "match_abandoned" }, () => {
-                    triggerToast("Opponent left the match.", 3000);
+                    triggerToast("Opponent left the match.", TOAST_DURATION.DEFAULT);
                     stopAllTimers();
                     setPhase("idle");
                     useLiveStore.getState().setView("menu");

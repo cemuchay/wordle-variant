@@ -6,6 +6,7 @@ import { generateWordUpQuestions, generateSecretKey, encryptQuestions } from "..
 import { isProceduralCategory } from "../../../services/wordup/generatorRegistry";
 import { generateMatchQuestions } from "../../../services/wordup/questionService";
 import formatUsername from '../../../utils/formatUsername';
+import { TOAST_DURATION } from '../../../constants/ui';
 
 export const useAsyncMatchmaking = (
    user: any,
@@ -73,11 +74,11 @@ export const useAsyncMatchmaking = (
 
          useAsyncStore.getState().setMatchId(newMatch.id);
          useAsyncStore.getState().setRole("player1");
-         triggerToast("Match created! Your opponent will see it in their pending list.", 3000);
+         triggerToast("Match created! Your opponent will see it in their pending list.", TOAST_DURATION.DEFAULT);
          return newMatch.id;
       } catch (e) {
          console.error("Failed to create async match:", e);
-         triggerToast("Failed to create match. Try again.", 4000);
+         triggerToast("Failed to create match. Try again.", TOAST_DURATION.LONG);
          return null;
       }
    }, [user, category, triggerToast]);

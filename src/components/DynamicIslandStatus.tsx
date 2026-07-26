@@ -12,7 +12,8 @@ import { useAppStore } from '../store/useAppStore';
 import { WordUpMascot } from '../wordup/shared/WordUpMascot';
 import type { MascotExpression } from '../wordup/shared/WordUpMascot';
 import formatUsername from '../utils/formatUsername';
-import { Z_INDEX } from '../constants/ui';
+import { Z_INDEX, TOAST_DURATION } from '../constants/ui';
+import { TIMEOUT } from '../constants/game';
 
 export const DynamicIslandStatus = () => {
     const { user } = useAuth();
@@ -104,7 +105,7 @@ export const DynamicIslandStatus = () => {
 
     useEffect(() => {
         if (audioChat.error) {
-            triggerToast(audioChat.error, 5000);
+            triggerToast(audioChat.error, TOAST_DURATION.VERY_LONG);
         }
     }, [audioChat.error, triggerToast]);
 
@@ -114,7 +115,9 @@ export const DynamicIslandStatus = () => {
             const detail = (e as CustomEvent)?.detail;
             if (detail && detail.message) {
                 // Briefly flash in Dynamic Island using triggerToast
-                triggerToast(detail.message, 5000);
+triggerToast(detail.message, TOAST_DURATION.VERY_LONG);
+
+
             }
         };
         window.addEventListener('new-notification', handleNewNotification);
@@ -127,7 +130,7 @@ export const DynamicIslandStatus = () => {
             if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
             toastTimerRef.current = setTimeout(() => {
                 setToast({ ...toast, show: false });
-            }, toast.duration || 3000);
+            }, toast.duration || TOAST_DURATION.DEFAULT);
             return () => {
                 if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
             };
@@ -179,7 +182,7 @@ export const DynamicIslandStatus = () => {
         if (mascot) {
             const timer = setTimeout(() => {
                 setMascot(null);
-            }, 90000);
+            }, TIMEOUT.AUDIO_RECONNECT);
             return () => clearTimeout(timer);
         }
     }, [mascot]);
@@ -749,7 +752,7 @@ export const DynamicIslandStatus = () => {
                                                             <button
                                                                 onClick={() => {
                                                                     if (activeCall) {
-                                                                        triggerToast("You are already in a call.", 4000);
+                                                                        triggerToast("You are already in a call.", TOAST_DURATION.LONG);
                                                                         return;
                                                                     }
                                                                     initiatePrivateCall({

@@ -11,6 +11,7 @@ import { DAILY_CONFIG } from '../../constants/marathon';
 import { parseMarathonGames, getMarathonTimer, type MarathonGame } from '../../utils/marathon';
 import { supabase } from '../../lib/supabaseClient';
 import { deobfuscateWord } from '../../lib/game-logic';
+import { TOAST_DURATION } from '../../constants/ui';
 
 interface MarathonGameplayProps {
     challenge: any;
@@ -171,7 +172,7 @@ export const MarathonGameplay = memo(function MarathonGameplay({
             }
         } catch (err: any) {
             console.error("Failed to fetch bot daily words:", err);
-            triggerToast("Failed to fetch today's words.", 4000);
+            triggerToast("Failed to fetch today's words.", TOAST_DURATION.LONG);
         }
     }, [challenge.is_bot_marathon, challenge.target_word, triggerToast]);
 
