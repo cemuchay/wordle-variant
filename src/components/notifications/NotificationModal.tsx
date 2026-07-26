@@ -119,7 +119,7 @@ export const NotificationModal = memo(() => {
             markAsRead(n.id);
         }
 
-        if (n.type === 'CHALLENGE_INVITE' || n.type === 'CHALLENGE_COMPLETED' || n.type === 'MARATHON_GAME_COMPLETED') {
+        if (['CHALLENGE_INVITE', 'CHALLENGE_COMPLETED', 'MARATHON_GAME_COMPLETED', 'BOT_MARATHON_NEW', 'BOT_MARATHON_OVERTAKEN', 'BOT_MARATHON_FINALE'].includes(n.type)) {
             if (n.data?.mode === 'wordup_async') {
                 const matchId = n.data?.matchId;
                 if (matchId) {
@@ -139,6 +139,17 @@ export const NotificationModal = memo(() => {
                     setIsNotificationsOpen(false);
                 }
             }
+        } else if (n.type === 'ADMIN_BROADCAST') {
+            const targetUrl = n.data?.url || n.data?.action_url;
+            if (targetUrl) {
+                if (targetUrl.startsWith('http')) {
+                    window.open(targetUrl, '_blank');
+                } else {
+                    window.history.pushState({}, '', targetUrl);
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+            }
+            setIsNotificationsOpen(false);
         } else if (n.type === 'LEADERBOARD_OVERTAKEN') {
             window.dispatchEvent(new CustomEvent('open-stats-modal', { detail: { tab: 'leaderboard' } }));
             setIsNotificationsOpen(false);
@@ -167,6 +178,7 @@ export const NotificationModal = memo(() => {
             setIsChatOpen(true);
             setIsNotificationsOpen(false);
         }
+
     }, [markAsRead, setIsChallengeOpen, setIsNotificationsOpen, setIsChatOpen]);
 
     const sortedNotifications = useMemo(() => {
@@ -248,6 +260,10 @@ export const NotificationModal = memo(() => {
                                 const isInteractive = n.type === 'CHALLENGE_INVITE' ||
                                     n.type === 'CHALLENGE_COMPLETED' ||
                                     n.type === 'MARATHON_GAME_COMPLETED' ||
+                                    n.type === 'BOT_MARATHON_NEW' ||
+                                    n.type === 'BOT_MARATHON_OVERTAKEN' ||
+                                    n.type === 'BOT_MARATHON_FINALE' ||
+                                    n.type === 'ADMIN_BROADCAST' ||
                                     n.type === 'LEADERBOARD_OVERTAKEN' ||
                                     n.type === 'DM_MESSAGE' ||
                                     n.type === 'CHAT_MENTION' ||
@@ -255,6 +271,7 @@ export const NotificationModal = memo(() => {
                                     n.type === 'NEW_COMMENT' ||
                                     n.type === 'FOLLOWEE_STARTED_PLAYING' ||
                                     n.type === 'FOLLOWEE_FINISHED_PLAYING';
+
                                 const isSessionNew = sessionNewIds.has(n.id);
                                 return (
                                     <NotificationItem

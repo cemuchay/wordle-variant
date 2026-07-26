@@ -884,10 +884,127 @@ serve(async (req) => {
          );
       }
 
+      // ACTION: BOT MARATHON NEW EVENT
+      if (action === "bot-marathon-new-event") {
+         log(`Starting action bot-marathon-new-event`);
+         const challengeId = body.challenge_id;
+         const targetUrl = `${APP_URL}/?challenge=${challengeId || ""}`;
+
+         // Fetch active users without push subscriptions
+         const { data: recipients, error } = await supabase.rpc("get_active_users_for_bot_marathon");
+         if (error) throw error;
+
+         const emailEligible = (recipients || []).filter((r: any) => !r.has_push_sub && r.receive_emails);
+         log(`Found ${emailEligible.length} active users eligible for bot marathon email notification.`);
+
+         for (const r of emailEligible) {
+            const content = `
+               <p>A brand new <strong>Daily Bot Marathon Event</strong> has just been created!</p>
+               <p>Compete against <strong>Variant Bot</strong> and players worldwide across sequential 3 to 7-letter word puzzles. Prove your word skills and claim top standing on the leaderboard!</p>
+               <div style="margin: 32px 0 16px 0; text-align: center;">
+                 <a href="${targetUrl}" class="btn-primary">Join Bot Marathon Now</a>
+               </div>
+            `;
+            const html = getEmailHtml(r.username, r.user_id, "🤖 New Daily Bot Marathon Event!", content);
+            const success = await sendEmailWithFallback(r.email, "🤖 New Daily Bot Marathon Event! Compete Now", html);
+            if (success) sentCount++;
+         }
+
+         return new Response(JSON.stringify({ success: true, action, emails_sent: sentCount }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
+
+      // ACTION: BOT MARATHON OVERTAKEN
+      if (action === "bot-marathon-overtaken") {
+         log(`Starting action bot-marathon-overtaken`);
+         const targetEmail = body.email;
+         const targetUsername = body.username || "Player";
+         const targetUserId = body.user_id;
+         const surpassedBy = body.surpassed_by || "Another player";
+         const challengeId = body.challenge_id;
+         const targetUrl = `${APP_URL}/?challenge=${challengeId || ""}`;
+
+         if (targetEmail) {
+            const content = `
+               <p><strong>${formatUsername(surpassedBy)}</strong> just surpassed your score in the Daily Bot Marathon Event!</p>
+               <p>Don't let them take your rank. Rejoin the challenge right now and push for a higher score!</p>
+               <div style="margin: 32px 0 16px 0; text-align: center;">
+                 <a href="${targetUrl}" class="btn-primary">Reclaim Your Rank</a>
+               </div>
+            `;
+            const html = getEmailHtml(targetUsername, targetUserId, "⚠️ You've Been Passed!", content);
+            const success = await sendEmailWithFallback(targetEmail, `⚠️ ${formatUsername(surpassedBy)} passed you in the Bot Marathon!`, html);
+            if (success) sentCount++;
+         }
+
+         return new Response(JSON.stringify({ success: true, action, emails_sent: sentCount }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
+
+      // ACTION: BOT MARATHON GRAND FINALE
+      if (action === "bot-marathon-grand-finale") {
+         log(`Starting action bot-marathon-grand-finale`);
+         const targetEmail = body.email;
+         const targetUsername = body.username || "Player";
+         const targetUserId = body.user_id;
+         const challengeId = body.challenge_id;
+         const targetUrl = `${APP_URL}/?challenge=${challengeId || ""}`;
+
+         if (targetEmail) {
+            const content = `
+               <p>The <strong>Grand Finale</strong> for the Daily Bot Marathon Event is approaching!</p>
+               <p>There are only <strong>24 hours remaining</strong> to complete your games and lock in your position on the leaderboard.</p>
+               <div style="margin: 32px 0 16px 0; text-align: center;">
+                 <a href="${targetUrl}" class="btn-primary">Play Final Rounds</a>
+               </div>
+            `;
+            const html = getEmailHtml(targetUsername, targetUserId, "🔥 Bot Marathon Grand Finale Approaching!", content);
+            const success = await sendEmailWithFallback(targetEmail, "🔥 24 Hours Left! Bot Marathon Grand Finale", html);
+            if (success) sentCount++;
+         }
+
+         return new Response(JSON.stringify({ success: true, action, emails_sent: sentCount }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
+
+      // ACTION: ADMIN CUSTOM BROADCAST
+      if (action === "admin-custom-broadcast") {
+         log(`Starting action admin-custom-broadcast`);
+         const targetEmail = body.email;
+         const targetUsername = body.username || "Player";
+         const targetUserId = body.user_id;
+         const title = body.title || "Special Announcement";
+         const message = body.message || "";
+         const url = body.url || APP_URL;
+         const targetUrl = url.startsWith("http") ? url : `${APP_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+
+         if (targetEmail) {
+            const content = `
+               <div style="margin-bottom: 24px;">
+                 <p style="font-size: 15px; line-height: 1.6; color: #f3f4f6;">${message.replace(/\n/g, "<br>")}</p>
+               </div>
+               <div style="margin: 32px 0 16px 0; text-align: center;">
+                 <a href="${targetUrl}" class="btn-primary">Open Variant</a>
+               </div>
+            `;
+            const html = getEmailHtml(targetUsername, targetUserId, title, content);
+            const success = await sendEmailWithFallback(targetEmail, title, html);
+            if (success) sentCount++;
+         }
+
+         return new Response(JSON.stringify({ success: true, action, emails_sent: sentCount }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
+
       return new Response(JSON.stringify({ error: "Invalid action" }), {
          status: 400,
          headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+
    } catch (error) {
       log(
          `[ERROR] Fatal execution failure in action "${action}": ${(error as any).message}`,
