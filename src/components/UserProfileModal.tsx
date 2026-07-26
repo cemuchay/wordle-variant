@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays, MessageCircle, UserPlus, UserMinus, MessageSquare, MessageSquareOff, Users } from 'lucide-react';
+import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Target, CalendarDays, MessageCircle, UserPlus, UserMinus, MessageSquare, MessageSquareOff, Users } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -9,10 +9,11 @@ import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
-import { isCurrentPeriod, formatAwardPeriod } from '../utils/isoWeek';
 import { calculateStreak } from '../utils/streak';
 import { useUserFollowers, useUserFollowing, useIsFollowing, useToggleFollowMutation, type FollowUser } from '../hooks/queries/useFollows';
 import { useAppStore } from '../store/useAppStore';
+import { TrophyCabinet } from './awards/TrophyCabinet';
+import { TrophyCabinetExplorer } from './awards/TrophyCabinetExplorer';
 
 interface UserProfileModalProps {
     userId: string;
@@ -103,7 +104,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [allChallengeParticipations, setAllChallengeParticipations] = useState<{ challenge_id: string; user_id: string; score: number; status: string }[]>([]);
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
     const [awards, setAwards] = useState<UserAward[]>([]);
-    const [visibleAwardsCount, setVisibleAwardsCount] = useState(20);
+    const [isCabinetOpen, setIsCabinetOpen] = useState(false);
 
     const handleFollowToggle = async () => {
         if (!currentUser || !profile) return;
@@ -630,86 +631,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                         </div>
                                     </div>
 
-                                    {/* Award system (badges) */}
-                                    <div className="space-y-2">
-                                        <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">Leaderboard Awards</h3>
-                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.dailyWins > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Award size={24} className={`${stats.dailyWins > 0 ? 'text-yellow-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.dailyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Daily Champion</div>
-                                            </div>
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.weeklyWins > 0 ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={24} className={`${stats.weeklyWins > 0 ? 'text-blue-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.weeklyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Weekly Master</div>
-                                            </div>
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.monthlyWins > 0 ? 'bg-purple-500/10 border-purple-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={24} className={`${stats.monthlyWins > 0 ? 'text-purple-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.monthlyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Monthly Dominator</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Awards History */}
-                                    {awards.length > 0 && (() => {
-                                        const completedAwards = awards.filter(a => !isCurrentPeriod(a.award_type, a.period_key));
-                                        if (completedAwards.length === 0) return null;
-                                        return (
-                                            <div className="space-y-2">
-                                                <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">
-                                                    Awards History ({completedAwards.length})
-                                                </h3>
-                                                <div className="space-y-1">
-                                                    {completedAwards.slice(0, visibleAwardsCount).map(a => {
-                                                        let icon, label, colorClass, bgClass;
-                                                        switch (a.award_type) {
-                                                            case 'weekly_champion':
-                                                                icon = <Trophy size={12} className="text-blue-400 shrink-0" />;
-                                                                label = 'Weekly Champion';
-                                                                colorClass = 'text-blue-300';
-                                                                bgClass = 'bg-blue-500/10';
-                                                                break;
-                                                            case 'monthly_champion':
-                                                                icon = <Trophy size={12} className="text-purple-400 shrink-0" />;
-                                                                label = 'Monthly Dominator';
-                                                                colorClass = 'text-purple-300';
-                                                                bgClass = 'bg-purple-500/10';
-                                                                break;
-                                                            case 'bot_marathon_weekly':
-                                                                icon = <Zap size={12} className="text-emerald-400 shrink-0" />;
-                                                                label = 'Bot Marathon Champ';
-                                                                colorClass = 'text-emerald-300';
-                                                                bgClass = 'bg-emerald-500/10';
-                                                                break;
-                                                        }
-                                                        return (
-                                                            <div key={a.id} className={`flex items-center gap-2 ${bgClass} rounded-xl px-3 py-2 border border-white/5`}>
-                                                                {icon}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <span className={`text-[11px] font-semibold ${colorClass}`}>{label}</span>
-                                                                    <span className="text-[9px] text-white ml-1.5">{formatAwardPeriod(a.award_type, a.period_key)}</span>
-                                                                </div>
-                                                                <span className="text-[10px] font-black text-white/70 shrink-0">{a.score} pts</span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                                {visibleAwardsCount < completedAwards.length && (
-                                                    <button
-                                                        onClick={() => setVisibleAwardsCount(prev => Math.min(prev + 20, completedAwards.length))}
-                                                        className="w-full text-[10px] font-black uppercase text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl py-2 transition-colors cursor-pointer"
-                                                    >
-                                                        Load More ({completedAwards.length - visibleAwardsCount} remaining)
-                                                    </button>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
+                                    <TrophyCabinet
+                                       stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                                       awards={awards}
+                                       onExplore={() => setIsCabinetOpen(true)}
+                                    />
                                 </div>
                             ) : (
                                 <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300">
@@ -818,6 +744,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     users={followListModal === 'followers' ? followers : following}
                     onClose={() => setFollowListModal(null)}
                     onSelectUser={(newId) => setViewedUserId(newId)}
+                />
+            )}
+            {isCabinetOpen && profile && (
+                <TrophyCabinetExplorer
+                    stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                    awards={awards}
+                    username={profile.username}
+                    onClose={() => setIsCabinetOpen(false)}
                 />
             )}
         </div>

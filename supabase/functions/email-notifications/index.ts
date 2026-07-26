@@ -685,6 +685,29 @@ serve(async (req) => {
          }
          log(`Leaderboard size: ${leaderboard?.length || 0}`);
 
+         // Compute previous ISO week key for awards lookup
+         const prevMonday = new Date();
+         const dayOfWeek = (prevMonday.getDay() + 6) % 7;
+         prevMonday.setDate(prevMonday.getDate() - dayOfWeek - 7);
+         const isoYear = prevMonday.getFullYear();
+         const startOfYear = new Date(isoYear, 0, 1);
+         const diffDays = Math.floor((prevMonday.getTime() - startOfYear.getTime()) / 86400000);
+         const weekNum = Math.ceil((diffDays + startOfYear.getDay() + 1) / 7);
+         const prevWeekKey = `${isoYear}-W${String(weekNum).padStart(2, '0')}`;
+
+         // Fetch weekly awards
+         const { data: weeklyAwards } = await supabase
+            .from("user_awards")
+            .select("user_id, award_type, score")
+            .eq("period_key", prevWeekKey);
+         const winnerMap: Record<string, { weekly_champion?: number; bot_marathon_weekly?: number }> = {};
+         if (weeklyAwards) {
+            for (const award of weeklyAwards) {
+               if (!winnerMap[award.user_id]) winnerMap[award.user_id] = {};
+               winnerMap[award.user_id][award.award_type] = award.score;
+            }
+         }
+
          // 2. Fetch Weekly Report recipients (played at least 1 game last week)
          log(`Fetching weekly report recipients from DB...`);
          const { data: recipients, error: recErr } = await supabase.rpc(
@@ -744,6 +767,12 @@ serve(async (req) => {
                   );
                   const rank = globalIdx + 1;
                   const isMe = entry.username === recipient.username;
+                  const entryAwards = winnerMap[entry.user_id];
+                  let awardIcons = "";
+                  if (entryAwards) {
+                     if (entryAwards.weekly_champion) awardIcons += "🥇";
+                     if (entryAwards.bot_marathon_weekly) awardIcons += "🤖";
+                  }
 
                   const rankColor =
                      rank === 1
@@ -780,6 +809,7 @@ serve(async (req) => {
                 <td style="padding: 12px 8px; font-weight: bold; ${textStyle}">
                   <img src="${avatarSrc}" alt="" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #374151; vertical-align: middle; margin-right: 8px; background-color: #1f2937;" />
                   <span style="vertical-align: middle;">${formatUsername(entry.username)}${isMe ? " (You)" : ""}</span>
+                  ${awardIcons ? `<span style="margin-left: 4px; font-size: 12px;">${awardIcons}</span>` : ''}
                 </td>
                 <td style="padding: 12px 8px; text-align: right; font-weight: 900; color: #6366f1;">${entry.total_points}</td>
                 <td style="padding: 12px 8px; text-align: right; color: #9ca3af; font-size: 13px;">${entry.days_active}d</td>
@@ -805,8 +835,19 @@ serve(async (req) => {
 
                let statsSummaryHtml = "";
                if (myRank) {
+                  let awardBadgesHtml = "";
+                  const recipientAwards = winnerMap[recipient.user_id];
+                  if (recipientAwards) {
+                     if (recipientAwards.weekly_champion) {
+                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000000; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 20px; margin: 0 4px;">🥇 Weekly Champion</div>`;
+                     }
+                     if (recipientAwards.bot_marathon_weekly) {
+                        awardBadgesHtml += `<div style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 14px; border-radius: 20px; margin: 0 4px;">🤖 Bot Marathon Champ</div>`;
+                     }
+                  }
                   statsSummaryHtml = `
               <div style="background-color: #1e1b4b; border: 1px solid #312e81; border-radius: 16px; padding: 18px; margin-bottom: 24px; text-align: center;">
+                ${awardBadgesHtml ? `<div style="margin-bottom: 12px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">${awardBadgesHtml}</div>` : ''}
                 <p style="margin: 0; font-size: 12px; text-transform: uppercase; font-weight: 900; color: #c7d2fe; letter-spacing: 0.05em;">Your Performance</p>
                 <div style="display: flex; justify-content: space-around; margin-top: 12px;">
                   <div>
