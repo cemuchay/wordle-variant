@@ -2,6 +2,8 @@
 import { memo } from 'react';
 import { formatTime } from './types';
 
+import { DEFAULT_WORD_LENGTH } from '../../constants/game';
+
 interface ScoreBreakdownProps {
     breakdown: any;
     gameData: any;
@@ -82,7 +84,7 @@ export const ScoreBreakdown = memo(({
             <div className="pt-2 mt-1 border-t border-gray-700 flex justify-between text-[11px] uppercase font-black text-gray-100">
                 <span>
                     {isMarathon
-                        ? `Game #${marathonGameIndex + 1} (${activeGame?.wordLength || 5}L) Score:`
+                        ? `Game #${marathonGameIndex + 1} (${activeGame?.wordLength || DEFAULT_WORD_LENGTH}L) Score:`
                         : "Total Index:"}
                 </span>
                 <span className="text-white bg-correct px-2 rounded-full">

@@ -7,9 +7,11 @@ import { supabase } from '../lib/supabaseClient';
 import { useChallengeStore } from '../store/useChallengeStore';
 import { useApp } from './AppContext';
 import { parseMarathonGames } from '../utils/marathon';
+import { DEFAULT_WORD_LENGTH } from '../constants/game';
 import { safeLocalStorage } from '../utils/storage';
 import { saveChallengeView, loadChallengeView } from '../utils/challengeViewPersistence';
 import { useAppStore } from '../store/useAppStore';
+import { TOAST_DURATION } from '../constants/ui';
 import { ChallengeFiltersProvider } from './ChallengeFiltersContext';
 import { ChallengeContext, type ChallengeContextType } from './ChallengeContext';
 
@@ -403,7 +405,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             if (challenge) {
                 const isExpired = new Date(challenge.expires_at) < new Date();
                 if (isExpired) {
-                    triggerToast("This challenge has expired. Viewing results.", 4000);
+                    triggerToast("This challenge has expired. Viewing results.", TOAST_DURATION.LONG);
                 }
 
                 // Add to recent challenges in localStorage
@@ -473,11 +475,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             } else {
                 setSelectedChallenge(null);
                 setMyParticipation(null);
-                triggerToast("Challenge not found.", 4000);
+                triggerToast("Challenge not found.", TOAST_DURATION.LONG);
             }
         } catch (err: any) {
             console.error("Error viewing challenge:", err);
-            triggerToast(err?.message || "Failed to load challenge details.", 4000);
+            triggerToast(err?.message || "Failed to load challenge details.", TOAST_DURATION.LONG);
             setSelectedChallenge(null);
             setMyParticipation(null);
         } finally {
@@ -505,7 +507,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             setMyParticipation(normalizedPart);
         } catch (err: any) {
             console.error("Failed to join challenge:", err);
-            triggerToast(err?.message || "Failed to join challenge.", 4000);
+            triggerToast(err?.message || "Failed to join challenge.", TOAST_DURATION.LONG);
         }
     }, [selectedChallenge, effectiveUser, joinMutation, normalizeParticipation, triggerToast, setMyParticipation, user]);
 
@@ -526,7 +528,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
 
         if (error) {
             console.error("Error creating guest profile:", error);
-            triggerToast("Failed to create guest profile. Please try again.", 4000);
+            triggerToast("Failed to create guest profile. Please try again.", TOAST_DURATION.LONG);
             return null;
         }
 
@@ -598,7 +600,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             }
         } catch (err: any) {
             console.error("Failed to create challenge:", err);
-            triggerToast(err?.message || "Failed to create challenge.", 4000);
+            triggerToast(err?.message || "Failed to create challenge.", TOAST_DURATION.LONG);
         } finally {
             setBootstrappingMessage(null);
         }
@@ -613,11 +615,11 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     max_attempts: maxAttempts
                 }
             });
-            triggerToast("Challenge updated successfully!", 3000);
+            triggerToast("Challenge updated successfully!", TOAST_DURATION.DEFAULT);
             setIsEditingChallenge(false);
         } catch (err: any) {
             console.error("Failed to update challenge:", err);
-            triggerToast(err?.message || "Failed to update challenge.", 4000);
+            triggerToast(err?.message || "Failed to update challenge.", TOAST_DURATION.LONG);
             throw err;
         }
     }, [updateMutation, triggerToast, maxAttempts]);
@@ -626,10 +628,10 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
         try {
             await deleteMutation.mutateAsync(challengeId);
             setSelectedChallenge(null);
-            triggerToast("Challenge deleted successfully.", 3000);
+            triggerToast("Challenge deleted successfully.", TOAST_DURATION.DEFAULT);
         } catch (err: any) {
             console.error("Failed to delete challenge:", err);
-            triggerToast(err?.message || "Failed to delete challenge.", 4000);
+            triggerToast(err?.message || "Failed to delete challenge.", TOAST_DURATION.LONG);
             throw err;
         }
     }, [deleteMutation, setSelectedChallenge, triggerToast]);
@@ -644,7 +646,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             setIsPlaying(true);
         } catch (err: any) {
             console.error("Failed to start challenge game:", err);
-            triggerToast(err?.message || "Failed to start challenge.", 4000);
+            triggerToast(err?.message || "Failed to start challenge.", TOAST_DURATION.LONG);
         } finally {
             setBootstrappingMessage(null);
         }
@@ -667,7 +669,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     participationId: myParticipation.id,
                     challengeId: selectedChallenge!.id,
                     gameIndex: resolvedGameIndex,
-                    wordLength: wordLength || games[resolvedGameIndex]?.wordLength || 5,
+                    wordLength: wordLength || games[resolvedGameIndex]?.wordLength || DEFAULT_WORD_LENGTH,
                     result,
                     playDate: isBotMarathon ? playDate : undefined
                 });
@@ -682,7 +684,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     const updatedMarathon = [...currentMarathon];
                     const idx = updatedMarathon.findIndex(p => p.game_index === resolvedGameIndex || (p.game_index === undefined && p.word_length === wordLength));
                     if (idx > -1) updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
-                    else updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
+                    else updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || DEFAULT_WORD_LENGTH, ...result } as any);
 
                     setMyParticipation({ ...myParticipation, marathon_progress: updatedMarathon });
                     return true;
@@ -696,7 +698,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                 if (idx > -1) {
                     updatedMarathon[idx] = { ...updatedMarathon[idx], game_index: resolvedGameIndex, ...result };
                 } else {
-                    updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || 5, ...result } as any);
+                    updatedMarathon.push({ game_index: resolvedGameIndex, word_length: wordLength || DEFAULT_WORD_LENGTH, ...result } as any);
                 }
 
                 let totalScore = 0;
@@ -947,7 +949,7 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
             const text = `Hey! I challenge you to a ${c.word_length === 1 ? 'Marathon' : c.word_length + '-letter'} match (${c.mode} mode)! 🏆\n\nJoin here: ${url}`;
             navigator.clipboard.writeText(text);
-            triggerToast('Challenge link copied to clipboard!', 2000);
+            triggerToast('Challenge link copied to clipboard!', TOAST_DURATION.SHORT);
         },
         shareLink: async (c: Challenge) => {
             const url = `${window.location.origin}${window.location.pathname}?challenge=${c.id}`;
@@ -964,12 +966,12 @@ export const ChallengeProvider = ({ children, user, onChallengeCreated, initialC
                     if (err.name !== 'AbortError') {
                         console.error('Error sharing:', err);
                         navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
-                        triggerToast('Copied to clipboard instead!', 2000);
+                        triggerToast('Copied to clipboard instead!', TOAST_DURATION.SHORT);
                     }
                 }
             } else {
                 navigator.clipboard.writeText(`${text}\n\nJoin here: ${url}`);
-                triggerToast('Copied to clipboard!', 2000);
+                triggerToast('Copied to clipboard!', TOAST_DURATION.SHORT);
             }
         },
         loadMyChallenges: async () => { await refetchChallenges(); },

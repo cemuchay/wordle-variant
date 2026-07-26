@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { type Challenge, type ChallengeParticipant } from '../hooks/useChallenge';
+import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from '../constants/game';
 
 export type ChallengeViewType = 'list' | 'lobby' | 'gameplay';
 
@@ -86,8 +87,8 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     activeGameLength: null,
     backAction: null,
     mode: 'ANYTIME',
-    length: 5,
-    maxAttempts: 6,
+    length: DEFAULT_WORD_LENGTH,
+    maxAttempts: MAX_ATTEMPTS,
     maxTime: null,
     invitedIds: [],
     selectedChallenge: null,
@@ -136,8 +137,8 @@ export const useChallengeStore = create<ChallengeState>((set) => ({
     }),
     resetForm: () => set({
         mode: 'ANYTIME',
-        length: 5,
-        maxAttempts: 6,
+        length: DEFAULT_WORD_LENGTH,
+        maxAttempts: MAX_ATTEMPTS,
         maxTime: null,
         invitedIds: []
     })

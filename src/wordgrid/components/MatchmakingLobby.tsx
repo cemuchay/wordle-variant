@@ -9,6 +9,7 @@ import { ALLOWED_GRID_SIZES, RECOMMENDED_MAX_PLAYERS } from '../../utils/wordgri
 import { useTheme } from '@/hooks/useTheme';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { Trash2 } from 'lucide-react';
+import { TOAST_DURATION } from '../../constants/ui';
 
 interface PlayerProfile {
   id: string;
@@ -122,7 +123,7 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
         const store = useWordGridStore.getState();
         if (store.loading || store.view === 'matchmaking') {
           useWordGridStore.setState({ loading: false, view: 'lobby' });
-          triggerToast('Game creation timed out (10s limit). Returning to lobby.', 4000);
+          triggerToast('Game creation timed out (10s limit). Returning to lobby.', TOAST_DURATION.LONG);
         }
       }, 10000);
       return () => clearTimeout(timer);

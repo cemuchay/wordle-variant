@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Loader2, Search, X } from "lucide-react";
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { MAX_ATTEMPTS } from "../../constants/game";
+import { MAX_ATTEMPTS, LIMITS, MISC } from "../../constants/game";
 import { useApp } from "../../context/AppContext";
 import { ChallengeContext } from "../../context/ChallengeContext";
 import {
@@ -79,7 +79,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const numDays = useMemo(() => {
-    if (!challenge?.created_at || !challenge?.expires_at) return 7;
+    if (!challenge?.created_at || !challenge?.expires_at) return MISC.DEFAULT_CHALLENGE_DAYS;
     const diffMs = new Date(challenge.expires_at).getTime() - new Date(challenge.created_at).getTime();
     return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
   }, [challenge?.created_at, challenge?.expires_at]);
@@ -523,7 +523,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
         .eq('target_user_id', tId)
         .eq('game_date', targetDate)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(LIMITS.COMMENTS);
 
       if (cmData) {
         const authorIds = Array.from(new Set(cmData.map(c => c.author_id)));

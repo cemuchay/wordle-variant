@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { RETRY, MISC } from "../constants/game";
 
 export interface ChallengeMessage {
    id: string;
@@ -164,7 +165,7 @@ export const useChallengeChat = (
 
    const retryOperation = async (
       operation: () => Promise<any>,
-      retries = 3,
+      retries = RETRY.SYNC_COUNT,
       delay = 1000,
    ): Promise<any> => {
       for (let i = 0; i < retries; i++) {
@@ -336,28 +337,28 @@ export const useChallengeChat = (
          const msg = messages.find((m) => m.id === messageId);
          if (!msg) return;
 
-         const elapsed = Date.now() - new Date(msg.created_at).getTime();
-         if (elapsed > 5 * 60 * 1000) return;
+          const elapsed = Date.now() - new Date(msg.created_at).getTime();
+          if (elapsed > MISC.MESSAGE_EDIT_TIMEOUT) return;
 
-         setMessages((prev) =>
-            prev.map((m) =>
-               m.id === messageId
-                  ? { ...m, content: newContent, is_edited: true }
-                  : m,
-            ),
-         );
+          setMessages((prev) =>
+             prev.map((m) =>
+                m.id === messageId
+                   ? { ...m, content: newContent, is_edited: true }
+                   : m,
+             ),
+          );
 
-         try {
-            const { error } = await supabase
-               .from("challenge_messages")
-               .update({ content: newContent, is_edited: true })
-               .eq("id", messageId);
-            if (error) throw error;
-         } catch (err) {
-            console.error("Failed to edit challenge message:", err);
-         }
-      },
-      [messages],
+          try {
+             const { error } = await supabase
+                .from("challenge_messages")
+                .update({ content: newContent, is_edited: true })
+                .eq("id", messageId);
+             if (error) throw error;
+          } catch (err) {
+             console.error("Failed to edit challenge message:", err);
+          }
+       },
+       [messages],
    );
 
    const deleteMessage = useCallback(
@@ -366,12 +367,12 @@ export const useChallengeChat = (
          if (!msg) return;
 
          const elapsed = Date.now() - new Date(msg.created_at).getTime();
-         if (elapsed > 5 * 60 * 1000) return;
+          if (elapsed > MISC.MESSAGE_EDIT_TIMEOUT) return;
 
-         setMessages((prev) =>
-            prev.map((m) =>
-               m.id === messageId
-                  ? {
+          setMessages((prev) =>
+             prev.map((m) =>
+                m.id === messageId
+                   ? {
                        ...m,
                        content: "🚫 This message was deleted",
                        is_deleted: true,

@@ -1,6 +1,7 @@
 import { Mic, MicOff, Volume2, VolumeX, Phone, PhoneOff, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { TOAST_DURATION } from '../../constants/ui';
 
 interface AudioChatControlsProps {
     challengeId: string;
@@ -24,7 +25,7 @@ export const AudioChatControls = ({ challengeId, userId: _userId }: AudioChatCon
         } else {
             // PREVENTION: Check if already in a DIFFERENT call
             if (activeCall) {
-                triggerToast("You are already in a call. Leave it first to join this one.", 4000);
+                triggerToast("You are already in a call. Leave it first to join this one.", TOAST_DURATION.LONG);
                 return;
             }
             setActiveCall({

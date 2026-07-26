@@ -12,7 +12,7 @@ import {
 import { generateRoast } from "../../utils/roastEngine";
 import returnAnimationTime from "../../utils/returnAnimationTime";
 import { TOAST_DURATION, ANIMATION_DURATION } from "../../constants/ui";
-import { ANIMATION } from "../../constants/game";
+import { ANIMATION, DEFAULT_WORD_LENGTH } from "../../constants/game";
 import { getLocalSalt, saveGameWithBackup } from "./utils";
 
 interface UseActionsProps {
@@ -46,7 +46,7 @@ export const useActions = ({
 
    const onChar = useCallback(
       (char: string) => {
-         dispatch({ type: "ADD_LETTER", char, maxLength: config?.length || 5 });
+         dispatch({ type: "ADD_LETTER", char, maxLength: config?.length || DEFAULT_WORD_LENGTH });
       },
       [dispatch, config?.length],
    );

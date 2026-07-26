@@ -5,6 +5,7 @@ import { Reply, CheckCheck, Smile, Pencil, Trash2 } from "lucide-react";
 import { ReigningBadge } from "../../common/ReigningBadge";
 import { ProtectedAvatar } from "../ProtectedAvatar";
 import { useAppStore } from '../../../store/useAppStore';
+import { MISC } from '../../../constants/game';
 
 import type { ChatMessageProps } from './types';
 import { MENTION_COLORS } from './constants';
@@ -12,6 +13,7 @@ import { ReactionPicker } from './ReactionPicker';
 import { ReactionModal } from './ReactionModal';
 import { ReactionBadge } from './ReactionBadge';
 import { ConnectedAudioPlayer } from './ConnectedAudioPlayer';
+import { TOAST_DURATION } from '../../../constants/ui';
 import { ChatImage } from './ChatImage';
 import { MessageContent } from './MessageContent';
 
@@ -89,10 +91,10 @@ const ChatMessage = memo(({
                 }
                 textArea.remove();
             }
-            triggerToast("Message copied to clipboard", 2000);
+            triggerToast("Message copied to clipboard", TOAST_DURATION.SHORT);
         } catch (err) {
             console.error('Failed to copy:', err);
-            triggerToast("Failed to copy message", 2000);
+            triggerToast("Failed to copy message", TOAST_DURATION.SHORT);
         }
     };
 
@@ -103,7 +105,7 @@ const ChatMessage = memo(({
 
     const isWithinTimeLimit = useMemo(() => {
         const elapsed = Date.now() - new Date(msg.created_at).getTime();
-        return elapsed < 5 * 60 * 1000; // 5 minutes
+        return elapsed < MISC.MESSAGE_EDIT_TIMEOUT;
     }, [msg.created_at]);
 
     const isEditable = isMe && !msg.is_deleted && isWithinTimeLimit;

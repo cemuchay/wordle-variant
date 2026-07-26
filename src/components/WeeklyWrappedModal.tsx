@@ -5,6 +5,9 @@ import { Volume2, VolumeX, ChevronLeft, ChevronRight, X, Trophy, Film, Share2 } 
 import { supabase } from '../lib/supabaseClient';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { logger } from '../lib/logger';
+import { getPreviousIsoWeekKey } from '../utils/isoWeek';
+import type { UserAward } from '../types/awards';
+import { DEFAULT_WORD_LENGTH, WRAPPED } from '../constants/game';
 
 const getWeekNumber = (d: Date): number => {
     const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -327,6 +330,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [userRank, setUserRank] = useState<{ rank: number; entry: LeaderboardEntry } | null>(null);
     const [username, setUsername] = useState('Player');
+    const [weeklyAwards, setWeeklyAwards] = useState<UserAward[]>([]);
 
     const [isRecording, setIsRecording] = useState(false);
     const [recordingProgress, setRecordingProgress] = useState(0);
@@ -410,6 +414,17 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                             entry: typedLb[userIdx]
                         });
                     }
+                }
+
+                // Query awards for the previous week
+                const prevWeekKey = getPreviousIsoWeekKey();
+                const { data: awardsData } = await supabase
+                    .from('user_awards')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('period_key', prevWeekKey);
+                if (awardsData) {
+                    setWeeklyAwards(awardsData as UserAward[]);
                 }
             } catch (err) {
                 console.error("Error loading wrapped data:", err);
@@ -509,7 +524,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 1 to N: Daily Slides (weeklyScores.length)
     // N+1: Weekly Summary Stats
     // N+2: Leaderboard Spotlight (Last slide)
-    const totalSlides = 1 + weeklyScores.length + 2;
+    const totalSlides = 1 + weeklyScores.length + 3;
 
     const nextSlide = () => {
         if (currentSlide < totalSlides - 1) {
@@ -526,7 +541,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 3. Render slide background colors (Spotify Wrapped aesthetics)
     const getSlideBackground = (index: number) => {
         if (index === 0) return 'from-indigo-950 via-purple-950 to-gray-950'; // Intro
-        if (index === totalSlides - 2) return 'from-teal-950 via-emerald-950 to-gray-950'; // Stats
+        if (index === totalSlides - 3) return 'from-teal-950 via-emerald-950 to-gray-950'; // Stats
+        if (index === totalSlides - 2) return 'from-amber-950 via-yellow-950 to-gray-950'; // Awards
         if (index === totalSlides - 1) return 'from-fuchsia-950 via-violet-950 to-gray-950'; // Leaderboard
 
         // Alternate colors for daily slides
@@ -554,9 +570,13 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             grad.addColorStop(0, '#1e1b4b'); // indigo-950
             grad.addColorStop(0.5, '#3b0764'); // purple-950
             grad.addColorStop(1, '#030712'); // gray-950
-        } else if (index === totalSlides - 2) {
+        } else if (index === totalSlides - 3) {
             grad.addColorStop(0, '#115e59'); // teal-950
             grad.addColorStop(0.5, '#064e3b'); // emerald-950
+            grad.addColorStop(1, '#030712');
+        } else if (index === totalSlides - 2) {
+            grad.addColorStop(0, '#78350f'); // amber-950
+            grad.addColorStop(0.5, '#92400e'); // yellow-950
             grad.addColorStop(1, '#030712');
         } else if (index === totalSlides - 1) {
             grad.addColorStop(0, '#701a75'); // fuchsia-950
@@ -739,6 +759,52 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             drawMetric('WIN RATE', `${winPct}%`, height * 0.46, '#10b981');
             drawMetric('TOTAL POINTS', totalScore.toString(), height * 0.56, '#fbbf24');
 
+        } else if (index === totalSlides - 2) {
+            // Slide: Awards
+            ctx.fillStyle = '#fbbf24'; // amber-400
+            ctx.font = 'bold 36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('YOUR AWARDS', width / 2, height * 0.22);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 64px sans-serif';
+            ctx.fillText('TROPHY CABINET', width / 2, height * 0.28);
+
+            const awardList = weeklyAwards.length > 0 ? weeklyAwards : [];
+            if (awardList.length > 0) {
+                awardList.forEach((award, idx) => {
+                    const yBase = height * 0.38 + idx * 100;
+                    const label = award.award_type === 'weekly_champion'
+                        ? 'Weekly Champion'
+                        : award.award_type === 'bot_marathon_weekly'
+                            ? 'Bot Marathon Champ'
+                            : 'Monthly Dominator';
+
+                    ctx.fillStyle = 'rgba(251, 191, 36, 0.08)';
+                    ctx.fillRect(100, yBase, width - 200, 75);
+                    ctx.strokeStyle = 'rgba(251, 191, 36, 0.2)';
+                    ctx.strokeRect(100, yBase, width - 200, 75);
+
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = 'bold 32px sans-serif';
+                    ctx.fillText(`🏆 ${label}`, 140, yBase + 48);
+
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 28px sans-serif';
+                    ctx.fillText(`${award.score} pts`, width - 140, yBase + 48);
+                });
+            } else {
+                ctx.fillStyle = '#6b7280';
+                ctx.font = 'bold 32px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No awards this week', width / 2, height * 0.50);
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = '24px sans-serif';
+                ctx.fillText('Keep playing to earn trophies!', width / 2, height * 0.56);
+            }
+
         } else if (index === totalSlides - 1) {
             // Slide: Leaderboard Spotlight
             ctx.fillStyle = '#f472b6'; // pink-400
@@ -814,7 +880,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             // Draw Wordle grid of guesses
             const guesses = dayScore.guesses;
             const rows = guesses.length;
-            const cols = guesses[0]?.length || 5;
+            const cols = guesses[0]?.length || DEFAULT_WORD_LENGTH;
 
             // Scale tiles and gap to canvas resolution to guarantee visual quality
             // Scale down if word length > 8 to prevent horizontal overflow on 1080px canvas
@@ -951,8 +1017,8 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
     // 5. Share a single slide as PNG (actual browser share with download fallback)
     const exportSlideImage = () => {
         const canvas = canvasRef.current || document.createElement('canvas');
-        canvas.width = 1080;
-        canvas.height = 1920;
+        canvas.width = WRAPPED.CANVAS_WIDTH;
+        canvas.height = WRAPPED.CANVAS_HEIGHT;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -1025,7 +1091,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         // Draw the very first slide immediately BEFORE capturing and starting the recorder
         // This ensures the stream is initialized with image frames right away, preventing initial blank screens
-        drawSlideToCanvas(ctx, 0, 1080, 1920, 0);
+        drawSlideToCanvas(ctx, 0, WRAPPED.CANVAS_WIDTH, WRAPPED.CANVAS_HEIGHT, 0);
 
         // Setup MediaStream
         const stream = canvas.captureStream(30); // 30 FPS
@@ -1128,7 +1194,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
 
         // Pre-recording drawing loop: draw slide 0 at 20fps to feed the stream during startup
         preRecordIntervalRef.current = setInterval(() => {
-            drawSlideToCanvas(ctx, 0, 1080, 1920, 0);
+            drawSlideToCanvas(ctx, 0, WRAPPED.CANVAS_WIDTH, WRAPPED.CANVAS_HEIGHT, 0);
         }, 50);
 
         // Synchronize actual recording timeline with MediaRecorder onstart event
@@ -1139,7 +1205,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
             }
 
             // Play through all slides programmatically for the video recording (4.0 seconds per slide)
-            const slideDuration = 4000; // ms
+            const slideDuration = WRAPPED.SLIDE_DURATION;
             const totalDuration = totalSlides * slideDuration;
 
             let elapsed = 0;
@@ -1416,7 +1482,7 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                             Let's take a ride through all your daily guesses, roasts, and global standing.
                                         </p>
                                     </div>
-                                ) : currentSlide === totalSlides - 2 ? (
+                                ) : currentSlide === totalSlides - 3 ? (
                                     // Slide: Weekly Stats Summary
                                     <div className="space-y-6 text-center">
                                         <h2 className="text-xs font-black uppercase text-correct tracking-widest">Your Performance</h2>
@@ -1440,6 +1506,52 @@ export const WeeklyWrappedModal: React.FC<WeeklyWrappedModalProps> = ({
                                                 </span>
                                             </div>
                                         </div>
+                                    </div>
+                                ) : currentSlide === totalSlides - 2 ? (
+                                    // Slide: Awards
+                                    <div className="text-center space-y-6">
+                                        <h2 className="text-xs font-black uppercase text-amber-400 tracking-widest">Your Awards</h2>
+                                        <h1 className="text-3xl font-black text-white uppercase tracking-wider">Trophy Cabinet</h1>
+
+                                        {weeklyAwards.length > 0 ? (
+                                            <div className="space-y-3 max-w-xs mx-auto">
+                                                {weeklyAwards.map(a => {
+                                                    const isWeekly = a.award_type === 'weekly_champion';
+                                                    const isBot = a.award_type === 'bot_marathon_weekly';
+                                                    return (
+                                                        <div
+                                                            key={a.id}
+                                                            className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${
+                                                                isWeekly
+                                                                    ? 'bg-amber-500/10 border-amber-500/30'
+                                                                    : isBot
+                                                                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                                                                        : 'bg-purple-500/10 border-purple-500/30'
+                                                            }`}
+                                                        >
+                                                            <span className="text-2xl">{isWeekly ? '🏆' : isBot ? '🤖' : '👑'}</span>
+                                                            <div className="flex-1 text-left">
+                                                                <div className={`text-sm font-black uppercase tracking-wider ${
+                                                                    isWeekly ? 'text-amber-400' : isBot ? 'text-emerald-400' : 'text-purple-400'
+                                                                }`}>
+                                                                    {isWeekly ? 'Weekly Champion' : isBot ? 'Bot Marathon Champion' : 'Monthly Dominator'}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-400 font-bold">{a.score} points</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3 max-w-xs mx-auto">
+                                                <div className="w-16 h-16 bg-white/5 rounded-full border border-white/10 flex items-center justify-center mx-auto">
+                                                    <span className="text-2xl">🏆</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 leading-relaxed">
+                                                    No awards this week. Keep playing daily puzzles to earn trophies!
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : currentSlide === totalSlides - 1 ? (
                                     // Slide: Leaderboard Spotlight

@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Eye, Loader2, MessageCircle, RotateCw, Trophy, User, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MAX_ATTEMPTS } from '../constants/game';
+import { MAX_ATTEMPTS, TIMEOUT } from '../constants/game';
+import { TOAST_DURATION } from '../constants/ui';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabaseClient';
 import type { AppUser, LeaderboardEntry } from '../types/game';
@@ -134,7 +135,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
       console.error('Failed to clear sessionStorage on manual refresh:', e);
     }
     await fetchLeaderboard(true);
-    triggerToast("Leaderboard refreshed with latest scores!", 3000);
+    triggerToast("Leaderboard refreshed with latest scores!", TOAST_DURATION.DEFAULT);
   }, [fetchLeaderboard, loading, triggerToast, currentDate]);
 
   // Evict all sessionStorage caches on modal close (unmount)
@@ -195,7 +196,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           fetchLeaderboard(true, true);
-        }, 1500);
+        }, TIMEOUT.LEADERBOARD_REFRESH);
       }
     };
 
@@ -267,7 +268,7 @@ export const StatsModal: React.FC<Props> = ({ isOpen, onClose, user, stats, isGa
           fetchLeaderboard(true, isBackground);
 
 
-        }, 1500);
+        }, TIMEOUT.LEADERBOARD_REFRESH);
       }
     };
 

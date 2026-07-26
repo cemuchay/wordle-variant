@@ -34,6 +34,7 @@ import {
 import { deobfuscateWord } from "../../lib/game-logic";
 import { LobbyParticipantsSkeleton } from "./ChallengeUIElements";
 import formatUsername from '../../utils/formatUsername';
+import { TOAST_DURATION } from '../../constants/ui';
 import { DAILY_CONFIG } from '../../constants/marathon';
 
 const MODE_DEFINITIONS = {
@@ -335,7 +336,7 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
 
     if (gotMention) {
       const lastMsg = newMessages[newMessages.length - 1];
-      triggerToast(`@${formatUsername(lastMsg.sender_name)} mentioned you in chat!`, 4000);
+      triggerToast(`@${formatUsername(lastMsg.sender_name)} mentioned you in chat!`, TOAST_DURATION.LONG);
     }
   }, [messages, lobbyTab, effectiveUser, triggerToast]);
 
@@ -662,13 +663,13 @@ export const ChallengeLobby = memo(function ChallengeLobby() {
                             if (name.length < 3) {
                               triggerToast(
                                 "Nickname must be at least 3 characters.",
-                                3000,
+                                TOAST_DURATION.DEFAULT,
                               );
                               return;
                             }
                             const user = await registerAnonymousUser(name);
                             if (user) {
-                              triggerToast("Guest profile created! Joining...", 2000);
+                              triggerToast("Guest profile created! Joining...", TOAST_DURATION.SHORT);
                             }
                           }}
                           className="bg-correct text-black py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"

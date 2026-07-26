@@ -1,5 +1,6 @@
 import { type WordUpQuestion } from "./wordupQuestionGenerator";
 import { FLAG_MAP } from "../wordup/shared/constants";
+import { TIMEOUT } from "../constants/game";
 
 // Cache to hold preloaded flag image URLs so we don't have to resolve/re-verify them mid-game
 const flagUrlCache: Record<string, string> = {};
@@ -54,7 +55,7 @@ export function getCountryName(code: string): string {
    return code.toUpperCase();
 }
 
-function tryLoadImage(url: string, retries = 1, delay = 200): Promise<void> {
+function tryLoadImage(url: string, retries = 1, delay = TIMEOUT.IMAGE_RETRY): Promise<void> {
    return new Promise<void>((resolve, reject) => {
       let attempts = 0;
       const load = () => {

@@ -23,6 +23,7 @@ import { WORDUP_LIMITS, WORDUP_TIMEOUT } from "../../constants/wordup";
 import { RATING, XP } from "../../constants/wordup";
 import { safeLocalStorage } from "../../utils/storage";
 import formatUsername from '../../utils/formatUsername';
+import { TOAST_DURATION } from '../../constants/ui';
 
 interface AsyncViewProps {
    onBack?: () => void;
@@ -251,7 +252,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
       const mId = await createMatch(targetUser);
       if (!mId) {
          setView("menu");
-         triggerToast("Failed to create challenge.", 4000);
+         triggerToast("Failed to create challenge.", TOAST_DURATION.LONG);
          return;
       }
 
@@ -300,7 +301,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                startMatch?.(acceptedMId, "player1");
             } else {
                setView("menu");
-               triggerToast("Failed to start match.", 4000);
+               triggerToast("Failed to start match.", TOAST_DURATION.LONG);
             }
          })
          .on("broadcast", { event: "wordup_async_invite_later" }, () => {
@@ -315,7 +316,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
             challengeResolvedRef.current = true;
             clearChallengeResources();
             setView("menu");
-            triggerToast(`${payload?.senderName || "They"} declined your challenge.`, 3000);
+            triggerToast(`${payload?.senderName || "They"} declined your challenge.`, TOAST_DURATION.DEFAULT);
             try {
                await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", mId);
             } catch (err) {
@@ -638,7 +639,7 @@ export const AsyncView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }:
                onLater={() => {
                   setPendingChallenge(null);
                   setView("menu");
-                  triggerToast("Challenge saved. Play when you're ready!", 3000);
+                  triggerToast("Challenge saved. Play when you're ready!", TOAST_DURATION.DEFAULT);
                   refreshPending();
                }}
             />

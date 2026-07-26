@@ -27,6 +27,8 @@ import { useGameEngine } from "./hooks/useGameEngine";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useWordleStats } from "./hooks/useStats";
 import { supabase } from "./lib/supabaseClient";
+import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from "./constants/game";
+import { TOAST_DURATION } from "./constants/ui";
 import { wordupNetworkGate } from "./wordup/shared/wordupNetworkGate";
 import { type AppUser, type Challenge } from "./types/game";
 import { useChallengeStore } from "./store/useChallengeStore";
@@ -34,6 +36,7 @@ import { useAppStore } from "./store/useAppStore";
 import { safeLazy } from "./utils/safeLazy";
 import { safeLocalStorage, safeSessionStorage } from "./utils/storage";
 import formatUsername from './utils/formatUsername';
+import { TIMEOUT } from './constants/game';
 import { motion, AnimatePresence } from "framer-motion";
 import { AlreadyPlayedScreen } from "./components/AlreadyPlayedScreen";
 import MoreGamesList from "./components/MoreGamesList";
@@ -251,7 +254,7 @@ export default function App() {
     if (!saved) return false;
     try {
       const payload = JSON.parse(saved);
-      const isFinished = payload.status === "won" || payload.status === "lost" || (payload.guesses && payload.guesses.length >= (payload.config?.maxAttempts ?? 6));
+      const isFinished = payload.status === "won" || payload.status === "lost" || (payload.guesses && payload.guesses.length >= (payload.config?.maxAttempts ?? MAX_ATTEMPTS));
       return !!isFinished;
     } catch {
       return false;
@@ -415,7 +418,7 @@ export default function App() {
     if ("requestIdleCallback" in window) {
       (window as any).requestIdleCallback(preloadLazyComponents);
     } else {
-      const timer = setTimeout(preloadLazyComponents, 2000);
+      const timer = setTimeout(preloadLazyComponents, TIMEOUT.PRELOAD);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -486,7 +489,7 @@ export default function App() {
       if (!alreadySeen) {
         const timer = setTimeout(() => {
           setIsWeeklyWrappedOpen(true);
-        }, 750); // 750ms delay to ensure app is ready
+        }, TIMEOUT.PRELOAD); // delay to ensure app is ready
         return () => clearTimeout(timer);
       }
     }
@@ -654,7 +657,7 @@ export default function App() {
   useEffect(() => {
     const handleOpenProfile = (e: Event) => {
       if (!user) {
-        triggerToast("Please log in to view user profiles.", 4000);
+        triggerToast("Please log in to view user profiles.", TOAST_DURATION.LONG);
         setIsAuthOpen(true);
         return;
       }
@@ -692,7 +695,7 @@ export default function App() {
   );
 
   const handleChallengeCreated = () => {
-    triggerToast(`Challenge created successfully`, 3000);
+    triggerToast(`Challenge created successfully`, TOAST_DURATION.DEFAULT);
   };
 
   // Delayed realtime disconnected warning & reconnect feedback
@@ -719,7 +722,7 @@ export default function App() {
         if (realtimeStatus === "disconnected") {
           setShowDisconnectedUI(true);
         }
-      }, 5000); // 5 seconds grace period
+      }, TIMEOUT.RECONNECT_GRACE); // grace period
     };
 
     // Trigger attempt on mount/status change to disconnected
@@ -747,7 +750,7 @@ export default function App() {
       } else {
         setReconnectStatus("idle");
       }
-    }, 4000);
+    }, TIMEOUT.RECONNECT_CHECK);
   };
 
   const [incomingInviteTimeLeft, setIncomingInviteTimeLeft] = useState(15);
@@ -813,10 +816,10 @@ export default function App() {
             event: 'wordup_invite_later',
             payload: { matchId: newMatch.id, senderName: formatUsername(user?.user_metadata?.username) || user?.email?.split('@')[0] || "Opponent" }
           });
-          setTimeout(() => supabase.removeChannel(laterChannel), 1000);
+          setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
         }
       });
-      triggerToast("Challenge saved as pending.", 3000);
+      triggerToast("Challenge saved as pending.", TOAST_DURATION.DEFAULT);
     } catch (e) {
       console.error("Failed to save challenge as pending:", e);
     }
@@ -980,7 +983,7 @@ export default function App() {
         isRevealing: state.isRevealing,
         usedHint: state.usedHint,
         canShowHint: stableGuessesCount >= 2,
-        isHintLocked: (stableGuessesCount >= (config?.maxAttempts ?? 6) - 1 || stableIsHintDisabled) && !state.usedHint,
+        isHintLocked: (stableGuessesCount >= (config?.maxAttempts ?? MAX_ATTEMPTS) - 1 || stableIsHintDisabled) && !state.usedHint,
         syncStatus: state.syncStatus,
         isMonday: isMonday
       }}
@@ -1066,8 +1069,8 @@ export default function App() {
                   />
                 ) : (
                   <GameArea
-                    wordLength={config?.length ?? 5}
-                    maxAttempts={config?.maxAttempts ?? 6}
+                    wordLength={config?.length ?? DEFAULT_WORD_LENGTH}
+                    maxAttempts={config?.maxAttempts ?? MAX_ATTEMPTS}
                     guesses={state.guesses}
                     currentGuess={state.currentGuess}
                     cursorIndex={state.cursorIndex}
@@ -1339,12 +1342,12 @@ export default function App() {
                           useLiveStore.getState().setView("connecting");
                           handleNavigation("wordup");
                         });
-                        setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
+                        setTimeout(() => supabase.removeChannel(acceptChannel), TIMEOUT.CHANNEL_CLEANUP);
                       }
                     });
                   } catch (e) {
                     console.error("Failed to accept invite:", e);
-                    triggerToast("Failed to start match.", 4000);
+                    triggerToast("Failed to start match.", TOAST_DURATION.LONG);
                   }
                 }}
                 className="bg-correct hover:bg-correct/90 text-black text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
@@ -1371,7 +1374,7 @@ export default function App() {
                         event: 'wordup_invite_rejected',
                         payload: { senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
                       });
-                      setTimeout(() => supabase.removeChannel(rejectChannel), 1000);
+                      setTimeout(() => supabase.removeChannel(rejectChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                 }}
@@ -1419,7 +1422,7 @@ export default function App() {
                           event: 'wordup_async_invite_accepted',
                           payload: { matchId: invite.matchId, senderName: user?.user_metadata?.username || user?.email?.split('@')[0] || "Opponent" }
                         });
-                        setTimeout(() => supabase.removeChannel(acceptChannel), 1000);
+                        setTimeout(() => supabase.removeChannel(acceptChannel), TIMEOUT.CHANNEL_CLEANUP);
                       }
                     });
                   } catch (e) {
@@ -1442,10 +1445,10 @@ export default function App() {
                         event: 'wordup_async_invite_later',
                         payload: { matchId: invite.matchId }
                       });
-                      setTimeout(() => supabase.removeChannel(laterChannel), 1000);
+          setTimeout(() => supabase.removeChannel(laterChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
-                  triggerToast("Challenge saved as pending. Play when ready!", 3000);
+                  triggerToast("Challenge saved as pending. Play when ready!", TOAST_DURATION.DEFAULT);
                 }}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
               >
@@ -1463,7 +1466,7 @@ export default function App() {
                         event: 'wordup_async_invite_declined',
                         payload: { matchId: invite.matchId }
                       });
-                      setTimeout(() => supabase.removeChannel(declineChannel), 1000);
+                       setTimeout(() => supabase.removeChannel(declineChannel), TIMEOUT.CHANNEL_CLEANUP);
                     }
                   });
                   await supabase.from("wordup_async_matches").update({ status: "declined" }).eq("id", invite.matchId);

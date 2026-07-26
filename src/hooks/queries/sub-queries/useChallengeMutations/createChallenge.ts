@@ -3,6 +3,7 @@ import { getRandomCuratedSentence } from "@/data/sentences";
 import { getRandomWord, obfuscateWord } from "@/lib/game-logic";
 import { supabase } from "@/lib/supabaseClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { MAX_ATTEMPTS, DEFAULT_WORD_LENGTH } from "@/constants/game";
 import getMatchCount from "../helpers/getMatchCount";
 
 const useCreateChallenge = () => {
@@ -79,7 +80,7 @@ const useCreateChallenge = () => {
                   .map((w: string) => w.trim().toUpperCase())
                   .filter(Boolean);
             } else {
-               const curated = getRandomCuratedSentence(sentenceWordCount || 5);
+                const curated = getRandomCuratedSentence(sentenceWordCount || DEFAULT_WORD_LENGTH);
                sentenceWords = curated ? curated : ["THE", "CAT", "SLEEPS"];
             }
             resolvedMarathonGames = sentenceWords!.map((w: string) => w.length);
@@ -221,7 +222,7 @@ const useCreateChallenge = () => {
                   word_length: actualLength,
                   target_word: targetWord,
                   salt: salt,
-                  max_attempts: max_attempts ?? 6,
+                  max_attempts: max_attempts ?? MAX_ATTEMPTS,
                   max_time: maxTime,
                   expires_at: expiresAt.toISOString(),
                   is_public: isPublic,

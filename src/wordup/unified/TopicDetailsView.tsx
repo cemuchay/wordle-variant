@@ -8,9 +8,11 @@ import { type ProfileStats } from "../shared/types";
 import { RankingView } from "../shared/RankingView";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { supabase } from "../../lib/supabaseClient";
+import { Z_INDEX } from "../../constants/ui";
 import { useApp } from "../../context/AppContext";
 import { useAsyncMatchmaking } from "../async/hooks/useMatchmaking";
 import { PlayNowLaterPopup } from "../async/components/PlayNowLaterPopup";
+import { TOAST_DURATION } from "../../constants/ui";
 
 interface TopicDetailsViewProps {
    categoryId: string;
@@ -369,13 +371,13 @@ export const TopicDetailsView = ({
                onLater={() => {
                   setPendingChallengeMatch(null);
                   setShowInviteOverlay(false);
-                  triggerToast("Challenge saved! Play when you're ready.", 3000);
+                  triggerToast("Challenge saved! Play when you're ready.", TOAST_DURATION.DEFAULT);
                }}
             />
          )}
 
          {isCreatingMatch && (
-            <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-xs p-6 text-center space-y-5 animate-in fade-in duration-200">
+            <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-xs p-6 text-center space-y-5 animate-in fade-in duration-200" style={{ zIndex: Z_INDEX.TOPIC_DETAILS }}>
                <div className="w-12 h-12 border-4 border-[#E85151]/30 border-t-[#E85151] rounded-full animate-spin" />
                <div className="space-y-1">
                   <h3 className="text-sm font-black uppercase tracking-wider text-white">Creating 1v1 Game</h3>
@@ -386,7 +388,7 @@ export const TopicDetailsView = ({
                      onClick={() => {
                         setIsCreatingMatch(null);
                         setCreationTimeout(false);
-                        triggerToast("Matchmaking creation cancelled.", 3000);
+                        triggerToast("Matchmaking creation cancelled.", TOAST_DURATION.DEFAULT);
                      }}
                      className="mt-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-white transition-all cursor-pointer hover:scale-102 active:scale-98"
                   >

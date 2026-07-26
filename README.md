@@ -1,6 +1,6 @@
 # 🧩 Variant
 
-A high-performance, feature rich Wordle clone built with **React**, **TypeScript**, **Tailwind CSS**, and **Supabase**. This version goes beyond the classic game by introducing dynamic word lengths, real time social features, and a competitive challenge mode.
+A high-performance multiplayer word game platform built with **React**, **TypeScript**, **Tailwind CSS**, and **Supabase**. Features daily Wordle-style puzzles, **WordUp** competitive trivia battles (live + async), global chat with voice rooms, challenge modes, and a full awards/trophy system.
 
 ## 🚀 Key Features
 
@@ -29,7 +29,7 @@ A high-performance, feature rich Wordle clone built with **React**, **TypeScript
 - **Styling:** Tailwind CSS 4.0, Framer Motion
 - **Backend/BaaS:** Supabase (Auth, Database, Realtime, Edge Functions)
 - **Audio:** Agora RTC SDK
-- **State Management:** React Reducers & Context API
+- **State Management:** Zustand + TanStack Query + Context API
 - **Deployment:** Vercel & Render
 
 ## 📦 Getting Started
@@ -69,7 +69,23 @@ What started as a simple Wordle clone has evolved into a full scale social gamin
 - **Phase 2:** Supabase integration for stats and authentication.
 - **Phase 3:** Challenge mode and real-time multiplayer lobbies.
 - **Phase 4:** Voice chat integration and "Dynamic Island" UI.
-- **Phase 5 (Current):** Enhanced animations, performance optimizations, and global social rooms.
+- **Phase 5:** Enhanced animations, performance optimizations, and global social rooms.
+- **Phase 6 (Current):** WordUp multiplayer (live + async), procedural question generation (10 generators), Trophy Cabinet UI, weekly Wrapped slides, weekly email reports with awards, full game-logic test coverage.
+
+## 📚 Documentation
+
+Full documentation is in the [`docs/`](docs/) folder:
+
+| Document | Description |
+|----------|-------------|
+| [SPEC.md](docs/SPEC.md) | Product vision, principles, design goals |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture, state management, data flow |
+| [AGENTS.md](docs/AGENTS.md) | AI assistant coding guidelines |
+| [TESTING.md](docs/TESTING.md) | Test setup, layers, writing new tests |
+| [game-logic.md](docs/game-logic.md) | Game logic core — word generation, scoring, validation |
+| [procedural-entities.md](docs/procedural-entities.md) | Entity standards for procedural question generation |
+| [scripts/README.md](docs/scripts/README.md) | Game simulator CLI usage |
+| [uploads/sentences.md](docs/uploads/sentences.md) | Uploading sentence templates to Supabase |
 
 ## 📄 License
 

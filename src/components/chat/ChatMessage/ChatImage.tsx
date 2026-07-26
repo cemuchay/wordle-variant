@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
+import { TOAST_DURATION } from "../../../constants/ui";
 
 interface ChatImageProps {
   url: string;
@@ -32,7 +33,7 @@ export const ChatImage = ({ url }: ChatImageProps) => {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(blobUrl);
     } catch {
-      useAppStore.getState().triggerToast("Failed to download image", 3000);
+      useAppStore.getState().triggerToast("Failed to download image", TOAST_DURATION.DEFAULT);
     } finally {
       setIsDownloading(false);
     }

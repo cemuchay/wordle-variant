@@ -3,8 +3,10 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../context/AppContext";
 import { useAppStore } from "../store/useAppStore";
+import { TOAST_DURATION } from "../constants/ui";
 import { logger } from "../lib/logger";
 import { safeLocalStorage } from "../utils/storage";
+import { RETRY } from "../constants/game";
 import {
    editMessage as editMessageAction,
    deleteMessage as deleteMessageAction,
@@ -609,7 +611,7 @@ export const useChat = (userId: string) => {
 
    const retryOperation = async (
       operation: () => Promise<any>,
-      retries = 3,
+      retries = RETRY.SYNC_COUNT,
       delay = 1000,
    ): Promise<any> => {
       for (let i = 0; i < retries; i++) {
@@ -632,7 +634,7 @@ export const useChat = (userId: string) => {
    const sendWithRetry = async (
       messageId: string,
       messagePayload: any,
-      retries = 3,
+      retries = RETRY.SYNC_COUNT,
       delay = 1000,
    ): Promise<boolean> => {
       try {
@@ -713,7 +715,7 @@ export const useChat = (userId: string) => {
          addFailedMessageId(tempId);
          useAppStore
             .getState()
-            .triggerToast("Failed to send message. Tap to retry.", 4000);
+            .triggerToast("Failed to send message. Tap to retry.", TOAST_DURATION.LONG);
       }
    };
 
@@ -729,7 +731,7 @@ export const useChat = (userId: string) => {
       ) {
          useAppStore
             .getState()
-            .triggerToast("Cannot resend media. Please upload again.", 4000);
+            .triggerToast("Cannot resend media. Please upload again.", TOAST_DURATION.LONG);
          return;
       }
 
@@ -767,7 +769,7 @@ export const useChat = (userId: string) => {
             .getState()
             .updateGlobalMessage({ id: messageId, status: "failed" });
          addFailedMessageId(messageId);
-         useAppStore.getState().triggerToast("Resend failed.", 4000);
+         useAppStore.getState().triggerToast("Resend failed.", TOAST_DURATION.LONG);
       }
    };
 
@@ -849,7 +851,7 @@ export const useChat = (userId: string) => {
          addFailedMessageId(tempId);
          useAppStore
             .getState()
-            .triggerToast("Failed to send voice note.", 4000);
+            .triggerToast("Failed to send voice note.", TOAST_DURATION.LONG);
       }
    };
 

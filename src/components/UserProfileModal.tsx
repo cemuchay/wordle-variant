@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Award, Target, CalendarDays, MessageCircle, UserPlus, UserMinus, MessageSquare, MessageSquareOff } from 'lucide-react';
+import { Phone, X, Calendar, Clock, Trophy, Flame, Zap, Target, CalendarDays, MessageCircle, UserPlus, UserMinus, MessageSquare, MessageSquareOff, Users } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -9,12 +9,20 @@ import { WeeklyWrappedModal } from './WeeklyWrappedModal';
 import { ProfileSkeleton } from './common/Skeletons';
 import formatLastSeen from '../utils/formatLastSeen';
 import type { UserAward } from '../types/awards';
-import { isCurrentPeriod, formatAwardPeriod } from '../utils/isoWeek';
 import { calculateStreak } from '../utils/streak';
+import { Z_INDEX } from '../constants/ui';
+import { TIMEOUT } from '../constants/game';
+import { TOAST_DURATION } from '../constants/ui';
+import { useUserFollowers, useUserFollowing, useIsFollowing, useToggleFollowMutation, type FollowUser } from '../hooks/queries/useFollows';
+import { useAppStore } from '../store/useAppStore';
+import { TrophyCabinet } from './awards/TrophyCabinet';
+import { TrophyCabinetExplorer } from './awards/TrophyCabinetExplorer';
+
 interface UserProfileModalProps {
     userId: string;
     onClose: () => void;
 }
+
 
 interface ProfileData {
     id: string;
@@ -52,14 +60,18 @@ interface ChallengeParticipation {
     };
 }
 
-import { useAppStore } from '../store/useAppStore';
-
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onClose }) => {
+    const [viewedUserId, setViewedUserId] = useState(userId);
     const { user: currentUser } = useAuth();
     const setPendingDMUserId = useAppStore(s => s.setPendingDMUserId);
     const { onlineUsers, initiatePrivateCall, activeCall, triggerToast, date, setIsChatOpen } = useApp();
     const [isWrappedOpen, setIsWrappedOpen] = useState(false);
     const [avatarClicks, setAvatarClicks] = useState(0);
+    const [followListModal, setFollowListModal] = useState<'followers' | 'following' | null>(null);
+
+    useEffect(() => {
+        setViewedUserId(userId);
+    }, [userId]);
 
     const handleAvatarClick = () => {
         setAvatarClicks(prev => {
@@ -73,7 +85,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
 
     useEffect(() => {
         if (avatarClicks > 0) {
-            const timer = setTimeout(() => setAvatarClicks(0), 1500);
+            const timer = setTimeout(() => setAvatarClicks(0), TIMEOUT.AVATAR_CLICK_RESET);
             return () => clearTimeout(timer);
         }
     }, [avatarClicks]);
@@ -81,8 +93,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'daily' | 'challenge'>('daily');
-    const [isFollowing, setIsFollowing] = useState(false);
     const [commentsDisabled, setCommentsDisabled] = useState(false);
+
+    // TanStack Query Cache-First Follows Data & Mutations
+    const { data: followers = [] } = useUserFollowers(viewedUserId);
+    const { data: following = [] } = useUserFollowing(viewedUserId);
+    const { data: isFollowingTarget = false } = useIsFollowing(currentUser?.id, viewedUserId);
+    const toggleFollowMutation = useToggleFollowMutation();
 
     // Stats states
     const [dailyScores, setDailyScores] = useState<DailyScore[]>([]);
@@ -90,35 +107,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     const [allChallengeParticipations, setAllChallengeParticipations] = useState<{ challenge_id: string; user_id: string; score: number; status: string }[]>([]);
     const [currentUserChallenges, setCurrentUserChallenges] = useState<{ challenge_id: string; score: number; status: string }[]>([]);
     const [awards, setAwards] = useState<UserAward[]>([]);
-    const [visibleAwardsCount, setVisibleAwardsCount] = useState(20);
+    const [isCabinetOpen, setIsCabinetOpen] = useState(false);
 
     const handleFollowToggle = async () => {
         if (!currentUser || !profile) return;
-        if (isFollowing) {
-            const { error } = await supabase
-                .from('follows')
-                .delete()
-                .eq('follower_id', currentUser.id)
-                .eq('following_id', profile.id);
-            if (!error) {
-                setIsFollowing(false);
-                triggerToast(`Unfollowed @${profile.username}`, 3000);
-            } else {
-                triggerToast("Failed to unfollow user.", 3000);
-            }
-        } else {
-            const { error } = await supabase
-                .from('follows')
-                .insert({
-                    follower_id: currentUser.id,
-                    following_id: profile.id
-                });
-            if (!error) {
-                setIsFollowing(true);
-                triggerToast(`Following @${profile.username}`, 3000);
-            } else {
-                triggerToast("Failed to follow user.", 3000);
-            }
+        try {
+            const nextState = await toggleFollowMutation.mutateAsync({
+                currentUserId: currentUser.id,
+                targetUserId: profile.id,
+                isFollowing: isFollowingTarget
+            });
+            triggerToast(nextState ? `Following @${profile.username}` : `Unfollowed @${profile.username}`, TOAST_DURATION.DEFAULT);
+        } catch {
+            triggerToast("Failed to update follow status.", TOAST_DURATION.DEFAULT);
         }
     };
 
@@ -131,11 +132,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
             .eq('id', currentUser.id);
         if (!error) {
             setCommentsDisabled(newValue);
-            triggerToast(newValue ? "Comments disabled on your guesses" : "Comments enabled on your guesses", 3000);
+            triggerToast(newValue ? "Comments disabled on your guesses" : "Comments enabled on your guesses", TOAST_DURATION.DEFAULT);
         } else {
-            triggerToast("Failed to update comment settings.", 3000);
+            triggerToast("Failed to update comment settings.", TOAST_DURATION.DEFAULT);
         }
     };
+
 
     useEffect(() => {
         let isMounted = true;
@@ -143,20 +145,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         const fetchProfileData = async () => {
             setLoading(true);
             try {
-                // 1. Kick off both network requests concurrently
+                // 1. Kick off network requests concurrently
                 const edgePromise = supabase.functions.invoke('redis-cache', {
-                    body: { action: 'get-user-profile', userId }
+                    body: { action: 'get-user-profile', userId: viewedUserId }
                 });
 
-                // 2. Fetch the pre-aggregated data from your security-compliant view
+                // 2. Fetch pre-aggregated data from view
                 const viewPromise = supabase
                     .from('user_dashboard_stats')
                     .select('daily_scores, challenge_participations, all_challenge_participations')
-                    .eq('user_id', userId)
+                    .eq('user_id', viewedUserId)
                     .single();
 
-                // 3. Conditional Head-to-Head request (only if viewing another user's profile)
-                const h2hPromise = (currentUser && currentUser.id !== userId)
+                // 3. Conditional Head-to-Head request
+                const h2hPromise = (currentUser && currentUser.id !== viewedUserId)
                     ? supabase
                         .from('challenge_participants')
                         .select('challenge_id, score, status')
@@ -167,27 +169,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 const awardsPromise = supabase
                     .from('user_awards')
                     .select('*')
-                    .eq('user_id', userId)
+                    .eq('user_id', viewedUserId)
                     .order('awarded_at', { ascending: false });
 
-                // 5. Fetch profile comments preference and follow status
+                // 5. Fetch profile comments preference
                 const profilePromise = supabase
                     .from('profiles')
                     .select('comments_disabled')
-                    .eq('id', userId)
+                    .eq('id', viewedUserId)
                     .maybeSingle();
 
-                const followPromise = (currentUser && currentUser.id !== userId)
+                // 6. Fetch follow status
+                const followPromise = (currentUser && currentUser.id !== viewedUserId)
                     ? supabase
                         .from('follows')
                         .select('follower_id')
                         .eq('follower_id', currentUser.id)
-                        .eq('following_id', userId)
+                        .eq('following_id', viewedUserId)
                         .maybeSingle()
                     : Promise.resolve({ data: null, error: null });
 
                 // Fire all requests in parallel
-                const [edgeResult, viewResult, h2hResult, awardsResult, profilePrefResult, followResult] = await Promise.all([
+                const [edgeResult, viewResult, h2hResult, awardsResult, profilePrefResult] = await Promise.all([
                     edgePromise,
                     viewPromise,
                     h2hPromise,
@@ -206,7 +209,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                         setProfile(edgeResult.data.data);
                     }
 
-                    // The view returns clean arrays directly mapping to your states
                     if (viewResult.data) {
                         setDailyScores(viewResult.data.daily_scores);
                         setChallengeParticipations(viewResult.data.challenge_participations);
@@ -222,18 +224,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     }
 
                     if (profilePrefResult.data) {
-                        setCommentsDisabled(profilePrefResult.data.comments_disabled || false);
+                        setCommentsDisabled(!!profilePrefResult.data.comments_disabled);
                     }
 
-                    if (followResult.data) {
-                        setIsFollowing(true);
-                    } else {
-                        setIsFollowing(false);
-                    }
+
                 }
-
-            } catch (err) {
-                console.error("Error loading profile stats:", err);
+            } catch (err: any) {
+                console.error("Failed to load user profile:", err);
+                if (isMounted) triggerToast("Could not load user profile stats.", TOAST_DURATION.LONG);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -244,12 +242,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
         return () => {
             isMounted = false;
         };
-    }, [userId, currentUser]);
+    }, [viewedUserId, currentUser]);
 
     // Helpers
     const isOnline = useMemo(() => {
-        return onlineUsers.some(u => u.id === userId);
-    }, [onlineUsers, userId]);
+        return onlineUsers.some(u => u.id === viewedUserId);
+    }, [onlineUsers, viewedUserId]);
+
 
 
     // Computations
@@ -365,7 +364,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
     }, [dailyScores, challengeParticipations, allChallengeParticipations, currentUserChallenges, userId, currentUser, profile]);
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-9999">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -373,19 +372,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                 className="w-full max-w-lg bg-gray-950/95 border border-white/10 rounded-[32px] overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]"
             >
                 {/* Header Profile Section */}
-                <div className="p-6 border-b border-white/5 relative overflow-hidden bg-white/5 shrink-0 z-10">
+                <div className="p-4 sm:p-6 border-b border-white/5 relative overflow-hidden bg-white/5 shrink-0 z-10">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-correct/5 blur-3xl -mr-12 -mt-12 pointer-events-none" />
 
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 text-gray-400 hover:text-white transition-all cursor-pointer"
+                        className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 text-gray-400 hover:text-white transition-all cursor-pointer z-20"
+                        title="Close Profile"
                     >
                         <X size={16} />
                     </button>
 
                     {loading ? (
                         <div className="flex items-center gap-4 animate-pulse">
-                            <div className="w-16 h-16 rounded-full bg-white/10" />
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10" />
                             <div className="space-y-2">
                                 <div className="h-4 w-32 bg-white/10 rounded" />
                                 <div className="h-3 w-20 bg-white/10 rounded" />
@@ -393,103 +393,139 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                         </div>
                     ) : (
                         profile && (
-                            <div className="flex items-center gap-5 w-full">
-                                <div className="relative cursor-pointer" onClick={handleAvatarClick} title="Double tap? No, triple tap for a surprise!">
-                                    <ProtectedAvatar
-                                        userId={profile.id}
-                                        src={profile.avatar_url}
-                                        username={profile.username}
-                                        className={`w-16 h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
-                                    />
-                                    {isOnline && (
-                                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-gray-950" />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h2 className="text-lg sm:text-xl font-black text-white truncate text-left pr-2 sm:pr-6">@{profile.username}</h2>
-                                    {profile.full_name && (
-                                        <div className="text-[11px] font-bold text-gray-500 mt-0.5">{profile.full_name}</div>
-                                    )}
-                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-2 sm:gap-x-3 text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
-                                        <span className="flex items-center gap-1">
-                                            <Calendar size={11} className="text-correct" />
-                                            Joined {stats.memberSince}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <Clock size={11} className="text-correct" />
-                                            {isOnline ? (
-                                                <span className="text-emerald-400 font-black">Active Now</span>
-                                            ) : (
-                                                <span>Seen {formatLastSeen(profile.last_seen_at)}</span>
-                                            )}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                 {currentUser && currentUser.id === userId && (
-                                    <div className="flex items-center gap-2 mr-6 shrink-0">
-                                        <button
-                                            onClick={handleToggleComments}
-                                            className={`flex items-center justify-center p-2.5 sm:p-3 rounded-full shadow-lg hover:scale-105 transition-all ${
-                                                commentsDisabled 
-                                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                                                    : 'bg-white/10 text-white border border-white/5 hover:bg-white/20'
-                                            }`}
-                                            title={commentsDisabled ? "Enable Comments on Guesses" : "Disable Comments on Guesses"}
-                                        >
-                                            {commentsDisabled ? <MessageSquareOff size={14} className="sm:w-4 sm:h-4" /> : <MessageSquare size={14} className="sm:w-4 sm:h-4" />}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {currentUser && currentUser.id !== userId && (
-                                    <div className="flex items-center gap-2 mr-6 shrink-0">
-                                        <button
-                                            onClick={handleFollowToggle}
-                                            className={`flex items-center justify-center p-2.5 sm:p-3 rounded-full shadow-lg hover:scale-105 transition-all ${
-                                                isFollowing 
-                                                    ? 'bg-correct text-black hover:bg-correct/90 shadow-correct/20' 
-                                                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'
-                                            }`}
-                                            title={isFollowing ? `Unfollow @${profile.username}` : `Follow @${profile.username}`}
-                                        >
-                                            {isFollowing ? <UserMinus size={14} className="sm:w-4 sm:h-4" /> : <UserPlus size={14} className="sm:w-4 sm:h-4" />}
-                                        </button>
-
-                                        <button
-                                            onClick={() => {
-                                                setPendingDMUserId(profile.id);
-                                                setIsChatOpen(true);
-                                                onClose();
-                                            }}
-                                            className="flex items-center justify-center p-2.5 sm:p-3 bg-white/10 hover:bg-white/20 text-white rounded-full shadow-lg hover:scale-105 transition-all"
-                                            title={`Message ${profile.username}`}
-                                        >
-                                            <MessageCircle size={14} className="sm:w-4 sm:h-4" />
-                                        </button>
-
+                            <div className="flex flex-col gap-4 w-full pr-8">
+                                {/* Profile Info */}
+                                <div className="flex items-start sm:items-center gap-3.5 sm:gap-5 w-full">
+                                    <div className="relative cursor-pointer shrink-0" onClick={handleAvatarClick} title="Triple tap for a surprise!">
+                                        <ProtectedAvatar
+                                            userId={profile.id}
+                                            src={profile.avatar_url}
+                                            username={profile.username}
+                                            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 ${isOnline ? 'border-emerald-500 ring-4 ring-emerald-500/20' : 'border-white/20'}`}
+                                        />
                                         {isOnline && (
-                                            <button
-                                                onClick={() => {
-                                                    if (activeCall) {
-                                                        triggerToast("You are already in a call.", 4000);
-                                                        return;
-                                                    }
-                                                    initiatePrivateCall({
-                                                        id: profile.id,
-                                                        username: profile.username,
-                                                        avatar_url: profile.avatar_url
-                                                    });
-                                                    onClose();
-                                                }}
-                                                className="flex items-center justify-center p-2.5 sm:p-3 bg-emerald-500 hover:bg-emerald-600 text-black rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
-                                                title={`Call ${profile.username}`}
-                                            >
-                                                <Phone size={14} className="sm:w-4 sm:h-4" />
-                                            </button>
+                                            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-gray-950" />
                                         )}
                                     </div>
-                                )}
+                                    <div className="flex-1 min-w-0">
+                                        <h2 className="text-base sm:text-xl font-black text-white truncate text-left">
+                                            @{profile.username}
+                                        </h2>
+                                        {profile.full_name && (
+                                            <div className="text-[11px] font-bold text-gray-500 mt-0.5 truncate">{profile.full_name}</div>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-y-1 gap-x-2 sm:gap-x-3 text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                                            <span className="flex items-center gap-1">
+                                                <Calendar size={11} className="text-correct" />
+                                                Joined {stats.memberSince}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Clock size={11} className="text-correct" />
+                                                {isOnline ? (
+                                                    <span className="text-emerald-400 font-black">Active Now</span>
+                                                ) : (
+                                                    <span>Seen {formatLastSeen(profile.last_seen_at)}</span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Followers / Following + Actions Bar */}
+                                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-white/5">
+                                    {/* Followers / Following Counter Pills */}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setFollowListModal('followers')}
+                                            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center gap-1.5 transition-all text-xs font-bold text-white cursor-pointer hover:border-correct/40"
+                                            title="View Followers"
+                                        >
+                                            <span className="font-black text-correct">{followers.length}</span>
+                                            <span className="text-[10px] text-gray-400 uppercase tracking-wider">Followers</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setFollowListModal('following')}
+                                            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center gap-1.5 transition-all text-xs font-bold text-white cursor-pointer hover:border-correct/40"
+                                            title="View Following"
+                                        >
+                                            <span className="font-black text-correct">{following.length}</span>
+                                            <span className="text-[10px] text-gray-400 uppercase tracking-wider">Following</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {currentUser && currentUser.id === viewedUserId && (
+                                            <button
+                                                onClick={handleToggleComments}
+                                                className={`flex items-center justify-center px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg hover:scale-105 transition-all gap-1.5 cursor-pointer ${
+                                                    commentsDisabled
+                                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                        : 'bg-white/10 text-white border border-white/5 hover:bg-white/20'
+                                                }`}
+                                                title={commentsDisabled ? "Enable Comments on Guesses" : "Disable Comments on Guesses"}
+                                            >
+                                                {commentsDisabled ? <MessageSquareOff size={14} /> : <MessageSquare size={14} />}
+                                                <span className="text-[10px] uppercase font-black tracking-wider hidden sm:inline">
+                                                    {commentsDisabled ? 'Comments Off' : 'Comments On'}
+                                                </span>
+                                            </button>
+                                        )}
+
+                                        {currentUser && currentUser.id !== viewedUserId && (
+                                            <>
+                                                <button
+                                                    onClick={handleFollowToggle}
+                                                    disabled={toggleFollowMutation.isPending}
+                                                    className={`flex items-center justify-center px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg hover:scale-105 transition-all gap-1.5 cursor-pointer ${
+                                                        isFollowingTarget
+                                                            ? 'bg-correct text-black hover:bg-correct/90 shadow-correct/20 font-black'
+                                                            : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'
+                                                    }`}
+                                                    title={isFollowingTarget ? `Unfollow @${profile.username}` : `Follow @${profile.username}`}
+                                                >
+                                                    {isFollowingTarget ? <UserMinus size={14} /> : <UserPlus size={14} />}
+                                                    <span className="text-[10px] uppercase font-black tracking-wider">
+                                                        {isFollowingTarget ? 'Following' : 'Follow'}
+                                                    </span>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setPendingDMUserId(profile.id);
+                                                        setIsChatOpen(true);
+                                                        onClose();
+                                                    }}
+                                                    className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl shadow-lg hover:scale-105 transition-all cursor-pointer"
+                                                    title={`Message ${profile.username}`}
+                                                >
+                                                    <MessageCircle size={14} />
+                                                </button>
+
+                                                {isOnline && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (activeCall) {
+                                                                triggerToast("You are already in a call.", TOAST_DURATION.LONG);
+                                                                return;
+                                                            }
+                                                            initiatePrivateCall({
+                                                                id: profile.id,
+                                                                username: profile.username,
+                                                                avatar_url: profile.avatar_url
+                                                            });
+                                                            onClose();
+                                                        }}
+                                                        className="flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-black rounded-xl shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                        title={`Call ${profile.username}`}
+                                                    >
+                                                        <Phone size={14} />
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )
                     )}
@@ -598,86 +634,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                                         </div>
                                     </div>
 
-                                    {/* Award system (badges) */}
-                                    <div className="space-y-2">
-                                        <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400">Leaderboard Awards</h3>
-                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.dailyWins > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Award size={24} className={`${stats.dailyWins > 0 ? 'text-yellow-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.dailyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Daily Champion</div>
-                                            </div>
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.weeklyWins > 0 ? 'bg-blue-500/10 border-blue-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={24} className={`${stats.weeklyWins > 0 ? 'text-blue-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.weeklyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Weekly Master</div>
-                                            </div>
-                                            <div className={`rounded-2xl p-2 sm:p-3 border text-center flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 ${stats.monthlyWins > 0 ? 'bg-purple-500/10 border-purple-500/30' : 'bg-white/5 border-white/5 opacity-40'}`}>
-                                                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                                                <Trophy size={24} className={`${stats.monthlyWins > 0 ? 'text-purple-400' : 'text-gray-600'} sm:w-7 sm:h-7`} />
-                                                <div className="text-lg sm:text-xl font-black text-white mt-1">{stats.monthlyWins}</div>
-                                                <div className="text-[7px] sm:text-[8px] font-black uppercase text-gray-400 tracking-wider text-ellipsis overflow-hidden whitespace-nowrap w-full">Monthly Dominator</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Awards History */}
-                                    {awards.length > 0 && (() => {
-                                        const completedAwards = awards.filter(a => !isCurrentPeriod(a.award_type, a.period_key));
-                                        if (completedAwards.length === 0) return null;
-                                        return (
-                                            <div className="space-y-2">
-                                                <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">
-                                                    Awards History ({completedAwards.length})
-                                                </h3>
-                                                <div className="space-y-1">
-                                                    {completedAwards.slice(0, visibleAwardsCount).map(a => {
-                                                        let icon, label, colorClass, bgClass;
-                                                        switch (a.award_type) {
-                                                            case 'weekly_champion':
-                                                                icon = <Trophy size={12} className="text-blue-400 shrink-0" />;
-                                                                label = 'Weekly Champion';
-                                                                colorClass = 'text-blue-300';
-                                                                bgClass = 'bg-blue-500/10';
-                                                                break;
-                                                            case 'monthly_champion':
-                                                                icon = <Trophy size={12} className="text-purple-400 shrink-0" />;
-                                                                label = 'Monthly Dominator';
-                                                                colorClass = 'text-purple-300';
-                                                                bgClass = 'bg-purple-500/10';
-                                                                break;
-                                                            case 'bot_marathon_weekly':
-                                                                icon = <Zap size={12} className="text-emerald-400 shrink-0" />;
-                                                                label = 'Bot Marathon Champ';
-                                                                colorClass = 'text-emerald-300';
-                                                                bgClass = 'bg-emerald-500/10';
-                                                                break;
-                                                        }
-                                                        return (
-                                                            <div key={a.id} className={`flex items-center gap-2 ${bgClass} rounded-xl px-3 py-2 border border-white/5`}>
-                                                                {icon}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <span className={`text-[11px] font-semibold ${colorClass}`}>{label}</span>
-                                                                    <span className="text-[9px] text-white ml-1.5">{formatAwardPeriod(a.award_type, a.period_key)}</span>
-                                                                </div>
-                                                                <span className="text-[10px] font-black text-white/70 shrink-0">{a.score} pts</span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                                {visibleAwardsCount < completedAwards.length && (
-                                                    <button
-                                                        onClick={() => setVisibleAwardsCount(prev => Math.min(prev + 20, completedAwards.length))}
-                                                        className="w-full text-[10px] font-black uppercase text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl py-2 transition-colors cursor-pointer"
-                                                    >
-                                                        Load More ({completedAwards.length - visibleAwardsCount} remaining)
-                                                    </button>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
+                                    <TrophyCabinet
+                                       stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                                       awards={awards}
+                                       onExplore={() => setIsCabinetOpen(true)}
+                                    />
                                 </div>
                             ) : (
                                 <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-300">
@@ -780,6 +741,91 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ userId, onCl
                     gameDate={date as string}
                 />
             )}
+            {followListModal && (
+                <FollowListModal
+                    title={followListModal === 'followers' ? 'Followers' : 'Following'}
+                    users={followListModal === 'followers' ? followers : following}
+                    onClose={() => setFollowListModal(null)}
+                    onSelectUser={(newId) => setViewedUserId(newId)}
+                />
+            )}
+            {isCabinetOpen && profile && (
+                <TrophyCabinetExplorer
+                    stats={{ dailyWins: stats.dailyWins, weeklyWins: stats.weeklyWins, monthlyWins: stats.monthlyWins }}
+                    awards={awards}
+                    username={profile.username}
+                    onClose={() => setIsCabinetOpen(false)}
+                />
+            )}
         </div>
     );
 };
+
+const FollowListModal: React.FC<{
+    title: string;
+    users: FollowUser[];
+    onClose: () => void;
+    onSelectUser: (id: string) => void;
+}> = ({ title, users, onClose, onSelectUser }) => {
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" style={{ zIndex: Z_INDEX.USER_PROFILE }}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-md bg-gray-950 border border-white/10 rounded-[28px] overflow-hidden shadow-2xl flex flex-col max-h-[75vh]"
+            >
+                <div className="p-4 sm:p-5 border-b border-white/5 flex items-center justify-between bg-white/5">
+                    <h3 className="text-sm sm:text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
+                        <Users size={16} className="text-correct" />
+                        {title} ({users.length})
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 text-gray-400 hover:text-white transition-all cursor-pointer"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-white/10">
+                    {users.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 text-xs font-bold uppercase tracking-wider">
+                            No {title.toLowerCase()} yet.
+                        </div>
+                    ) : (
+                        users.map(u => (
+                            <div
+                                key={u.id}
+                                onClick={() => {
+                                    onSelectUser(u.id);
+                                    onClose();
+                                }}
+                                className="flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl cursor-pointer transition-all group"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <ProtectedAvatar
+                                        userId={u.id}
+                                        src={u.avatar_url || ''}
+                                        username={u.username}
+                                        className="w-10 h-10 rounded-full border border-white/20"
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-black text-white truncate group-hover:text-correct transition-colors">
+                                            @{u.username}
+                                        </p>
+                                        {u.full_name && (
+                                            <p className="text-[10px] text-gray-500 font-medium truncate">
+                                                {u.full_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+

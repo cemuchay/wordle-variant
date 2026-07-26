@@ -293,36 +293,126 @@ export const generateAnagramScrambled = async (
 // -------------------------------------------------------------
 // Pattern
 // -------------------------------------------------------------
+// Helper to generate a dynamic true substring and a plausible, sensible false distractor for pattern questions
+const generateDynamicSubstrings = (word: string): { trueSub: string; falseSub: string } => {
+   const cleanWord = word.toUpperCase();
+   const len = cleanWord.length;
+
+   // 1. Pick a real 2-letter or 3-letter substring present in the word
+   const subLen = len >= 5 && Math.random() < 0.3 ? 3 : 2;
+   const startIdx = rand(0, len - subLen);
+   const trueSub = cleanWord.substring(startIdx, startIdx + subLen);
+
+   // 2. Generate a plausible distractor substring (NOT present in cleanWord)
+   const vowels = ["A", "E", "I", "O", "U"];
+   const consonantPairs: Record<string, string[]> = {
+      B: ["P", "V", "D"],
+      C: ["K", "S", "G"],
+      D: ["T", "B", "G"],
+      F: ["V", "P"],
+      G: ["K", "J", "D"],
+      H: ["W", "F"],
+      J: ["G"],
+      K: ["C", "Q"],
+      L: ["R", "W"],
+      M: ["N"],
+      N: ["M"],
+      P: ["B", "F"],
+      Q: ["K"],
+      R: ["L", "W"],
+      S: ["Z", "C"],
+      T: ["D"],
+      V: ["F", "W", "B"],
+      W: ["V"],
+      X: ["Z"],
+      Z: ["S", "C"],
+   };
+
+   let falseSub = "";
+   let attempts = 0;
+
+   while (attempts < 25) {
+      attempts++;
+      const chars = trueSub.split("");
+      const mutateIdx = rand(0, chars.length - 1);
+      const originalChar = chars[mutateIdx];
+
+      if (vowels.includes(originalChar)) {
+         // Swap with another vowel
+         const otherVowels = vowels.filter((v) => v !== originalChar);
+         chars[mutateIdx] = otherVowels[rand(0, otherVowels.length - 1)];
+      } else if (consonantPairs[originalChar]) {
+         // Swap with a plausible/similar sounding consonant
+         const options = consonantPairs[originalChar];
+         chars[mutateIdx] = options[rand(0, options.length - 1)];
+      } else {
+         const fallbackVowels = vowels.filter((v) => v !== originalChar);
+         chars[mutateIdx] = fallbackVowels[rand(0, fallbackVowels.length - 1)];
+      }
+
+      const candidate = chars.join("");
+      if (!cleanWord.includes(candidate) && candidate !== trueSub) {
+         falseSub = candidate;
+         break;
+      }
+   }
+
+   // Fallback: reverse trueSub if reversal is not in word, or swap vowels
+   if (!falseSub) {
+      const reversed = trueSub.split("").reverse().join("");
+      if (!cleanWord.includes(reversed) && reversed !== trueSub) {
+         falseSub = reversed;
+      } else {
+         falseSub = trueSub.includes("A") ? trueSub.replace("A", "O") : trueSub.replace(/[EIOU]/, "A");
+      }
+   }
+
+   return { trueSub, falseSub };
+};
+
 export const generatePatternQuestion = async (
    allowedLengths: number[],
 ): Promise<WordUpQuestion> => {
    const length = allowedLengths[rand(0, allowedLengths.length - 1)];
    const { official } = await loadWordLists(length);
-   const word = official[rand(0, official.length - 1)];
+   const word = official[rand(0, official.length - 1)].toUpperCase();
    const wordLetters = Array.from(new Set(word.split("")));
    const randomChar = wordLetters[rand(0, wordLetters.length - 1)];
    const firstOccurIdx = word.indexOf(randomChar) + 1;
+   const wrongOccurIdx = firstOccurIdx === 1 ? 2 : firstOccurIdx - 1;
+
+   const { trueSub, falseSub } = generateDynamicSubstrings(word);
 
    const patternsList = [
-      { query: "Contains 'PH'?", test: (w: string) => w.includes("PH") },
-      { query: "Contains 'ING'?", test: (w: string) => w.includes("ING") },
+      // 1. Dynamic True Substring Containment (e.g. GUINEA contains 'NE' -> True)
       {
-         query: "Contains exactly double letters?",
+         query: `Contains '${trueSub}'?`,
+         test: (w: string) => w.includes(trueSub),
+      },
+      // 2. Dynamic False Substring Containment with Plausible Distractor (e.g. GUINEA contains 'AC' -> False)
+      {
+         query: `Contains '${falseSub}'?`,
+         test: (w: string) => w.includes(falseSub),
+      },
+      // 3. Retained: Exactly double letters
+      {
+         query: "Contains double letters?",
          test: (w: string) => {
             const counts: Record<string, number> = {};
             for (const char of w) counts[char] = (counts[char] || 0) + 1;
             return Object.values(counts).includes(2);
          },
       },
+      // 4. Retained: Exactly triple letters
       {
-         query: "Contains exactly triple letters?",
+         query: "Contains triple letters?",
          test: (w: string) => {
             const counts: Record<string, number> = {};
             for (const char of w) counts[char] = (counts[char] || 0) + 1;
             return Object.values(counts).includes(3);
          },
       },
-      { query: "Contains 'QU'?", test: (w: string) => w.includes("QU") },
+      // 5. Retained: Exactly 2 vowels
       {
          query: "Has exactly 2 vowels?",
          test: (w: string) => {
@@ -330,18 +420,15 @@ export const generatePatternQuestion = async (
             return v ? v.length === 2 : false;
          },
       },
-      {
-         query: "Contains the letter 'X', 'Z', or 'Q'?",
-         test: (w: string) => /[XZQ]/.test(w),
-      },
+      // 6. Retained: First occurrence position (True)
       {
          query: `First occurrence of '${randomChar}' is at position ${firstOccurIdx}?`,
          test: (w: string) => w.indexOf(randomChar) + 1 === firstOccurIdx,
       },
+      // 7. Retained: First occurrence position (False)
       {
-         query: `First occurrence of '${randomChar}' is at position ${firstOccurIdx === 1 ? 2 : firstOccurIdx - 1}?`,
-         test: (w: string) =>
-            w.indexOf(randomChar) + 1 === (firstOccurIdx === 1 ? 2 : firstOccurIdx - 1),
+         query: `First occurrence of '${randomChar}' is at position ${wrongOccurIdx}?`,
+         test: (w: string) => w.indexOf(randomChar) + 1 === wrongOccurIdx,
       },
    ];
 
@@ -356,6 +443,7 @@ export const generatePatternQuestion = async (
       explanation: `The word "${word}" ${answerBool ? "does" : "does not"} satisfy: ${p.query}`,
    };
 };
+
 
 // -------------------------------------------------------------
 // Vowel Drop

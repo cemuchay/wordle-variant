@@ -1,6 +1,7 @@
 import { HelpCircle, Lightbulb, RotateCcw, SettingsIcon, Share } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { TOAST_DURATION } from '../../constants/ui';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import type { SyncStatus } from '../../types/game';
@@ -62,7 +63,7 @@ export const AppHeader = ({
             "Nice try, lockpicker! 🗝️"
         ];
         const randomMsg = goofyMessages[Math.floor(Math.random() * goofyMessages.length)];
-        triggerToast(randomMsg, 3000);
+        triggerToast(randomMsg, TOAST_DURATION.DEFAULT);
         setTimeout(() => setIsShaking(false), 500);
     };
 

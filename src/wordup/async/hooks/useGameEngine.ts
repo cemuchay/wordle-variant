@@ -17,6 +17,7 @@ import {
 } from "../../../constants/wordup";
 import { gameEngineReducer, initialState } from "./useGameEngine.types";
 import { GRACE_DECAY } from "@/wordup/shared/constants";
+import { TOAST_DURATION } from "../../../constants/ui";
 
 function getQuestionDuration(type: string): number {
    return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
@@ -234,7 +235,7 @@ export function useGameEngine(props: EngineProps) {
             const nextIdx = merged.current_question_index + 1;
             if (nextIdx === 6) {
                wordupAudio.playFinalRoundAnticipationStart();
-               triggerToast("FINAL ROUND: DOUBLE POINTS!", 3000);
+               triggerToast("FINAL ROUND: DOUBLE POINTS!", TOAST_DURATION.DEFAULT);
             }
             clearT("revealTimeout");
             T.current.revealTimeout = window.setTimeout(
@@ -322,7 +323,7 @@ export function useGameEngine(props: EngineProps) {
             }
          } catch (e) {
             console.error("[WordUp] Async persist failed:", e);
-            triggerToast("Failed to save progress.", 5000);
+            triggerToast("Failed to save progress.", TOAST_DURATION.VERY_LONG);
          }
       },
       [triggerToast, onGameOver],
@@ -446,7 +447,7 @@ export function useGameEngine(props: EngineProps) {
             safeLocalStorage.removeItem("wordup_async_active_game");
          } catch (e) {
             console.error("[WordUp] endGame DB failed:", e);
-            triggerToast("Failed to save final results.", 5000);
+            triggerToast("Failed to save final results.", TOAST_DURATION.VERY_LONG);
          }
 
          dispatch({ type: "SET_MATCH_DATA", data: finalMatch });
@@ -614,7 +615,7 @@ export function useGameEngine(props: EngineProps) {
                safeSessionStorage.getItem("wordup_completed_" + mId) === "true"
             ) {
                safeSessionStorage.setItem("wordup_completed_" + mId, "true");
-               triggerToast("This match has already been completed.", 4000);
+               triggerToast("This match has already been completed.", TOAST_DURATION.LONG);
                dispatch({ type: "SET_MATCH_DATA", data: match });
                dispatch({ type: "SET_PHASE", phase: "gameover" });
                onGameOver(match);
@@ -740,7 +741,7 @@ export function useGameEngine(props: EngineProps) {
             }
          } catch (err) {
             console.error("[WordUp] loadMatch error:", err);
-            triggerToast("Failed to load match. Aborting.", 5000);
+            triggerToast("Failed to load match. Aborting.", TOAST_DURATION.VERY_LONG);
             const sd = S.current.matchData;
             if (sd?.id && sd.status !== "completed") {
                supabase

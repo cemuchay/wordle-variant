@@ -14,7 +14,9 @@ import { syncWithRetry } from '../lib/game-logic';
 import { safeLocalStorage } from '../utils/storage';
 import { getAllMessages, saveMessages, addMessage, updateMessage, removeMessage, purgeMessagesOlderThan } from '../utils/indexedDBMessages';
 import { logger } from '../lib/logger';
+import { TOAST_DURATION } from '../constants/ui';
 import { AppContext, type AppContextType } from './AppContext';
+import { TIMEOUT, LIMITS, MISC } from '../constants/game';
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<any>(null);
@@ -272,7 +274,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const timeoutId = setTimeout(() => {
             const currentCall = useAppStore.getState().activeCall;
             if (currentCall && currentCall.channelId === channelId && currentCall.status === 'calling') {
-                triggerToast('No answer.', 4000);
+                triggerToast('No answer.', TOAST_DURATION.LONG);
                 const hangupChannel = supabase.channel(`user_signals_${targetUser.id}`);
                 trackOneShotChannel(hangupChannel);
                 hangupChannel.subscribe((status) => {
@@ -297,7 +299,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         userId: user?.id || '',
         enabled: !!activeCall && (activeCall.status === 'connecting' || activeCall.status === 'connected'),
         onConnectionFailure: (reason) => {
-            triggerToast(`Call failed: ${reason}`, 5000);
+            triggerToast(`Call failed: ${reason}`, TOAST_DURATION.VERY_LONG);
             hangUpCall();
         },
         onConnectionSuccess: () => {
@@ -376,21 +378,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             .on('broadcast', { event: 'call_rejected' }, ({ payload }) => {
                 const currentCall = useAppStore.getState().activeCall;
                 if (currentCall && currentCall.channelId === payload.channelId) {
-                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} rejected the call.`, 4000);
+                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} rejected the call.`, TOAST_DURATION.LONG);
                     setActiveCall(null);
                 }
             })
             .on('broadcast', { event: 'call_busy' }, ({ payload }) => {
                 const currentCall = useAppStore.getState().activeCall;
                 if (currentCall && currentCall.channelId === payload.channelId) {
-                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} is busy.`, 4000);
+                    triggerToast(`${currentCall.targetUser?.username || 'Opponent'} is busy.`, TOAST_DURATION.LONG);
                     setActiveCall(null);
                 }
             })
             .on('broadcast', { event: 'hang_up' }, ({ payload }) => {
                 const currentCall = useAppStore.getState().activeCall;
                 if (currentCall && currentCall.channelId === payload.channelId) {
-                    triggerToast(`Call ended.`, 3000);
+                    triggerToast(`Call ended.`, TOAST_DURATION.DEFAULT);
                     setActiveCall(null);
                 }
             })
@@ -462,7 +464,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 if (eligible) {
-                    triggerToast(`${payload.creatorName} created a call in ${payload.roomName}! Join Voice to connect.`, 6000);
+                    triggerToast(`${payload.creatorName} created a call in ${payload.roomName}! Join Voice to connect.`, TOAST_DURATION.VERY_LONG);
                 }
             })
             .subscribe();
@@ -549,7 +551,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     .from('messages')
                     .select('*, profiles(username, avatar_url)')
                     .order('created_at', { ascending: false })
-                    .limit(300);
+                    .limit(LIMITS.MESSAGES);
 
                 if (data) {
                     const chronData = data.reverse();
@@ -559,14 +561,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // 3. Purge messages older than 7 days
-            purgeMessagesOlderThan(7).catch(e => console.warn('Failed to purge old messages:', e));
+            purgeMessagesOlderThan(MISC.MESSAGE_PURGE_DAYS).catch(e => console.warn('Failed to purge old messages:', e));
         };
 
         const syncMessages = async () => {
             if (!user?.id) return;
 
             const now = Date.now();
-            if (now - lastSyncRef.current < 10000) return;
+            if (now - lastSyncRef.current < TIMEOUT.MESSAGE_SYNC_THROTTLE) return;
             lastSyncRef.current = now;
 
             queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
@@ -603,7 +605,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 syncMessages();
 
                 const timeHidden = Date.now() - lastHiddenTimeRef.current;
-                const shouldRefresh = wasDisconnectedRef.current || timeHidden > 30 * 60 * 1000;
+                const shouldRefresh = wasDisconnectedRef.current || timeHidden > TIMEOUT.REFRESH_AFTER_HIDDEN;
 
                 if (shouldRefresh) {
                     queryClient.refetchQueries({ queryKey: ['server-date'], type: 'active' });

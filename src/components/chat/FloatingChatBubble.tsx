@@ -6,6 +6,7 @@ import type { PanInfo } from "framer-motion";
 import { Search, MessageCircle, X, Send, ArrowLeft, ExternalLink, Edit2, Trash2, Check, CheckCheck, ShieldAlert, Mic, Image as ImageIcon, Smile, Reply, Users } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAppStore } from "../../store/useAppStore";
+import { TOAST_DURATION } from "../../constants/ui";
 import { useAuth } from "../../hooks/useAuth";
 import { decryptDM, encryptDM, getDMRoomKey, compressImage } from "../../hooks/useChat";
 import { supabase } from "../../lib/supabaseClient";
@@ -19,6 +20,7 @@ import { ReactionPicker } from "./ChatMessage/ReactionPicker";
 import { ReactionModal } from "./ChatMessage/ReactionModal";
 import { ReactionBadge } from "./ChatMessage/ReactionBadge";
 import { safeLocalStorage } from "../../utils/storage";
+import { Z_INDEX } from "../../constants/ui";
 
 const CLOSE_DELAY = 10000;
 
@@ -181,7 +183,7 @@ export default function FloatingChatBubble() {
          }, 1000);
       } catch (err) {
          console.error("Error accessing microphone:", err);
-         useAppStore.getState().triggerToast("Could not access microphone.", 4000);
+         useAppStore.getState().triggerToast("Could not access microphone.", TOAST_DURATION.LONG);
       }
    };
 
@@ -196,7 +198,7 @@ export default function FloatingChatBubble() {
       }
 
       if (audioBlob.size < 500) {
-         useAppStore.getState().triggerToast("Audio capture failed.", 4000);
+         useAppStore.getState().triggerToast("Audio capture failed.", TOAST_DURATION.LONG);
       } else {
          await handleSendVoice(audioBlob);
       }
@@ -311,7 +313,7 @@ export default function FloatingChatBubble() {
          startInactivityTimer();
       } catch (err) {
          console.error("Failed to send voice note:", err);
-         useAppStore.getState().triggerToast("Failed to send voice note.", 4000);
+         useAppStore.getState().triggerToast("Failed to send voice note.", TOAST_DURATION.LONG);
       } finally {
          setIsSending(false);
       }
@@ -368,7 +370,7 @@ export default function FloatingChatBubble() {
          startInactivityTimer();
       } catch (err) {
          console.error("Failed to send image:", err);
-         useAppStore.getState().triggerToast("Failed to send image.", 4000);
+         useAppStore.getState().triggerToast("Failed to send image.", TOAST_DURATION.LONG);
       } finally {
          setIsSending(false);
       }
@@ -770,10 +772,10 @@ export default function FloatingChatBubble() {
             }
             textArea.remove();
          }
-         useAppStore.getState().triggerToast("Message copied to clipboard", 2000);
+         useAppStore.getState().triggerToast("Message copied to clipboard", TOAST_DURATION.SHORT);
       } catch (err) {
          console.error('Failed to copy:', err);
-         useAppStore.getState().triggerToast("Failed to copy message", 2000);
+         useAppStore.getState().triggerToast("Failed to copy message", TOAST_DURATION.SHORT);
       }
    };
 
@@ -1008,7 +1010,7 @@ export default function FloatingChatBubble() {
                      whileTap={{ scale: 0.95 }}
                      className="absolute w-10 h-10 rounded-full bg-transparent border-none shadow-lg flex items-center justify-center cursor-pointer pointer-events-auto select-none touch-none"
                      style={{
-                        zIndex: 99999,
+                         zIndex: Z_INDEX.CHAT_BUBBLE,
                      }}
                   >
                      {unreadCount > 0 && latestUnreadMsg ? (

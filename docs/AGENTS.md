@@ -144,4 +144,3 @@ Before making architectural or product decisions, consult:
 
 - SPEC.md
 - ARCHITECTURE.md
-- TASKS.md

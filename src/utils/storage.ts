@@ -4,6 +4,7 @@ import {
   asyncRemoveItem as idbRemoveItem,
   asyncGetAllEntries as idbGetAllEntries,
 } from './indexedDBStorage';
+import { TIMEOUT } from '../constants/game';
 
 type StorageType = 'local' | 'session';
 
@@ -64,7 +65,7 @@ class SafeStorage implements Storage {
           console.warn(`[SafeStorage] IndexedDB write failed for "${key}":`, e),
         );
       }
-    }, 500);
+    }, TIMEOUT.STORAGE_FLUSH);
     this._flushTimers.set(key, timer);
   }
 

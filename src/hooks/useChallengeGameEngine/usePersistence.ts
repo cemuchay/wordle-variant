@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef, useCallback } from 'react';
 import { logger } from '../../lib/logger';
+import { TOAST_DURATION } from '../../constants/ui';
 import { safeLocalStorage } from '../../utils/storage';
 import { encryptGuesses } from '../../lib/game-logic';
 import type { NetworkLog } from './types';
@@ -133,9 +134,9 @@ export const usePersistence = ({
          if (success) {
             setSyncFailed(false);
             lastPayloadRef.current = null;
-            triggerToast("Sync recovered!", 2000);
+            triggerToast("Sync recovered!", TOAST_DURATION.SHORT);
          } else {
-            triggerToast("Sync failed again.", 3000);
+            triggerToast("Sync failed again.", TOAST_DURATION.DEFAULT);
          }
       } finally {
          setIsSaving(false);

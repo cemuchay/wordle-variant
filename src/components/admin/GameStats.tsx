@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES } from "@/wordup/shared/constants";
+import { LIMITS } from "@/constants/game";
 import { BarChart2, Cpu, Users, Target, Clock, Calendar, RefreshCw } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 
@@ -42,7 +43,7 @@ const GameStats = ({ triggerToast }: { triggerToast: (text: string, type?: 'succ
             let allMatches: any[] = [];
             let hasMore = true;
             let page = 0;
-            const pageSize = 1000;
+            const pageSize = LIMITS.ADMIN_PAGE;
             const dateLimit = new Date();
             dateLimit.setDate(dateLimit.getDate() - periodDays);
             const dateStr = dateLimit.toISOString();
