@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
 import { CATEGORY_SUPER_MAP } from "./types.ts";
-import { getQuestionConfig } from "./questionConfig.ts";
+import { fetchQuestionConfigFromDB, getQuestionConfig } from "./questionConfig.ts";
+
 import {
    createSeededRandom,
    seededShuffle,
@@ -1419,7 +1420,8 @@ serve(async (req) => {
       const shuffledHandcrafted = seededShuffle(handcraftedList, matchRng);
       let handcraftedCursor = 0;
 
-      const config = getQuestionConfig(category);
+      const config = await fetchQuestionConfigFromDB(category, supabaseClient);
+
 
       // Weighted variant selection from config
       const variantSequence = pickVariants(config.variantWeights, matchRng, targetQuestionCount);

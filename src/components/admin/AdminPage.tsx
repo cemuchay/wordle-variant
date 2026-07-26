@@ -31,6 +31,9 @@ import { supabase } from '../../lib/supabaseClient';
 import TopicHub from './TopicHub';
 import GameStats from './GameStats';
 import { BarChart2 } from 'lucide-react';
+import { useTopics, useSaveTopicMutation, useToggleTopicActiveMutation, useToggleTopicSuspendedMutation, type WordUpTopic } from '../../hooks/queries/useTopics';
+
+
 
 interface FlaggedWordData {
     id: string;
@@ -1355,7 +1358,8 @@ export const AdminPage: React.FC = () => {
     const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
 
     // Navigation state
-    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'stats' | 'broadcast'>('words');
+    const [activeTab, setActiveTab] = useState<'words' | 'marathon' | 'wordup' | 'topics' | 'dynamic_topics' | 'stats' | 'broadcast'>('words');
+
 
 
     // Authentication States
@@ -1700,7 +1704,346 @@ SELECT create_admin_user(
         );
     }
 
+const WordUpTopicsManager = ({ triggerToast }: { triggerToast: (text: string, type?: 'success' | 'error') => void }) => {
+
+    const { data: topics = [], isLoading } = useTopics();
+    const saveTopicMutation = useSaveTopicMutation();
+    const toggleActiveMutation = useToggleTopicActiveMutation();
+    const toggleSuspendedMutation = useToggleTopicSuspendedMutation();
+
+    const [editingTopic, setEditingTopic] = useState<WordUpTopic | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
+
+    const [formSlug, setFormSlug] = useState('');
+    const [formName, setFormName] = useState('');
+    const [formEmoji, setFormEmoji] = useState('💡');
+    const [formProcedural, setFormProcedural] = useState(0.5);
+    const [formWeave, setFormWeave] = useState(0.4);
+    const [formVariantWeights, setFormVariantWeights] = useState<number[]>([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    const [formIsActive, setFormIsActive] = useState(true);
+    const [formIsSuspended, setFormIsSuspended] = useState(false);
+    const [formIsDefault, setFormIsDefault] = useState(false);
+
+    const variantNames = [
+        "Forward", "Reverse", "Odd One Out", "True/False",
+        "Multi-clue", "Correct Error", "Tag Match", "Compare", "Timeline"
+    ];
+
+    const openEdit = (t: WordUpTopic) => {
+        setEditingTopic(t);
+        setIsCreating(false);
+        setFormSlug(t.slug);
+        setFormName(t.name);
+        setFormEmoji(t.emoji || '💡');
+        setFormProcedural(t.procedural_weight ?? 0.5);
+        setFormWeave(t.handcrafted_weave_probability ?? 0.4);
+        setFormVariantWeights(t.variant_weights || [1, 1, 1, 1, 1, 1, 1, 1, 1]);
+        setFormIsActive(t.is_active ?? true);
+        setFormIsSuspended(t.is_suspended ?? false);
+        setFormIsDefault(t.is_default_fallback ?? false);
+    };
+
+    const openCreate = () => {
+        setEditingTopic(null);
+        setIsCreating(true);
+        setFormSlug('');
+        setFormName('');
+        setFormEmoji('💡');
+        setFormProcedural(0.5);
+        setFormWeave(0.4);
+        setFormVariantWeights([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+        setFormIsActive(true);
+        setFormIsSuspended(false);
+        setFormIsDefault(false);
+    };
+
+    const handleSave = async () => {
+        if (!formSlug.trim() || !formName.trim()) {
+            triggerToast("Slug and Name are required.", "error");
+            return;
+        }
+        try {
+            await saveTopicMutation.mutateAsync({
+                id: editingTopic?.id,
+                slug: formSlug.trim().toLowerCase().replace(/\s+/g, '_'),
+                name: formName.trim(),
+                emoji: formEmoji.trim() || '💡',
+                procedural_weight: formProcedural,
+                handcrafted_weave_probability: formWeave,
+                variant_weights: formVariantWeights,
+                is_active: formIsActive,
+                is_suspended: formIsSuspended,
+                is_default_fallback: formIsDefault,
+            });
+            triggerToast(editingTopic ? `Updated topic "${formName}"` : `Created topic "${formName}"`, "success");
+            setEditingTopic(null);
+            setIsCreating(false);
+        } catch (err: any) {
+            triggerToast(err.message || "Failed to save topic.", "error");
+        }
+    };
+
+    const handleToggleActive = async (topic: WordUpTopic) => {
+        try {
+            const next = !topic.is_active;
+            await toggleActiveMutation.mutateAsync({ id: topic.id, is_active: next });
+            triggerToast(next ? `Activated "${topic.name}"` : `Deactivated "${topic.name}"`, "success");
+        } catch {
+            triggerToast("Failed to toggle topic status.", "error");
+        }
+    };
+
+    const handleToggleSuspended = async (topic: WordUpTopic) => {
+        try {
+            const next = !topic.is_suspended;
+            await toggleSuspendedMutation.mutateAsync({ id: topic.id, is_suspended: next });
+            triggerToast(next ? `Suspended "${topic.name}"` : `Unsuspended "${topic.name}"`, "success");
+        } catch {
+            triggerToast("Failed to toggle topic suspension.", "error");
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between bg-gray-900 border border-white/10 rounded-2xl p-5">
+                <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                        <Sparkles className="text-correct" size={18} /> WordUp Dynamic Topics ({topics.length})
+                    </h3>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">
+                        Manage live procedural weights, handcrafted weave probabilities, suspension, and 9-variant distributions.
+                    </p>
+                </div>
+                <button
+                    onClick={openCreate}
+                    className="px-5 py-2.5 bg-correct hover:brightness-110 text-black font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-lg shadow-correct/20 cursor-pointer"
+                >
+                    + Add New Topic
+                </button>
+            </div>
+
+            {(editingTopic || isCreating) && (
+                <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 space-y-5">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                            {isCreating ? 'Create New Topic' : `Edit Topic: ${editingTopic?.name}`}
+                        </h4>
+                        <button
+                            onClick={() => { setEditingTopic(null); setIsCreating(false); }}
+                            className="p-1 text-gray-500 hover:text-white"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Slug</label>
+                            <input
+                                type="text"
+                                value={formSlug}
+                                disabled={!!editingTopic}
+                                onChange={e => setFormSlug(e.target.value)}
+                                placeholder="e.g. physics"
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white disabled:opacity-50"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Topic Name</label>
+                            <input
+                                type="text"
+                                value={formName}
+                                onChange={e => setFormName(e.target.value)}
+                                placeholder="e.g. Physics"
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Emoji</label>
+                            <input
+                                type="text"
+                                value={formEmoji}
+                                onChange={e => setFormEmoji(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Suspension Toggle Box */}
+                    <div className="flex items-center gap-4 bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formIsSuspended}
+                                onChange={e => setFormIsSuspended(e.target.checked)}
+                                className="w-4 h-4 accent-red-500 cursor-pointer"
+                            />
+                            <span className="text-xs font-black uppercase tracking-wider text-red-400">
+                                Suspend Category (Prevents gameplay selection & routes requests to fallback)
+                            </span>
+                        </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-black/30 p-4 rounded-xl border border-white/5">
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Procedural Weight</span>
+                                <span className="text-xs font-black text-correct">{Math.round(formProcedural * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={formProcedural}
+                                onChange={e => setFormProcedural(Number(e.target.value))}
+                                className="w-full accent-correct cursor-pointer"
+                            />
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Handcrafted Weave Probability</span>
+                                <span className="text-xs font-black text-purple-400">{Math.round(formWeave * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={formWeave}
+                                onChange={e => setFormWeave(Number(e.target.value))}
+                                className="w-full accent-purple-400 cursor-pointer"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">9 Variant Relative Weights</h5>
+                        <div className="grid grid-cols-3 sm:grid-cols-9 gap-2">
+                            {variantNames.map((vName, idx) => (
+                                <div key={vName} className="bg-white/5 p-2 rounded-xl border border-white/5 text-center">
+                                    <span className="text-[9px] font-bold text-gray-400 block truncate" title={vName}>{vName}</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="20"
+                                        step="0.5"
+                                        value={formVariantWeights[idx] ?? 1}
+                                        onChange={e => {
+                                            const updated = [...formVariantWeights];
+                                            updated[idx] = Math.max(0, Number(e.target.value));
+                                            setFormVariantWeights(updated);
+                                        }}
+                                        className="w-full bg-black/60 border border-white/10 rounded-lg text-center text-xs font-bold text-white mt-1 py-1"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button
+                            onClick={() => { setEditingTopic(null); setIsCreating(false); }}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={saveTopicMutation.isPending}
+                            className="px-6 py-2 bg-correct hover:brightness-110 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-correct/20"
+                        >
+                            {saveTopicMutation.isPending ? 'Saving...' : 'Save Configuration'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-gray-900 border border-white/10 rounded-2xl overflow-hidden">
+                {isLoading ? (
+                    <div className="p-8 text-center text-gray-500 font-bold uppercase text-xs animate-pulse">
+                        Loading topics...
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-white/5 text-[10px] uppercase font-black tracking-wider text-gray-400 border-b border-white/5">
+                                <tr>
+                                    <th className="py-3.5 px-4">Topic</th>
+                                    <th className="py-3.5 px-4">Slug</th>
+                                    <th className="py-3.5 px-4">Procedural</th>
+                                    <th className="py-3.5 px-4">Weave Prob</th>
+                                    <th className="py-3.5 px-4">Status</th>
+                                    <th className="py-3.5 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 font-medium text-gray-300">
+                                {topics.map(t => (
+                                    <tr key={t.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="py-3 px-4 font-black text-white flex items-center gap-2">
+                                            <span>{t.emoji}</span>
+                                            <span>{t.name}</span>
+                                            {t.is_suspended && (
+                                                <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-[9px] font-black uppercase">
+                                                    Suspended
+                                                </span>
+                                            )}
+                                            {t.is_default_fallback && (
+                                                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black uppercase">
+                                                    Default Fallback
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="py-3 px-4 font-mono text-[11px] text-gray-400">{t.slug}</td>
+                                        <td className="py-3 px-4 font-bold text-correct">{Math.round(t.procedural_weight * 100)}%</td>
+                                        <td className="py-3 px-4 font-bold text-purple-400">{Math.round(t.handcrafted_weave_probability * 100)}%</td>
+                                        <td className="py-3 px-4">
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    onClick={() => handleToggleActive(t)}
+                                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer border transition-all ${
+                                                        t.is_active
+                                                            ? 'bg-correct/20 text-correct border-correct/30'
+                                                            : 'bg-gray-800 text-gray-400 border-gray-700'
+                                                    }`}
+                                                >
+                                                    {t.is_active ? 'Active' : 'Inactive'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleSuspended(t)}
+                                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer border transition-all ${
+                                                        t.is_suspended
+                                                            ? 'bg-red-500 text-white border-red-500 shadow-md shadow-red-500/20'
+                                                            : 'bg-white/5 text-gray-400 hover:text-white border-white/10'
+                                                    }`}
+                                                >
+                                                    {t.is_suspended ? 'Suspended' : 'Suspend'}
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right">
+                                            <button
+                                                onClick={() => openEdit(t)}
+                                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                            >
+                                                Edit Config
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
+};
+
     // MAIN DASHBOARD RENDER
+
     return (
         <div className="h-screen overflow-y-auto bg-black text-white flex flex-col font-sans selection:bg-correct selection:text-black">
             {/* Local Toast Rendering */}
@@ -1802,6 +2145,16 @@ SELECT create_admin_user(
                     >
                         <BookOpen size={14} /> Topic Hub
                     </button>
+                    <button
+                        onClick={() => setActiveTab('dynamic_topics')}
+                        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'dynamic_topics'
+                            ? 'bg-correct text-black shadow-lg shadow-correct/25'
+                            : 'text-gray-500 hover:text-white'
+                            }`}
+                    >
+                        <Sparkles size={14} /> Dynamic Topics
+                    </button>
+
                     <button
                         onClick={() => setActiveTab('stats')}
                         className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'stats'
@@ -2234,7 +2587,10 @@ SELECT create_admin_user(
                     <WordUpCurator triggerToast={triggerToast} />
                 ) : activeTab === 'topics' ? (
                     <TopicHub triggerToast={triggerToast} />
+                ) : activeTab === 'dynamic_topics' ? (
+                    <WordUpTopicsManager triggerToast={triggerToast} />
                 ) : activeTab === 'broadcast' ? (
+
                     <AdminCustomNotificationBroadcaster triggerToast={triggerToast} />
                 ) : (
                     <GameStats triggerToast={triggerToast} />

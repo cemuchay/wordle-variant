@@ -203,8 +203,86 @@ const CATEGORY_QUESTION_CONFIG = Object.fromEntries<
    }),
 ]);
 
+export async function fetchQuestionConfigFromDB(
+   category: string,
+   supabaseClient?: any,
+): Promise<CategoryQuestionConfig> {
+   const now = Date.now();
+
+   // 1. Check in-memory TTL cache (5 min)
+   const cached = topicCacheMap.get(category);
+   if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+      return cached.config;
+   }
+
+   if (supabaseClient) {
+      try {
+         const { data, error } = await supabaseClient
+            .from("topics")
+            .select("slug, procedural_weight, handcrafted_weave_probability, variant_weights, is_default_fallback, is_suspended")
+            .or(`slug.eq.${category},slug.eq.mixed,is_default_fallback.eq.true`)
+            .eq("is_active", true);
+
+         if (!error && data && data.length > 0) {
+            // Find requested category row
+            const targetRow = data.find((r: any) => r.slug === category);
+            if (targetRow && targetRow.is_suspended) {
+               throw new Error("CATEGORY_SUSPENDED: This topic is currently unavailable.");
+            }
+
+            // Find fallback row ('mixed' or is_default_fallback)
+            const fallbackRow = data.find((r: any) => (r.slug === "mixed" || r.is_default_fallback) && !r.is_suspended);
+
+            const chosenRow = targetRow || fallbackRow;
+
+
+
+            if (chosenRow) {
+               const parsedConfig: CategoryQuestionConfig = {
+                  proceduralWeight: Number(chosenRow.procedural_weight ?? DEFAULT_CONFIG.proceduralWeight),
+                  handcraftedWeaveProbability: Number(chosenRow.handcrafted_weave_probability ?? DEFAULT_CONFIG.handcraftedWeaveProbability),
+                  variantWeights: padWeights(
+                     DEFAULT_CONFIG.variantWeights,
+                     (chosenRow.variant_weights || []).map((w: any) => Number(w)),
+                  ),
+               };
+
+               validateConfig(category, parsedConfig);
+
+               // Store in cache
+               topicCacheMap.set(category, { config: parsedConfig, fetchedAt: now });
+               return parsedConfig;
+            }
+         }
+      } catch (err: any) {
+         console.warn(`[questionConfig] Failed to fetch config from DB for "${category}":`, err.message);
+      }
+   }
+
+   // 2. Synchronous fallback: inspect hardcoded table, then 'mixed', then DEFAULT_CONFIG
+   const override = CATEGORY_QUESTION_CONFIG[category] || CATEGORY_QUESTION_CONFIG["mixed"] || {};
+   const merged: CategoryQuestionConfig = {
+      ...DEFAULT_CONFIG,
+      ...override,
+   };
+   if (override.variantWeights) {
+      merged.variantWeights = padWeights(
+         DEFAULT_CONFIG.variantWeights,
+         override.variantWeights,
+      );
+   }
+   validateConfig(category, merged);
+   topicCacheMap.set(category, { config: merged, fetchedAt: now });
+   return merged;
+}
+
 export function getQuestionConfig(category: string): CategoryQuestionConfig {
-   const override = CATEGORY_QUESTION_CONFIG[category] || {};
+   const cached = topicCacheMap.get(category);
+   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      return cached.config;
+   }
+
+   const override = CATEGORY_QUESTION_CONFIG[category] || CATEGORY_QUESTION_CONFIG["mixed"] || {};
    const merged: CategoryQuestionConfig = {
       ...DEFAULT_CONFIG,
       ...override,
@@ -219,24 +297,22 @@ export function getQuestionConfig(category: string): CategoryQuestionConfig {
    return merged;
 }
 
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
+const topicCacheMap = new Map<string, { config: CategoryQuestionConfig; fetchedAt: number }>();
+
 function validateConfig(
-   category: string,
+   _category: string,
    config: CategoryQuestionConfig,
 ): void {
+
    const { proceduralWeight, handcraftedWeaveProbability, variantWeights } =
       config;
 
    if (proceduralWeight < 0 || proceduralWeight > 1) {
-      console.warn(
-         `[questionConfig] "${category}": proceduralWeight ${proceduralWeight} is out of range [0,1]. Clamping.`,
-      );
       config.proceduralWeight = Math.max(0, Math.min(1, proceduralWeight));
    }
 
    if (handcraftedWeaveProbability < 0 || handcraftedWeaveProbability > 1) {
-      console.warn(
-         `[questionConfig] "${category}": handcraftedWeaveProbability ${handcraftedWeaveProbability} is out of range [0,1]. Clamping.`,
-      );
       config.handcraftedWeaveProbability = Math.max(
          0,
          Math.min(1, handcraftedWeaveProbability),
@@ -244,9 +320,6 @@ function validateConfig(
    }
 
    if (variantWeights.length !== VARIANT_COUNT) {
-      console.warn(
-         `[questionConfig] "${category}": variantWeights has ${variantWeights.length} elements, expected ${VARIANT_COUNT}. Padding.`,
-      );
       config.variantWeights = padWeights(
          DEFAULT_CONFIG.variantWeights,
          variantWeights,
@@ -255,23 +328,13 @@ function validateConfig(
 
    for (let i = 0; i < variantWeights.length; i++) {
       if (variantWeights[i] < 0) {
-         console.warn(
-            `[questionConfig] "${category}": variantWeights[${i}] is ${variantWeights[i]}, must be >= 0. Setting to 0.`,
-         );
          variantWeights[i] = 0;
-      }
-      if (variantWeights[i] > 20) {
-         console.warn(
-            `[questionConfig] "${category}": variantWeights[${i}] is ${variantWeights[i]} (very high). Weights are relative — this means ~${Math.round((variantWeights[i] / variantWeights.reduce((a, b) => a + b, 0)) * 100)}% chance for this variant.`,
-         );
       }
    }
 
    const sum = variantWeights.reduce((a, b) => a + b, 0);
    if (sum === 0) {
-      console.warn(
-         `[questionConfig] "${category}": all variant weights are 0. Reverting to defaults.`,
-      );
       config.variantWeights = [...DEFAULT_CONFIG.variantWeights];
    }
 }
+
