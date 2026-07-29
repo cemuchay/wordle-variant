@@ -18,7 +18,7 @@ import { WordGridBotEngine } from "../utils/wordgrid/WordGridBotEngine";
 
 import { safeLocalStorage } from "../utils/storage";
 import { TIMEOUT } from "../constants/game";
-import { preloadBotWordPools, findBotWordMove } from "../utils/wordgrid/botAI";
+import { preloadBotWordPools } from "../utils/wordgrid/botAI";
 
 export type WordGridViewType = "lobby" | "matchmaking" | "active" | "completed";
 
