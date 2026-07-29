@@ -100,6 +100,16 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     };
   }, [matchId, effectiveUserId, updateFromMatchRecord]);
 
+  // Auto-play bot move when it's the bot's turn
+  useEffect(() => {
+    if (status === 'active' && isBotMatch && currentTurn === 'bot') {
+      const timer = setTimeout(() => {
+        useWordGridStore.getState().playBotTurn();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [status, isBotMatch, currentTurn]);
+
   const handleSelectTile = (idx: number) => {
     setSelectedRackIdx(idx < 0 ? null : idx);
   };

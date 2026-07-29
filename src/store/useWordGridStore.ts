@@ -451,9 +451,9 @@ interface WordGridState {
       triggerToast: (msg: string, duration?: number) => void,
    ) => Promise<void>;
    playBotTurn: (
-      newBoard: GridCell[],
-      newBag: string[],
-      botPlayerIdx: number,
+      newBoard?: GridCell[],
+      newBag?: string[],
+      botPlayerIdx?: number,
    ) => Promise<void>;
    deleteMatch: (matchId: string, userId: string) => Promise<void>;
 }
@@ -1082,6 +1082,30 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
       }
    },
 
+   playBotTurn: async () => {
+      const state = get();
+      if (!state.isBotMatch || state.currentTurn !== "bot" || state.status === "completed") return;
+
+      const botTurnRes = await WordGridBotEngine.processBotMove({
+         matchId: state.matchId,
+         gridSize: state.gridSize,
+         status: state.status,
+         board: state.board,
+         tileBag: state.tileBag,
+         players: state.players,
+         currentTurnIndex: state.currentTurnIndex,
+         currentTurn: state.currentTurn,
+         moves: state.moves,
+         botDifficulty: state.botDifficulty,
+      });
+
+      set({
+         ...botTurnRes.updatedState,
+         p1Score: botTurnRes.updatedState.players?.[0]?.score ?? state.p1Score,
+         p2Score: botTurnRes.updatedState.players?.[1]?.score ?? state.p2Score,
+      });
+   },
+
    loadMatchesList: async (userId) => {
       if (!isUuid(userId)) {
          set({ matchesList: [] });
@@ -1201,137 +1225,5 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
          console.error("startDirectChallenge error:", e);
          triggerToast(e?.message || "Failed to create challenge.");
       }
-   },
-    playBotTurn: async (
-       newBoard: GridCell[],
-       newBag: string[],
-       botPlayerIdx: number,
-    ) => {
-       const { matchId, moves, players, gridSize, botDifficulty } = get();
-       if (!matchId) return;
-
-       // Preload bot word pools if not preloaded yet
-       await preloadBotWordPools();
-
-       const updatedPlayers = [...players];
-       const botPlayer = updatedPlayers[botPlayerIdx] || {
-          id: "bot",
-          username: "AI",
-          score: 0,
-          rack: [],
-       };
-       const botRack = [...botPlayer.rack];
-       const updatedBoard = [...newBoard];
-       let currentBag = [...newBag];
-       let addedScore = 0;
-       let wordPlaced = "SWAP";
-
-       const botMove = await findBotWordMove(updatedBoard, botRack, gridSize, botDifficulty);
-
-      if (botMove && botMove.placedTiles.length > 0) {
-         // Apply placed tiles to board
-         for (const tile of botMove.placedTiles) {
-            updatedBoard.push({
-               x: tile.x,
-               y: tile.y,
-               letter: tile.letter.toUpperCase(),
-               ownerId: "bot",
-            });
-            const rIdx = botRack.findIndex((l) => l.toUpperCase() === tile.letter.toUpperCase());
-            if (rIdx !== -1) botRack.splice(rIdx, 1);
-         }
-
-         const { rack: refreshedRack, newBag: nextBag } = await drawBalancedRack(
-            currentBag,
-            botRack,
-            7,
-            false,
-         );
-         currentBag = nextBag;
-         addedScore = botMove.score;
-         wordPlaced = botMove.word;
-
-         updatedPlayers[botPlayerIdx] = {
-            ...botPlayer,
-            score: botPlayer.score + addedScore,
-            rack: refreshedRack,
-         };
-      } else {
-         // If no word can be formed, exchange 2 tiles if bag is not empty
-         const swapCount = Math.min(2, botRack.length);
-         if (swapCount > 0 && currentBag.length > 0) {
-            const swappedLetters = botRack.splice(0, swapCount);
-            const { rack: refreshedRack, newBag: tempBag } = await drawBalancedRack(
-               currentBag,
-               botRack,
-               7,
-               false,
-            );
-            currentBag = [...tempBag, ...swappedLetters];
-            wordPlaced = `SWAP (${swapCount} tiles)`;
-            updatedPlayers[botPlayerIdx] = {
-               ...botPlayer,
-               rack: refreshedRack,
-            };
-         }
-      }
-
-      const movePayload = {
-         player_id: "bot",
-         word: wordPlaced,
-         score: addedScore,
-         breakdown: botMove?.score ? `${botMove.word} = ${botMove.score} pts` : undefined,
-         tiles_placed: botMove?.placedTiles || [],
-         timestamp: new Date().toISOString(),
-      };
-
-      const nextMoves = [...moves, movePayload];
-      const { turnIndex: nextTurnIdx, turnPlayerId: nextPlayerTurnId } = deriveTurnFromMoves(nextMoves, updatedPlayers);
-
-      const isCompleted =
-         currentBag.length === 0 &&
-         updatedPlayers.some((p) => p.rack.length === 0);
-
-      const updatePayload: any = {
-         board: updatedBoard,
-         tile_bag: currentBag,
-         players_data: updatedPlayers,
-         p2_rack: updatedPlayers[1]?.rack || [],
-         p2_score: updatedPlayers[1]?.score || 0,
-         moves: nextMoves,
-         current_turn_index: nextTurnIdx,
-         current_turn: isUuid(nextPlayerTurnId || "") ? nextPlayerTurnId : null,
-         last_move_at: new Date().toISOString(),
-      };
-
-      if (isCompleted) {
-         updatePayload.status = "completed";
-         updatePayload.completed_at = new Date().toISOString();
-      }
-
-      // 1. Optimistic Local Commitment & LS Snapshot (LS-First)
-      set({
-         board: updatedBoard,
-         tileBag: currentBag,
-         players: updatedPlayers,
-         p2Score: updatedPlayers[1]?.score || 0,
-         moves: nextMoves,
-         currentTurnIndex: nextTurnIdx,
-         currentTurn: nextPlayerTurnId,
-         status: isCompleted ? "completed" : get().status,
-      });
-
-      saveMatchSnapshotToLocalStorage(matchId, {
-         ...updatePayload,
-         id: matchId,
-         grid_size: gridSize,
-         is_bot_match: get().isBotMatch,
-         bot_difficulty: get().botDifficulty,
-      });
-
-      // 2. Dispatch network sync asynchronously
-      safeWordGridUpdate(matchId, updatePayload).catch((err) => {
-         console.warn("[WordGrid] Background bot turn sync failed (queued in LS):", err);
-      });
    },
 }));
