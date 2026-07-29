@@ -70,10 +70,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     setShowTutorial(false);
   };
 
-  // Flush any un-synced offline uploads on mount
-  useEffect(() => {
-    flushPendingUploads();
-  }, []);
+
 
   // Resubscribe to match updates when matchId changes
   useEffect(() => {
@@ -160,8 +157,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   };
 
   const handleConfirmExchange = async () => {
-    // Current working rack after recalling all placed tiles
-    const fullRack = [...rack, ...placedTiles.map(t => t.letter)];
+  // Current working rack after recalling all placed tiles
+  const fullRack = [...rack, ...placedTiles.map((t: any) => t.letter)];
     const selectedLetters = fullRack.filter((_: string, idx: number) => exchangeSelections[idx]);
     if (selectedLetters.length === 0) {
       triggerToast("Select at least one tile to swap.");
