@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useWordGridStore, flushPendingUploads } from '../store/useWordGridStore';
+import { useWordGridStore } from '../store/useWordGridStore';
 import { MatchmakingLobby } from './components/MatchmakingLobby';
 import { BoardGrid } from './components/BoardGrid';
 import { TileRack } from './components/TileRack';
@@ -55,7 +55,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     return !localStorage.getItem('wordgrid_tutorial_completed');
   });
 
-  const isBotMatch = useWordGridStore((s) => s.isBotMatch);
+  const isBotMatch = useWordGridStore((s: any) => s.isBotMatch);
   const effectiveUserId = user?.id || (isBotMatch ? (player1?.id || 'p1') : 'guest');
   const userId = effectiveUserId;
   const isMyTurn = status === 'active' && (
@@ -162,7 +162,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const handleConfirmExchange = async () => {
     // Current working rack after recalling all placed tiles
     const fullRack = [...rack, ...placedTiles.map(t => t.letter)];
-    const selectedLetters = fullRack.filter((_, idx) => exchangeSelections[idx]);
+    const selectedLetters = fullRack.filter((_: string, idx: number) => exchangeSelections[idx]);
     if (selectedLetters.length === 0) {
       triggerToast("Select at least one tile to swap.");
       return;
@@ -247,7 +247,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             {/* Right section: Scores & Resign */}
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner">
-                {activePlayersList.map((p, i) => {
+                {activePlayersList.map((p: any, i: number) => {
                   const isYou = p.id === userId;
                   const isCurrent = currentTurn === p.id && status === 'active';
                   return (
@@ -351,7 +351,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             </div>
 
             <div className="flex justify-center gap-2 flex-wrap">
-              {rack.map((letter, idx) => (
+              {rack.map((letter: string, idx: number) => (
                 <button
                   key={idx}
                   onClick={() => handleToggleExchangeSelection(idx)}

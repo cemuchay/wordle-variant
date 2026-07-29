@@ -7,7 +7,6 @@ import { DEFAULT_GRID_SIZE } from "../utils/wordgrid/constants";
 import { generateInitialTileBag, drawBalancedRack } from "../utils/wordgrid/bagBalancing";
 import { WordGridBotEngine } from "../utils/wordgrid/WordGridBotEngine";
 import { safeLocalStorage } from "../utils/storage";
-import { TIMEOUT } from "../constants/game";
 
 export type WordGridBotViewType = "lobby" | "matchmaking" | "active" | "completed";
 
@@ -429,7 +428,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
     });
   },
 
-  deleteBotMatch: async (matchId, userId) => {
+  deleteBotMatch: async (matchId, _userId) => {
     clearBotSnapshot(matchId);
     set((s) => ({
       botMatchesList: s.botMatchesList.filter((m) => m.id !== matchId),
@@ -440,7 +439,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
     });
   },
 
-  loadBotMatchesList: async (userId) => {
+  loadBotMatchesList: async (_userId) => {
     try {
       const { data } = await supabase
         .from("wordgrid_matches")

@@ -7,7 +7,6 @@ import { DEFAULT_GRID_SIZE } from "../utils/wordgrid/constants";
 import { generateInitialTileBag, drawBalancedRack } from "../utils/wordgrid/bagBalancing";
 import { WordGridPvPEngine } from "../utils/wordgrid/WordGridPvPEngine";
 import { safeLocalStorage } from "../utils/storage";
-import { TIMEOUT } from "../constants/game";
 
 export type WordGridPvPViewType = "lobby" | "matchmaking" | "active" | "completed";
 
@@ -193,7 +192,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       matchId: record.id,
       gridSize: record.grid_size || DEFAULT_GRID_SIZE,
       maxPlayers: record.max_players || 2,
-      role,
+      role: role as "player1" | "player2" | null,
       status: record.status,
       board: record.board || [],
       tileBag: record.tile_bag || [],
@@ -201,7 +200,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
       currentTurnIndex: turnIndex,
       currentTurn,
       moves: record.moves || [],
-      view: record.status === "completed" ? "completed" : "active",
+      view: (record.status === "completed" ? "completed" : "active") as WordGridPvPViewType,
       placedTiles: [],
       rack: activeRack,
     };
@@ -335,7 +334,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     return true;
   },
 
-  exchangeTiles: async (userId, lettersToExchange, triggerToast) => {
+  exchangeTiles: async (userId, lettersToExchange, _triggerToast) => {
     const state = get();
     if (!state.matchId || state.currentTurn !== userId) return;
 
@@ -374,7 +373,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     });
   },
 
-  resignMatch: async (userId) => {
+  resignMatch: async (_userId) => {
     const { matchId } = get();
     if (!matchId) return;
     set({ status: "completed", view: "completed" });
@@ -382,7 +381,7 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     supabase.from("wordgrid_matches").update({ status: "completed" }).eq("id", matchId);
   },
 
-  startQueue: async (userId, isRated, gridSize, targetPlayers, triggerToast) => {
+  startQueue: async (userId, _isRated, gridSize, targetPlayers, _triggerToast) => {
     set({ loading: true, view: "matchmaking" });
     try {
       const matchId = `match_${Date.now()}`;
