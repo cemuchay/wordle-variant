@@ -3,7 +3,7 @@
 // src/utils/wordgrid/constants.ts
 
 export const DEFAULT_GRID_SIZE = 7;
-export const ALLOWED_GRID_SIZES = [7, 8, 9, 10, 11] as const;
+export const ALLOWED_GRID_SIZES = [7, 8, 9, 10, 11, 13, 14, 15] as const;
 export type GridSize = typeof ALLOWED_GRID_SIZES[number];
 
 // Recommended Max Players per Grid Size
@@ -11,12 +11,16 @@ export type GridSize = typeof ALLOWED_GRID_SIZES[number];
 // 8x8: 3
 // 9x9: 4
 // 10x10 & 11x11: 4–6
+// 13x13 to 15x15: 4–8
 export const RECOMMENDED_MAX_PLAYERS: Record<number, number> = {
   7: 3,
   8: 3,
   9: 4,
   10: 6,
   11: 6,
+  13: 8,
+  14: 8,
+  15: 8,
 };
 
 // Standard English Scrabble letter values

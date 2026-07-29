@@ -224,6 +224,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   <span className="text-[9px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
                     {gridSize}×{gridSize}
                   </span>
+                  <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-950/80 border border-amber-800 text-amber-300 rounded-md flex items-center gap-1">
+                    🎒 Bag: {useWordGridStore.getState().tileBag.length}
+                  </span>
                 </div>
                 <span className={`text-[11px] font-black leading-tight truncate mt-0.5 ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
                   {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting for move...'}

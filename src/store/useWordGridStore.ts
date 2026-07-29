@@ -9,17 +9,15 @@ import type {
    WordGridPlayer,
 } from "../utils/wordgrid/constants";
 import { DEFAULT_GRID_SIZE } from "../utils/wordgrid/constants";
-import { validateBoardPlacement } from "../utils/wordgrid/boardValidation";
-import { calculateTurnScore } from "../utils/wordgrid/scoring";
-import { validateWordInDictionary } from "../utils/wordgrid/dictionary";
 import {
    generateInitialTileBag,
    drawBalancedRack,
 } from "../utils/wordgrid/bagBalancing";
+import { WordGridPvPEngine } from "../utils/wordgrid/WordGridPvPEngine";
+import { WordGridBotEngine } from "../utils/wordgrid/WordGridBotEngine";
 
 import { safeLocalStorage } from "../utils/storage";
 import { TIMEOUT } from "../constants/game";
-import { TOAST_DURATION } from "../constants/ui";
 import { preloadBotWordPools, findBotWordMove } from "../utils/wordgrid/botAI";
 
 export type WordGridViewType = "lobby" | "matchmaking" | "active" | "completed";
@@ -742,155 +740,98 @@ export const useWordGridStore = create<WordGridState>((set, get) => ({
    },
 
    submitMove: async (userId, triggerToast) => {
-      const {
-         matchId,
-         placedTiles,
-         board,
-         players,
-         currentTurn,
-         tileBag,
-         moves,
-         gridSize,
-      } = get();
-      if (!matchId || currentTurn !== userId) return false;
+      const state = get();
+      if (!state.matchId || state.currentTurn !== userId) return false;
 
-      // 1. Board placement alignment validation
-      const validation = validateBoardPlacement(placedTiles, board, gridSize);
-      if (!validation.isValid) {
-         triggerToast(validation.error || "Invalid placement");
-         return false;
+      if (state.isBotMatch) {
+        const botRes = await WordGridBotEngine.processHumanMove(
+          {
+            matchId: state.matchId,
+            gridSize: state.gridSize,
+            status: state.status,
+            board: state.board,
+            tileBag: state.tileBag,
+            players: state.players,
+            currentTurnIndex: state.currentTurnIndex,
+            currentTurn: state.currentTurn,
+            moves: state.moves,
+            botDifficulty: state.botDifficulty,
+          },
+          userId,
+          state.placedTiles,
+          triggerToast,
+        );
+
+        if (!botRes.success) return false;
+
+        set({
+          ...botRes.updatedState,
+          placedTiles: [],
+        });
+
+        // Trigger bot turn if required
+        if (botRes.botShouldPlay) {
+          setTimeout(async () => {
+            const currentState = get();
+            const botTurnRes = await WordGridBotEngine.processBotMove({
+              matchId: currentState.matchId,
+              gridSize: currentState.gridSize,
+              status: currentState.status,
+              board: currentState.board,
+              tileBag: currentState.tileBag,
+              players: currentState.players,
+              currentTurnIndex: currentState.currentTurnIndex,
+              currentTurn: currentState.currentTurn,
+              moves: currentState.moves,
+              botDifficulty: currentState.botDifficulty,
+            });
+
+            set({
+              ...botTurnRes.updatedState,
+              p1Score: botTurnRes.updatedState.players?.[0]?.score ?? currentState.p1Score,
+              p2Score: botTurnRes.updatedState.players?.[1]?.score ?? currentState.p2Score,
+            });
+          }, 800);
+        }
+        return true;
       }
 
-      // 2. Dictionary word validity checks
-      const words = validation.wordsFormed || [];
-      for (const w of words) {
-         const isValid = await validateWordInDictionary(w.word);
-         if (!isValid) {
-            triggerToast(`"${w.word}" is not a valid word!`);
-            return false;
-         }
-      }
-
-      // 3. Score calculation
-      const scoreResult = calculateTurnScore(words, placedTiles.length, board, gridSize);
-
-      // Update board state
-      const newBoard = [...board];
-      placedTiles.forEach((tile) => {
-         newBoard.push({
-            x: tile.x,
-            y: tile.y,
-            letter: tile.letter,
-            ownerId: userId,
-         });
-      });
-
-      // Update player's rack and draw replacements using bag balancing
-      const activeIdx = players.findIndex((p) => p.id === userId);
-      if (activeIdx === -1) return false;
-
-      const currentRack = [...players[activeIdx].rack];
-      placedTiles.forEach((tile) => {
-         const idx = currentRack.indexOf(tile.letter);
-         if (idx !== -1) currentRack.splice(idx, 1);
-      });
-
-      const { rack: newRack, newBag } = await drawBalancedRack(
-         tileBag,
-         currentRack,
-         7,
-         false,
+      // PvP Mode execution
+      const pvpRes = await WordGridPvPEngine.processPlayerMove(
+        {
+          matchId: state.matchId,
+          gridSize: state.gridSize,
+          maxPlayers: state.maxPlayers,
+          status: state.status,
+          board: state.board,
+          tileBag: state.tileBag,
+          players: state.players,
+          currentTurnIndex: state.currentTurnIndex,
+          currentTurn: state.currentTurn,
+          moves: state.moves,
+        },
+        userId,
+        state.placedTiles,
+        triggerToast,
       );
 
-      // Update players list with updated score and rack
-      const updatedPlayers = [...players];
-      updatedPlayers[activeIdx] = {
-         ...updatedPlayers[activeIdx],
-         score: updatedPlayers[activeIdx].score + scoreResult.totalScore,
-         rack: newRack,
-      };
+      if (!pvpRes.success || !pvpRes.updatedState || !pvpRes.payloadToSave) return false;
 
-      try {
-         const movePayload = {
-            player_id: userId,
-            word: words.map((w) => w.word).join(", "),
-            score: scoreResult.totalScore,
-            breakdown: scoreResult.words.map((w) => w.breakdown).join(" | ") + (scoreResult.bingoApplied ? " + 50 (1st Move Bingo Bonus)" : ""),
-            tiles_placed: placedTiles,
-            timestamp: new Date().toISOString(),
-         };
+      set({
+        ...pvpRes.updatedState,
+        p1Score: pvpRes.updatedState.players?.[0]?.score ?? state.p1Score,
+        p2Score: pvpRes.updatedState.players?.[1]?.score ?? state.p2Score,
+        placedTiles: [],
+      });
 
-         // Determine next player's turn using sequence derivation helper
-         const nextMoves = [...moves, movePayload];
-         const { turnIndex: nextTurnIdx, turnPlayerId: nextPlayerTurnId } = deriveTurnFromMoves(nextMoves, updatedPlayers);
+      // Save updated PvP match snapshot & sync via Supabase
+      saveMatchSnapshotToLocalStorage(state.matchId, {
+        id: state.matchId,
+        ...pvpRes.payloadToSave,
+      });
 
-         // Check game end condition: empty bag and all players unable to move / rack empty
-         const isCompleted =
-            newBag.length === 0 && updatedPlayers.some((p) => p.rack.length === 0);
-
-         const updatePayload: any = {
-            board: newBoard,
-            tile_bag: newBag,
-            players_data: updatedPlayers,
-            p1_rack: updatedPlayers[0]?.rack || [],
-            p2_rack: updatedPlayers[1]?.rack || [],
-            p1_score: updatedPlayers[0]?.score || 0,
-            p2_score: updatedPlayers[1]?.score || 0,
-            moves: nextMoves,
-            current_turn_index: nextTurnIdx,
-            current_turn: isUuid(nextPlayerTurnId || "") ? nextPlayerTurnId : null,
-            last_move_at: new Date().toISOString(),
-         };
-
-         if (isCompleted) {
-            updatePayload.status = "completed";
-            updatePayload.completed_at = new Date().toISOString();
-         }
-
-         // 1. Optimistic Local Commitment & LS Snapshot (LS-First)
-         set({
-            placedTiles: [],
-            rack: newRack,
-            board: newBoard,
-            tileBag: newBag,
-            players: updatedPlayers,
-            p1Score: updatedPlayers[0]?.score || 0,
-            p2Score: updatedPlayers[1]?.score || 0,
-            moves: nextMoves,
-            currentTurnIndex: nextTurnIdx,
-            currentTurn: nextPlayerTurnId,
-            status: isCompleted ? "completed" : get().status,
-         });
-
-         saveMatchSnapshotToLocalStorage(matchId, {
-            ...updatePayload,
-            id: matchId,
-            grid_size: gridSize,
-            is_bot_match: get().isBotMatch,
-            bot_difficulty: get().botDifficulty,
-         });
-
-         triggerToast(`Placed word(s)! Score: +${scoreResult.totalScore}`, TOAST_DURATION.LONG, true);
-
-         // 2. Dispatch network sync asynchronously
-         safeWordGridUpdate(matchId, updatePayload).catch((err) => {
-            console.warn("[WordGrid] Background move sync failed (queued in LS):", err);
-         });
-
-         // 3. Trigger Bot Turn immediately if derived turn points to bot
-         if (get().isBotMatch && !isCompleted && (nextPlayerTurnId === "bot" || updatedPlayers[nextTurnIdx]?.id === "bot")) {
-            setTimeout(
-               () => get().playBotTurn(newBoard, newBag, nextTurnIdx),
-               TIMEOUT.BOT_TURN,
-            );
-         }
-
-         return true;
-      } catch (e: any) {
-         triggerToast(`Error saving move: ${e?.message || "DB Error"}`);
-         console.error("submitMove error:", e);
-         return false;
-      }
+      safeWordGridUpdate(state.matchId, pvpRes.payloadToSave);
+      return true;
    },
 
    exchangeTiles: async (userId, lettersToExchange, triggerToast) => {

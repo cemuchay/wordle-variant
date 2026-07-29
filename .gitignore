@@ -16,6 +16,7 @@ implementation_plan.md
 dev-dist/
 twl.txt/
 research/
+src/components/dev/
 
 # Editor directories and files
 .vscode/*

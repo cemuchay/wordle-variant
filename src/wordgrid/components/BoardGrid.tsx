@@ -38,13 +38,14 @@ export const BoardGrid = ({
     if (boardCell) {
       const letter = boardCell.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
+      const textClass = gridSize > 11 ? 'text-xs sm:text-sm font-black' : 'text-sm sm:text-base md:text-lg font-black';
       return (
         <div
           key={key}
-          className="aspect-square bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border-2 border-amber-200 rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-transform hover:scale-[1.02] select-none"
+          className="aspect-square bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-transform hover:scale-[1.02] select-none"
         >
-          <span className="text-sm sm:text-base md:text-lg font-black text-slate-950 select-none leading-none">{letter}</span>
-          <span className="text-[9px] font-black text-slate-900 absolute bottom-0.5 right-1 select-none">{val}</span>
+          <span className={`${textClass} text-slate-950 select-none leading-none`}>{letter}</span>
+          {gridSize <= 11 && <span className="text-[9px] font-black text-slate-900 absolute bottom-0.5 right-1 select-none">{val}</span>}
         </div>
       );
     }
@@ -53,6 +54,7 @@ export const BoardGrid = ({
     if (placedTile) {
       const letter = placedTile.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
+      const textClass = gridSize > 11 ? 'text-xs sm:text-sm font-black' : 'text-sm sm:text-base md:text-lg font-black';
       return (
         <button
           key={key}
@@ -90,11 +92,11 @@ export const BoardGrid = ({
             }
           }}
           onClick={() => onRecallTile(x, y)}
-          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-grab active:cursor-grabbing transform active:scale-95 transition-all hover:brightness-110 select-none"
+          className="aspect-square bg-linear-to-br from-indigo-500 via-purple-600 to-indigo-700 border-2 border-white rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-xl cursor-grab active:cursor-grabbing transform active:scale-95 transition-all hover:brightness-110 select-none"
         >
-          <span className="text-sm sm:text-base md:text-lg font-black text-white drop-shadow-md select-none leading-none">{letter}</span>
-          <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>
-          <span className="absolute top-0.5 left-1 text-[6px] uppercase font-black text-emerald-300 tracking-wider select-none">NEW</span>
+          <span className={`${textClass} text-white drop-shadow-md select-none leading-none`}>{letter}</span>
+          {gridSize <= 11 && <span className="text-[9px] font-black text-amber-200 absolute bottom-0.5 right-1 select-none">{val}</span>}
+          <span className="absolute top-0.5 left-0.5 text-[5px] sm:text-[6px] uppercase font-black text-emerald-300 tracking-wider select-none">NEW</span>
         </button>
       );
     }
@@ -102,24 +104,20 @@ export const BoardGrid = ({
     // 3. Empty cell styling with drop and click targets
     let cellBg = 'bg-slate-900/90 hover:bg-slate-800/80 border-slate-800/80 hover:border-indigo-500/60';
     let text = '';
-    let textStyle = 'text-[9px] sm:text-[10px] font-black tracking-wider text-slate-500 select-none';
+    const textStyle = gridSize > 11 ? 'text-[7px] sm:text-[8px] font-black tracking-tighter select-none' : 'text-[9px] sm:text-[10px] font-black tracking-wider select-none';
 
     if (multiplier === 'TW') {
       cellBg = 'bg-rose-950/70 hover:bg-rose-900/70 border-rose-500/50 shadow-inner shadow-rose-950/50';
       text = 'TW';
-      textStyle = 'text-[9px] sm:text-[11px] font-black text-rose-400 drop-shadow select-none';
     } else if (multiplier === 'DW') {
       cellBg = 'bg-orange-950/70 hover:bg-orange-900/70 border-orange-500/50 shadow-inner shadow-orange-950/50';
       text = 'DW';
-      textStyle = 'text-[9px] sm:text-[11px] font-black text-orange-400 drop-shadow select-none';
     } else if (multiplier === 'TL') {
       cellBg = 'bg-indigo-950/70 hover:bg-indigo-900/70 border-indigo-500/50 shadow-inner shadow-indigo-950/50';
       text = 'TL';
-      textStyle = 'text-[9px] sm:text-[11px] font-black text-indigo-300 drop-shadow select-none';
     } else if (multiplier === 'DL') {
       cellBg = 'bg-sky-950/70 hover:bg-sky-900/70 border-sky-500/50 shadow-inner shadow-sky-950/50';
       text = 'DL';
-      textStyle = 'text-[9px] sm:text-[11px] font-black text-sky-300 drop-shadow select-none';
     }
 
     const isCenter = x === centerCoord && y === centerCoord;
