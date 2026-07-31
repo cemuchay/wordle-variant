@@ -334,8 +334,13 @@ export const useGameEngine = (
                            performSync(mergedPayload);
                         } else {
                            // Equal and coherent
+                           const localTs = payload.guessTimestamps || payload.guess_timestamps || [];
+                           const cloudTs = cloudPayload.guessTimestamps || cloudPayload.guess_timestamps || [];
+                           const mergedTimestamps = cloudTs.length >= localTs.length ? cloudTs : localTs;
+
                            const mergedPayload = {
                               ...payload,
+                              guessTimestamps: mergedTimestamps,
                               usedHint: payload.usedHint || cloudPayload.usedHint,
                               hintRecord:
                                  payload.hintRecord || cloudPayload.hintRecord,

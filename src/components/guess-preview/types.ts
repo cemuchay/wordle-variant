@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface GuessPreviewData {
    guesses: any[] | null;
+   guess_timestamps?: (number | string)[] | null;
+   guessTimestamps?: (number | string)[] | null;
    hints_used: boolean;
    skill_score: number;
    hint_record: { letter: string; index: number; row?: number } | null;
@@ -14,6 +16,13 @@ export interface MarathonGame {
    wordLength: number;
    gameIndex: number;
 }
+
+export const formatGuessTimestamp = (ts: number | string | null | undefined): string | null => {
+  if (!ts) return null;
+  const dateObj = typeof ts === 'number' ? new Date(ts) : new Date(ts);
+  if (isNaN(dateObj.getTime())) return null;
+  return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
 
 export const formatTime = (seconds: number | null | undefined) => {
   if (seconds === null || seconds === undefined) return null;

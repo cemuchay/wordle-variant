@@ -16,7 +16,7 @@ export const syncGameStateSub = async (
          type: 'supabase',
          table: 'scores',
          operation: 'select',
-         payload: { select: 'guesses, hints_used, hint_record' },
+         payload: { select: 'guesses, guess_timestamps, hints_used, hint_record' },
          query: {
             eq: { user_id: userId, game_date: date },
             maybeSingle: true
@@ -36,11 +36,27 @@ export const syncGameStateSub = async (
          // Server has hint but client doesn't — don't roll back
          if (existing.hints_used && !payload.usedHint) return;
 
-         // Both have same hint state — already synced, skip
+         // Check timestamps if present to resolve conflict cleanly
+         const existingTs = existing.guess_timestamps && Array.isArray(existing.guess_timestamps)
+            ? existing.guess_timestamps[existing.guess_timestamps.length - 1]
+            : null;
+         const incomingTs = (payload.guessTimestamps || payload.guess_timestamps) && Array.isArray(payload.guessTimestamps || payload.guess_timestamps)
+            ? (payload.guessTimestamps || payload.guess_timestamps)[(payload.guessTimestamps || payload.guess_timestamps).length - 1]
+            : null;
+
+         if (existingTs && incomingTs) {
+            const existingTime = new Date(existingTs).getTime();
+            const incomingTime = new Date(incomingTs).getTime();
+            // If existing is strictly newer, abort
+            if (existingTime > incomingTime) return;
+         }
+
+         // Both have same hint state and equal or older timestamps — already synced, skip
          if (
             existing.hints_used === payload.usedHint &&
             JSON.stringify(existing.hint_record) ===
-               JSON.stringify(payload.hintRecord)
+               JSON.stringify(payload.hintRecord) &&
+            (!incomingTs || (existingTs && new Date(existingTs).getTime() >= new Date(incomingTs).getTime()))
          )
             return;
       }
@@ -59,6 +75,8 @@ export const syncGameStateSub = async (
         }).finalScore
       : 0;
 
+   const timestampsToSave = payload.guessTimestamps || payload.guess_timestamps || [];
+
    try {
       await networkGate.enqueue(
          'upsert_game_score',
@@ -70,6 +88,7 @@ export const syncGameStateSub = async (
                user_id: userId,
                game_date: date,
                guesses: payload.guesses,
+               guess_timestamps: timestampsToSave,
                status: payload.status,
                hints_used: payload.usedHint,
                hint_record: payload.hintRecord,

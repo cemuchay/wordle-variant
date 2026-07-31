@@ -8,6 +8,7 @@ create table public.scores (
   skill_score integer not null,
   created_at timestamp with time zone null default now(),
   guesses jsonb null default '[]'::jsonb,
+  guess_timestamps jsonb null default '[]'::jsonb,
   status text null default 'playing'::text,
   hint_record jsonb null,
   game_message text null,
