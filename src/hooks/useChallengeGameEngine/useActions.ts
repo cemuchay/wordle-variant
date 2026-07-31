@@ -183,7 +183,9 @@ export const useActions = ({
             setActiveTargetWord(finalTargetWord);
          }
 
+         const submitTimestamp = Date.now();
          const newGuesses = [...guesses, result];
+         const newTimestamps = [...(state.guessTimestamps || []), submitTimestamp];
          const newStatuses = getLetterStatuses(newGuesses);
          const won = upperGuess === finalTargetWord;
          const lost = newGuesses.length === maxAttempts;
@@ -194,6 +196,7 @@ export const useActions = ({
             newStatuses,
             isWon: won,
             isLost: lost,
+            timestamp: submitTimestamp,
          });
 
          setIsSaving(true);
@@ -225,6 +228,7 @@ export const useActions = ({
                      score: skillScore,
                      attempts: newGuesses.length,
                      guesses: newGuesses,
+                     guess_timestamps: newTimestamps,
                      hints_used: usedHint,
                      hint_record: hintRecord,
                      time_taken: timeTaken,
@@ -236,6 +240,7 @@ export const useActions = ({
                   resultPayload = {
                      status: "playing",
                      guesses: newGuesses,
+                     guess_timestamps: newTimestamps,
                      attempts: newGuesses.length,
                      hints_used: usedHint,
                      hint_record: hintRecord,
@@ -259,6 +264,7 @@ export const useActions = ({
                      score: skillScore,
                      attempts: newGuesses.length,
                      guesses: newGuesses,
+                     guess_timestamps: newTimestamps,
                      hints_used: usedHint,
                      hint_record: hintRecord,
                      time_taken: timeTaken,
@@ -272,6 +278,7 @@ export const useActions = ({
                      score: 0,
                      attempts: newGuesses.length,
                      guesses: newGuesses,
+                     guess_timestamps: newTimestamps,
                      hints_used: usedHint,
                      hint_record: hintRecord,
                      ...(challenge.is_shapeshifter
