@@ -87,19 +87,31 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
     };
   }, [userId, view, loadMatchesList]);
 
+  const [isLaunching, setIsLaunching] = useState(false);
+
+  useEffect(() => {
+    if (!loading && view !== 'matchmaking') {
+      setIsLaunching(false);
+    }
+  }, [loading, view]);
+
   const handleQueue = (isRated: boolean) => {
+    setIsLaunching(true);
     startQueue(userId, isRated, selectedGridSize, targetPlayers, triggerToast);
   };
 
   const handleBotStart = () => {
-    startBotMatch(userId, difficulty, selectedGridSize);
+    setIsLaunching(true);
+    startBotMatch(userId, difficulty, selectedGridSize, triggerToast);
   };
 
   const handleChallengePlayer = (oppId: string) => {
+    setIsLaunching(true);
     startDirectChallenge(userId, oppId, selectedGridSize, triggerToast);
   };
 
   const handleResumeMatch = (matchId: string) => {
+    setIsLaunching(true);
     loadMatch(matchId, userId);
   };
 
@@ -118,54 +130,24 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
 
   // Self-abort 10s timeout during matchmaking or game creation
   useEffect(() => {
-    if (loading || view === 'matchmaking') {
+    if (loading || isLaunching || view === 'matchmaking') {
       const timer = setTimeout(() => {
         const store = useWordGridStore.getState();
         if (store.loading || store.view === 'matchmaking') {
+          setIsLaunching(false);
           useWordGridStore.setState({ loading: false, view: 'lobby' });
           triggerToast('Game creation timed out (10s limit). Returning to lobby.', TOAST_DURATION.LONG);
         }
       }, 10000);
       return () => clearTimeout(timer);
     }
-  }, [loading, view, triggerToast]);
+  }, [loading, isLaunching, view, triggerToast]);
 
   const filteredPlayers = (allProfiles || []).filter(
     (p: PlayerProfile) =>
       p.id !== userId &&
       (p.username || '').toLowerCase().includes(playerSearch.toLowerCase())
   );
-
-  if (loading || view === 'matchmaking') {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 bg-[#101828] border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 select-none scrollbar-hide">
-        <div className="relative flex items-center justify-center">
-          <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
-          <span className="absolute text-2xl animate-bounce">🔠</span>
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-black uppercase tracking-wider text-white">
-            {view === 'matchmaking' ? 'Finding Opponent' : 'Creating Game'}
-          </h3>
-          <p className="text-xs text-indigo-300 font-bold">
-            Initializing {selectedGridSize}×{selectedGridSize} Scrabble board...
-          </p>
-          <p className="text-[10px] text-slate-400 font-medium">
-            Shuffling balanced tile bag & preparing racks. Self-aborting in 10s if delayed.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            useWordGridStore.setState({ loading: false, view: 'lobby' });
-            cancelQueue(userId);
-          }}
-          className="w-full py-3 rounded-2xl border border-slate-700 bg-[#0c121e] hover:bg-slate-800 text-xs font-black uppercase tracking-wider text-white transition-all cursor-pointer shadow-md active:scale-95"
-        >
-          Cancel & Abort
-        </button>
-      </div>
-    );
-  }
 
   const activeMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'active');
   const completedMatches = (matchesList as WordGridMatchRecord[]).filter(m => m.status === 'completed');
@@ -457,6 +439,41 @@ export const MatchmakingLobby = ({ userId, allProfiles, onBack }: MatchmakingLob
           )}
         </div>
       </div>
+
+      {/* Loading & Matchmaking Modal Overlay */}
+      {(loading || isLaunching || view === 'matchmaking') && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200 pointer-events-auto">
+          <div className="bg-[#0c121e] border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center justify-center text-center space-y-5 animate-in zoom-in-95 duration-200 select-none">
+            <div className="relative flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+              <span className="absolute text-xl animate-bounce">🔠</span>
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black uppercase tracking-wider text-white">
+                {view === 'matchmaking' ? 'Finding Opponent...' : 'Loading Game...'}
+              </h3>
+              <p className="text-xs text-indigo-300 font-bold">
+                Populating board & tile rack...
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium">
+                Please wait while the match data initializes.
+              </p>
+            </div>
+            {view === 'matchmaking' && (
+              <button
+                onClick={() => {
+                  setIsLaunching(false);
+                  useWordGridStore.setState({ loading: false, view: 'lobby' });
+                  cancelQueue(userId);
+                }}
+                className="w-full py-2.5 rounded-xl border border-slate-700 bg-[#101828] hover:bg-slate-800 text-xs font-black uppercase tracking-wider text-white transition-all cursor-pointer shadow-md active:scale-95"
+              >
+                Cancel Matchmaking
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <ConfirmationModal
         isOpen={matchToDelete !== null}

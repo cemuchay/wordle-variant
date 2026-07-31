@@ -327,14 +327,22 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     set(updatedState);
     savePvPSnapshot(state.matchId, updatedState);
 
-    supabase.from("wordgrid_matches").update(pvpRes.payloadToSave).eq("id", state.matchId).then(({ error }) => {
-      if (error) console.warn("[WordGridPvP] Async DB update error:", error);
+    const safePayload = {
+      ...pvpRes.payloadToSave,
+      current_turn: isUuid(pvpRes.payloadToSave?.current_turn) ? pvpRes.payloadToSave.current_turn : null,
+    };
+
+    supabase.from("wordgrid_matches").update(safePayload).eq("id", state.matchId).then(({ error }) => {
+      if (error) {
+        console.warn("[WordGridPvP] Async DB update error:", error);
+        triggerToast?.(`Cloud sync warning: ${error.message || "Failed to update match"}`, 4000);
+      }
     });
 
     return true;
   },
 
-  exchangeTiles: async (userId, lettersToExchange, _triggerToast) => {
+  exchangeTiles: async (userId, lettersToExchange, triggerToast) => {
     const state = get();
     if (!state.matchId || state.currentTurn !== userId) return;
 
@@ -368,8 +376,16 @@ export const useWordGridPvPStore = create<WordGridPvPState>((set, get) => ({
     set(updatedState);
     savePvPSnapshot(state.matchId, updatedState);
 
-    supabase.from("wordgrid_matches").update(exRes.payloadToSave).eq("id", state.matchId).then(({ error }) => {
-      if (error) console.warn("[WordGridPvP] Async DB exchange error:", error);
+    const safeExPayload = {
+      ...exRes.payloadToSave,
+      current_turn: isUuid(exRes.payloadToSave?.current_turn) ? exRes.payloadToSave.current_turn : null,
+    };
+
+    supabase.from("wordgrid_matches").update(safeExPayload).eq("id", state.matchId).then(({ error }) => {
+      if (error) {
+        console.warn("[WordGridPvP] Async DB exchange error:", error);
+        triggerToast?.(`Cloud sync warning: ${error.message || "Failed to exchange tiles"}`, 4000);
+      }
     });
   },
 

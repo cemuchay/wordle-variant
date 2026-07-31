@@ -8,6 +8,7 @@ interface BoardGridProps {
   board: GridCell[];
   placedTiles: PlacedTile[];
   selectedIdx: number | null;
+  highlightedCoords?: string[];
   onMoveTileInGrid?: (fromX: number, fromY: number, toX: number, toY: number) => void;
   onPlaceTile: (x: number, y: number, rackIdx: number) => void;
   onRecallTile: (x: number, y: number) => void;
@@ -18,6 +19,7 @@ export const BoardGrid = ({
   board,
   placedTiles,
   selectedIdx,
+  highlightedCoords = [],
   onMoveTileInGrid,
   onPlaceTile,
   onRecallTile,
@@ -33,8 +35,9 @@ export const BoardGrid = ({
     const boardCell = getBoardCell(x, y);
     const placedTile = getPlacedTile(x, y);
     const multiplier = premiumCells[key] || 'NONE';
+    const isBotHighlighted = highlightedCoords.includes(key);
 
-    // 1. Permanently locked board tiles (bright wood/amber style)
+    // 1. Permanently locked board tiles (bright wood/amber style or glowing bot highlight)
     if (boardCell) {
       const letter = boardCell.letter.toUpperCase();
       const val = TILE_VALUES[letter] || 0;
@@ -42,10 +45,21 @@ export const BoardGrid = ({
       return (
         <div
           key={key}
-          className="aspect-square bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-transform hover:scale-[1.02] select-none"
+          className={`aspect-square rounded-lg sm:rounded-xl flex flex-col items-center justify-center relative shadow-lg transform transition-all select-none ${
+            isBotHighlighted
+              ? 'bg-linear-to-br from-emerald-300 via-teal-400 to-emerald-500 border-2 border-white ring-4 ring-emerald-400/90 shadow-emerald-500/60 scale-105 z-10 animate-pulse'
+              : 'bg-linear-to-br from-amber-200 via-amber-300 to-amber-400 border border-amber-200 hover:scale-[1.02]'
+          }`}
         >
-          <span className={`${textClass} text-slate-950 select-none leading-none`}>{letter}</span>
-          {gridSize <= 11 && <span className="text-[9px] font-black text-slate-900 absolute bottom-0.5 right-1 select-none">{val}</span>}
+          <span className={`${textClass} ${isBotHighlighted ? 'text-emerald-950 font-black' : 'text-slate-950'} select-none leading-none`}>{letter}</span>
+          {gridSize <= 11 && (
+            <span className={`text-[9px] font-black absolute bottom-0.5 right-1 select-none ${isBotHighlighted ? 'text-emerald-950' : 'text-slate-900'}`}>{val}</span>
+          )}
+          {isBotHighlighted && (
+            <span className="absolute -top-1 -right-1 text-[6px] font-black bg-emerald-950 text-emerald-300 px-1 rounded-sm border border-emerald-400 shadow-xs animate-bounce select-none">
+              BOT
+            </span>
+          )}
         </div>
       );
     }
