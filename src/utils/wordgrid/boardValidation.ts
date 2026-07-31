@@ -107,44 +107,93 @@ export function validateBoardPlacement(
     }
   }
 
-  // 5. Extract all newly formed words
+  // 5. Extract ALL words on the grid ("Nerve" validation)
+  // Scan the complete board to ensure EVERY contiguous line of 2+ letters (both horizontal and vertical) is returned for validation
   const wordsFormed: { word: string; tiles: PlacedTile[] }[] = [];
+  const processedKeys = new Set<string>();
 
-  if (placedTiles.length === 1) {
-    const horizWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'horizontal', tempBoard, boardMap, gridSize);
-    if (horizWord && horizWord.word.length > 1) {
-      wordsFormed.push(horizWord);
+  // Helper to extract placed tiles contributing to a word
+  const getPlacedTilesForWord = (
+    startX: number,
+    startY: number,
+    length: number,
+    isHoriz: boolean
+  ): PlacedTile[] => {
+    const tiles: PlacedTile[] = [];
+    for (let i = 0; i < length; i++) {
+      const x = isHoriz ? startX + i : startX;
+      const y = isHoriz ? startY : startY + i;
+      const key = `${x},${y}`;
+      if (!boardMap.has(key)) {
+        const pTile = placedTiles.find((t) => t.x === x && t.y === y);
+        if (pTile) {
+          tiles.push(pTile);
+        }
+      }
     }
-    const vertWord = getWordAt(placedTiles[0].x, placedTiles[0].y, 'vertical', tempBoard, boardMap, gridSize);
-    if (vertWord && vertWord.word.length > 1) {
-      wordsFormed.push(vertWord);
-    }
+    return tiles;
+  };
 
-    if (wordsFormed.length === 0) {
-      if (isFirstMove) {
-        wordsFormed.push({
-          word: placedTiles[0].letter.toUpperCase(),
-          tiles: [placedTiles[0]],
-        });
+  // Horizontal scan across entire grid
+  for (let y = 0; y < gridSize; y++) {
+    let currentWord = '';
+    let startX = -1;
+
+    for (let x = 0; x <= gridSize; x++) {
+      const key = `${x},${y}`;
+      const letter = tempBoard.get(key);
+
+      if (letter && x < gridSize) {
+        if (currentWord === '') startX = x;
+        currentWord += letter;
       } else {
-        return { isValid: false, error: 'Placed tile must touch another tile to form a valid word.' };
+        if (currentWord.length > 1) {
+          const wordKey = `H:${startX},${y}:${currentWord.length}`;
+          if (!processedKeys.has(wordKey)) {
+            processedKeys.add(wordKey);
+            const tiles = getPlacedTilesForWord(startX, y, currentWord.length, true);
+            wordsFormed.push({ word: currentWord, tiles });
+          }
+        }
+        currentWord = '';
+        startX = -1;
       }
     }
-  } else {
-    const primaryDir = direction!;
-    const refTile = placedTiles[0];
-    const primaryWord = getWordAt(refTile.x, refTile.y, primaryDir, tempBoard, boardMap, gridSize);
-    if (primaryWord) {
-      wordsFormed.push(primaryWord);
-    }
+  }
 
-    const secondaryDir = primaryDir === 'horizontal' ? 'vertical' : 'horizontal';
-    for (const tile of placedTiles) {
-      const crossWord = getWordAt(tile.x, tile.y, secondaryDir, tempBoard, boardMap, gridSize);
-      if (crossWord && crossWord.word.length > 1) {
-        wordsFormed.push(crossWord);
+  // Vertical scan across entire grid
+  for (let x = 0; x < gridSize; x++) {
+    let currentWord = '';
+    let startY = -1;
+
+    for (let y = 0; y <= gridSize; y++) {
+      const key = `${x},${y}`;
+      const letter = tempBoard.get(key);
+
+      if (letter && y < gridSize) {
+        if (currentWord === '') startY = y;
+        currentWord += letter;
+      } else {
+        if (currentWord.length > 1) {
+          const wordKey = `V:${x},${startY}:${currentWord.length}`;
+          if (!processedKeys.has(wordKey)) {
+            processedKeys.add(wordKey);
+            const tiles = getPlacedTilesForWord(x, startY, currentWord.length, false);
+            wordsFormed.push({ word: currentWord, tiles });
+          }
+        }
+        currentWord = '';
+        startY = -1;
       }
     }
+  }
+
+  // First move edge case: single tile word
+  if (isFirstMove && placedTiles.length === 1 && wordsFormed.length === 0) {
+    wordsFormed.push({
+      word: placedTiles[0].letter.toUpperCase(),
+      tiles: [placedTiles[0]],
+    });
   }
 
   return {
@@ -153,53 +202,5 @@ export function validateBoardPlacement(
   };
 }
 
-/**
- * Traces a line horizontally or vertically to find a word containing (startX, startY).
- */
-function getWordAt(
-  startX: number,
-  startY: number,
-  dir: 'horizontal' | 'vertical',
-  tempBoard: Map<string, string>,
-  boardMap: Map<string, string>,
-  gridSize: number
-): { word: string; tiles: PlacedTile[] } | null {
-  const isHoriz = dir === 'horizontal';
-  let minCoord = isHoriz ? startX : startY;
-  let maxCoord = isHoriz ? startX : startY;
 
-  const getKey = (c: number) => (isHoriz ? `${c},${startY}` : `${startX},${c}`);
-
-  // Trace backwards
-  while (minCoord > 0 && tempBoard.has(getKey(minCoord - 1))) {
-    minCoord--;
-  }
-  // Trace forwards
-  while (maxCoord < gridSize - 1 && tempBoard.has(getKey(maxCoord + 1))) {
-    maxCoord++;
-  }
-
-  if (minCoord === maxCoord) {
-    return null;
-  }
-
-  let word = '';
-  const tiles: PlacedTile[] = [];
-
-  for (let c = minCoord; c <= maxCoord; c++) {
-    const key = getKey(c);
-    const letter = tempBoard.get(key)!;
-    word += letter;
-
-    if (!boardMap.has(key)) {
-      tiles.push({
-        x: isHoriz ? c : startX,
-        y: isHoriz ? startY : c,
-        letter,
-      });
-    }
-  }
-
-  return { word, tiles };
-}
 

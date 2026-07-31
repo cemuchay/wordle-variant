@@ -18,6 +18,7 @@ export interface GuessResult {
    letter: string;
    status: LetterStatus;
    index?: number;
+   timestamp?: number;
 }
 
 interface UserMetadata {

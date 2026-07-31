@@ -30,7 +30,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                   type: 'supabase',
                   table: 'scores',
                   operation: 'select',
-                  payload: { select: 'guesses, hints_used, hint_record' },
+                  payload: { select: 'guesses, guess_timestamps, hints_used, hint_record' },
                   query: {
                      eq: { user_id: user.id, game_date: date },
                      maybeSingle: true
@@ -43,10 +43,20 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                const cloudCount = cloudData.guesses.length;
                const localCount = gamePayload.guesses.length;
 
+               const cloudTs = cloudData.guess_timestamps && Array.isArray(cloudData.guess_timestamps)
+                  ? cloudData.guess_timestamps[cloudData.guess_timestamps.length - 1]
+                  : null;
+               const localTs = (gamePayload as any).guessTimestamps && Array.isArray((gamePayload as any).guessTimestamps)
+                  ? (gamePayload as any).guessTimestamps[(gamePayload as any).guessTimestamps.length - 1]
+                  : null;
+
+               const isCloudTsNewer = cloudTs && localTs ? new Date(cloudTs).getTime() >= new Date(localTs).getTime() : false;
+
                const cloudAhead = cloudCount > localCount || (
                   cloudCount === localCount &&
                   cloudData.hints_used === gamePayload.usedHint &&
-                  JSON.stringify(cloudData.hint_record) === JSON.stringify(gamePayload.hintRecord)
+                  JSON.stringify(cloudData.hint_record) === JSON.stringify(gamePayload.hintRecord) &&
+                  (!localTs || isCloudTsNewer)
                );
 
                if (cloudAhead) {
@@ -174,7 +184,7 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
                type: 'supabase',
                table: 'scores',
                operation: 'select',
-               payload: { select: 'guesses, status, hints_used, hint_record, game_message' },
+               payload: { select: 'guesses, guess_timestamps, status, hints_used, hint_record, game_message' },
                query: {
                   eq: { user_id: user.id, game_date: date },
                   maybeSingle: true
@@ -186,6 +196,8 @@ export const usePersistence = ({ user, date, dispatch, config, triggerToast }: U
          if (data) {
             return {
                guesses: data.guesses,
+               guessTimestamps: data.guess_timestamps || [],
+               guess_timestamps: data.guess_timestamps || [],
                letterStatuses: getLetterStatuses(data.guesses),
                status: data.status,
                usedHint: data.hints_used,

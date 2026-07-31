@@ -104,6 +104,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
     if (initialData && !isMarathon) {
       return {
         guesses: initialData.guesses,
+        guess_timestamps: (initialData as any).guess_timestamps || (initialData as any).guessTimestamps || entry.guess_timestamps || entry.guessTimestamps || null,
+        guessTimestamps: (initialData as any).guessTimestamps || (initialData as any).guess_timestamps || entry.guessTimestamps || entry.guess_timestamps || null,
         hints_used: initialData.hints_used || false,
         skill_score: initialData.skill_score || 0,
         hint_record: initialData.hint_record || null,
@@ -355,6 +357,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
             setGameData({
               guesses: decrypted || [],
+              guess_timestamps: entry.guess_timestamps || entry.guessTimestamps || null,
+              guessTimestamps: entry.guessTimestamps || entry.guess_timestamps || null,
               hints_used: entry.hints_used || false,
               skill_score: entry.score || 0,
               hint_record: hintRecordToUse || null,
@@ -679,6 +683,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
             <GuessGrid
               guesses={gameData.guesses}
+              guessTimestamps={(gameData.guess_timestamps || gameData.guessTimestamps) as any}
               breakdown={breakdown}
               canSeeDetails={canSeeDetails}
               targetWordLength={targetWordToUse.length}

@@ -874,10 +874,22 @@ export default function App() {
     }
   }, [isChallengeOpen, activeNavigationItem, isPlayingChallenge, isWordUpOpen, moreGameMode]);
 
+const WordFinderPage = safeLazy(() => import("./components/dev/WordFinderPage").then(m => ({ default: m.WordFinderPage })));
+
   const isPageAdmin = window.location.pathname === "/admin";
 
   if (isPageAdmin) {
     return <AdminPage />;
+  }
+
+  const isPageWordFinder = window.location.pathname === "/word-finder" || window.location.pathname === "/finder";
+
+  if (isPageWordFinder) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-950 text-amber-400 font-bold p-8 flex items-center justify-center">Loading Word Finder...</div>}>
+        <WordFinderPage />
+      </Suspense>
+    );
   }
 
   const isPageUnsubscribe = window.location.pathname === "/unsubscribe";

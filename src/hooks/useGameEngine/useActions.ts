@@ -119,11 +119,13 @@ export const useActions = ({
             if (!confirmSubmit) return;
          }
 
+         const submitTimestamp = Date.now();
          const result = checkGuess(upperGuess, config.word);
          const won = upperGuess === config.word;
          const lost = state.guesses.length + 1 === config.maxAttempts;
 
          const newGuesses = [...state.guesses, result];
+         const newTimestamps = [...(state.guessTimestamps || []), submitTimestamp];
          const newStatus = won ? "won" : lost ? "lost" : "playing";
 
          const message =
@@ -142,6 +144,8 @@ export const useActions = ({
             date,
             isGuest: !user,
             guesses: newGuesses,
+            guessTimestamps: newTimestamps,
+            guess_timestamps: newTimestamps,
             letterStatuses: getLetterStatuses(newGuesses),
             status: newStatus,
             usedHint: state.usedHint,
@@ -168,6 +172,7 @@ export const useActions = ({
             isWon: won,
             isLost: lost,
             message,
+            timestamp: submitTimestamp,
          });
 
          // 3. Update local stats immediately on game over

@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { memo } from 'react';
-import { getTileSizeClass } from './types';
+import { getTileSizeClass, formatGuessTimestamp } from './types';
 import { GuessReactionsComments } from './GuessReactionsComments';
 
 interface GuessGridProps {
     guesses: any[];
+    guessTimestamps?: (number | string)[];
     breakdown: any;
     canSeeDetails: boolean;
     targetWordLength: number;
@@ -15,6 +16,7 @@ interface GuessGridProps {
 
 export const GuessGrid = memo(({
     guesses,
+    guessTimestamps,
     breakdown,
     canSeeDetails,
     targetWordLength,
@@ -27,12 +29,14 @@ export const GuessGrid = memo(({
             {guesses.map((row: any[], i: number) => {
                 const rowScore = breakdown.rows[i];
                 const rowDecisions = breakdown?.decisions?.[i]?.decisions;
+                const formattedTime = guessTimestamps?.[i] ? formatGuessTimestamp(guessTimestamps[i]) : null;
 
                 if (!rowDecisions) {
                     return (
                         <div key={i}>
                             <h4>Row {i + 1}</h4>
                             <p>{rowScore}</p>
+                            {formattedTime && <span className="text-[10px] text-gray-400 font-mono">{formattedTime}</span>}
                             <p>No breakdown available</p>
                         </div>
                     );
@@ -59,10 +63,17 @@ export const GuessGrid = memo(({
                                     </div>
                                 ))}
                             </div>
-                            <div
-                                className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
-                            >
-                                {rowScore > 0 ? `+${rowScore}` : rowScore}
+                            <div className="flex items-center gap-1.5">
+                                {formattedTime && (
+                                    <span className="text-[9px] font-mono text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                        {formattedTime}
+                                    </span>
+                                )}
+                                <div
+                                    className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
+                                >
+                                    {rowScore > 0 ? `+${rowScore}` : rowScore}
+                                </div>
                             </div>
                         </div>
 

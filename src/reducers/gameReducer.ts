@@ -2,6 +2,7 @@ import type { GuessResult, LetterStatus } from '../types/game';
 
 export interface GameState {
     guesses: GuessResult[][];
+    guessTimestamps: number[];
     currentGuess: string;
     cursorIndex: number;
     editIndex: number | null;
@@ -20,12 +21,12 @@ export interface GameState {
 export type GameAction =
     | { type: 'ADD_LETTER'; char: string; maxLength: number }
     | { type: 'DELETE_LETTER' }
-    | { type: 'SUBMIT_GUESS'; result: GuessResult[]; isWon: boolean; isLost: boolean; message: string }
+    | { type: 'SUBMIT_GUESS'; result: GuessResult[]; isWon: boolean; isLost: boolean; message: string; timestamp?: number }
     | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string; index: number; row?: number } }
     | { type: 'SET_CURSOR'; index: number }
     | { type: 'SET_EDIT_INDEX'; index: number | null }
-    | { type: 'LOAD_STATE'; payload: Partial<GameState> }
+    | { type: 'LOAD_STATE'; payload: Partial<GameState> & { guess_timestamps?: number[] } }
     | { type: 'SET_GAME_OVER_MODAL'; isOpen: boolean }
     | { type: 'RESET_CURRENT_GUESS' }
     | { type: 'SET_SYNC_STATUS'; status: 'idle' | 'syncing' | 'synced' | 'error'; error?: unknown }
@@ -34,6 +35,7 @@ export type GameAction =
 
 export const initialState: GameState = {
     guesses: [],
+    guessTimestamps: [],
     currentGuess: '',
     cursorIndex: 0,
     editIndex: null,
@@ -115,12 +117,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
         case 'SUBMIT_GUESS': {
             const newGuesses = [...state.guesses, action.result];
+            const ts = action.timestamp || Date.now();
+            const newTimestamps = [...(state.guessTimestamps || []), ts];
             const newStatus = action.isWon ? 'won' : (action.isLost ? 'lost' : 'playing');
             const isFinished = newStatus !== 'playing';
 
             return {
                 ...state,
                 guesses: newGuesses,
+                guessTimestamps: newTimestamps,
                 currentGuess: '',
                 cursorIndex: 0,
                 editIndex: null,
@@ -145,12 +150,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 hintRecord: action.hint,
             };
 
-        case 'LOAD_STATE':
+        case 'LOAD_STATE': {
+            const loadedTimestamps = action.payload.guessTimestamps || action.payload.guess_timestamps || state.guessTimestamps || [];
             return {
                 ...state,
                 ...action.payload,
+                guessTimestamps: loadedTimestamps,
                 isGameOver: action.payload.status === 'won' || action.payload.status === 'lost',
             };
+        }
 
         case 'SET_GAME_OVER_MODAL':
             return {
