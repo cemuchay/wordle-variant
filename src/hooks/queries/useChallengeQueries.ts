@@ -12,11 +12,11 @@ import { useBulkChallengeParticipantsSub } from "./sub-queries/useBulkChallengeP
  * Supabase select strings for reusable queries.
  */
 export const CHALLENGE_PARTICIPANTS_SELECT = `
-    id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words,
+    id, challenge_id, user_id, guest_id, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words, guess_timestamps,
     profiles(username, avatar_url),
     guest_profiles(username, avatar_url),
     marathon_progress:challenge_participants_marathon(
-        id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words
+        id, participation_id, game_index, word_length, status, score, attempts, hints_used, time_taken, started_at, completed_at, target_words, guess_timestamps
     )
 `;
 

@@ -282,12 +282,13 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
             let guessesToUse = prog.guesses;
             let hintRecordToUse = prog.hint_record;
             let targetWordsToUse = prog.target_words;
+            let guessTimestampsToUse = prog.guess_timestamps || prog.guessTimestamps;
 
             // If guesses are not loaded or are in encrypted string format
-            if (!Array.isArray(guessesToUse) || !targetWordsToUse) {
+            if (!Array.isArray(guessesToUse) || !targetWordsToUse || !guessTimestampsToUse) {
               const { data, error } = await supabase
                 .from("challenge_participants_marathon")
-                .select("guesses, hint_record, target_words")
+                .select("guesses, guess_timestamps, hint_record, target_words")
                 .eq("participation_id", entry.id)
                 .eq("game_index", marathonGameIndex)
                 .maybeSingle();
@@ -295,6 +296,7 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
               if (!error && data) {
                 if (!Array.isArray(guessesToUse)) guessesToUse = data.guesses;
                 if (!hintRecordToUse) hintRecordToUse = data.hint_record;
+                if (!guessTimestampsToUse) guessTimestampsToUse = data.guess_timestamps;
                 targetWordsToUse = data.target_words;
               }
             }
@@ -307,6 +309,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
             const resolvedData = {
               guesses: decrypted || [],
+              guess_timestamps: guessTimestampsToUse || null,
+              guessTimestamps: guessTimestampsToUse || null,
               hints_used: prog.hints_used || false,
               skill_score: prog.score || 0,
               hint_record: hintRecordToUse || null,
@@ -334,17 +338,19 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
             let guessesToUse = entry.guesses;
             let hintRecordToUse = entry.hint_record;
             let targetWordsToUse = entry.target_words;
+            let guessTimestampsToUse = entry.guess_timestamps || entry.guessTimestamps;
 
-            if (!Array.isArray(guessesToUse) || !targetWordsToUse) {
+            if (!Array.isArray(guessesToUse) || !targetWordsToUse || !guessTimestampsToUse) {
               const { data, error } = await supabase
                 .from("challenge_participants")
-                .select("guesses, hint_record, target_words")
+                .select("guesses, guess_timestamps, hint_record, target_words")
                 .eq("id", entry.id)
                 .single();
 
               if (!error && data) {
                 if (!Array.isArray(guessesToUse)) guessesToUse = data.guesses;
                 if (!hintRecordToUse) hintRecordToUse = data.hint_record;
+                if (!guessTimestampsToUse) guessTimestampsToUse = data.guess_timestamps;
                 targetWordsToUse = data.target_words;
               }
             }
@@ -357,8 +363,8 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
 
             setGameData({
               guesses: decrypted || [],
-              guess_timestamps: entry.guess_timestamps || entry.guessTimestamps || null,
-              guessTimestamps: entry.guessTimestamps || entry.guess_timestamps || null,
+              guess_timestamps: guessTimestampsToUse || null,
+              guessTimestamps: guessTimestampsToUse || null,
               hints_used: entry.hints_used || false,
               skill_score: entry.score || 0,
               hint_record: hintRecordToUse || null,
@@ -382,20 +388,50 @@ const GuessPreviewModal: React.FC<GuessPreviewModalProps> = ({
       loadChallengeGuesses();
     } else {
       // Daily game flow
-      if (!initialData) {
+      if (!initialData || !(initialData as any).guess_timestamps) {
         const fetchGuesses = async () => {
           setLoading(true);
           try {
-            const { data: edgeRes, error } = await supabase.functions.invoke("redis-cache", {
-              body: { action: "get-user-score", userId: entry.user_id, date: targetDate },
-            });
-            if (edgeRes && edgeRes.data) {
-              setGameData(edgeRes.data);
-            } else if (error) {
-              console.error("Failed to fetch guesses from redis-cache:", error);
+            let resolvedData: any = null;
+            try {
+              const { data: edgeRes } = await supabase.functions.invoke("redis-cache", {
+                body: { action: "get-user-score", userId: entry.user_id, date: targetDate },
+              });
+              if (edgeRes && edgeRes.data) {
+                resolvedData = edgeRes.data;
+              }
+            } catch (err) {
+              console.error("Error invoking redis-cache for guesses:", err);
+            }
+
+            // Always fallback or enrich with direct Supabase scores query if guess_timestamps is missing
+            if (!resolvedData || !resolvedData.guess_timestamps || !resolvedData.guessTimestamps) {
+              const { data: dbData } = await supabase
+                .from("scores")
+                .select("guesses, guess_timestamps, hints_used, skill_score, hint_record, game_message")
+                .eq("user_id", entry.user_id || entry.user?.id || entry.profiles?.id)
+                .eq("game_date", targetDate)
+                .maybeSingle();
+
+              if (dbData) {
+                resolvedData = {
+                  ...resolvedData,
+                  guesses: resolvedData?.guesses || dbData.guesses || [],
+                  guess_timestamps: dbData.guess_timestamps || resolvedData?.guess_timestamps || null,
+                  guessTimestamps: dbData.guess_timestamps || resolvedData?.guessTimestamps || null,
+                  hints_used: resolvedData?.hints_used ?? dbData.hints_used ?? false,
+                  skill_score: resolvedData?.skill_score ?? dbData.skill_score ?? 0,
+                  hint_record: resolvedData?.hint_record ?? dbData.hint_record ?? null,
+                  game_message: resolvedData?.game_message ?? dbData.game_message ?? null,
+                };
+              }
+            }
+
+            if (resolvedData) {
+              setGameData(resolvedData);
             }
           } catch (err) {
-            console.error("Error invoking redis-cache for guesses:", err);
+            console.error("Error fetching guesses for preview:", err);
           } finally {
             setLoading(false);
           }

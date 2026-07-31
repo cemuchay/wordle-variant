@@ -2,6 +2,7 @@
 
 export interface ChallengeGameState {
     guesses: any[];
+    guessTimestamps: number[];
     currentGuess: string;
     cursorIndex: number;
     editIndex: number | null;
@@ -18,11 +19,11 @@ export interface ChallengeGameState {
 }
 
 export type ChallengeGameAction =
-    | { type: 'START_GAME'; payload: { guesses: any[], letterStatuses: any, usedHint: boolean, hintRecord: any, timeLeft: number | null, isGameOver: boolean, status: any, currentGuess?: string, cursorIndex?: number } }
+    | { type: 'START_GAME'; payload: { guesses: any[], guessTimestamps?: number[], guess_timestamps?: number[], letterStatuses: any, usedHint: boolean, hintRecord: any, timeLeft: number | null, isGameOver: boolean, status: any, currentGuess?: string, cursorIndex?: number } }
     | { type: 'TICK_TIMER' }
     | { type: 'TYPE_CHAR'; char: string; wordLength: number }
     | { type: 'DELETE_CHAR' }
-    | { type: 'SUBMIT_GUESS'; newGuesses: any[]; newStatuses: any; isWon: boolean; isLost: boolean }
+    | { type: 'SUBMIT_GUESS'; newGuesses: any[]; newStatuses: any; isWon: boolean; isLost: boolean; timestamp?: number }
     | { type: 'STOP_REVEALING' }
     | { type: 'SET_HINT'; hint: { letter: string, index: number, row?: number } }
     | { type: 'SET_CURSOR'; index: number }
@@ -36,6 +37,7 @@ export type ChallengeGameAction =
 
 export const initialChallengeState: ChallengeGameState = {
     guesses: [],
+    guessTimestamps: [],
     currentGuess: '',
     cursorIndex: 0,
     editIndex: null,
@@ -57,6 +59,7 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
             return {
                 ...state,
                 ...action.payload,
+                guessTimestamps: action.payload.guessTimestamps || action.payload.guess_timestamps || state.guessTimestamps || [],
             };
 
         case 'TICK_TIMER':
@@ -125,9 +128,12 @@ export function challengeGameReducer(state: ChallengeGameState, action: Challeng
 
         case 'SUBMIT_GUESS': {
             const isFinished = action.isWon || action.isLost;
+            const ts = action.timestamp || Date.now();
+            const newTimestamps = [...(state.guessTimestamps || []), ts];
             return {
                 ...state,
                 guesses: action.newGuesses,
+                guessTimestamps: newTimestamps,
                 letterStatuses: action.newStatuses,
                 currentGuess: '',
                 cursorIndex: 0,
