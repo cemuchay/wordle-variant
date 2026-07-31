@@ -10,6 +10,7 @@ interface GuessReactionsCommentsProps {
     gameDate: string;
     guessIndex: number;
     commentsDisabledByTarget: boolean;
+    formattedTime?: string | null;
 }
 
 interface Comment {
@@ -40,6 +41,7 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
     gameDate,
     guessIndex,
     commentsDisabledByTarget,
+    formattedTime,
 }) => {
     const { user: currentUser } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
@@ -371,6 +373,13 @@ export const GuessReactionsComments: React.FC<GuessReactionsCommentsProps> = ({
                         <Heart size={12} className={myActiveReaction ? 'fill-indigo-400 text-indigo-400' : ''} />
                     </button>
                 </div>
+
+                {/* Timestamp in the middle */}
+                {formattedTime && (
+                    <span className="text-[9px] font-mono text-gray-400/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                        {formattedTime}
+                    </span>
+                )}
 
                 {/* Comments button */}
                 {!commentsDisabledByTarget && (

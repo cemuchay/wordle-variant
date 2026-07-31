@@ -63,17 +63,10 @@ export const GuessGrid = memo(({
                                     </div>
                                 ))}
                             </div>
-                            <div className="flex items-center gap-1.5">
-                                {formattedTime && (
-                                    <span className="text-[9px] font-mono text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
-                                        {formattedTime}
-                                    </span>
-                                )}
-                                <div
-                                    className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
-                                >
-                                    {rowScore > 0 ? `+${rowScore}` : rowScore}
-                                </div>
+                            <div
+                                className={`text-[12px] font-mono font-black px-2 py-0.5 rounded-full ${rowScore >= 0 ? "bg-correct/20 text-correct" : "bg-red-500/20 text-red-400"}`}
+                            >
+                                {rowScore > 0 ? `+${rowScore}` : rowScore}
                             </div>
                         </div>
 
@@ -109,17 +102,16 @@ export const GuessGrid = memo(({
                             </div>
                         )}
 
-                        {/* Guess reactions and comments section */}
-                        {targetUserId && gameDate && (
-                            <div className="pt-2 border-t border-white/5 w-full">
-                                <GuessReactionsComments
-                                    targetUserId={targetUserId}
-                                    gameDate={gameDate}
-                                    guessIndex={i}
-                                    commentsDisabledByTarget={commentsDisabledByTarget}
-                                />
-                            </div>
-                        )}
+                        {/* Guess reactions, timestamps and comments section */}
+                        <div className="pt-2 border-t border-white/5 w-full">
+                            <GuessReactionsComments
+                                targetUserId={targetUserId}
+                                gameDate={gameDate}
+                                guessIndex={i}
+                                commentsDisabledByTarget={commentsDisabledByTarget}
+                                formattedTime={formattedTime}
+                            />
+                        </div>
                     </div>
                 );
             })}
