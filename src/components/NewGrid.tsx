@@ -328,11 +328,12 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
               </button>
               {showRules && (
                 <>
-                  <div className="absolute right-0 mt-1.5 z-50 w-56 bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in slide-in-from-top-1 duration-150 md:left-full md:bottom-0 md:mt-0 md:ml-2 md:slide-in-from-left-1">
+                  <div className="fixed inset-0 z-[9998] bg-black/50" onClick={onToggleRules} />
+                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] w-64 max-w-[90vw] bg-gray-900/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-2xl text-left animate-in fade-in zoom-in-95 duration-150">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[9px] font-black uppercase tracking-wider text-correct">Quick Rules</span>
                       <button onClick={onToggleRules} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
-                        <X size={10} />
+                        <X size={14} />
                       </button>
                     </div>
                     <p className="text-[9px] text-gray-400 uppercase font-black tracking-wide mb-2 leading-relaxed">
@@ -353,7 +354,6 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                       </li>
                     </ul>
                   </div>
-                  <div className="fixed inset-0 z-40" onClick={onToggleRules} />
                 </>
               )}
             </div>
@@ -370,8 +370,14 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
               </button>
               {showEditHelp && (
                 <>
-                  <div className="absolute right-0 mt-1.5 z-50 w-60 bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150 md:left-full md:bottom-0 md:mt-0 md:ml-2 md:slide-in-from-left-1">
-                    <div className="font-bold text-white/90 text-xs mb-1.5">Editing Controls</div>
+                  <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setShowEditHelp(false)} />
+                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] w-64 max-w-[90vw] bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[11px] leading-relaxed text-white/80 space-y-1.5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="font-bold text-white/90 text-xs">Editing Controls</div>
+                      <button onClick={() => setShowEditHelp(false)} className="text-gray-500 hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
+                        <X size={14} />
+                      </button>
+                    </div>
                     <p><span className="text-blue-400 font-bold">Tap</span> a cell to move the cursor there.</p>
                     <p><span className="text-red-400 font-bold">Backspace</span> deletes the letter at cursor and shifts remaining left.</p>
                     <p><span className="text-yellow-400 font-bold">Double-click</span> or <span className="text-yellow-400 font-bold">long-press</span> a cell to enter <span className="text-yellow-400">edit mode</span>.</p>
@@ -383,7 +389,6 @@ export const NewGrid: React.FC<NewGridProps> = memo(({
                       Got it
                     </button>
                   </div>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowEditHelp(false)} />
                 </>
               )}
             </div>
