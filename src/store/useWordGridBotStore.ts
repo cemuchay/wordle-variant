@@ -117,6 +117,7 @@ interface WordGridBotState {
       userId: string,
       triggerToast?: (msg: string, duration?: number) => void,
    ) => Promise<void>;
+   updateFromMatchRecord: (record: any, currentUserId: string) => void;
 
    // Tile play actions
    moveTileInGrid: (
@@ -356,6 +357,34 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          set({ error: errMsg, loading: false });
          triggerToast?.(`Failed to load match: ${errMsg}`, 4000);
       }
+   },
+
+   updateFromMatchRecord: (record, currentUserId) => {
+      if (!record) return;
+      const playersList: WordGridPlayer[] = record.players_data || [];
+      const human = playersList.find((p) => p.id === currentUserId || p.id !== "bot");
+      const turnIndex = record.current_turn_index ?? 0;
+
+      const loadedState = {
+         matchId: record.id,
+         gridSize: record.grid_size || DEFAULT_GRID_SIZE,
+         status: record.status,
+         board: record.board || [],
+         tileBag: record.tile_bag || [],
+         players: playersList.length > 0 ? playersList : get().players,
+         currentTurnIndex: turnIndex,
+         currentTurn: record.current_turn || (turnIndex === 0 ? currentUserId : "bot"),
+         moves: record.moves || [],
+         botDifficulty: record.bot_difficulty || get().botDifficulty || "normal",
+         isBotMatch: true,
+         view: record.status === "completed" ? "completed" : ("active" as WordGridBotViewType),
+         placedTiles: [],
+         rack: human?.rack || get().rack,
+         loading: false,
+      };
+
+      set(loadedState);
+      saveBotSnapshot(record.id, loadedState);
    },
 
    moveTileInGrid: (fromX, fromY, toX, toY) => {

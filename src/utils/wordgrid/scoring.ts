@@ -44,18 +44,24 @@ export function calculateTurnScore(
     let wordMultiplier = 1;
     const breakdownParts: string[] = [];
 
-    // Find the direction of the word (horizontal or vertical)
-    // If tiles.length > 0, we can determine the line.
-    // If tiles.length is 0, this shouldn't happen for a newly formed word.
-    const isHoriz = tiles.length > 0 ? (tiles.length === 1 ? true : tiles[0].y === tiles[1].y) : true;
-    const ref = tiles[0];
+    if (!tiles || tiles.length === 0 || !tiles[0]) {
+      for (let i = 0; i < word.length; i++) {
+        const letter = word[i];
+        const baseValue = TILE_VALUES[letter] || 0;
+        wordSum += baseValue;
+        breakdownParts.push(`${letter}(${baseValue})`);
+      }
+      totalScore += wordSum;
+      results.push({ word, score: wordSum, breakdown: `${breakdownParts.join(' + ')} = ${wordSum}` });
+      continue;
+    }
 
-    // To trace the word coordinates, let's find the start and end of the word.
-    // Let's deduce the full sequence of cells for this word.
-    // Since we know the letters, we can find the min and max coordinates of the tiles in the word's line.
-    const coords = tiles.map(t => isHoriz ? t.x : t.y);
+    const ref = tiles[0];
+    const isHoriz = tiles.length > 1 ? (tiles[0].y === (tiles[1]?.y ?? tiles[0].y)) : true;
+    const coords = tiles.map(t => (isHoriz ? t?.x : t?.y)).filter(c => c !== undefined) as number[];
+    if (coords.length === 0) continue;
     const minPlaced = Math.min(...coords);
-    const fixedCoord = isHoriz ? ref.y : ref.x;
+    const fixedCoord = isHoriz ? (ref.y ?? 0) : (ref.x ?? 0);
 
     // Go backwards to find start of the word on the board
     let start = minPlaced;
@@ -63,7 +69,7 @@ export function calculateTurnScore(
       const x = isHoriz ? c : fixedCoord;
       const y = isHoriz ? fixedCoord : c;
       // It's occupied if it's either in the existing board or one of the new tiles
-      return existingMap.has(`${x},${y}`) || tiles.some(t => t.x === x && t.y === y);
+      return existingMap.has(`${x},${y}`) || tiles.some(t => t && t.x === x && t.y === y);
     };
 
     while (start > 0 && isCellOccupied(start - 1)) {

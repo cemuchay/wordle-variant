@@ -87,7 +87,9 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
           filter: `id=eq.${matchId}`,
         },
         (payload) => {
-          updateFromMatchRecord(payload.new, effectiveUserId);
+          if (typeof updateFromMatchRecord === 'function') {
+            updateFromMatchRecord(payload.new, effectiveUserId);
+          }
         }
       )
       .subscribe();
