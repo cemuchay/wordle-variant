@@ -378,6 +378,19 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 Confirm Swap
               </button>
             </div>
+      {/* Active Game Loading Overlay */}
+      {useWordGridStore((s: any) => s.loading) && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200 pointer-events-auto">
+          <div className="bg-[#0c121e] border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center justify-center text-center space-y-5 animate-in zoom-in-95 duration-200 select-none">
+            <div className="relative flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+              <span className="absolute text-xl animate-bounce">🔠</span>
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black uppercase tracking-wider text-white">Loading Game...</h3>
+              <p className="text-xs text-indigo-300 font-bold">Populating board & tile rack...</p>
+              <p className="text-[10px] text-slate-400 font-medium">Please wait while the match initializes.</p>
+            </div>
           </div>
         </div>
       )}
