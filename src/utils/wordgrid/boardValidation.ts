@@ -188,9 +188,13 @@ export function validateBoardPlacement(
     }
   }
 
+  // Filter wordsFormed so ONLY words that contain AT LEAST ONE newly placed tile from this turn are scored and validated.
+  // Pre-existing static words on the board that were untouched by this turn's placed tiles are excluded!
+  const newlyCreatedOrModifiedWords = wordsFormed.filter((item) => item.tiles && item.tiles.length > 0);
+
   // First move edge case: single tile word
-  if (isFirstMove && placedTiles.length === 1 && wordsFormed.length === 0) {
-    wordsFormed.push({
+  if (isFirstMove && placedTiles.length === 1 && newlyCreatedOrModifiedWords.length === 0) {
+    newlyCreatedOrModifiedWords.push({
       word: placedTiles[0].letter.toUpperCase(),
       tiles: [placedTiles[0]],
     });
@@ -198,7 +202,7 @@ export function validateBoardPlacement(
 
   return {
     isValid: true,
-    wordsFormed,
+    wordsFormed: newlyCreatedOrModifiedWords,
   };
 }
 

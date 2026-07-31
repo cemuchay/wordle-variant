@@ -103,7 +103,9 @@ export class WordGridPvPEngine {
     const newMove = {
       player_id: userId,
       word: words.map((w) => w.word).join(", "),
+      primary_word: words[0]?.word || words.map((w) => w.word).join(", "),
       score: scoreResult.totalScore,
+      breakdown: scoreResult.words.map((w) => `${w.word}: ${w.breakdown}`).join(" | ") + (scoreResult.bingoApplied ? " + 50 (Bingo)" : ""),
       created_at: new Date().toISOString(),
     };
 

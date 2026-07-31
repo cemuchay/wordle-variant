@@ -47,39 +47,64 @@ export const MoveHistory = ({ moves, player1, player2 }: MoveHistoryProps) => {
       <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Play Timeline</span>
 
       <div className="max-h-[140px] overflow-y-auto space-y-2 pr-1 scrollbar-hide">
-        {moves.slice().reverse().map((move, idx) => {
-          const isPass = move.word === 'PASS' || move.word?.startsWith('SWAP');
+        {moves.slice().reverse().map((move, reverseIdx) => {
+          const chronologicalIdx = moves.length - 1 - reverseIdx;
+          const isLatestMove = reverseIdx === 0;
+
+          const isPass = !move.word || move.word === 'PASS' || move.word.startsWith('[') || move.word.startsWith('SWAP');
           const hasBreakdown = !!move.breakdown;
+
+          // Extract all words formed on this turn (stored in move.word)
+          const wordsFormedOnTurn = move.word ? move.word.split(',').map((w: string) => w.trim().toUpperCase()) : [];
 
           return (
             <div
-              key={idx}
-              className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded-xl text-xs gap-2"
+              key={chronologicalIdx}
+              className={`flex items-center justify-between p-2.5 rounded-xl text-xs gap-2.5 transition-all ${
+                isLatestMove
+                  ? 'bg-indigo-950/70 border border-emerald-500/60 shadow-lg shadow-emerald-950/20'
+                  : 'bg-slate-850/80 border border-slate-800 shadow-sm hover:border-slate-700'
+              }`}
             >
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[9px] text-gray-400 font-bold uppercase truncate">
-                  {getUsername(move.player_id)}
-                </span>
+              <div className="flex flex-col min-w-0 flex-1 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase truncate">
+                    {getUsername(move.player_id)}
+                  </span>
+                  {isLatestMove && !isPass && (
+                    <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-emerald-500 text-slate-950 rounded-md tracking-wider shadow-xs animate-pulse">
+                      LATEST PLAY
+                    </span>
+                  )}
+                </div>
+
                 {isPass ? (
-                  <span className="text-gray-500 font-black italic truncate">{move.word || 'PASSED'}</span>
+                  <span className="text-slate-500 font-black italic text-[11px] truncate">{move.word || 'PASSED'}</span>
                 ) : (
-                  <button
-                    onClick={() => handleWordClick(move.word)}
-                    className="text-left font-black text-indigo-300 hover:text-indigo-200 underline cursor-pointer truncate"
-                  >
-                    {move.word}
-                  </button>
+                  <div className="flex items-center flex-wrap gap-1.5 text-[11px] font-black">
+                    {wordsFormedOnTurn.map((w: string, wIdx: number) => (
+                      <button
+                        key={wIdx}
+                        onClick={() => handleWordClick(w)}
+                        className="px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/80 hover:text-white transition-all underline cursor-pointer truncate shadow-xs"
+                        title="Click to view dictionary definition"
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
+
               <div className="flex items-center gap-1.5 font-black text-right shrink-0">
-                <span className={`text-[10px] ${isPass ? 'text-gray-500' : 'text-emerald-400'}`}>
+                <span className={`text-[11px] ${isPass ? 'text-slate-500' : isLatestMove ? 'text-emerald-300 font-extrabold' : 'text-emerald-400'}`}>
                   {isPass ? '0' : `+${move.score}`} pts
                 </span>
                 {hasBreakdown && (
                   <button
                     onClick={() => setSelectedBreakdown({ word: move.word, breakdown: move.breakdown, score: move.score })}
-                    className="w-4 h-4 rounded-full bg-indigo-950 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 flex items-center justify-center text-[9px] font-black cursor-pointer transition-colors"
-                    title="View score decision breakdown"
+                    className="w-4 h-4 rounded-full bg-indigo-950 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 flex items-center justify-center text-[9px] font-black cursor-pointer transition-colors shadow-xs"
+                    title="View tile scoring breakdown"
                   >
                     i
                   </button>

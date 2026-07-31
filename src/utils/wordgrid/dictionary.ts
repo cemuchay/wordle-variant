@@ -38,22 +38,33 @@ export async function validateWordInDictionary(word: string): Promise<boolean> {
     }
   }
 
-  // 3. Eleven or more letters: Fallback to Free Dictionary API or basic sanity check
-  // Since we don't have local lists for 11+, we do a quick check via the public API,
-  // or return true if API fails so we don't block players on valid long words.
+  // 3. Eleven or more letters: Fallback to Free Dictionary API or Datamuse API
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${normalized.toLowerCase()}`);
-    if (res.status === 200) {
+    if (res.ok) {
       return true;
     }
-    // If the API specifically returned 404, it is definitely not a word.
     if (res.status === 404) {
       return false;
     }
-    return true; // Other API errors shouldn't block play
   } catch (e) {
-    return true; // Network errors shouldn't block play
+    // CORS or network error on api.dictionaryapi.dev
   }
+
+  // Fallback to Datamuse (CORS friendly)
+  try {
+    const res = await fetch(`https://api.datamuse.com/words?sp=${normalized.toLowerCase()}&max=1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && data[0].word.toLowerCase() === normalized.toLowerCase()) {
+        return true;
+      }
+    }
+  } catch (e) {
+    // Network errors shouldn't block play
+  }
+
+  return true;
 }
 
 export interface DictionaryDefinition {
@@ -63,7 +74,7 @@ export interface DictionaryDefinition {
 }
 
 /**
- * Fetches the definition of a word from the Free Dictionary API.
+ * Fetches the definition of a word from the Free Dictionary API with Datamuse fallback.
  */
 export async function fetchWordDefinition(word: string): Promise<DictionaryDefinition> {
   const normalized = word.trim().toLowerCase();
@@ -72,29 +83,57 @@ export async function fetchWordDefinition(word: string): Promise<DictionaryDefin
     definition: 'No definition found.'
   };
 
+  // 1. Try Free Dictionary API
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${normalized}`);
-    if (!res.ok) return fallback;
-
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return fallback;
-
-    const entry = data[0];
-    const meanings = entry.meanings;
-    if (!Array.isArray(meanings) || meanings.length === 0) return fallback;
-
-    const firstMeaning = meanings[0];
-    const partOfSpeech = firstMeaning.partOfSpeech;
-    const defs = firstMeaning.definitions;
-    if (!Array.isArray(defs) || defs.length === 0) return fallback;
-
-    return {
-      word: word.toUpperCase(),
-      partOfSpeech: partOfSpeech ? partOfSpeech.toUpperCase() : undefined,
-      definition: defs[0].definition
-    };
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const entry = data[0];
+        const meanings = entry.meanings;
+        if (Array.isArray(meanings) && meanings.length > 0) {
+          const firstMeaning = meanings[0];
+          const partOfSpeech = firstMeaning.partOfSpeech;
+          const defs = firstMeaning.definitions;
+          if (Array.isArray(defs) && defs.length > 0) {
+            return {
+              word: word.toUpperCase(),
+              partOfSpeech: partOfSpeech ? partOfSpeech.toUpperCase() : undefined,
+              definition: defs[0].definition
+            };
+          }
+        }
+      }
+    }
   } catch (e) {
-    console.error('Error fetching word definition:', e);
-    return fallback;
+    // CORS or network error on api.dictionaryapi.dev, failover to Datamuse
   }
+
+  // 2. Fallback to Datamuse API (CORS-friendly: always returns Access-Control-Allow-Origin: *)
+  try {
+    const res = await fetch(`https://api.datamuse.com/words?sp=${normalized}&md=d&max=1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && data[0].defs && data[0].defs.length > 0) {
+        const rawDef: string = data[0].defs[0]; // e.g. "n\tA mound, hill, or barrow."
+        const parts = rawDef.split('\t');
+        if (parts.length >= 2) {
+          return {
+            word: word.toUpperCase(),
+            partOfSpeech: parts[0].toUpperCase(),
+            definition: parts[1]
+          };
+        } else {
+          return {
+            word: word.toUpperCase(),
+            definition: rawDef
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching word definition from fallback API:', e);
+  }
+
+  return fallback;
 }

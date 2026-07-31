@@ -97,7 +97,9 @@ export class WordGridBotEngine {
     const newMove = {
       player_id: userId,
       word: words.map((w) => w.word).join(", "),
+      primary_word: words[0]?.word || words.map((w) => w.word).join(", "),
       score: scoreResult.totalScore,
+      breakdown: scoreResult.words.map((w) => `${w.word}: ${w.breakdown}`).join(" | ") + (scoreResult.bingoApplied ? " + 50 (Bingo)" : ""),
       created_at: new Date().toISOString(),
     };
 
@@ -124,6 +126,7 @@ export class WordGridBotEngine {
     state: WordGridBotState,
   ): Promise<{
     updatedState: Partial<WordGridBotState>;
+    lastBotMove: { word: string; score: number; placedTiles: PlacedTile[] };
   }> {
     await preloadBotWordPools();
 
@@ -172,6 +175,7 @@ export class WordGridBotEngine {
       updatedMoves.push({
         player_id: "bot",
         word: botMove.word,
+        primary_word: botMove.word.split(",")[0].trim(),
         score: botMove.score,
         created_at: new Date().toISOString(),
       });
@@ -204,6 +208,15 @@ export class WordGridBotEngine {
         currentTurnIndex: 0,
         currentTurn: humanId,
         moves: updatedMoves,
+      },
+      lastBotMove: botMove && botMove.placedTiles.length > 0 ? {
+        word: botMove.word,
+        score: botMove.score,
+        placedTiles: botMove.placedTiles,
+      } : {
+        word: "[Bot Swapped Tiles]",
+        score: 0,
+        placedTiles: [],
       },
     };
   }

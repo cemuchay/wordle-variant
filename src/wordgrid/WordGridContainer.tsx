@@ -48,6 +48,16 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
     updateFromMatchRecord,
   } = useWordGridStore();
 
+  const tileBag = useWordGridStore((s: any) => s.tileBag);
+  const p1Score = useWordGridStore((s: any) => s.p1Score);
+  const p2Score = useWordGridStore((s: any) => s.p2Score);
+  const reorderRack = useWordGridStore((s: any) => s.reorderRack);
+  const loading = useWordGridStore((s: any) => s.loading);
+
+  const isBotThinking = useWordGridStore((s: any) => s.isBotThinking);
+  const lastBotMove = useWordGridStore((s: any) => s.lastBotMove);
+  const lastBotPlacedCoords = useWordGridStore((s: any) => s.lastBotPlacedCoords);
+
   const [selectedRackIdx, setSelectedRackIdx] = useState<number | null>(null);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const [exchangeSelections, setExchangeSelections] = useState<boolean[]>([]);
@@ -101,13 +111,13 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   // Auto-play bot move when it's the bot's turn
   useEffect(() => {
-    if (status === 'active' && isBotMatch && currentTurn === 'bot') {
+    if (status === 'active' && isBotMatch && currentTurn === 'bot' && !isBotThinking) {
       const timer = setTimeout(() => {
         useWordGridStore.getState().playBotTurn();
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [status, isBotMatch, currentTurn]);
+  }, [status, isBotMatch, currentTurn, isBotThinking]);
 
   const handleSelectTile = (idx: number) => {
     setSelectedRackIdx(idx < 0 ? null : idx);
@@ -184,7 +194,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
 
   if (view === 'lobby' || view === 'matchmaking') {
     return (
-      <div className="h-full w-full flex items-center justify-center select-none px-2 md:px-6">
+      <div className="h-[#100%] w-full flex items-center justify-center select-none px-2 md:px-6">
         <MatchmakingLobby userId={effectiveUserId} allProfiles={allProfiles} onBack={onBackToClassic} />
       </div>
     );
@@ -194,8 +204,8 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
   const activePlayersList = players.length > 0
     ? players
     : [
-      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: useWordGridStore.getState().p1Score, rack: [] },
-      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: useWordGridStore.getState().p2Score, rack: [] },
+      { id: player1?.id || 'p1', username: player1?.username || 'Player 1', score: p1Score, rack: [] },
+      { id: player2?.id || 'p2', username: player2?.username || 'Player 2', score: p2Score, rack: [] },
     ];
 
   return (
@@ -204,7 +214,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
       onCut={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
       style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
-      className="h-full w-full flex flex-col items-center justify-start bg-[#101828] overflow-y-auto pb-10 scrollbar-hide px-3 pt-12 sm:pt-14 md:pt-6 space-y-4 mx-auto select-none"
+      className="h-full w-full flex flex-col items-center justify-start bg-[#101828] overflow-y-auto pb-10 scrollbar-hide px-3 pt-12 sm:pt-14 md:pt-6 space-y-4 mx-auto select-none relative"
     >
       {showTutorial && (
         <WordGridTutorialModal
@@ -213,39 +223,72 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
         />
       )}
 
+      {/* Bot Move Splash Notification */}
+      {lastBotMove && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top-4 zoom-in-95 duration-300 px-4 w-full max-w-sm">
+          <div className="bg-linear-to-r from-emerald-900/95 via-teal-900/95 to-slate-900/95 border-2 border-emerald-400 rounded-3xl p-4 shadow-2xl shadow-emerald-950/80 backdrop-blur-md flex items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-xl shadow-inner animate-bounce">
+                🤖
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">Bot Played</span>
+                <span className="text-base font-black tracking-wide text-white drop-shadow-md">
+                  {lastBotMove.word}
+                </span>
+              </div>
+            </div>
+            <div className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-xs font-black uppercase shadow-md">
+              +{lastBotMove.score} pts
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Responsive Layout: Mobile flex ordering (Banner -> Actions & Rack -> Board -> Timeline), Desktop 12-column Grid */}
       <div className="w-full max-w-none md:px-6 flex flex-col md:grid md:grid-cols-12 gap-5 items-start">
 
         {/* Banner Header (Mobile: 1st, Desktop: top of left column) */}
         <div className="order-1 md:col-span-5 w-full max-w-[480px] mx-auto md:max-w-none">
-          <div className="w-full bg-[#0c121e]/95 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl backdrop-blur-md flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 animate-in fade-in duration-300">
-            {/* Left section: Back button & Status */}
-            <div className="flex items-center gap-3 min-w-0 shrink-0">
-              <button
-                onClick={handleBackToLobby}
-                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md active:scale-95 shrink-0"
-              >
-                ← Back
-              </button>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
+          <div className="w-full bg-[#0c121e]/95 border border-slate-800 rounded-3xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-md flex flex-col gap-3 animate-in fade-in duration-300">
+            
+            {/* Top row: Back button, Title & Mode info */}
+            <div className="flex items-center justify-between w-full gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  onClick={handleBackToLobby}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-md active:scale-95 shrink-0"
+                >
+                  ← Back
+                </button>
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span className="text-[11px] font-black text-indigo-400 uppercase tracking-wider">WordGrid</span>
                   <span className="text-[9px] font-black px-1.5 py-0.5 bg-indigo-950 border border-indigo-800 text-indigo-300 rounded-md">
                     {gridSize}×{gridSize}
                   </span>
                   <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-950/80 border border-amber-800 text-amber-300 rounded-md flex items-center gap-1">
-                    🎒 Bag: {useWordGridStore.getState().tileBag.length}
+                    🎒 Bag: {tileBag?.length ?? 0}
                   </span>
                 </div>
-                <span className={`text-[11px] font-black leading-tight truncate mt-0.5 ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
-                  {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : 'Waiting for move...'}
-                </span>
               </div>
+
+              {status !== 'completed' && (
+                <button
+                  onClick={handleResign}
+                  className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                >
+                  Resign
+                </button>
+              )}
             </div>
 
-            {/* Right section: Scores & Resign */}
-            <div className="flex items-center gap-2 shrink-0 ml-auto">
-              <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner">
+            {/* Bottom row: Turn status & Player scores */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 w-full">
+              <span className={`text-[11px] font-black leading-tight truncate ${isMyTurn ? 'text-amber-400 animate-pulse' : 'text-slate-400'}`}>
+                {status === 'completed' ? 'Match Finished' : isMyTurn ? '🔥 Your Turn' : isBotMatch && (isBotThinking || currentTurn === 'bot') ? '🤖 Bot is thinking...' : 'Waiting for move...'}
+              </span>
+
+              <div className="flex items-center gap-2 bg-[#101828]/90 px-3 py-1.5 border border-slate-800 rounded-2xl shadow-inner flex-wrap">
                 {activePlayersList.map((p: any, i: number) => {
                   const isYou = p.id === userId;
                   const isCurrent = currentTurn === p.id && status === 'active';
@@ -260,21 +303,23 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                   );
                 })}
               </div>
-
-              {status !== 'completed' && (
-                <button
-                  onClick={handleResign}
-                  className="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0"
-                >
-                  Resign
-                </button>
-              )}
             </div>
+
           </div>
         </div>
 
         {/* Action Panel & Tile Rack (Mobile: 2nd, Desktop: 2nd block of left column) */}
         <div className="order-2 md:col-span-5 md:col-start-1 flex flex-col space-y-4 w-full max-w-[480px] mx-auto md:max-w-none">
+          {/* Bot Thinking Banner Indicator */}
+          {isBotMatch && (isBotThinking || currentTurn === 'bot') && status === 'active' && (
+            <div className="w-full bg-linear-to-r from-emerald-950/90 via-teal-950/90 to-emerald-950/90 border border-emerald-500/60 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-lg shadow-emerald-950/50 animate-pulse">
+              <div className="w-4 h-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
+              <span className="text-xs font-black uppercase text-emerald-300 tracking-wider">
+                🤖 AI Bot is thinking of a move...
+              </span>
+            </div>
+          )}
+
           {/* Action panel: Play Word vs Swap Tiles */}
           {isMyTurn && (
             <div className="w-full grid grid-cols-2 gap-3 animate-in fade-in duration-300">
@@ -314,7 +359,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             onShuffle={shuffleRack}
             onRecallAll={recallAllTiles}
             isMyTurn={isMyTurn}
-            onReorderRack={useWordGridStore.getState().reorderRack}
+            onReorderRack={reorderRack}
           />
         </div>
 
@@ -325,6 +370,7 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
             board={board}
             placedTiles={placedTiles}
             selectedIdx={selectedRackIdx}
+            highlightedCoords={lastBotPlacedCoords}
             onMoveTileInGrid={moveTileInGrid}
             onPlaceTile={handlePlaceTile}
             onRecallTile={handleRecallTile}
@@ -378,8 +424,12 @@ export const WordGridContainer = ({ onBackToClassic }: WordGridContainerProps) =
                 Confirm Swap
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
       {/* Active Game Loading Overlay */}
-      {useWordGridStore((s: any) => s.loading) && (
+      {loading && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200 pointer-events-auto">
           <div className="bg-[#0c121e] border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center justify-center text-center space-y-5 animate-in zoom-in-95 duration-200 select-none">
             <div className="relative flex items-center justify-center">

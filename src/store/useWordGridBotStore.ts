@@ -96,6 +96,10 @@ interface WordGridBotState {
    botDifficulty: "easy" | "normal" | "hard";
    isBotMatch: boolean;
 
+   isBotThinking: boolean;
+   lastBotMove: { word: string; score: number; placedTiles: PlacedTile[] } | null;
+   lastBotPlacedCoords: string[];
+
    view: WordGridBotViewType;
    placedTiles: PlacedTile[];
    rack: string[];
@@ -141,6 +145,8 @@ interface WordGridBotState {
    loadBotMatchesList: (userId: string) => Promise<void>;
 }
 
+let botHighlightTimer: any = null;
+
 export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
    matchId: null,
    gridSize: DEFAULT_GRID_SIZE,
@@ -154,6 +160,10 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
    botDifficulty: "normal",
    isBotMatch: true,
 
+   isBotThinking: false,
+   lastBotMove: null,
+   lastBotPlacedCoords: [],
+
    view: "lobby",
    placedTiles: [],
    rack: [],
@@ -164,6 +174,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
    setView: (view) => set({ view }),
 
    resetGame: () => {
+      if (botHighlightTimer) clearTimeout(botHighlightTimer);
       clearBotSnapshot(get().matchId);
       set({
          matchId: null,
@@ -177,6 +188,9 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          moves: [],
          botDifficulty: "normal",
          isBotMatch: true,
+         isBotThinking: false,
+         lastBotMove: null,
+         lastBotPlacedCoords: [],
          view: "lobby",
          placedTiles: [],
          rack: [],
@@ -567,6 +581,8 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
       )
          return;
 
+      set({ isBotThinking: true });
+
       try {
          const botRes = await WordGridBotEngine.processBotMove({
             matchId: state.matchId,
@@ -584,15 +600,26 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
          const humanPlayer = botRes.updatedState.players?.find(
             (p) => p.id !== "bot",
          );
+         const botMove = (botRes as any).lastBotMove || null;
+         const botCoords = botMove?.placedTiles ? botMove.placedTiles.map((t: any) => `${t.x},${t.y}`) : [];
+
          const updatedState = {
             ...state,
             ...botRes.updatedState,
             currentTurn: humanPlayer?.id || "p1",
             currentTurnIndex: 0,
+            isBotThinking: false,
+            lastBotMove: botMove,
+            lastBotPlacedCoords: botCoords,
          };
 
          set(updatedState);
          saveBotSnapshot(state.matchId, updatedState);
+
+         if (botHighlightTimer) clearTimeout(botHighlightTimer);
+         botHighlightTimer = setTimeout(() => {
+            set({ lastBotPlacedCoords: [], lastBotMove: null });
+         }, 3500);
 
          // Async DB update after bot turn - convert turn to valid PostgreSQL UUID or null
          const dbTurn = toDbUuid(updatedState.currentTurn);
@@ -622,6 +649,7 @@ export const useWordGridBotStore = create<WordGridBotState>((set, get) => ({
             });
       } catch (err: any) {
          console.error("[WordGridBot] triggerBotTurn error:", err);
+         set({ isBotThinking: false });
          triggerToast?.(`Bot turn error: ${err?.message || "Failed to process bot turn"}`, 4000);
       }
    },
