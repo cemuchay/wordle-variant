@@ -34,6 +34,7 @@ import {
     simulateBotResponse,
 } from "../../../utils/wordupQuestionGenerator";
 import { isBotMatchId, cleanBotMatchId } from "../../shared/botUtils";
+import { removePausedGame } from "../../shared/pauseStorage";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
@@ -820,6 +821,10 @@ export function useGameEngine(props: EngineProps) {
         const dbId = cleanBotMatchId(mId);
 
         if (mId) {
+            removePausedGame(mId);
+            if (dbId) {
+                removePausedGame(dbId);
+            }
             if (!isBot && channelRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
