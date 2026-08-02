@@ -1,8 +1,26 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Flame, Play, PauseCircle } from "lucide-react";
 import { CATEGORIES } from "./constants";
+import { safeLocalStorage } from "../../utils/storage";
+
+const MARATHON_TOTAL_GAMES_KEY = "wordup_marathon_total_games";
+const gameOptions = [1, 2, 3, 5, 7, 10];
+
+const getSavedTotalGames = (): number => {
+   try {
+      const saved = safeLocalStorage.getItem(MARATHON_TOTAL_GAMES_KEY);
+      if (saved) {
+         const parsed = parseInt(saved, 10);
+         if (gameOptions.includes(parsed)) {
+            return parsed;
+         }
+      }
+   } catch {
+      /* ignore */
+   }
+   return 5;
+};
 
 interface MarathonConfigModalProps {
    isOpen: boolean;
@@ -24,7 +42,7 @@ export const MarathonConfigModal = ({
    onConfirm,
    allProfiles = [],
 }: MarathonConfigModalProps) => {
-   const [totalGames, setTotalGames] = useState<number>(5);
+   const [totalGames, setTotalGames] = useState<number>(getSavedTotalGames);
    const [allowPause, setAllowPause] = useState<boolean>(false);
    const [mode, setMode] = useState<"live_bot" | "async">("live_bot");
    const [selectedTargetUser, setSelectedTargetUser] = useState<any | null>(null);
@@ -35,13 +53,16 @@ export const MarathonConfigModal = ({
    const catObj = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
    const totalQuestions = totalGames * 7;
 
-   const gameOptions = [1, 2, 3, 5, 7, 10];
-
    const filteredProfiles = allProfiles.filter((p: any) =>
       (p.username || "").toLowerCase().includes(userSearch.toLowerCase())
    );
 
    const handleStart = () => {
+      try {
+         safeLocalStorage.setItem(MARATHON_TOTAL_GAMES_KEY, String(totalGames));
+      } catch {
+         /* ignore */
+      }
       onConfirm({
          totalGames,
          allowPause,
