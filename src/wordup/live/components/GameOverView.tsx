@@ -47,7 +47,6 @@ export const GameOverView = ({
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
    const oppScore = isP1 ? matchData.p2_score : matchData.p1_score;
-   const myAnswers = isP1 ? matchData.p1_answers : matchData.p2_answers;
 
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;

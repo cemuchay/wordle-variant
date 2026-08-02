@@ -562,15 +562,14 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   onPause={async () => {
                      const state = useLiveStore.getState();
                      if (state.matchId && state.questions && state.questions.length > 0) {
-                        const isP1 = state.role === "player1";
                         const updatedMatchData = {
                            ...(state.matchData || matchDataFromStore || {}),
                            category: state.category || category || "mixed",
                            is_bot_match: true,
                            allow_pause: true,
                            current_question_index: state.currentIdx || 0,
-                           p1_score: isP1 ? (engine.myScore ?? state.matchData?.p1_score ?? 0) : (engine.opponentScore ?? state.matchData?.p1_score ?? 0),
-                           p2_score: isP1 ? (engine.opponentScore ?? state.matchData?.p2_score ?? 0) : (engine.myScore ?? state.matchData?.p2_score ?? 0),
+                           p1_score: state.matchData?.p1_score ?? 0,
+                           p2_score: state.matchData?.p2_score ?? 0,
                            status: "paused",
                         };
 
