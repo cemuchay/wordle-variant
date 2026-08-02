@@ -887,14 +887,20 @@ export function useGameEngine(props: EngineProps) {
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
-            if (isBotMatchId(mId)) {
+            const storeQuestions = useLiveStore.getState().questions;
+            const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
+            const storeOppStats = useLiveStore.getState().opponentStats;
+
+            if (storeQuestions && storeQuestions.length > 0 && storeMatchData) {
+                questions = storeQuestions;
+                matchData = storeMatchData;
+                oppStats = storeOppStats;
+            } else if (isBotMatchId(mId)) {
                 const category = useLiveStore.getState().category || "mixed";
-                const storeQuestions = useLiveStore.getState().questions;
-                const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
-                const targetRounds = storeQuestions?.length || (storeMatchData?.total_rounds as number | undefined) || 7;
+                const targetRounds = (storeMatchData?.total_rounds as number | undefined) || 7;
                 const prefetched = getPrefetchedBotMatch(category, targetRounds);
 
-                matchData = storeMatchData || {
+                matchData = {
                     id: prefetched ? prefetched.matchId : mId,
                     category,
                     status: "active",
@@ -909,9 +915,7 @@ export function useGameEngine(props: EngineProps) {
                     p2_score: 0,
                 };
 
-                if (storeQuestions && storeQuestions.length > 0) {
-                    questions = storeQuestions;
-                } else if (prefetched) {
+                if (prefetched) {
                     mId = prefetched.matchId;
                     questions = prefetched.questions;
                     encryptedQuestionsRef.current = prefetched.encryptedQuestions;
