@@ -1,23 +1,23 @@
-import { useState, useEffect, useRef, Fragment } from "react";
-import { motion } from "framer-motion";
 import type { TargetAndTransition, Transition } from "framer-motion";
-import { AlertTriangle, Volume2, VolumeX } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertTriangle, PauseCircle, Volume2, VolumeX } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useConfirmation } from "../../../hooks/useConfirmation";
 import { BOT_PROFILES, type WordUpQuestion } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
-import { useConfirmation } from "../../../hooks/useConfirmation";
 import FormulaRenderer from "../../shared/FormulaRenderer";
 import { PreloadedImage } from "../../shared/PreloadedImage";
 import { type ProfileStats } from "../../shared/types";
 
 
-import { getQuestionDuration } from "../hooks/useGameEngine.core";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
-import { WORDUP_GAME, CONFETTI, PROMPT_FONT_SIZE, CHOICE_FONT_SIZE } from "../../../constants/wordup";
+import { CHOICE_FONT_SIZE, CONFETTI, PROMPT_FONT_SIZE, WORDUP_GAME } from "../../../constants/wordup";
 import { CircularTimer } from "../../shared/CircularTimer";
+import { GameStatusToast } from "../../shared/GameStatusToast";
 import { ScoreBar } from "../../shared/ScoreBar";
 import { SignalBar } from "../../shared/SignalBar";
-import { GameStatusToast } from "../../shared/GameStatusToast";
 import { CATEGORIES } from "../../shared/constants";
+import { getQuestionDuration } from "../hooks/useGameEngine.core";
 
 interface MatchData {
    p1_score?: number;
@@ -95,7 +95,10 @@ export const BattleView = ({
 }: BattleViewProps) => {
    const [particles, setParticles] = useState<Particle[]>([]);
    const [imgErrorMap, setImgErrorMap] = useState<Record<string, boolean>>({});
+   const [isSavingPause, setIsSavingPause] = useState(false);
    const { ask } = useConfirmation();
+
+
 
    useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -332,14 +335,25 @@ export const BattleView = ({
                   <span>{soundEnabled ? "Mute" : "Sound"}</span>
                </button>
             )}
-            {matchData?.allow_pause && onPause && (
-               <button
-                  onClick={onPause}
-                  className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm"
-               >
-                  <span>Pause</span>
-               </button>
-            )}
+             {matchData?.allow_pause && onPause && (
+                <button
+                   disabled={isSavingPause}
+                   onClick={async () => {
+                      if (isSavingPause) return;
+                      setIsSavingPause(true);
+                      try {
+                         await onPause();
+                      } catch (e) {
+                         console.warn("[BattleView] Pause error:", e);
+                         setIsSavingPause(false);
+                      }
+                   }}
+                   className="flex items-center gap-1 bg-amber-950/40 border border-amber-500/30 text-amber-400 hover:bg-amber-950/60 px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                   <PauseCircle size={12} className={isSavingPause ? "animate-spin" : ""} />
+                   <span>{isSavingPause ? "Saving..." : "Pause"}</span>
+                </button>
+             )}
             <button
                onClick={async () => {
                   const confirmed = await ask({
@@ -640,6 +654,45 @@ export const BattleView = ({
                );
             })}
          </div>
+
+         {/* Saving / Transition Overlay on Pause */}
+         <AnimatePresence>
+            {isSavingPause && (
+               <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md text-white text-center"
+               >
+                  <motion.div
+                     initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                     animate={{ scale: 1, opacity: 1, y: 0 }}
+                     className="bg-[#18181b] border border-amber-500/40 rounded-3xl p-8 max-w-xs w-full shadow-2xl space-y-4 flex flex-col items-center relative overflow-hidden"
+                  >
+                     <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                     <div className="relative w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <PauseCircle className="w-8 h-8 animate-pulse" />
+                        <div className="absolute inset-0 rounded-2xl border-2 border-amber-400/40 animate-ping" />
+                     </div>
+
+                     <div className="space-y-1">
+                        <h3 className="text-lg font-black uppercase tracking-wider text-amber-400">
+                           Match Paused
+                        </h3>
+                        <p className="text-xs text-white/70 font-semibold leading-relaxed">
+                           Saving match snapshot & updating database...
+                        </p>
+                     </div>
+
+                     <div className="flex items-center gap-2 pt-2 text-[10px] font-black uppercase tracking-widest text-amber-300/80">
+                        <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                        <span>Returning to lobby...</span>
+                     </div>
+                  </motion.div>
+               </motion.div>
+            )}
+         </AnimatePresence>
       </motion.div>
    );
 };

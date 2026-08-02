@@ -6,6 +6,7 @@ import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { getCachedFlagUrl } from "../../../utils/wordupQuestionPostProcessor";
 import { ProtectedAvatar } from "../../../components/chat/ProtectedAvatar";
 import { useApp } from "../../../context/AppContext";
+import { calculateMatchRewards } from "../../shared/xpCalculator";
 
 interface GameOverViewProps {
    matchData: any;
@@ -46,7 +47,6 @@ export const GameOverView = ({
    const isP1 = role === "player1";
    const myScore = isP1 ? matchData.p1_score : matchData.p2_score;
    const oppScore = isP1 ? matchData.p2_score : matchData.p1_score;
-   const myAnswers = isP1 ? matchData.p1_answers : matchData.p2_answers;
 
    const isWinner = myScore > oppScore;
    const isDraw = myScore === oppScore;
@@ -103,18 +103,33 @@ export const GameOverView = ({
 
          {/* Rewards and Elo changes */}
          {(() => {
-            const gameMultiplier = Math.max(1, Math.round((questions?.length || matchData.total_rounds || 7) / 7));
-            const xpEarned = (50 * gameMultiplier) + (isWinner ? 100 * gameMultiplier : 0) + (((myAnswers || []).filter((a: any) => a.correct).length) * 10);
-            const eloChange = isWinner ? (18 * gameMultiplier) : isDraw ? (2 * gameMultiplier) : (-12 * gameMultiplier);
-            const formattedElo = eloChange >= 0 ? `+${eloChange}` : `${eloChange}`;
+            const rewards = calculateMatchRewards(matchData, role, questions?.length);
+            const formattedElo = rewards.totalEloChange >= 0 ? `+${rewards.totalEloChange}` : `${rewards.totalEloChange}`;
             return (
-               <div className={`border rounded-2xl p-4 text-center space-y-1 ${statusColor}`}>
+               <div className={`border rounded-2xl p-4 text-center space-y-2 ${statusColor}`}>
                   <p className="text-xs font-bold uppercase tracking-wider">
                      Rating Change: {formattedElo} Elo Rating
                   </p>
-                  <p className="text-[10px] text-white/60 uppercase font-black">
-                     Earned: +{xpEarned} XP
+                  <p className="text-[10px] text-white/80 uppercase font-black">
+                     Earned: +{rewards.totalXpEarned} XP
                   </p>
+                  {rewards.subGameCount > 1 && (
+                     <div className="pt-2 border-t border-white/10 space-y-1.5 text-left">
+                        <p className="text-[10px] text-white/50 font-black uppercase tracking-wider text-center">
+                           Marathon Split ({rewards.subGameCount} Single Games)
+                        </p>
+                        <div className="grid grid-cols-1 gap-1 text-[10px] font-bold">
+                           {rewards.subGames.map((sg: any) => (
+                              <div key={sg.gameIndex} className="flex justify-between items-center bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                 <span>Game {sg.gameIndex + 1} (Rounds {sg.roundRange[0]}-{sg.roundRange[1]}): <span className="text-white/60">{sg.myScore} vs {sg.oppScore} pts</span></span>
+                                 <span className={sg.outcome === "win" ? "text-correct font-extrabold" : sg.outcome === "draw" ? "text-yellow-500 font-extrabold" : "text-red-400 font-extrabold"}>
+                                    {sg.outcome === "win" ? `+${sg.eloChange} Elo` : sg.outcome === "draw" ? `+${sg.eloChange} Elo` : `${sg.eloChange} Elo`}
+                                 </span>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                  )}
                </div>
             );
          })()}

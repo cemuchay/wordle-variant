@@ -18,6 +18,7 @@ import {
 import { gameEngineReducer, initialState } from "./useGameEngine.types";
 import { GRACE_DECAY } from "@/wordup/shared/constants";
 import { TOAST_DURATION } from "../../../constants/ui";
+import { removePausedGame } from "../../shared/pauseStorage";
 
 function getQuestionDuration(type: string): number {
    return QUESTION_DURATION[type] ?? QUESTION_DURATION.default;
@@ -837,6 +838,7 @@ export function useGameEngine(props: EngineProps) {
    const abortMatch = useCallback(() => {
       cleanup();
       if (matchId) {
+         removePausedGame(matchId);
          wordupNetworkGate
             .enqueue("put", "abort async match", async () => {
                const { error } = await supabase

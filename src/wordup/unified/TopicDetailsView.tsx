@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Flame } from "lucide-react";
+import { Swords, UserPlus, Search, Trophy, ChevronLeft, Play, Users, Flame, PauseCircle, Trash2 } from "lucide-react";
 import { CATEGORIES } from "../shared/constants";
 import { CATEGORY_STYLE_MAP, DEFAULT_STYLE } from "../shared/categorySelectConstants";
 import { type ProfileStats } from "../shared/types";
+import { type PausedMatch } from "../shared/pauseStorage";
 import { RankingView } from "../shared/RankingView";
 import { ProtectedAvatar } from "../../components/chat/ProtectedAvatar";
 import { supabase } from "../../lib/supabaseClient";
@@ -25,6 +25,9 @@ interface TopicDetailsViewProps {
    onChallengePlayer: (targetUser: any) => void;
    onPlayBot: () => void;
    onPlayMarathon?: () => void;
+   pausedMatches?: PausedMatch[];
+   onResumePausedMatch?: (paused: PausedMatch) => void;
+   onDiscardPausedMatch?: (matchId: string) => void;
 }
 
 export const TopicDetailsView = ({
@@ -38,6 +41,9 @@ export const TopicDetailsView = ({
    onChallengePlayer,
    onPlayBot,
    onPlayMarathon,
+   pausedMatches = [],
+   onResumePausedMatch,
+   onDiscardPausedMatch,
 }: TopicDetailsViewProps) => {
    const [activeSection, setActiveSection] = useState<"play" | "rankings">("play");
    const [playerSearch, setPlayerSearch] = useState("");
@@ -131,6 +137,8 @@ export const TopicDetailsView = ({
 
    const categoryObj = CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0];
    const style = CATEGORY_STYLE_MAP[categoryId] || DEFAULT_STYLE;
+
+   const topicPausedMatches = (pausedMatches || []).filter((pm) => pm.categoryId === categoryId);
 
    // Filter out current user and match username query
    const filteredPlayers = (allProfiles || []).filter((p: any) =>
@@ -246,6 +254,42 @@ export const TopicDetailsView = ({
 
                      {/* RIGHT COLUMN: Action Buttons & Collapsible Challenge Panel */}
                      <div className="space-y-4">
+                        {/* Topic Paused Match Card */}
+                        {topicPausedMatches.map((pm) => {
+                           const isP1 = pm.role === "player1";
+                           const myScore = isP1 ? (pm.matchData?.p1_score || 0) : (pm.matchData?.p2_score || 0);
+                           const oppScore = isP1 ? (pm.matchData?.p2_score || 0) : (pm.matchData?.p1_score || 0);
+                           const totalQ = pm.questions?.length || 7;
+
+                           return (
+                              <div key={pm.matchId} className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-4 space-y-2 shadow-lg">
+                                 <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-amber-400">
+                                       <PauseCircle size={20} />
+                                       <span className="text-xs font-black uppercase tracking-wider">Paused Game in Progress</span>
+                                    </div>
+                                    <button
+                                       onClick={() => onDiscardPausedMatch?.(pm.matchId)}
+                                       className="p-1 bg-white/5 hover:bg-white/10 text-white/40 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
+                                       title="Discard Match"
+                                    >
+                                       <Trash2 size={14} />
+                                    </button>
+                                 </div>
+                                 <p className="text-[11px] text-amber-200 font-bold uppercase">
+                                    Paused at Round {pm.currentIdx + 1}/{totalQ} • Score: {myScore} - {oppScore} pts
+                                 </p>
+                                 <button
+                                    onClick={() => onResumePausedMatch?.(pm)}
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 tracking-widest shadow-md transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                                 >
+                                    <Play size={16} fill="black" />
+                                    <span>Resume Paused Game</span>
+                                 </button>
+                              </div>
+                           );
+                        })}
+
                         <div className="space-y-3">
                            <button
                               onClick={onPlayLive}

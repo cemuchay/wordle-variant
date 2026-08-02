@@ -33,6 +33,8 @@ import {
     encryptQuestions,
     simulateBotResponse,
 } from "../../../utils/wordupQuestionGenerator";
+import { isBotMatchId, cleanBotMatchId } from "../../shared/botUtils";
+import { removePausedGame } from "../../shared/pauseStorage";
 import { preloadMatchImages } from "../../../utils/wordupQuestionPostProcessor";
 import { BOT_PROFILES } from "../../../utils/wordupQuestionGenerator";
 import { safeLocalStorage } from "../../../utils/storage";
@@ -337,6 +339,10 @@ export function useGameEngine(props: EngineProps) {
         setOpponentScore((s) => s + opponentCurrentPointsRef.current);
 
         setCurrentRound(next);
+        myChoiceRef.current = null;
+        opponentChoiceRef.current = null;
+        myCurrentPointsRef.current = 0;
+        opponentCurrentPointsRef.current = 0;
         setMyChoice(null);
         setOpponentChoice(null);
         setMyCurrentPoints(0);
@@ -450,8 +456,11 @@ export function useGameEngine(props: EngineProps) {
     useEffect(() => {
         if (phase !== "countdown") return;
 
+        const targetRound = (matchDataRef.current?.current_question_index as number | undefined) ?? useLiveStore.getState().currentIdx ?? 0;
+        const isResuming = targetRound > 0;
+
         Promise.resolve().then(() => {
-            setCountdownText("3");
+            setCountdownText(isResuming ? "Resuming in 3..." : "3");
         });
         wordupAudio.playCountdownTick(3);
         let count = 3;
@@ -462,20 +471,27 @@ export function useGameEngine(props: EngineProps) {
                 stopCountdown();
                 wordupAudio.playGameStart();
 
-                // Start the first round
-                setCurrentRound(0);
+                // Start the round (0 if new game, targetRound if resuming)
+                setCurrentRound(targetRound);
+                currentRoundRef.current = targetRound;
+                useLiveStore.getState().setCurrentIdx(targetRound);
+
+                myChoiceRef.current = null;
+                opponentChoiceRef.current = null;
+                myCurrentPointsRef.current = 0;
+                opponentCurrentPointsRef.current = 0;
                 setMyChoice(null);
                 setOpponentChoice(null);
                 setMyCurrentPoints(0);
                 setOpponentCurrentPoints(0);
-                const q = questionsRef.current[0];
+                const q = questionsRef.current[targetRound];
                 const dur = q ? getQuestionDuration(q.type) : 10;
                 setTimeRemaining(dur);
                 setMaxTime(dur);
                 roundStartedAtRef.current = Date.now();
                 setPhase("playing");
             } else {
-                setCountdownText(String(count));
+                setCountdownText(isResuming ? `Resuming in ${count}...` : String(count));
                 wordupAudio.playCountdownTick(count);
             }
         }, 1000);
@@ -659,7 +675,14 @@ export function useGameEngine(props: EngineProps) {
     const handleAnswerSelect = useCallback((choice: string) => {
         if (myChoiceRef.current !== null || phaseRef.current !== "playing") return;
 
-        const q = questionsRef.current[currentRoundRef.current];
+        let q = questionsRef.current[currentRoundRef.current];
+        if (!q) {
+            const storeQ = useLiveStore.getState().questions;
+            if (storeQ && storeQ.length > 0) {
+                questionsRef.current = storeQ;
+                q = storeQ[currentRoundRef.current];
+            }
+        }
         if (!q) return;
 
         const duration = getQuestionDuration(q.type);
@@ -669,6 +692,7 @@ export function useGameEngine(props: EngineProps) {
         const pts = calcPoints(correct, timeTaken, duration, (currentRoundRef.current + 1) % 7 === 0);
 
         myTimeTakenRef.current = timeTaken;
+        myChoiceRef.current = choice;
         setMyChoice(choice);
         setMyCurrentPoints(pts);
 
@@ -705,6 +729,7 @@ export function useGameEngine(props: EngineProps) {
                 (currentRoundRef.current + 1) % 7 === 0,
             );
             opponentTimeTakenRef.current = br.time_taken;
+            opponentChoiceRef.current = botChoice;
             setOpponentChoice(botChoice);
             setOpponentCurrentPoints(botPts);
         }
@@ -815,21 +840,30 @@ export function useGameEngine(props: EngineProps) {
     const abortMatch = useCallback(async () => {
         stopAllTimers();
         const mId = useLiveStore.getState().matchId;
-        if (mId && !mId.startsWith("bot-match-")) {
-            if (channelRef.current) {
+        const isBot = isBotMatchId(mId);
+        const dbId = cleanBotMatchId(mId);
+
+        if (mId) {
+            removePausedGame(mId);
+            if (dbId) {
+                removePausedGame(dbId);
+            }
+            if (!isBot && channelRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
                     event: "match_abandoned",
                     payload: { role: roleRef.current }
                 });
             }
-            try {
-                await supabase
-                    .from("wordup_matches")
-                    .update({ status: "abandoned" })
-                    .eq("id", mId);
-            } catch (e) {
-                console.error("Failed to mark match as abandoned in DB:", e);
+            if (dbId) {
+                try {
+                    await supabase
+                        .from("wordup_matches")
+                        .update({ status: "abandoned" })
+                        .eq("id", dbId);
+                } catch (e) {
+                    console.error("Failed to mark match as abandoned in DB:", e);
+                }
             }
         }
         setPhase("idle");
@@ -853,14 +887,20 @@ export function useGameEngine(props: EngineProps) {
             let matchData: Record<string, unknown>;
             let oppStats: ProfileStats | null = null;
 
-            if (mId.startsWith("bot-match-") || mId.startsWith("bot-marathon-")) {
+            const storeQuestions = useLiveStore.getState().questions;
+            const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
+            const storeOppStats = useLiveStore.getState().opponentStats;
+
+            if (storeQuestions && storeQuestions.length > 0 && storeMatchData) {
+                questions = storeQuestions;
+                matchData = storeMatchData;
+                oppStats = storeOppStats;
+            } else if (isBotMatchId(mId)) {
                 const category = useLiveStore.getState().category || "mixed";
-                const storeQuestions = useLiveStore.getState().questions;
-                const storeMatchData = useLiveStore.getState().matchData as Record<string, unknown> | null;
-                const targetRounds = storeQuestions?.length || (storeMatchData?.total_rounds as number | undefined) || 7;
+                const targetRounds = (storeMatchData?.total_rounds as number | undefined) || 7;
                 const prefetched = getPrefetchedBotMatch(category, targetRounds);
 
-                matchData = storeMatchData || {
+                matchData = {
                     id: prefetched ? prefetched.matchId : mId,
                     category,
                     status: "active",
@@ -875,9 +915,7 @@ export function useGameEngine(props: EngineProps) {
                     p2_score: 0,
                 };
 
-                if (storeQuestions && storeQuestions.length > 0) {
-                    questions = storeQuestions;
-                } else if (prefetched) {
+                if (prefetched) {
                     mId = prefetched.matchId;
                     questions = prefetched.questions;
                     encryptedQuestionsRef.current = prefetched.encryptedQuestions;
@@ -885,7 +923,7 @@ export function useGameEngine(props: EngineProps) {
                 } else {
                     // fall back to generate on the fly
                     if (isProceduralCategory(category)) {
-                        const cleanId = mId.startsWith("bot-match-") ? mId.slice(10) : mId;
+                        const cleanId = cleanBotMatchId(mId);
                         cleanIdRef.current = cleanId;
                         const seed = `${cleanId}-${category}`;
                         const { data: edgeData } = await supabase.functions.invoke(
@@ -1042,9 +1080,20 @@ export function useGameEngine(props: EngineProps) {
             useLiveStore.getState().setOpponentStats(oppStats);
             useLiveStore.getState().setQuestions(questions);
 
-            // Reset scores and choices for new game
-            setMyScore(0);
-            setOpponentScore(0);
+            // Initialize scores from matchData (0 for new games, restored scores for resumed games)
+            const isP1 = activeRole === "player1";
+            const initialMyScore = isP1 ? ((matchData?.p1_score as number) || 0) : ((matchData?.p2_score as number) || 0);
+            const initialOppScore = isP1 ? ((matchData?.p2_score as number) || 0) : ((matchData?.p1_score as number) || 0);
+
+            setMyScore(initialMyScore);
+            setOpponentScore(initialOppScore);
+            myScoreRef.current = initialMyScore;
+            opponentScoreRef.current = initialOppScore;
+
+            myChoiceRef.current = null;
+            opponentChoiceRef.current = null;
+            myCurrentPointsRef.current = 0;
+            opponentCurrentPointsRef.current = 0;
             setMyCurrentPoints(0);
             setOpponentCurrentPoints(0);
             setMyChoice(null);
@@ -1053,7 +1102,7 @@ export function useGameEngine(props: EngineProps) {
 
             // Enforce visual buffer so the user can see their opponent
             const elapsed = Date.now() - loadStart;
-            const bufferDuration = mId.startsWith("bot-match-") ? 300 : 800;
+            const bufferDuration = isBotMatchId(mId) ? 300 : 800;
             const remainingDelay = Math.max(0, bufferDuration - elapsed);
             if (remainingDelay > 0) {
                 await new Promise((resolve) => setTimeout(resolve, remainingDelay));
@@ -1068,7 +1117,7 @@ export function useGameEngine(props: EngineProps) {
                 channelRef.current = null;
             }
 
-            if (!mId.startsWith("bot-match-")) {
+            if (!isBotMatchId(mId)) {
                 const channelName = `wordup_match_${mId}`;
                 const ch = supabase.channel(channelName);
 

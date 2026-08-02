@@ -40,9 +40,9 @@ export const CircularTimer = ({
          const elapsed = (Date.now() - startTimeRef.current) / 1000;
          const remaining = Math.max(0, maxTime - elapsed);
          setDisplayTime(remaining);
-          if (remaining <= 0 && intervalRef.current !== null) {
-             window.clearInterval(intervalRef.current);
-          }
+         if (remaining <= 0 && intervalRef.current !== null) {
+            window.clearInterval(intervalRef.current);
+         }
       }, 100);
 
       return () => {
