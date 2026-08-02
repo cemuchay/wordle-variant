@@ -675,7 +675,14 @@ export function useGameEngine(props: EngineProps) {
     const handleAnswerSelect = useCallback((choice: string) => {
         if (myChoiceRef.current !== null || phaseRef.current !== "playing") return;
 
-        const q = questionsRef.current[currentRoundRef.current];
+        let q = questionsRef.current[currentRoundRef.current];
+        if (!q) {
+            const storeQ = useLiveStore.getState().questions;
+            if (storeQ && storeQ.length > 0) {
+                questionsRef.current = storeQ;
+                q = storeQ[currentRoundRef.current];
+            }
+        }
         if (!q) return;
 
         const duration = getQuestionDuration(q.type);
