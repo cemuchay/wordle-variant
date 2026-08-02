@@ -14,6 +14,7 @@ import { wordupAudio } from "../utils/wordupAudio";
 import { useWordUpStore } from "../store/useWordUpStore";
 import { TOAST_DURATION } from "../constants/ui";
 import { MarathonConfigModal } from "./shared/MarathonConfigModal";
+import { PausedMatch, getPausedGames, removePausedGame } from "./shared/pauseStorage";
 
 import { useTheme } from "../hooks/useTheme";
 
@@ -47,11 +48,34 @@ export const WordUpContainer = ({
    const { loadPendingMatches } = useAsyncMatchmaking(effectiveUser, "mixed", triggerToast);
 
    const [pendingMatches, setPendingMatches] = useState<any[]>([]);
+   const [pausedMatches, setPausedMatches] = useState<PausedMatch[]>(() => getPausedGames());
    const [soundEnabled, setSoundEnabled] = useState(() => wordupAudio.isEnabled());
    const [showSoundPrompt, setShowSoundPrompt] = useState(false);
    const [lastCategory, setLastCategory] = useState<string | null>(null);
    const [marathonConfigModalOpen, setMarathonConfigModalOpen] = useState(false);
    const [marathonConfigCategory, setMarathonConfigCategory] = useState<string>("mixed");
+
+   const refreshPausedMatches = useCallback(() => {
+      setPausedMatches(getPausedGames());
+   }, []);
+
+   const handleResumePausedMatch = useCallback((paused: PausedMatch) => {
+      const liveStore = useLiveStore.getState();
+      liveStore.resetGame();
+      liveStore.setCategory(paused.categoryId);
+      liveStore.setMatchId(paused.matchId);
+      liveStore.setRole(paused.role || "player1");
+      liveStore.setMatchData(paused.matchData);
+      liveStore.setQuestions(paused.questions);
+      liveStore.setCurrentIdx(paused.currentIdx);
+      liveStore.setView("battle");
+      setWordupMode("live");
+   }, [setWordupMode]);
+
+   const handleDiscardPausedMatch = useCallback((matchId: string) => {
+      removePausedGame(matchId);
+      refreshPausedMatches();
+   }, [refreshPausedMatches]);
 
    const handleConfirmMarathon = useCallback(async (config: {
       totalGames: number;
@@ -235,11 +259,12 @@ export const WordUpContainer = ({
    }, []);
 
    const refreshPending = useCallback(async () => {
+      refreshPausedMatches();
       if (effectiveUser) {
          const pending = await loadPendingMatches();
          setPendingMatches(pending);
       }
-   }, [effectiveUser, loadPendingMatches]);
+   }, [effectiveUser, loadPendingMatches, refreshPausedMatches]);
 
    useEffect(() => {
       Promise.resolve().then(() => {
@@ -352,6 +377,9 @@ export const WordUpContainer = ({
                onPlayAsync={handlePlayAsync}
                onPlayAsyncTurn={handlePlayAsyncTurn}
                pendingMatches={pendingMatches}
+               pausedMatches={pausedMatches}
+               onResumePausedMatch={handleResumePausedMatch}
+               onDiscardPausedMatch={handleDiscardPausedMatch}
                onRefreshPending={refreshPending}
                onBackToClassic={onBackToClassic}
                onTutorial={onTutorial}

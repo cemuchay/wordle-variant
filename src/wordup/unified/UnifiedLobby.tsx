@@ -4,9 +4,11 @@ import {
    Clock,
    Home,
    Loader2,
+   PauseCircle,
    Play,
    Search,
    Swords,
+   Trash2,
    Trophy,
    UserPlus,
    Volume2, VolumeX
@@ -19,6 +21,7 @@ import { CategorySelectModal } from "../shared/CategorySelectModal";
 import { CATEGORIES } from "../shared/constants";
 import { RankingView } from "../shared/RankingView";
 import { type ProfileStats } from "../shared/types";
+import { type PausedMatch } from "../shared/pauseStorage";
 import ActivityFeed from "./components/ActivityFeed";
 import ProfileSummaryCard from "./components/ProfileSummaryCard";
 import { TopicDetailsView } from "./TopicDetailsView";
@@ -39,6 +42,9 @@ interface UnifiedLobbyProps {
    onPlayAsync: (targetUser: any, catId: string) => void;
    onPlayAsyncTurn: (match: any) => void;
    pendingMatches: any[];
+   pausedMatches?: PausedMatch[];
+   onResumePausedMatch?: (paused: PausedMatch) => void;
+   onDiscardPausedMatch?: (matchId: string) => void;
    onRefreshPending: () => void;
    onBackToClassic?: () => void;
    onTutorial?: () => void;
@@ -66,6 +72,9 @@ export const UnifiedLobby = ({
    onPlayAsync,
    onPlayAsyncTurn,
    pendingMatches,
+   pausedMatches = [],
+   onResumePausedMatch,
+   onDiscardPausedMatch,
    onBackToClassic,
    onTutorial,
    restoreCategory,
@@ -211,6 +220,9 @@ export const UnifiedLobby = ({
             onChallengePlayer={onPlayAsyncTurn}
             onPlayBot={() => onPlayLive(selectedCategoryId, true)}
             onPlayMarathon={() => onPlayMarathon?.(selectedCategoryId)}
+            pausedMatches={pausedMatches}
+            onResumePausedMatch={onResumePausedMatch}
+            onDiscardPausedMatch={onDiscardPausedMatch}
          />
       );
    }
@@ -375,6 +387,57 @@ export const UnifiedLobby = ({
                         userStats={userStats}
                         currentUser={currentUser}
                         getRankColor={getRankColor} />
+
+                     {/* Paused Games Section */}
+                     {pausedMatches && pausedMatches.length > 0 && (
+                        <div className="space-y-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 shadow-lg">
+                           <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-amber-400">
+                                 <PauseCircle size={18} />
+                                 <h3 className="text-xs font-black uppercase tracking-wider">Paused Games In Progress</h3>
+                              </div>
+                              <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-md">
+                                 {pausedMatches.length} Paused
+                              </span>
+                           </div>
+                           <div className="space-y-2">
+                              {pausedMatches.map((pm) => {
+                                 const catObj = CATEGORIES.find((c) => c.id === pm.categoryId) || CATEGORIES[0];
+                                 const isP1 = pm.role === "player1";
+                                 const myScore = isP1 ? (pm.matchData?.p1_score || 0) : (pm.matchData?.p2_score || 0);
+                                 const oppScore = isP1 ? (pm.matchData?.p2_score || 0) : (pm.matchData?.p1_score || 0);
+                                 const totalQ = pm.questions?.length || 7;
+
+                                 return (
+                                    <div key={pm.matchId} className="bg-black/40 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between gap-3">
+                                       <div className="min-w-0 flex-1">
+                                          <p className="text-xs font-black text-white truncate uppercase tracking-wider">{catObj.name}</p>
+                                          <p className="text-[10px] text-amber-300 font-bold uppercase mt-0.5">
+                                             Round {pm.currentIdx + 1}/{totalQ} • Score: {myScore} - {oppScore} pts
+                                          </p>
+                                       </div>
+                                       <div className="flex items-center gap-1.5 shrink-0">
+                                          <button
+                                             onClick={() => onResumePausedMatch?.(pm)}
+                                             className="bg-amber-500 hover:bg-amber-600 text-black font-black uppercase text-[10px] tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-md flex items-center gap-1"
+                                          >
+                                             <Play size={12} fill="black" />
+                                             <span>Resume</span>
+                                          </button>
+                                          <button
+                                             onClick={() => onDiscardPausedMatch?.(pm.matchId)}
+                                             className="p-1.5 bg-white/5 hover:bg-white/10 text-white/50 hover:text-red-400 rounded-xl border border-white/10 transition-colors cursor-pointer"
+                                             title="Discard Game"
+                                          >
+                                             <Trash2 size={13} />
+                                          </button>
+                                       </div>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     )}
 
                      {/* Frequently Used Topics */}
                      {frequentCategories.length > 0 && (

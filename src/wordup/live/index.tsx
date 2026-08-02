@@ -23,6 +23,7 @@ import { VSPreview } from "../shared/VSPreview";
 import { ConnectionOverlay } from "../shared/ConnectionOverlay";
 import { ConnectingView } from "./components/ConnectingView";
 import { safeLocalStorage } from "../../utils/storage";
+import { savePausedGame, removePausedGame } from "../shared/pauseStorage";
 
 import { RATING, XP, WORDUP_TIMEOUT, WORDUP_LIMITS, BOT_PROFILES_RATINGS } from "../../constants/wordup";
 import { useLiveStore } from "./store/useLiveStore";
@@ -90,6 +91,7 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
    const onGameOver = useCallback(async (match: any) => {
       if (useLiveStore.getState().view === "gameover") return;
       setView("gameover");
+      if (match?.id) removePausedGame(match.id);
 
       if (!effectiveUser) return;
       const isP1 = role === "player1";
@@ -561,6 +563,18 @@ export const LiveView = ({ onBack, onSwitchMode, onTutorial, onBackToClassic }: 
                   playerSignalLevel={playerSignalLevel}
                   opponentSignalLevel={matchDataFromStore?.is_bot_match ? playerSignalLevel : engine.opponentSignalLevel}
                   onPause={() => {
+                     const state = useLiveStore.getState();
+                     if (state.matchId && state.questions && state.questions.length > 0) {
+                        savePausedGame({
+                           matchId: state.matchId,
+                           categoryId: state.category || category || "mixed",
+                           currentIdx: state.currentIdx || 0,
+                           role: state.role,
+                           matchData: state.matchData || matchDataFromStore,
+                           questions: state.questions,
+                           pausedAt: Date.now(),
+                        });
+                     }
                      resetGame();
                      onBack?.();
                   }}

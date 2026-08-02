@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Flame, Play, PauseCircle } from "lucide-react";
@@ -124,11 +125,10 @@ export const MarathonConfigModal = ({
                            key={g}
                            type="button"
                            onClick={() => setTotalGames(g)}
-                           className={`py-3 rounded-2xl font-black text-xs transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${
-                              totalGames === g
+                           className={`py-3 rounded-2xl font-black text-xs transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${totalGames === g
                                  ? "bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105"
                                  : "bg-white/5 hover:bg-white/10 text-white/80 border-white/10"
-                           }`}
+                              }`}
                         >
                            <span className="text-sm">{g}x</span>
                            <span className="text-[8px] opacity-75 font-bold uppercase">{g * 7} Qs</span>
@@ -149,22 +149,20 @@ export const MarathonConfigModal = ({
                            setMode("live_bot");
                            setSelectedTargetUser(null);
                         }}
-                        className={`py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border flex items-center justify-center gap-2 ${
-                           mode === "live_bot"
+                        className={`py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border flex items-center justify-center gap-2 ${mode === "live_bot"
                               ? "bg-blue-600 text-white border-blue-400 shadow-md"
                               : "bg-white/5 hover:bg-white/10 text-white/60 border-white/10"
-                        }`}
+                           }`}
                      >
                         <span>🤖 vs Bot</span>
                      </button>
                      <button
                         type="button"
                         onClick={() => setMode("async")}
-                        className={`py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border flex items-center justify-center gap-2 ${
-                           mode === "async"
+                        className={`py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border flex items-center justify-center gap-2 ${mode === "async"
                               ? "bg-[#E85151] text-white border-red-400 shadow-md"
                               : "bg-white/5 hover:bg-white/10 text-white/60 border-white/10"
-                        }`}
+                           }`}
                      >
                         <span>👥 1v1 Async</span>
                      </button>
@@ -190,11 +188,10 @@ export const MarathonConfigModal = ({
                               <div
                                  key={p.id}
                                  onClick={() => setSelectedTargetUser(p)}
-                                 className={`p-2 rounded-lg text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
-                                    selectedTargetUser?.id === p.id
+                                 className={`p-2 rounded-lg text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${selectedTargetUser?.id === p.id
                                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                                        : "hover:bg-white/5 text-white/80"
-                                 }`}
+                                    }`}
                               >
                                  <span>{p.username}</span>
                                  {selectedTargetUser?.id === p.id && <span className="text-[10px] text-amber-400 font-black">SELECTED</span>}
@@ -224,9 +221,8 @@ export const MarathonConfigModal = ({
                   <button
                      type="button"
                      onClick={() => setAllowPause(!allowPause)}
-                     className={`w-12 h-6 rounded-full transition-colors p-1 cursor-pointer flex items-center ${
-                        allowPause ? "bg-amber-500 justify-end" : "bg-white/20 justify-start"
-                     }`}
+                     className={`w-12 h-6 rounded-full transition-colors p-1 cursor-pointer flex items-center ${allowPause ? "bg-amber-500 justify-end" : "bg-white/20 justify-start"
+                        }`}
                   >
                      <motion.div
                         layout
@@ -240,11 +236,10 @@ export const MarathonConfigModal = ({
                   type="button"
                   onClick={handleStart}
                   disabled={mode === "async" && !selectedTargetUser}
-                  className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                     mode === "async" && !selectedTargetUser
+                  className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${mode === "async" && !selectedTargetUser
                         ? "bg-gray-700 text-white/40 cursor-not-allowed"
                         : "bg-linear-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 text-white hover:scale-102 active:scale-98"
-                  }`}
+                     }`}
                >
                   <Play size={16} fill="white" />
                   <span>Start Extended Game ({totalQuestions} Rounds)</span>
